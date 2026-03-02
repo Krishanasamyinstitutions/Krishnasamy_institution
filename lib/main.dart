@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/supabase_config.dart';
 import 'utils/app_theme.dart';
 import 'utils/app_routes.dart';
 import 'utils/auth_provider.dart';
-import 'screens/splash/splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
+
   runApp(
     MultiProvider(
       providers: [

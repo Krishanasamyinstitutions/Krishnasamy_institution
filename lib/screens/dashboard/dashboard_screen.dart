@@ -10,6 +10,8 @@ import '../../widgets/attendance_chart.dart';
 import '../../widgets/recent_activities.dart';
 import '../../widgets/upcoming_events.dart';
 import '../../widgets/quick_actions.dart';
+import '../../services/supabase_service.dart';
+import '../../models/fee_model.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,6 +23,12 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
+
+  // Supabase data
+  int _studentCount = 0;
+  int _teacherCount = 0;
+  FeeSummary? _feeSummary;
+  bool _isLoadingStats = true;
 
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -34,6 +42,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.settings_rounded, 'Settings'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+
+    setState(() => _isLoadingStats = true);
+
+    final results = await Future.wait([
+      SupabaseService.getStudentCount(insId),
+      SupabaseService.getTeacherCount(insId),
+      SupabaseService.getFeeSummary(insId),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _studentCount = results[0] as int;
+        _teacherCount = results[1] as int;
+        _feeSummary = results[2] as FeeSummary;
+        _isLoadingStats = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -427,36 +464,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  String _formatCurrency(double amount) {
+    if (amount >= 10000000) {
+      return '₹${(amount / 10000000).toStringAsFixed(1)}Cr';
+    } else if (amount >= 100000) {
+      return '₹${(amount / 100000).toStringAsFixed(1)}L';
+    } else if (amount >= 1000) {
+      return '₹${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+
   Widget _buildStatCards(BuildContext context, bool isDesktop) {
+    final totalPaid = _feeSummary?.totalPaid ?? 0;
+    final totalDue = _feeSummary?.totalDue ?? 0;
+    final targetPercent =
+        totalDue > 0 ? ((totalPaid / totalDue) * 100).toStringAsFixed(0) : '0';
+
     final stats = [
       StatData(
         label: 'Total Students',
-        value: '2,847',
-        change: '+12%',
+        value: _isLoadingStats ? '...' : '$_studentCount',
+        change: '',
         isPositive: true,
         icon: Icons.people_alt_rounded,
         color: AppColors.accent,
       ),
       StatData(
         label: 'Total Teachers',
-        value: '156',
-        change: '+3',
+        value: _isLoadingStats ? '...' : '$_teacherCount',
+        change: '',
         isPositive: true,
         icon: Icons.school_rounded,
         color: AppColors.info,
       ),
       StatData(
         label: "Today's Attendance",
-        value: '94.2%',
-        change: '+1.3%',
+        value: '--',
+        change: 'Coming soon',
         isPositive: true,
         icon: Icons.check_circle_outline_rounded,
         color: AppColors.success,
       ),
       StatData(
         label: 'Fee Collection',
-        value: '₹48.5L',
-        change: '78% target',
+        value: _isLoadingStats ? '...' : _formatCurrency(totalPaid),
+        change: _isLoadingStats ? '' : '$targetPercent% collected',
         isPositive: true,
         icon: Icons.account_balance_wallet_rounded,
         color: AppColors.secondary,

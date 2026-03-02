@@ -1,62 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/auth_provider.dart';
+import '../services/supabase_service.dart';
+import '../models/payment_model.dart';
 
-class RecentActivitiesWidget extends StatelessWidget {
+class RecentActivitiesWidget extends StatefulWidget {
   const RecentActivitiesWidget({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final activities = [
-      _Activity(
-        avatar: 'A',
-        name: 'Anitha Sharma',
-        action: 'submitted fee payment of ₹15,000',
-        time: '5 mins ago',
-        icon: Icons.payment_rounded,
-        color: AppColors.success,
-      ),
-      _Activity(
-        avatar: 'R',
-        name: 'Rahul Menon',
-        action: 'was marked absent for Class X-B',
-        time: '15 mins ago',
-        icon: Icons.person_off_rounded,
-        color: AppColors.error,
-      ),
-      _Activity(
-        avatar: 'P',
-        name: 'Priya Nair',
-        action: 'uploaded exam results for Class XII',
-        time: '30 mins ago',
-        icon: Icons.upload_file_rounded,
-        color: AppColors.info,
-      ),
-      _Activity(
-        avatar: 'S',
-        name: 'System',
-        action: 'generated monthly attendance report',
-        time: '1 hour ago',
-        icon: Icons.auto_awesome_rounded,
-        color: AppColors.secondary,
-      ),
-      _Activity(
-        avatar: 'K',
-        name: 'Kumar Pillai',
-        action: 'applied for casual leave (Mar 6-7)',
-        time: '2 hours ago',
-        icon: Icons.event_busy_rounded,
-        color: AppColors.warning,
-      ),
-      _Activity(
-        avatar: 'D',
-        name: 'Deepa Rajan',
-        action: 'registered 3 new students for Class I',
-        time: '3 hours ago',
-        icon: Icons.person_add_rounded,
-        color: AppColors.accent,
-      ),
-    ];
+  State<RecentActivitiesWidget> createState() => _RecentActivitiesWidgetState();
+}
 
+class _RecentActivitiesWidgetState extends State<RecentActivitiesWidget> {
+  List<PaymentModel> _payments = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPayments();
+  }
+
+  Future<void> _loadPayments() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final payments = await SupabaseService.getRecentPayments(insId, limit: 6);
+    if (mounted) {
+      setState(() {
+        _payments = payments;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _timeAgo(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'C':
+        return AppColors.success;
+      case 'F':
+        return AppColors.error;
+      case 'R':
+        return AppColors.warning;
+      default:
+        return AppColors.info;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -71,7 +78,7 @@ class RecentActivitiesWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Activity',
+                'Recent Payments',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               TextButton(
@@ -88,123 +95,125 @@ class RecentActivitiesWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          ...activities.asMap().entries.map((entry) {
-            final activity = entry.value;
-            final isLast = entry.key == activities.length - 1;
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_payments.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  'No recent payments found',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textLight,
+                      ),
+                ),
+              ),
+            )
+          else
+            ..._payments.asMap().entries.map((entry) {
+              final payment = entry.value;
+              final isLast = entry.key == _payments.length - 1;
+              final color = _statusColor(payment.paystatus);
+              final initial =
+                  (payment.createdby ?? 'P')[0].toUpperCase();
 
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Avatar
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: activity.color.withValues(alpha: 0.12),
-                        child: activity.name == 'System'
-                            ? Icon(Icons.auto_awesome_rounded,
-                                size: 16, color: activity.color)
-                            : Text(
-                                activity.avatar,
-                                style: TextStyle(
-                                  color: activity.color,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: color.withValues(alpha: 0.12),
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: 'Payment #${payment.payId}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textPrimary,
+                                            fontSize: 13,
+                                          ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          ' — ₹${payment.amount.toStringAsFixed(2)} (${payment.statusText})',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: activity.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
-                                          fontSize: 13,
-                                        ),
-                                  ),
-                                  TextSpan(
-                                    text: ' ${activity.action}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 13,
-                                        ),
-                                  ),
-                                ],
+                              const SizedBox(height: 4),
+                              Text(
+                                _timeAgo(payment.createdat),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      fontSize: 11,
+                                      color: AppColors.textLight,
+                                    ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              activity.time,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontSize: 11,
-                                    color: AppColors.textLight,
-                                  ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: activity.color.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.payment_rounded,
+                            size: 16,
+                            color: color,
+                          ),
                         ),
-                        child: Icon(
-                          activity.icon,
-                          size: 16,
-                          color: activity.color,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (!isLast)
-                  Divider(
-                    color: AppColors.divider,
-                    height: 1,
-                  ),
-              ],
-            );
-          }),
+                  if (!isLast)
+                    Divider(
+                      color: AppColors.divider,
+                      height: 1,
+                    ),
+                ],
+              );
+            }),
         ],
       ),
     );
   }
-}
-
-class _Activity {
-  final String avatar;
-  final String name;
-  final String action;
-  final String time;
-  final IconData icon;
-  final Color color;
-
-  const _Activity({
-    required this.avatar,
-    required this.name,
-    required this.action,
-    required this.time,
-    required this.icon,
-    required this.color,
-  });
 }
