@@ -59,12 +59,12 @@ class SupabaseService {
   /// Get total active student count for an institution
   static Future<int> getStudentCount(int insId) async {
     try {
-      final response = await client
+      final count = await client
           .from('students')
-          .select('stu_id')
+          .count()
           .eq('ins_id', insId)
           .eq('activestatus', 1);
-      return (response as List).length;
+      return count;
     } catch (e) {
       debugPrint('Error getting student count: $e');
       return 0;
@@ -87,6 +87,89 @@ class SupabaseService {
       debugPrint('Error fetching students: $e');
       return [];
     }
+  }
+
+  /// Add a new student record — returns the new stu_id
+  static Future<int> addStudent(Map<String, dynamic> data) async {
+    final response = await client
+        .from('students')
+        .insert(data)
+        .select('stu_id')
+        .single();
+    return response['stu_id'] as int;
+  }
+
+  /// Update an existing student record
+  static Future<void> updateStudent(int stuId, Map<String, dynamic> data) async {
+    await client.from('students').update(data).eq('stu_id', stuId);
+  }
+
+  /// Get academic years for an institution
+  static Future<List<Map<String, dynamic>>> getYears(int insId) async {
+    try {
+      final response = await client
+          .from('year')
+          .select('yr_id, yrlabel')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('yr_id', ascending: false);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching years: $e');
+      return [];
+    }
+  }
+
+  /// Get distinct class names for an institution
+  static Future<List<String>> getClasses(int insId) async {
+    try {
+      final response = await client
+          .from('students')
+          .select('stuclass')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1);
+      final classes = (response as List)
+          .map((r) => r['stuclass']?.toString() ?? '')
+          .where((c) => c.isNotEmpty)
+          .toSet()
+          .toList();
+      classes.sort();
+      return classes;
+    } catch (e) {
+      debugPrint('Error fetching classes: $e');
+      return [];
+    }
+  }
+
+  /// Get concession categories for an institution
+  static Future<List<Map<String, dynamic>>> getConcessions(int insId) async {
+    try {
+      final response = await client
+          .from('concessioncategory')
+          .select('con_id, condesc')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('con_id', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching concessions: $e');
+      return [];
+    }
+  }
+
+  /// Insert parent record — returns the new par_id
+  static Future<int> saveParent(Map<String, dynamic> data) async {
+    final response = await client
+        .from('parents')
+        .insert(data)
+        .select('par_id')
+        .single();
+    return response['par_id'] as int;
+  }
+
+  /// Insert parentdetail record linking student ↔ parent
+  static Future<void> saveParentDetail(Map<String, dynamic> data) async {
+    await client.from('parentdetail').insert(data);
   }
 
   // ==================== TEACHERS / STAFF ====================
@@ -130,30 +213,38 @@ class SupabaseService {
   /// Get fee collection summary for an institution
   static Future<FeeSummary> getFeeSummary(int insId) async {
     try {
-      final response = await client
+      // Use RPC for server-side aggregation of pending balance (avoids 1000-row cap)
+      final rpcResult = await client
+          .rpc('get_fee_summary', params: {'p_ins_id': insId});
+
+      final totalPending =
+          (rpcResult['total_pending'] as num?)?.toDouble() ?? 0;
+      final pendingCount = (rpcResult['pending_count'] as num?)?.toInt() ?? 0;
+
+      // Fetch total due from feedemand
+      final feedemandResponse = await client
           .from('feedemand')
-          .select('feeamount, conamount, paidamount, balancedue, paidstatus')
-          .eq('ins_id', insId)
-          .eq('activestatus', 1);
+          .select('feeamount, conamount')
+          .eq('ins_id', insId);
 
       double totalDue = 0;
-      double totalPaid = 0;
-      double totalPending = 0;
-      int pendingCount = 0;
-
-      for (final row in (response as List)) {
+      for (final row in (feedemandResponse as List)) {
         final feeamount = (row['feeamount'] as num?)?.toDouble() ?? 0;
         final conamount = (row['conamount'] as num?)?.toDouble() ?? 0;
-        final paidamount = (row['paidamount'] as num?)?.toDouble() ?? 0;
-        final balancedue = (row['balancedue'] as num?)?.toDouble() ?? 0;
-
         totalDue += feeamount - conamount;
-        totalPaid += paidamount;
-        totalPending += balancedue;
+      }
 
-        if (row['paidstatus'] == 'U' && balancedue > 0) {
-          pendingCount++;
-        }
+      // Fetch total collection from payment table where paystatus='C' (Completed)
+      final paymentResponse = await client
+          .from('payment')
+          .select('transtotalamount')
+          .eq('ins_id', insId)
+          .eq('paystatus', 'C')
+          .eq('activestatus', 1);
+
+      double totalPaid = 0;
+      for (final row in (paymentResponse as List)) {
+        totalPaid += (row['transtotalamount'] as num?)?.toDouble() ?? 0;
       }
 
       return FeeSummary(
