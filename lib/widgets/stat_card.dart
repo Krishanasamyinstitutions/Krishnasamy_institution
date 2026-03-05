@@ -75,39 +75,44 @@ class _StatCardState extends State<StatCard> {
                     size: 22,
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: widget.data.isPositive
-                        ? AppColors.success.withValues(alpha: 0.08)
-                        : AppColors.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        widget.data.isPositive
-                            ? Icons.trending_up_rounded
-                            : Icons.trending_down_rounded,
-                        size: 14,
-                        color: widget.data.isPositive
-                            ? AppColors.success
-                            : AppColors.error,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.data.change,
-                        style: TextStyle(
+                Flexible(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: widget.data.isPositive
+                          ? AppColors.success.withValues(alpha: 0.08)
+                          : AppColors.error.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.data.isPositive
+                              ? Icons.trending_up_rounded
+                              : Icons.trending_down_rounded,
+                          size: 14,
                           color: widget.data.isPositive
                               ? AppColors.success
                               : AppColors.error,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            widget.data.change,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: widget.data.isPositive
+                                  ? AppColors.success
+                                  : AppColors.error,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

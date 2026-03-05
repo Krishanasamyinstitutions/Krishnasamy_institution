@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
 class QuickActionsWidget extends StatelessWidget {
-  const QuickActionsWidget({super.key});
+  final VoidCallback? onAddStudent;
+
+  const QuickActionsWidget({super.key, this.onAddStudent});
 
   @override
   Widget build(BuildContext context) {
@@ -11,11 +13,7 @@ class QuickActionsWidget extends StatelessWidget {
         icon: Icons.person_add_rounded,
         label: 'Add Student',
         color: AppColors.accent,
-      ),
-      _QuickAction(
-        icon: Icons.fact_check_rounded,
-        label: 'Mark Attendance',
-        color: AppColors.success,
+        onTap: onAddStudent,
       ),
       _QuickAction(
         icon: Icons.receipt_long_rounded,
@@ -26,11 +24,6 @@ class QuickActionsWidget extends StatelessWidget {
         icon: Icons.campaign_rounded,
         label: 'Send Notice',
         color: AppColors.info,
-      ),
-      _QuickAction(
-        icon: Icons.assignment_rounded,
-        label: 'Create Exam',
-        color: AppColors.error,
       ),
       _QuickAction(
         icon: Icons.bar_chart_rounded,
@@ -87,15 +80,19 @@ class _QuickActionChipState extends State<_QuickActionChip> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${widget.action.label} — Coming soon!'),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          if (widget.action.onTap != null) {
+            widget.action.onTap!();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${widget.action.label} — Coming soon!'),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -148,10 +145,12 @@ class _QuickAction {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   const _QuickAction({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 }
