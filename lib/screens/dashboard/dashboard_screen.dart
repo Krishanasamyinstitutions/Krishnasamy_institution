@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
-import '../../widgets/stat_card.dart';
-import '../../widgets/recent_activities.dart';
-import '../../widgets/upcoming_events.dart';
-import '../../widgets/quick_actions.dart';
 import '../../services/supabase_service.dart';
-import '../../models/fee_model.dart';
 import '../students/students_screen.dart';
+import '../fees/fees_screen.dart';
+import '../fees/fee_collection_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,10 +19,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
 
-  // Supabase data
-  int _studentCount = 0;
-  FeeSummary? _feeSummary;
-  bool _isLoadingStats = true;
   String? _institutionType;
   String _institutionRecognized = 'Yes';
   DateTime? _institutionStartDate;
@@ -59,18 +51,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<_NavItem> _navItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, 'Students'),
-    _NavItem(Icons.class_rounded, 'Classes'),
     _NavItem(Icons.domain_add_rounded, 'Institution creation'),
     _NavItem(Icons.account_balance_wallet_rounded, 'Fees'),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.settings_rounded, 'Settings'),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDashboardData();
-  }
 
   @override
   void dispose() {
@@ -86,27 +71,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _address3Controller.dispose();
     _pinCodeController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadDashboardData() async {
-    final auth = context.read<AuthProvider>();
-    final insId = auth.insId;
-    if (insId == null) return;
-
-    setState(() => _isLoadingStats = true);
-
-    final results = await Future.wait([
-      SupabaseService.getStudentCount(insId),
-      SupabaseService.getFeeSummary(insId),
-    ]);
-
-    if (mounted) {
-      setState(() {
-        _studentCount = results[0] as int;
-        _feeSummary = results[1] as FeeSummary;
-        _isLoadingStats = false;
-      });
-    }
   }
 
   @override
@@ -445,10 +409,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Icons.keyboard_arrow_down_rounded,
                     color: AppColors.textSecondary,
                   ),
-                  onSelected: (value) {
+                  onSelected: (value) async {
                     if (value == 'signout') {
-                      auth.logout();
-                      Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+                      await auth.logout();
+                      if (context.mounted) {
+                        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+                      }
                     }
                   },
                   itemBuilder: (context) => const [
@@ -475,7 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Students';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -486,337 +452,358 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (selectedMenu == 'Students') {
       return const StudentsScreen();
     }
+    if (selectedMenu == 'Fees') {
+      return const FeesScreen();
+    }
+    // Dashboard shows Fee Collection screen
+    return const FeeCollectionScreen();
+  }
 
+  Widget _buildInstitutionCreationContent(BuildContext context, bool isDesktop) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Stat cards
-        FadeInDown(
-          duration: const Duration(milliseconds: 400),
-          child: _buildStatCards(context, isDesktop),
+        // Top action bar
+        Row(
+          children: [
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: _saveInstitution,
+              icon: const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Save'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 16),
 
-        const SizedBox(height: 24),
+        // Split layout: LEFT = Institution Info | RIGHT = Affiliation + Address
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // LEFT — Institution Information
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: Row(children: [
+                          Icon(Icons.domain_add_rounded, color: AppColors.accent, size: 20),
+                          SizedBox(width: 8),
+                          Text('Institution Information',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        ]),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: Divider(color: AppColors.border),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _insField(label: 'Institution Type', child: DropdownButtonFormField<String>(
+                                initialValue: _institutionType,
+                                decoration: _insDec('Select institution type'),
+                                isExpanded: true,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+                                onChanged: (v) => setState(() => _institutionType = v),
+                              )),
+                              const SizedBox(height: 14),
+                              _insRow2(
+                                _insField(label: 'Institution Name *', child: TextFormField(
+                                  controller: _institutionNameController,
+                                  decoration: _insDec('Enter institution name'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                )),
+                                _insField(label: 'Institution Code *', child: TextFormField(
+                                  controller: _institutionCodeController,
+                                  decoration: _insDec('Enter institution code'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                )),
+                              ),
+                              const SizedBox(height: 14),
+                              _insField(
+                                label: 'Institution Start Date',
+                                child: InkWell(
+                                  onTap: _pickInstitutionStartDate,
+                                  child: InputDecorator(
+                                    decoration: _insDec('Select date').copyWith(
+                                      suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
+                                    ),
+                                    child: Text(
+                                      _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
+                                      style: TextStyle(
+                                        color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                                        fontSize: 13,
+                                        fontWeight: _institutionStartDate != null ? FontWeight.w700 : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              _insRow2(
+                                _insField(label: 'Authorized Username', child: TextFormField(
+                                  controller: _authorizedUsernameController,
+                                  decoration: _insDec('Enter authorized username'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                )),
+                                _insField(label: 'Designation', child: TextFormField(
+                                  controller: _designationController,
+                                  decoration: _insDec('Enter designation'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                )),
+                              ),
+                              const SizedBox(height: 14),
+                              _insRow2(
+                                _insField(label: 'Mobile Number', child: TextFormField(
+                                  controller: _mobileNumberController,
+                                  decoration: _insDec('Enter mobile number'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                  keyboardType: TextInputType.phone,
+                                )),
+                                _insField(label: 'Institution Recognized', child: DropdownButtonFormField<String>(
+                                  initialValue: _institutionRecognized,
+                                  decoration: _insDec('Select'),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                  items: const [
+                                    DropdownMenuItem(value: 'Yes', child: Text('Yes')),
+                                    DropdownMenuItem(value: 'No', child: Text('No')),
+                                  ],
+                                  onChanged: (v) { if (v != null) setState(() => _institutionRecognized = v); },
+                                )),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-        // Quick actions
-        FadeInDown(
-          delay: const Duration(milliseconds: 100),
-          duration: const Duration(milliseconds: 400),
-          child: const QuickActionsWidget(),
-        ),
+              const SizedBox(width: 16),
 
-        const SizedBox(height: 24),
-
-        // Upcoming events row
-        if (isDesktop)
-          FadeInDown(
-            delay: const Duration(milliseconds: 200),
-            duration: const Duration(milliseconds: 400),
-            child: const UpcomingEventsWidget(),
-          )
-        else ...[
-          FadeInDown(
-            delay: const Duration(milliseconds: 200),
-            child: const UpcomingEventsWidget(),
+              // RIGHT — Affiliation + Address
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Affiliation card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(children: [
+                              Icon(Icons.verified_rounded, color: AppColors.accent, size: 20),
+                              SizedBox(width: 8),
+                              Text('Affiliation Information', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ]),
+                            const SizedBox(height: 4),
+                            const Divider(color: AppColors.border),
+                            const SizedBox(height: 12),
+                            _insRow2(
+                              _insField(label: 'Institution Affiliation', child: TextFormField(
+                                controller: _institutionAffiliationController,
+                                decoration: _insDec('Enter affiliation'),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                              )),
+                              _insField(label: 'Affiliation Number', child: TextFormField(
+                                controller: _affiliationNumberController,
+                                decoration: _insDec('Enter affiliation number'),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                              )),
+                            ),
+                            const SizedBox(height: 14),
+                            _insField(
+                              label: 'Affiliation Start Year',
+                              child: InkWell(
+                                onTap: _pickAffiliationStartYear,
+                                child: InputDecorator(
+                                  decoration: _insDec('Select year').copyWith(
+                                    suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
+                                  ),
+                                  child: Text(
+                                    _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
+                                    style: TextStyle(
+                                      color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                                      fontSize: 13,
+                                      fontWeight: _affiliationStartYear != null ? FontWeight.w700 : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Address card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(children: [
+                              Icon(Icons.location_on_rounded, color: AppColors.accent, size: 20),
+                              SizedBox(width: 8),
+                              Text('Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ]),
+                            const SizedBox(height: 4),
+                            const Divider(color: AppColors.border),
+                            const SizedBox(height: 12),
+                            _insField(label: 'Address Line 1 *', child: TextFormField(
+                              controller: _address1Controller,
+                              decoration: _insDec('Enter address line 1'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                            )),
+                            const SizedBox(height: 14),
+                            _insField(label: 'Address Line 2', child: TextFormField(
+                              controller: _address2Controller,
+                              decoration: _insDec('Enter address line 2'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                            )),
+                            const SizedBox(height: 14),
+                            _insRow2(
+                              _insField(label: 'Address Line 3', child: TextFormField(
+                                controller: _address3Controller,
+                                decoration: _insDec('Enter address line 3'),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                              )),
+                              _insField(label: 'Pin Code', child: TextFormField(
+                                controller: _pinCodeController,
+                                decoration: _insDec('Enter pin code'),
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                                keyboardType: TextInputType.number,
+                              )),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-
-        const SizedBox(height: 24),
-
-        // Recent activities
-        FadeInDown(
-          delay: const Duration(milliseconds: 300),
-          duration: const Duration(milliseconds: 400),
-          child: const RecentActivitiesWidget(),
         ),
       ],
     );
   }
 
-  Widget _buildInstitutionCreationContent(BuildContext context, bool isDesktop) {
-    final fieldWidth = isDesktop
-        ? (MediaQuery.of(context).size.width - (_sidebarCollapsed ? 180 : 360)) /
-            2
-        : double.infinity;
-
-    return FadeInDown(
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: [
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Type',
-                child: DropdownButtonFormField<String>(
-                  initialValue: _institutionType,
-                  decoration: const InputDecoration(
-                    hintText: 'Select institution type',
-                  ),
-                  items: _institutionTypes
-                      .map((type) => DropdownMenuItem<String>(
-                            value: type,
-                            child: Text(type),
-                          ))
-                      .toList(),
-                  onChanged: (value) =>
-                      setState(() => _institutionType = value),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Name',
-                child: TextFormField(
-                  controller: _institutionNameController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter institution name',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Code',
-                child: TextFormField(
-                  controller: _institutionCodeController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter institution code',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Start Date',
-                child: _buildDateField(
-                  context: context,
-                  value: _institutionStartDate,
-                  onTap: _pickInstitutionStartDate,
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Authorized Username',
-                child: TextFormField(
-                  controller: _authorizedUsernameController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter authorized username',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Designation',
-                child: TextFormField(
-                  controller: _designationController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter designation',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Mobile Number',
-                child: TextFormField(
-                  controller: _mobileNumberController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter mobile number',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Recognized',
-                child: DropdownButtonFormField<String>(
-                  initialValue: _institutionRecognized,
-                  decoration: const InputDecoration(
-                    hintText: 'Select recognized status',
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                    DropdownMenuItem(value: 'No', child: Text('No')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _institutionRecognized = value);
-                    }
-                  },
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Institution Affiliation',
-                child: TextFormField(
-                  controller: _institutionAffiliationController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter institution affiliation',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Affiliation Number',
-                child: TextFormField(
-                  controller: _affiliationNumberController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter affiliation number',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Affiliation Start Year',
-                child: _buildDateField(
-                  context: context,
-                  value: _affiliationStartYear,
-                  onTap: _pickAffiliationStartYear,
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Address 1',
-                child: TextFormField(
-                  controller: _address1Controller,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter address line 1',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Address 2',
-                child: TextFormField(
-                  controller: _address2Controller,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter address line 2',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Address 3 (Optional)',
-                child: TextFormField(
-                  controller: _address3Controller,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter address line 3',
-                  ),
-                ),
-              ),
-            ),
-            _buildFieldWrapper(
-              width: fieldWidth,
-              child: _buildLabeledField(
-                context: context,
-                label: 'Pin Code',
-                child: TextFormField(
-                  controller: _pinCodeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter pin code',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFieldWrapper({required double width, required Widget child}) {
-    return SizedBox(
-      width: width,
-      child: child,
-    );
-  }
-
-  Widget _buildLabeledField({
-    required BuildContext context,
-    required String label,
-    required Widget child,
-  }) {
+  Widget _insField({required String label, required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-        ),
-        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+        const SizedBox(height: 6),
         child,
       ],
     );
   }
 
-  Widget _buildDateField({
-    required BuildContext context,
-    required DateTime? value,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          hintText: 'Select date',
-          suffixIcon: const Icon(Icons.calendar_month_rounded),
-        ),
-        child: Text(
-          value == null ? 'Select date' : _formatDate(value),
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ),
+  Widget _insRow2(Widget left, Widget right) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 14),
+        Expanded(child: right),
+      ],
     );
   }
+
+  InputDecoration _insDec(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),
+    filled: true,
+    fillColor: Colors.white,
+  );
+
+  Future<void> _saveInstitution() async {
+    // Basic validation
+    if (_institutionNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter institution name'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (_institutionCodeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter institution code'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    try {
+      await SupabaseService.client.from('institution').insert({
+        'instype': _institutionType,
+        'insname': _institutionNameController.text.trim(),
+        'inscode': _institutionCodeController.text.trim(),
+        'insstartdate': _institutionStartDate?.toIso8601String().split('T').first,
+        'insauthorizedusername': _authorizedUsernameController.text.trim(),
+        'insdesignation': _designationController.text.trim(),
+        'insmobile': _mobileNumberController.text.trim(),
+        'insrecognized': _institutionRecognized,
+        'insaffiliation': _institutionAffiliationController.text.trim(),
+        'insaffno': _affiliationNumberController.text.trim(),
+        'insaffstartyear': _affiliationStartYear?.year.toString(),
+        'insaddress1': _address1Controller.text.trim(),
+        'insaddress2': _address2Controller.text.trim(),
+        'insaddress3': _address3Controller.text.trim(),
+        'inspincode': _pinCodeController.text.trim(),
+        'activestatus': 1,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Institution saved successfully'), backgroundColor: AppColors.accent),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving institution: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
 
   Future<void> _pickInstitutionStartDate() async {
     final picked = await showDatePicker(
@@ -858,77 +845,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '₹$formatted';
   }
 
-  Widget _buildStatCards(BuildContext context, bool isDesktop) {
-    final totalPaid = _feeSummary?.totalPaid ?? 0;
-    final totalDue = _feeSummary?.totalDue ?? 0;
-    final totalPending = _feeSummary?.totalPending ?? 0;
-    final pendingCount = _feeSummary?.pendingCount ?? 0;
-    final targetPercent =
-        totalDue > 0 ? ((totalPaid / totalDue) * 100).toStringAsFixed(0) : '0';
-
-    final stats = [
-      StatData(
-        label: 'Total Students',
-        value: _isLoadingStats ? '...' : '$_studentCount',
-        change: '',
-        isPositive: true,
-        icon: Icons.people_alt_rounded,
-        color: AppColors.accent,
-      ),
-      StatData(
-        label: 'Total Fee Amount',
-        value: _isLoadingStats ? '...' : _formatCurrency(totalDue),
-        change: '',
-        isPositive: true,
-        icon: Icons.request_quote_rounded,
-        color: AppColors.info,
-      ),
-      StatData(
-        label: 'Total Collection Amount',
-        value: _isLoadingStats ? '...' : _formatCurrency(totalPaid),
-        change: _isLoadingStats ? '' : '$targetPercent% collected',
-        isPositive: true,
-        icon: Icons.account_balance_wallet_rounded,
-        color: AppColors.secondary,
-      ),
-      StatData(
-        label: 'Pending Amount',
-        value: _isLoadingStats ? '...' : _formatCurrency(totalPending),
-        change: _isLoadingStats
-            ? ''
-            : (pendingCount > 0 ? '$pendingCount pending records' : 'No pending'),
-        isPositive: totalPending <= 0,
-        icon: Icons.pending_actions_rounded,
-        color: AppColors.warning,
-      ),
-    ];
-
-    if (isDesktop) {
-      return Row(
-        children: stats.map((stat) {
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                right: stat == stats.last ? 0 : 16,
-              ),
-              child: StatCard(data: stat),
-            ),
-          );
-        }).toList(),
-      );
-    }
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: stats.map((stat) {
-        return SizedBox(
-          width: (MediaQuery.of(context).size.width - 44) / 2,
-          child: StatCard(data: stat),
-        );
-      }).toList(),
-    );
-  }
 }
 
 class _NavItem {

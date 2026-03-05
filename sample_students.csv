@@ -1,0 +1,6 @@
+Adm No,Name,Gender,DOB,Mobile,Class,Email,Address,City,State,Country,PIN,Blood Group,Admission Date,Father Name,Father Mobile,Father Occupation,Mother Name,Mother Mobile,Mother Occupation,Payment In Charge,Payment Mobile
+S001,Rahul Kumar,Male,15/06/2012,9876543210,V,rahul@test.com,123 Main Street,Chennai,Tamil Nadu,India,600001,B+,01/04/2024,Suresh Kumar,9876500001,Engineer,Lakshmi Kumar,9876500002,Teacher,Suresh Kumar,9876500001
+S002,Priya Sharma,Female,22/03/2011,9876543211,VI,priya@test.com,456 Park Road,Chennai,Tamil Nadu,India,600002,A+,01/04/2024,Rajesh Sharma,9876500003,Doctor,Anita Sharma,9876500004,Nurse,Rajesh Sharma,9876500003
+S003,Arjun Reddy,M,10/11/2013,9876543212,IV,,789 Lake View,Chennai,Tamil Nadu,India,600003,O+,01/04/2024,Venkat Reddy,9876500005,Business,Padma Reddy,9876500006,Homemaker,Venkat Reddy,9876500005
+S004,Sneha Patel,F,05/08/2010,9876543213,VII,sneha@test.com,101 Hill Road,Chennai,Tamil Nadu,India,600004,AB+,01/04/2024,Amit Patel,9876500007,Accountant,Meena Patel,9876500008,Teacher,Amit Patel,9876500007
+S005,Karthik Nair,Male,2014-01-20,9876543214,III,,,Chennai,Tamil Nadu,India,600005,B-,01/04/2024,Mohan Nair,9876500009,Lawyer,Revathi Nair,9876500010,Banker,Mohan Nair,9876500009

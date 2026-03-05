@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 44" fill="none">
+  <!-- Dark Excel cover (left panel) -->
+  <rect x="0" y="0" width="22" height="44" rx="3" fill="#1a1a1a"/>
+  <!-- White X mark -->
+  <line x1="7" y1="14" x2="15" y2="30" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="15" y1="14" x2="7" y2="30" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Right open page -->
+  <rect x="22" y="6" width="14" height="32" rx="1" fill="white" stroke="#1a1a1a" stroke-width="1.5"/>
+  <!-- Import arrow (pointing left into document) -->
+  <line x1="51" y1="22" x2="31" y2="22" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round"/>
+  <polyline points="38,14 30,22 38,30" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
