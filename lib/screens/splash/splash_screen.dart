@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
+import '../../utils/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -34,9 +36,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(seconds: 4));
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
-    }
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final loggedIn = await auth.tryAutoLogin();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(
+      context,
+      loggedIn ? AppRoutes.dashboard : AppRoutes.onboarding,
+    );
   }
 
   @override

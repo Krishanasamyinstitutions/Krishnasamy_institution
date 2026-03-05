@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 import '../models/institution_user_model.dart';
+
+const _kEmail = 'saved_email';
+const _kPassword = 'saved_password';
 
 class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
@@ -90,7 +94,31 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void logout() {
+  /// Auto-login using saved credentials — returns true if successful
+  Future<bool> tryAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_kEmail);
+    final password = prefs.getString(_kPassword);
+    if (email == null || password == null) return false;
+    return login(email, password);
+  }
+
+  /// Save credentials for auto-login on next launch
+  Future<void> saveCredentials(String email, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kEmail, email);
+    await prefs.setString(_kPassword, password);
+  }
+
+  /// Clear saved credentials (call on logout)
+  Future<void> clearCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kEmail);
+    await prefs.remove(_kPassword);
+  }
+
+  Future<void> logout() async {
+    await clearCredentials();
     _isAuthenticated = false;
     _currentUser = null;
     _userEmail = null;

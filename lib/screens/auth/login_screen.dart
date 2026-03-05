@@ -36,7 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      await authProvider.saveCredentials(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      }
     }
   }
 
