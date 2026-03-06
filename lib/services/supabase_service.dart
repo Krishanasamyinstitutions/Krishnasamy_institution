@@ -496,4 +496,20 @@ class SupabaseService {
       return [];
     }
   }
+
+  /// Get failed transactions for an institution
+  static Future<List<Map<String, dynamic>>> getFailedTransactions(int insId) async {
+    try {
+      final response = await client
+          .from('payment')
+          .select('*')
+          .eq('ins_id', insId)
+          .eq('paystatus', 'F')
+          .order('createdat', ascending: false);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching failed transactions: $e');
+      return [];
+    }
+  }
 }

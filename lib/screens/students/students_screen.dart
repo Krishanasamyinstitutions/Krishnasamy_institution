@@ -41,7 +41,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
   String? _selectedClass;
   List<String> _classes = [];
   String? _selectedConId;
-  String? _selectedConDesc;
   List<Map<String, dynamic>> _concessions = [];
   String? _photoUrl;
   String? _insName;
@@ -63,10 +62,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
   final _payNameController = TextEditingController();
   final _payMobileController = TextEditingController();
 
-  bool _isSaving = false;
   bool _isUploadingPhoto = false;
-  bool _isFormEnabled = true;
+  bool _isFormEnabled = false;
   List<StudentModel> _students = [];
+  StudentModel? _selectedStudent;
+  final _searchController = TextEditingController();
 
   static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary);
 
@@ -104,6 +104,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _guardianOccController.dispose();
     _payNameController.dispose();
     _payMobileController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -132,142 +133,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedYrLabel = years.first['yrlabel'];
       }
     });
-  }
-
-  void _clearForm() {
-    _formKey.currentState?.reset();
-    _admNoController.clear();
-    _nameController.clear();
-    _mobileController.clear();
-    _emailController.clear();
-    _addressController.clear();
-    _cityController.clear();
-    _stateController.clear();
-    _countryController.clear();
-    _pinController.clear();
-    _fatherNameController.clear();
-    _fatherMobileController.clear();
-    _fatherOccController.clear();
-    _motherNameController.clear();
-    _motherMobileController.clear();
-    _motherOccController.clear();
-    _guardianNameController.clear();
-    _guardianMobileController.clear();
-    _guardianOccController.clear();
-    _payNameController.clear();
-    _payMobileController.clear();
-    setState(() {
-      _selectedGender = null;
-      _selectedBloodGroup = null;
-      _selectedClass = null;
-      _selectedConId = null;
-      _selectedConDesc = null;
-      _admDate = null;
-      _dob = null;
-      _photoUrl = null;
-      _selectedParentTab = 'Father';
-      _isFormEnabled = false;
-      if (_years.isNotEmpty) {
-        _selectedYrId = _years.first['yr_id'].toString();
-        _selectedYrLabel = _years.first['yrlabel'];
-      }
-    });
-  }
-
-  void _showSelectStudentDialog() {
-    final searchController = TextEditingController();
-    List<StudentModel> filtered = List.from(_students);
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setDialogState) {
-          return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: SizedBox(
-              width: 560,
-              height: 520,
-              child: Column(
-                children: [
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_search_rounded, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        const Expanded(child: Text('Select Student', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Search
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: TextField(
-                      controller: searchController,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        hintText: 'Search by name, admission no, or class...',
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        isDense: true,
-                      ),
-                      onChanged: (q) {
-                        final lower = q.toLowerCase();
-                        setDialogState(() {
-                          filtered = _students.where((s) =>
-                            s.stuname.toLowerCase().contains(lower) ||
-                            s.stuadmno.toLowerCase().contains(lower) ||
-                            s.stuclass.toLowerCase().contains(lower),
-                          ).toList();
-                        });
-                      },
-                    ),
-                  ),
-                  // List
-                  Expanded(
-                    child: filtered.isEmpty
-                        ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary)))
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (_, i) {
-                              final s = filtered[i];
-                              return ListTile(
-                                dense: true,
-                                leading: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-                                  child: Text(s.stuname[0].toUpperCase(), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
-                                ),
-                                title: Text(s.stuname, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                subtitle: Text('${s.stuadmno} · ${s.stuclass}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  _populateStudentForm(s); // async — fire and forget
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        });
-      },
-    );
   }
 
   String? _normalizeBloodGroup(String? raw) {
@@ -311,7 +176,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _selectedBloodGroup = null;
       _selectedClass = null;
       _selectedConId = null;
-      _selectedConDesc = null;
       _admDate = null;
       _dob = null;
       _photoUrl = null;
@@ -370,127 +234,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  String _genderCode(String? g) {
-    if (g == 'Male') return 'M';
-    if (g == 'Female') return 'F';
-    return 'O';
-  }
-
-  Future<void> _saveStudent() async {
-    if (!_formKey.currentState!.validate()) return;
-    final auth = context.read<AuthProvider>();
-    final insId = auth.insId ?? 1;
-    final inscode = auth.inscode ?? '';
-    final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
-    final yrLabel = _selectedYrLabel ?? '';
-    final admNo = _admNoController.text.trim();
-    final stuName = _nameController.text.trim();
-    final stuClass = _selectedClass ?? '';
-    final now = DateTime.now().toIso8601String();
-
-    setState(() => _isSaving = true);
-    try {
-      final stuId = await SupabaseService.addStudent({
-        'ins_id': insId,
-        'inscode': inscode,
-        'yr_id': yrId,
-        'yrlabel': yrLabel,
-        'stuadmno': admNo,
-        'stuadmdate': (_admDate ?? DateTime.now()).toIso8601String().split('T').first,
-        'stuname': stuName,
-        'stugender': _genderCode(_selectedGender),
-        'studob': _dob?.toIso8601String().split('T').first,
-        'stumobile': _mobileController.text.trim(),
-        'stuemail': _n(_emailController),
-        'stuaddress': _n(_addressController),
-        'stucity': _n(_cityController),
-        'stustate': _n(_stateController),
-        'stucountry': _n(_countryController),
-        'stupin': _n(_pinController),
-        'stubloodgrp': _selectedBloodGroup,
-        'stuphoto': _photoUrl,
-        'stuclass': stuClass,
-        'con_id': _selectedConId != null ? int.tryParse(_selectedConId!) : null,
-        'stucondesc': _selectedConDesc,
-        'stuser_id': admNo,
-        'stuotpstatus': 0,
-        'approvedby': '',
-        'approveddate': now,
-        'suspendedby': '',
-        'terminatedby': '',
-        'activestatus': 1,
-        'createdon': now,
-      });
-
-      // Reuse existing parent record if same father/mother mobile already exists
-      // (prevents duplicate parent rows when a parent has multiple children)
-      final existingParId = await SupabaseService.findParentByMobile(
-        fatherMobile: _n(_fatherMobileController),
-        motherMobile: _n(_motherMobileController),
-        payMobile: _n(_payMobileController),
-      );
-
-      final parId = existingParId ?? await SupabaseService.saveParent({
-        'ins_id': insId,
-        'inscode': inscode,
-        'yr_id': yrId,
-        'yrlabel': yrLabel,
-        'partype': 'P',
-        'fathername': _n(_fatherNameController),
-        'fathermobile': _n(_fatherMobileController),
-        'fatheroccupation': _n(_fatherOccController),
-        'mothername': _n(_motherNameController),
-        'mothermobile': _n(_motherMobileController),
-        'motheroccupation': _n(_motherOccController),
-        'guardianname': _n(_guardianNameController),
-        'guardianmobile': _n(_guardianMobileController),
-        'guardianoccupation': _n(_guardianOccController),
-        'payincharge': _n(_payNameController),
-        'payinchargemob': _n(_payMobileController),
-        'parotpstatus': 0,
-        'approveddate': now,
-        'activestatus': 1,
-      });
-
-      await SupabaseService.saveParentDetail({
-        'yr_id': yrId,
-        'yrlabel': yrLabel,
-        'par_id': parId,
-        'stu_id': stuId,
-        'ins_id': insId,
-        'inscode': inscode,
-        'stuadmno': admNo,
-        'stuname': stuName,
-        'stuclass': stuClass,
-        'activestatus': 1,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Student saved successfully'), backgroundColor: AppColors.accent),
-        );
-        _clearForm();
-      }
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        final msg = e.code == '23505'
-            ? 'Admission number already exists for this institution. Please use a different admission number.'
-            : 'Database error: ${e.message}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving student: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
   Future<void> _uploadPhoto() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
     if (result == null || result.files.isEmpty) return;
@@ -522,7 +265,34 @@ class _StudentsScreenState extends State<StudentsScreen> {
     }
   }
 
-  String? _n(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
+  List<StudentModel> get _filteredStudents {
+    final q = _searchController.text.toLowerCase();
+    if (q.isEmpty) return _students;
+    return _students.where((s) =>
+      s.stuname.toLowerCase().contains(q) ||
+      s.stuadmno.toLowerCase().contains(q) ||
+      s.stuclass.toLowerCase().contains(q),
+    ).toList();
+  }
+
+  /// Group filtered students by class, ordered by [_classOrder].
+  Map<String, List<StudentModel>> get _groupedStudents {
+    final students = _filteredStudents;
+    final map = <String, List<StudentModel>>{};
+    for (final s in students) {
+      final cls = s.stuclass.isNotEmpty ? s.stuclass : 'Unassigned';
+      map.putIfAbsent(cls, () => []).add(s);
+    }
+    // Sort keys by _classOrder
+    final sortedKeys = map.keys.toList()..sort((a, b) {
+      final ai = _classOrder.indexOf(a);
+      final bi = _classOrder.indexOf(b);
+      final aIdx = ai == -1 ? 999 : ai;
+      final bIdx = bi == -1 ? 999 : bi;
+      return aIdx.compareTo(bIdx);
+    });
+    return {for (final k in sortedKeys) k: map[k]!};
+  }
 
   // ─── Build ────────────────────────────────────────────────────────────────────
 
@@ -530,218 +300,288 @@ class _StudentsScreenState extends State<StudentsScreen> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top action bar
-          Row(
-            children: [
-              // New button
-              ElevatedButton.icon(
-                onPressed: () {
-                  _clearForm();
-                  setState(() => _isFormEnabled = true);
-                },
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('New'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+          // LEFT — Student List
+          SizedBox(
+            width: 280,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
               ),
-              const SizedBox(width: 10),
-              // Select Student button
-              ElevatedButton.icon(
-                onPressed: _showSelectStudentDialog,
-                icon: const Icon(Icons.person_search_rounded, size: 18),
-                label: const Text('Select Student'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const Spacer(),
-              // Cancel — only active when form enabled
-              OutlinedButton(
-                onPressed: _isFormEnabled ? _clearForm : null,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Cancel'),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: (_isFormEnabled && !_isSaving) ? _saveStudent : null,
-                icon: _isSaving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save_rounded, size: 18),
-                label: const Text('Save'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: _showExcelUploadDialog,
-                icon: const Icon(Icons.file_download_rounded, size: 20),
-                label: const Text('Import from Excel'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.info,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // ── Split layout: LEFT = Student | RIGHT = Parent + Payment ──
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // LEFT — Student Information (fills full height, inner scroll)
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
+              child: Column(
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Left: title + school name
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Row(children: [
-                                      Icon(Icons.person_rounded, color: AppColors.accent, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Student Information',
-                                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                    ]),
-                                    const SizedBox(height: 4),
-                                    Row(children: [
-                                      if (_insLogo != null)
-                                        Image.network(
-                                          _insLogo!,
-                                          width: 32,
-                                          height: 32,
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
-                                        )
-                                      else
-                                        const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          _insName ?? context.read<AuthProvider>().inscode ?? '',
-                                          style: const TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ]),
-                                  ],
-                                ),
+                        Row(
+                          children: [
+                            const Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text('Students', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              // Right: profile photo + upload
-                              Column(
-                                children: [
-                                  Container(
-                                    width: 72,
-                                    height: 72,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppColors.accent.withValues(alpha: 0.1),
-                                    ),
-                                    child: ClipOval(
-                                      child: _photoUrl != null
-                                          ? Image.network(
-                                              _photoUrl!,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => _avatarPlaceholder(),
-                                            )
-                                          : _avatarPlaceholder(),
-                                    ),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
-                                    icon: _isUploadingPhoto
-                                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                        : const Icon(Icons.camera_alt_rounded, size: 14),
-                                    label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo',
-                                        style: const TextStyle(fontSize: 11)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Divider(color: AppColors.border),
-                        ),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                            child: IgnorePointer(
-                              ignoring: !_isFormEnabled,
-                              child: Opacity(
-                                opacity: _isFormEnabled ? 1.0 : 0.65,
-                                child: _buildStudentFields(),
+                              child: Text('${_students.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: IconButton(
+                                onPressed: _showExcelUploadDialog,
+                                icon: const Icon(Icons.file_download_rounded, size: 16),
+                                color: AppColors.info,
+                                padding: EdgeInsets.zero,
+                                tooltip: 'Import from Excel',
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // Search
+                        TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search students...',
+                            hintStyle: const TextStyle(fontSize: 12),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                            isDense: true,
                           ),
+                          style: const TextStyle(fontSize: 12),
+                          onChanged: (_) => setState(() {}),
                         ),
                       ],
                     ),
                   ),
-                ),
-
-                const SizedBox(width: 16),
-
-                // RIGHT — Parent + Payment
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Opacity(
-                      opacity: _isFormEnabled ? 1.0 : 0.65,
-                      child: Column(
-                        children: [
-                        _panel(
-                          title: 'Parent / Guardian Information',
-                          icon: Icons.family_restroom_rounded,
-                          child: _buildParentFields(),
-                        ),
-                        const SizedBox(height: 16),
-                        _panel(
-                          title: 'Payment In Charge',
-                          icon: Icons.payments_rounded,
-                          child: _buildPaymentFields(),
-                        ),
-                        const SizedBox(height: 24),
-                        ],
-                      ),
-                    ),
+                  const Divider(height: 1, color: AppColors.border),
+                  // Student List (grouped by class)
+                  Expanded(
+                    child: _filteredStudents.isEmpty
+                        ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)))
+                        : ListView(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            children: _groupedStudents.entries.expand((entry) {
+                              final className = entry.key;
+                              final students = entry.value;
+                              return [
+                                // Class header
+                                Container(
+                                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                                  color: AppColors.accent.withValues(alpha: 0.06),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.class_rounded, size: 14, color: AppColors.accent.withValues(alpha: 0.7)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Class $className',
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent.withValues(alpha: 0.8)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.accent.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text('${students.length}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.accent.withValues(alpha: 0.7))),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Students in this class
+                                ...students.map((s) {
+                                  final isSelected = _selectedStudent?.stuId == s.stuId;
+                                  return Material(
+                                    color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        setState(() => _selectedStudent = s);
+                                        _populateStudentForm(s);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor: isSelected
+                                                  ? AppColors.accent.withValues(alpha: 0.2)
+                                                  : AppColors.accent.withValues(alpha: 0.1),
+                                              backgroundImage: s.stuphoto != null ? NetworkImage(s.stuphoto!) : null,
+                                              child: s.stuphoto == null
+                                                  ? Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12))
+                                                  : null,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 12, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                                  Text(s.stuadmno, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                                ],
+                                              ),
+                                            ),
+                                            if (isSelected)
+                                              const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.accent),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ];
+                            }).toList(),
+                          ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // RIGHT — Student Details (only if selected)
+          Expanded(
+            child: _selectedStudent == null
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.person_search_rounded, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                        const SizedBox(height: 12),
+                        Text('Select a student to view details', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 14, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Student Information panel
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Row(children: [
+                                                  Icon(Icons.person_rounded, color: AppColors.accent, size: 20),
+                                                  SizedBox(width: 8),
+                                                  Text('Student Information',
+                                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                                ]),
+                                                const SizedBox(height: 4),
+                                                Row(children: [
+                                                  if (_insLogo != null)
+                                                    Image.network(
+                                                      _insLogo!,
+                                                      width: 32, height: 32, fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                    )
+                                                  else
+                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                  const SizedBox(width: 8),
+                                                  Flexible(
+                                                    child: Text(
+                                                      _insName ?? context.read<AuthProvider>().inscode ?? '',
+                                                      style: const TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ]),
+                                              ],
+                                            ),
+                                          ),
+                                          Column(
+                                            children: [
+                                              Container(
+                                                width: 72, height: 72,
+                                                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accent.withValues(alpha: 0.1)),
+                                                child: ClipOval(
+                                                  child: _photoUrl != null
+                                                      ? Image.network(_photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatarPlaceholder())
+                                                      : _avatarPlaceholder(),
+                                                ),
+                                              ),
+                                              TextButton.icon(
+                                                onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
+                                                icon: _isUploadingPhoto
+                                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                                    : const Icon(Icons.camera_alt_rounded, size: 14),
+                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: const TextStyle(fontSize: 11)),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(color: AppColors.border)),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                                        child: IgnorePointer(
+                                          ignoring: !_isFormEnabled,
+                                          child: Opacity(opacity: _isFormEnabled ? 1.0 : 0.65, child: _buildStudentFields()),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 16),
+
+                            // Parent + Payment panels
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Opacity(
+                                  opacity: _isFormEnabled ? 1.0 : 0.65,
+                                  child: Column(
+                                    children: [
+                                      _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
+                                      const SizedBox(height: 16),
+                                      _panel(title: 'Payment In Charge', icon: Icons.payments_rounded, child: _buildPaymentFields()),
+                                      const SizedBox(height: 24),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -899,9 +739,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
             )).toList(),
             onChanged: (v) => setState(() {
               _selectedConId = v;
-              _selectedConDesc = v != null
-                  ? _concessions.firstWhere((c) => c['con_id'].toString() == v)['condesc']
-                  : null;
             }),
           )),
         ),
