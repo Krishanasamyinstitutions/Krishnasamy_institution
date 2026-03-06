@@ -7,6 +7,7 @@ import '../../services/supabase_service.dart';
 import '../students/students_screen.dart';
 import '../fees/fees_screen.dart';
 import '../fees/fee_collection_screen.dart';
+import '../transactions/failed_transactions_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -53,6 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.people_alt_rounded, 'Students'),
     _NavItem(Icons.domain_add_rounded, 'Institution creation'),
     _NavItem(Icons.account_balance_wallet_rounded, 'Fees'),
+    _NavItem(Icons.error_outline_rounded, 'Failed Transactions'),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.settings_rounded, 'Settings'),
   ];
@@ -76,8 +78,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 1100;
-    final isTablet = size.width > 700 && size.width <= 1100;
+    final isDesktop = size.width > 800;
+    final isTablet = size.width > 500 && size.width <= 800;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -247,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Row(
         children: [
-          if (!isDesktop && MediaQuery.of(context).size.width <= 700)
+          if (!isDesktop && MediaQuery.of(context).size.width <= 500)
             IconButton(
               onPressed: () => Scaffold.of(context).openDrawer(),
               icon: const Icon(Icons.menu_rounded),
@@ -441,7 +443,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation' || label == 'Failed Transactions';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -454,6 +456,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Fees') {
       return const FeesScreen();
+    }
+    if (selectedMenu == 'Failed Transactions') {
+      return const FailedTransactionsScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();
