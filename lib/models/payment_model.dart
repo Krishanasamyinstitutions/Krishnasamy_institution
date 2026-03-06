@@ -1,6 +1,7 @@
 /// Payment model matching Supabase 'payment' table
 class PaymentModel {
   final int payId;
+  final String? paynumber;
   final int insId;
   final String? inscode;
   final int? stuId;
@@ -18,6 +19,7 @@ class PaymentModel {
 
   PaymentModel({
     required this.payId,
+    this.paynumber,
     required this.insId,
     this.inscode,
     this.stuId,
@@ -39,6 +41,7 @@ class PaymentModel {
       payId: json['pay_id'] is int
           ? json['pay_id']
           : int.parse(json['pay_id'].toString()),
+      paynumber: json['paynumber'],
       insId: json['ins_id'] is int
           ? json['ins_id']
           : int.parse(json['ins_id'].toString()),

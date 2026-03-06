@@ -4,10 +4,13 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
+import '../../models/student_model.dart';
 import '../students/students_screen.dart';
 import '../fees/fees_screen.dart';
 import '../fees/fee_collection_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
+import '../admin/admin_creation_screen.dart';
+import '../admin/settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -19,6 +22,14 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
+
+  // Global search
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  final LayerLink _searchLayerLink = LayerLink();
+  OverlayEntry? _searchOverlay;
+  List<StudentModel> _allStudents = [];
+  List<StudentModel> _searchResults = [];
 
   String? _institutionType;
   String _institutionRecognized = 'Yes';
@@ -54,13 +65,136 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.people_alt_rounded, 'Students'),
     _NavItem(Icons.domain_add_rounded, 'Institution creation'),
     _NavItem(Icons.account_balance_wallet_rounded, 'Fees'),
-    _NavItem(Icons.error_outline_rounded, 'Failed Transactions'),
+    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
+    _NavItem(Icons.admin_panel_settings_rounded, 'User Creation'),
+    _NavItem(Icons.settings_rounded, 'Designation & Role'),
     _NavItem(Icons.notifications_rounded, 'Notices'),
-    _NavItem(Icons.settings_rounded, 'Settings'),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadStudentsForSearch();
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus) {
+        // Delay removal so overlay tap events can fire first
+        Future.delayed(const Duration(milliseconds: 200), () {
+          _removeSearchOverlay();
+        });
+      }
+    });
+  }
+
+  Future<void> _loadStudentsForSearch() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    _allStudents = await SupabaseService.getStudents(insId);
+  }
+
+  void _onSearchChanged(String query) {
+    if (query.trim().isEmpty) {
+      _removeSearchOverlay();
+      _searchResults = [];
+      return;
+    }
+    final q = query.toLowerCase();
+    _searchResults = _allStudents.where((s) =>
+      s.stuname.toLowerCase().contains(q) ||
+      s.stuadmno.toLowerCase().contains(q)
+    ).take(10).toList();
+    _showSearchOverlay();
+  }
+
+  void _showSearchOverlay() {
+    _removeSearchOverlay();
+    if (_searchResults.isEmpty) return;
+    _searchOverlay = OverlayEntry(builder: (context) => _buildSearchOverlay());
+    Overlay.of(context).insert(_searchOverlay!);
+  }
+
+  void _removeSearchOverlay() {
+    _searchOverlay?.remove();
+    _searchOverlay = null;
+  }
+
+  StudentModel? _navigateToStudent;
+
+  void _onStudentSelected(StudentModel student) {
+    _removeSearchOverlay();
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _navigateToStudent = student;
+      _selectedNavIndex = 1; // Students tab
+    });
+  }
+
+
+  Widget _buildSearchOverlay() {
+    return Positioned(
+      width: 350,
+      child: CompositedTransformFollower(
+        link: _searchLayerLink,
+        showWhenUnlinked: false,
+        offset: const Offset(0, 48),
+        child: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              shrinkWrap: true,
+              itemCount: _searchResults.length,
+              itemBuilder: (context, index) {
+                final s = _searchResults[index];
+                return InkWell(
+                  onTap: () => _onStudentSelected(s),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                          child: s.stuphoto != null && s.stuphoto!.startsWith('http')
+                              ? ClipOval(child: Image.network(s.stuphoto!, width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(s.stuname[0].toUpperCase(), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14))))
+                              : Text(s.stuname[0].toUpperCase(), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.stuname, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text('${s.stuadmno}  •  Class ${s.stuclass}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                        Text(s.stumobile, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _removeSearchOverlay();
     _institutionNameController.dispose();
     _institutionCodeController.dispose();
     _authorizedUsernameController.dispose();
@@ -291,26 +425,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           // Search bar (desktop only)
           if (isDesktop)
-            Container(
-              width: 280,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search students, staff...',
-                  hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textLight,
-                        fontSize: 13,
-                      ),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      size: 20, color: AppColors.textLight),
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+            CompositedTransformTarget(
+              link: _searchLayerLink,
+              child: Container(
+                width: 350,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name or admission no...',
+                    hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textLight,
+                          fontSize: 13,
+                        ),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        size: 20, color: AppColors.textLight),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                            onPressed: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+                  ),
                 ),
               ),
             ),
@@ -443,7 +592,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation' || label == 'Failed Transactions';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -452,13 +601,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return _buildInstitutionCreationContent(context, isDesktop);
     }
     if (selectedMenu == 'Students') {
-      return const StudentsScreen();
+      final student = _navigateToStudent;
+      _navigateToStudent = null;
+      return StudentsScreen(key: student != null ? ValueKey(student.stuId) : null, initialStudent: student);
     }
     if (selectedMenu == 'Fees') {
       return const FeesScreen();
     }
-    if (selectedMenu == 'Failed Transactions') {
+    if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();
+    }
+    if (selectedMenu == 'User Creation') {
+      return const AdminCreationScreen();
+    }
+    if (selectedMenu == 'Designation & Role') {
+      return const SettingsScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();
@@ -857,3 +1014,4 @@ class _NavItem {
   final String label;
   const _NavItem(this.icon, this.label);
 }
+
