@@ -12,7 +12,8 @@ import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
 
 class StudentsScreen extends StatefulWidget {
-  const StudentsScreen({super.key});
+  final StudentModel? initialStudent;
+  const StudentsScreen({super.key, this.initialStudent});
 
   @override
   State<StudentsScreen> createState() => _StudentsScreenState();
@@ -66,6 +67,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   bool _isFormEnabled = false;
   List<StudentModel> _students = [];
   StudentModel? _selectedStudent;
+  String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   final _searchController = TextEditingController();
 
   static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary);
@@ -75,6 +77,30 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static const List<String> _classOrder = [
     'PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII',
   ];
+
+  static const List<Color> _classColors = [
+    Color(0xFF6366F1), // PKG - Indigo
+    Color(0xFF8B5CF6), // LKG - Violet
+    Color(0xFFA855F7), // UKG - Purple
+    Color(0xFFEC4899), // I - Pink
+    Color(0xFFF43F5E), // II - Rose
+    Color(0xFFEF4444), // III - Red
+    Color(0xFFF97316), // IV - Orange
+    Color(0xFFF59E0B), // V - Amber
+    Color(0xFF22C55E), // VI - Green
+    Color(0xFF14B8A6), // VII - Teal
+    Color(0xFF06B6D4), // VIII - Cyan
+    Color(0xFF3B82F6), // IX - Blue
+    Color(0xFF2563EB), // X - Blue dark
+    Color(0xFF7C3AED), // XI - Violet dark
+    Color(0xFF9333EA), // XII - Purple dark
+  ];
+
+  Color _getClassColor(String className) {
+    final index = _classOrder.indexOf(className);
+    if (index >= 0 && index < _classColors.length) return _classColors[index];
+    return AppColors.accent;
+  }
 
   @override
   void initState() {
@@ -133,6 +159,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedYrLabel = years.first['yrlabel'];
       }
     });
+
+    // Auto-select initial student if provided
+    if (widget.initialStudent != null) {
+      final s = students.firstWhere(
+        (s) => s.stuId == widget.initialStudent!.stuId,
+        orElse: () => widget.initialStudent!,
+      );
+      setState(() {
+        _selectedClassFilter = s.stuclass;
+        _selectedStudent = s;
+      });
+      _populateStudentForm(s);
+    }
   }
 
   String? _normalizeBloodGroup(String? raw) {
@@ -294,6 +333,197 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return {for (final k in sortedKeys) k: map[k]!};
   }
 
+  Widget _buildStudentAvatar(StudentModel s, Color classColor, bool isSelected) {
+    final bgColor = isSelected
+        ? classColor.withValues(alpha: 0.2)
+        : classColor.withValues(alpha: 0.1);
+    final letter = Text(
+      s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
+      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 12),
+    );
+
+    if (s.stuphoto != null && s.stuphoto!.startsWith('http')) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundColor: bgColor,
+        child: ClipOval(
+          child: Image.network(
+            s.stuphoto!,
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => letter,
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: bgColor,
+      child: letter,
+    );
+  }
+
+  // ─── Left Panel Builders ─────────────────────────────────────────────────────
+
+  Widget _buildClassList() {
+    final grouped = _groupedStudents;
+    if (grouped.isEmpty) {
+      return const Center(child: Text('No classes found', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: grouped.length,
+      itemBuilder: (context, index) {
+        final className = grouped.keys.elementAt(index);
+        final students = grouped[className]!;
+        final classColor = _getClassColor(className);
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() {
+              _selectedClassFilter = className;
+              _searchController.clear();
+            }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: classColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(child: Icon(Icons.class_rounded, size: 18, color: classColor)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Class $className', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        Text('${students.length} students', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: classColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('${students.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: classColor)),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentListForClass(String className) {
+    final allStudents = _groupedStudents[className] ?? [];
+    final q = _searchController.text.toLowerCase();
+    final students = q.isEmpty
+        ? allStudents
+        : allStudents.where((s) =>
+            s.stuname.toLowerCase().contains(q) ||
+            s.stuadmno.toLowerCase().contains(q)).toList();
+    final classColor = _getClassColor(className);
+
+    return Column(
+      children: [
+        // Back button + class header
+        Container(
+          padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+          decoration: BoxDecoration(
+            color: classColor.withValues(alpha: 0.06),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() {
+                  _selectedClassFilter = null;
+                  _selectedStudent = null;
+                  _searchController.clear();
+                }),
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                color: classColor,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+              Icon(Icons.class_rounded, size: 14, color: classColor.withValues(alpha: 0.7)),
+              const SizedBox(width: 6),
+              Text('Class $className', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: classColor)),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: classColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('${allStudents.length}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: AppColors.border),
+        // Student list
+        Expanded(
+          child: students.isEmpty
+              ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: students.length,
+                  itemBuilder: (context, index) {
+                    final s = students[index];
+                    final isSelected = _selectedStudent?.stuId == s.stuId;
+                    return Material(
+                      color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _selectedStudent = s);
+                          _populateStudentForm(s);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          child: Row(
+                            children: [
+                              _buildStudentAvatar(s, classColor, isSelected),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 12, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    Text(s.stuadmno, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.accent),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -348,104 +578,32 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        // Search
-                        TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Search students...',
-                            hintStyle: const TextStyle(fontSize: 12),
-                            prefixIcon: const Icon(Icons.search_rounded, size: 16),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                            isDense: true,
+                        if (_selectedClassFilter != null) ...[
+                          const SizedBox(height: 10),
+                          // Search (only when viewing students)
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search students...',
+                              hintStyle: const TextStyle(fontSize: 12),
+                              prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 12),
+                            onChanged: (_) => setState(() {}),
                           ),
-                          style: const TextStyle(fontSize: 12),
-                          onChanged: (_) => setState(() {}),
-                        ),
+                        ],
                       ],
                     ),
                   ),
                   const Divider(height: 1, color: AppColors.border),
-                  // Student List (grouped by class)
+                  // Class list or Student list
                   Expanded(
-                    child: _filteredStudents.isEmpty
-                        ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)))
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            children: _groupedStudents.entries.expand((entry) {
-                              final className = entry.key;
-                              final students = entry.value;
-                              return [
-                                // Class header
-                                Container(
-                                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-                                  color: AppColors.accent.withValues(alpha: 0.06),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.class_rounded, size: 14, color: AppColors.accent.withValues(alpha: 0.7)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Class $className',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.accent.withValues(alpha: 0.8)),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.accent.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text('${students.length}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.accent.withValues(alpha: 0.7))),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                // Students in this class
-                                ...students.map((s) {
-                                  final isSelected = _selectedStudent?.stuId == s.stuId;
-                                  return Material(
-                                    color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
-                                    child: InkWell(
-                                      onTap: () {
-                                        setState(() => _selectedStudent = s);
-                                        _populateStudentForm(s);
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                        child: Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: isSelected
-                                                  ? AppColors.accent.withValues(alpha: 0.2)
-                                                  : AppColors.accent.withValues(alpha: 0.1),
-                                              backgroundImage: s.stuphoto != null ? NetworkImage(s.stuphoto!) : null,
-                                              child: s.stuphoto == null
-                                                  ? Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12))
-                                                  : null,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 12, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
-                                                  Text(s.stuadmno, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                                                ],
-                                              ),
-                                            ),
-                                            if (isSelected)
-                                              const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.accent),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }),
-                              ];
-                            }).toList(),
-                          ),
+                    child: _selectedClassFilter == null
+                        ? _buildClassList()
+                        : _buildStudentListForClass(_selectedClassFilter!),
                   ),
                 ],
               ),
