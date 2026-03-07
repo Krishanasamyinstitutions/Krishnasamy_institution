@@ -27,6 +27,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   int? _selectedDesId;
   int? _selectedReportTo;
   String? _selectedRole;
+  InstitutionUserModel? _selectedUser; // for drilldown
 
   List<Map<String, dynamic>> _designationsList = [];
   List<Map<String, dynamic>> _rolesList = [];
@@ -180,14 +181,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Left: Creation Form
-              Expanded(
-                flex: 2,
+              SizedBox(
+                width: 340,
                 child: _buildCreationForm(),
               ),
               const SizedBox(width: 24),
               // Right: Existing Users List
               Expanded(
-                flex: 3,
                 child: _buildUserList(),
               ),
             ],
@@ -423,6 +423,11 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   }
 
   Widget _buildUserList() {
+    // If a user is selected, show drilldown
+    if (_selectedUser != null) {
+      return _buildUserDetail(_selectedUser!);
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -431,224 +436,212 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       ),
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
               children: [
                 Icon(Icons.group_rounded, size: 18, color: AppColors.accent),
                 const SizedBox(width: 8),
-                const Text('Existing Users',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const Text('Existing Users', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    '${_users.length} users',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accent),
-                  ),
+                  child: Text('${_users.length} users', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent)),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded,
-                      size: 18, color: AppColors.textSecondary),
-                  onPressed: _fetchUsers,
-                ),
+                IconButton(icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.textSecondary), onPressed: _fetchUsers),
               ],
             ),
           ),
           const Divider(height: 1),
-          // Table header
+          // Simplified table header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             color: AppColors.primary.withValues(alpha: 0.03),
             child: const Row(
               children: [
-                SizedBox(
-                    width: 36,
-                    child: Text('#',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                Expanded(
-                    flex: 3,
-                    child: Text('Name',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                Expanded(
-                    flex: 2,
-                    child: Text('Designation',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                Expanded(
-                    flex: 2,
-                    child: Text('Role',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                Expanded(
-                    flex: 2,
-                    child: Text('Email',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                Expanded(
-                    flex: 2,
-                    child: Text('Phone',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary))),
-                SizedBox(
-                    width: 60,
-                    child: Center(
-                        child: Text('Status',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary)))),
+                SizedBox(width: 36, child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                Expanded(flex: 3, child: Text('Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                Expanded(flex: 2, child: Text('Designation', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                Expanded(flex: 2, child: Text('Role', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 70, child: Text('Status', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 30),
               ],
             ),
           ),
           const Divider(height: 1),
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
           else if (_users.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(
-                  child: Text('No users found',
-                      style: TextStyle(color: AppColors.textSecondary))),
-            )
+            const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('No users found', style: TextStyle(color: AppColors.textSecondary))))
           else
             ...List.generate(_users.length, (i) {
               final u = _users[i];
-              final reportTo = u.userepto > 0
-                  ? _users
-                      .where((x) => x.useId == u.userepto)
-                      .map((x) => x.usename)
-                      .firstOrNull
-                  : null;
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: const BoxDecoration(
-                  border: Border(
-                      top: BorderSide(color: AppColors.border, width: 0.5)),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                        width: 36,
-                        child: Text('${i + 1}',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary))),
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(u.usename,
-                              style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
-                          if (reportTo != null)
-                            Text('Reports to: $reportTo',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    color: AppColors.textSecondary
-                                        .withValues(alpha: 0.7))),
-                        ],
+              return InkWell(
+                onTap: () => setState(() => _selectedUser = u),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 36, child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                      Expanded(
+                        flex: 3,
+                        child: Text(u.usename, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
-                    ),
-                    Expanded(
+                      Expanded(flex: 2, child: Text(u.desname, style: const TextStyle(fontSize: 12))),
+                      Expanded(
                         flex: 2,
-                        child: Text(u.desname,
-                            style: const TextStyle(fontSize: 11))),
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: u.urname.toLowerCase() == 'admin'
-                              ? AppColors.accent.withValues(alpha: 0.1)
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          u.urname,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: u.urname.toLowerCase() == 'admin'
-                                ? AppColors.accent
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                        flex: 2,
-                        child: Text(u.usemail,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary),
-                            overflow: TextOverflow.ellipsis)),
-                    Expanded(
-                        flex: 2,
-                        child: Text(u.usephone,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary))),
-                    SizedBox(
-                      width: 60,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: u.isActive
-                                ? AppColors.success.withValues(alpha: 0.1)
-                                : AppColors.error.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            u.isActive ? 'Active' : 'Inactive',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: u.isActive
-                                  ? AppColors.success
-                                  : AppColors.error,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: u.urname.toLowerCase() == 'admin' ? AppColors.accent.withValues(alpha: 0.1) : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(u.urname, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: u.urname.toLowerCase() == 'admin' ? AppColors.accent : AppColors.textSecondary)),
                             ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 70,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: u.isActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 30, child: Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary)),
+                    ],
+                  ),
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserDetail(InstitutionUserModel u) {
+    final reportTo = u.userepto > 0
+        ? _users.where((x) => x.useId == u.userepto).map((x) => x.usename).firstOrNull
+        : null;
+
+    Widget detailRow(String label, String value, {IconData? icon, Color? valueColor}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: AppColors.accent),
+              const SizedBox(width: 10),
+            ],
+            SizedBox(
+              width: 130,
+              child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            ),
+            Expanded(
+              child: Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: valueColor ?? AppColors.textPrimary)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with back button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                  onPressed: () => setState(() => _selectedUser = null),
+                  tooltip: 'Back to list',
+                ),
+                const SizedBox(width: 4),
+                const Text('User Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: u.isActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // User avatar + name header
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                  child: Text(
+                    u.usename.isNotEmpty ? u.usename[0].toUpperCase() : '?',
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.accent),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(u.usename, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text('${u.desname} - ${u.urname}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Detail rows
+          const SizedBox(height: 8),
+          detailRow('Email', u.usemail, icon: Icons.email_rounded),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Phone', u.usephone, icon: Icons.phone_rounded),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Designation', u.desname, icon: Icons.badge_rounded),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Role', u.urname, icon: Icons.security_rounded, valueColor: u.urname.toLowerCase() == 'admin' ? AppColors.accent : null),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Reports To', reportTo ?? 'None', icon: Icons.supervisor_account_rounded),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Start Date', '${u.usestadate.day.toString().padLeft(2, '0')}/${u.usestadate.month.toString().padLeft(2, '0')}/${u.usestadate.year}', icon: Icons.calendar_today_rounded),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Date of Birth', '${u.usedob.day.toString().padLeft(2, '0')}/${u.usedob.month.toString().padLeft(2, '0')}/${u.usedob.year}', icon: Icons.cake_rounded),
+          if (u.usecategory != null && u.usecategory!.isNotEmpty) ...[
+            Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+            detailRow('Category', u.usecategory!, icon: Icons.category_rounded),
+          ],
+          const SizedBox(height: 16),
         ],
       ),
     );
