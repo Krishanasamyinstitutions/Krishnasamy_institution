@@ -6,7 +6,6 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
 import '../students/students_screen.dart';
-import '../fees/fees_screen.dart';
 import '../fees/fee_collection_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
@@ -66,7 +65,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, 'Students'),
     _NavItem(Icons.domain_add_rounded, 'Institution creation'),
-    _NavItem(Icons.account_balance_wallet_rounded, 'Fees'),
     _NavItem(Icons.receipt_long_rounded, 'Transactions'),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation'),
     _NavItem(Icons.settings_rounded, 'Designation & Role'),
@@ -595,7 +593,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
+    return label == 'Dashboard' || label == 'Students' || label == 'Institution creation' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -607,9 +605,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final student = _navigateToStudent;
       _navigateToStudent = null;
       return StudentsScreen(key: student != null ? ValueKey(student.stuId) : null, initialStudent: student);
-    }
-    if (selectedMenu == 'Fees') {
-      return const FeesScreen();
     }
     if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();

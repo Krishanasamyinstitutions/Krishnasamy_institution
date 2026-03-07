@@ -135,19 +135,25 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               _failedTransactions.length,
             ];
 
-            return Row(
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
               children: List.generate(3, (i) {
                 final isActive = selected == i;
                 return Expanded(
                   child: GestureDetector(
                     onTap: () => _tabController.animateTo(i),
                     child: Container(
-                      margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
+                      margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: isActive ? tabColors[i] : Colors.white,
+                        color: isActive ? tabColors[i] : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isActive ? tabColors[i] : AppColors.border),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -173,6 +179,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   ),
                 );
               }),
+            ),
             );
           },
         ),

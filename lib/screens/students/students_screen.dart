@@ -423,22 +423,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
     }
   }
 
-  void _importClassStudents(String className) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _ExcelImportDialog(
-        years: _years,
-        selectedYrId: _selectedYrId,
-        selectedYrLabel: _selectedYrLabel,
-        defaultClass: className,
-        onImportDone: () {
-          _loadDropdowns();
-        },
-      ),
-    );
-  }
-
   // ─── Left Panel Builders ─────────────────────────────────────────────────────
 
   Widget _buildClassList() {
@@ -495,40 +479,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     child: Text('${students.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: classColor)),
                   ),
                   const SizedBox(width: 8),
-                  Tooltip(
-                    message: 'Import to $className',
-                    child: InkWell(
-                      onTap: () => _importClassStudents(className),
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                        ),
-                        child: const Icon(Icons.file_upload_rounded, size: 14, color: AppColors.info),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Export $className',
-                    child: InkWell(
-                      onTap: () => _exportClassStudents(className, students),
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                        ),
-                        child: const Icon(Icons.file_download_rounded, size: 14, color: AppColors.success),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
                 ],
               ),
@@ -667,30 +617,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   child: Text('${allStudents.length} students', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: classColor)),
                 ),
                 const Spacer(),
-                Tooltip(
-                  message: 'Import to $className',
-                  child: InkWell(
-                    onTap: () => _importClassStudents(className),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.file_upload_rounded, size: 14, color: AppColors.info),
-                          SizedBox(width: 4),
-                          Text('Import', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.info)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Tooltip(
                   message: 'Export $className',
                   child: InkWell(
@@ -1454,14 +1380,11 @@ class _ExcelImportDialog extends StatefulWidget {
   final String? selectedYrId;
   final String? selectedYrLabel;
   final VoidCallback onImportDone;
-  final String? defaultClass;
-
   const _ExcelImportDialog({
     required this.years,
     required this.selectedYrId,
     required this.selectedYrLabel,
     required this.onImportDone,
-    this.defaultClass,
   });
 
   @override
