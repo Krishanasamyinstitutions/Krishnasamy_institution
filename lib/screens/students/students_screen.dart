@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -138,27 +139,38 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
 
-    final years = await SupabaseService.getYears(insId);
-    final concessions = await SupabaseService.getConcessions(insId);
-    final rawClasses = await SupabaseService.getClasses(insId);
-    final insInfo = await SupabaseService.getInstitutionInfo(insId);
-    final students = await SupabaseService.getStudents(insId);
+    // Load lightweight data in parallel so class list appears immediately
+    final results = await Future.wait<dynamic>([
+      SupabaseService.getYears(insId),
+      SupabaseService.getConcessions(insId),
+      SupabaseService.getClasses(insId),
+      SupabaseService.getInstitutionInfo(insId),
+    ]);
+
+    if (!mounted) return;
+    final years = results[0] as List<Map<String, dynamic>>;
+    final concessions = results[1] as List<Map<String, dynamic>>;
+    final rawClasses = results[2] as List<String>;
+    final insInfo = results[3] as ({String? name, String? logo});
     final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
     final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
 
-    if (!mounted) return;
     setState(() {
       _years = years;
       _concessions = concessions;
       _classes = [...ordered, ...extra];
       _insName = insInfo.name;
       _insLogo = insInfo.logo;
-      _students = students;
       if (years.isNotEmpty) {
         _selectedYrId = years.first['yr_id'].toString();
         _selectedYrLabel = years.first['yrlabel'];
       }
     });
+
+    // Load students in background — class list is already visible
+    final students = await SupabaseService.getStudents(insId);
+    if (!mounted) return;
+    setState(() => _students = students);
 
     // Auto-select initial student if provided
     if (widget.initialStudent != null) {
@@ -365,6 +377,52 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  // ─── Import / Export ─────────────────────────────────────────────────────────
+
+  Future<void> _exportClassStudents(String className, List<StudentModel> students) async {
+    if (students.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No students to export')));
+      return;
+    }
+
+    final headers = ['Adm No', 'Student Name', 'Gender', 'DOB', 'Class', 'Mobile', 'Email', 'Address', 'City', 'State', 'Blood Group'];
+    final rows = <List<String>>[headers];
+    for (final s in students) {
+      rows.add([
+        s.stuadmno,
+        s.stuname,
+        s.gender,
+        '${s.studob.day.toString().padLeft(2, '0')}/${s.studob.month.toString().padLeft(2, '0')}/${s.studob.year}',
+        s.stuclass,
+        s.stumobile,
+        s.stuemail ?? '',
+        s.stuaddress ?? '',
+        s.stucity ?? '',
+        s.stustate ?? '',
+        s.stubloodgrp ?? '',
+      ]);
+    }
+
+    final csv = const ListToCsvConverter().convert(rows);
+
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Export Class $className Students',
+      fileName: 'Class_${className}_Students.csv',
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+
+    if (result != null) {
+      final file = File(result);
+      await file.writeAsString(csv);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported ${students.length} students to CSV'), backgroundColor: AppColors.success),
+        );
+      }
+    }
+  }
+
   // ─── Left Panel Builders ─────────────────────────────────────────────────────
 
   Widget _buildClassList() {
@@ -420,7 +478,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     ),
                     child: Text('${students.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: classColor)),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
                 ],
               ),
@@ -524,6 +582,122 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  Widget _buildClassStudentTable(String className) {
+    final allStudents = _groupedStudents[className] ?? [];
+    final classColor = _getClassColor(className);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            decoration: BoxDecoration(
+              color: classColor.withValues(alpha: 0.04),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.class_rounded, size: 20, color: classColor),
+                const SizedBox(width: 8),
+                Text('Class $className', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: classColor)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: classColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: classColor)),
+                ),
+                const Spacer(),
+                Tooltip(
+                  message: 'Export $className',
+                  child: InkWell(
+                    onTap: () => _exportClassStudents(className, allStudents),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.file_download_rounded, size: 14, color: AppColors.success),
+                          SizedBox(width: 4),
+                          Text('Export', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.success)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          // Table header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            color: AppColors.surface,
+            child: const Row(
+              children: [
+                SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 100, child: Text('Adm No', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                Expanded(child: Text('Student Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 80, child: Text('Gender', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 120, child: Text('Mobile', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          // Student rows
+          Expanded(
+            child: allStudents.isEmpty
+                ? const Center(child: Text('No students in this class', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)))
+                : ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: allStudents.length,
+                    itemBuilder: (context, index) {
+                      final s = allStudents[index];
+                      return InkWell(
+                        onTap: () {
+                          setState(() => _selectedStudent = s);
+                          _populateStudentForm(s);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: index.isEven ? Colors.white : AppColors.surface,
+                            border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(width: 40, child: Text('${index + 1}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                              SizedBox(width: 100, child: Text(s.stuadmno, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                              Expanded(child: Text(s.stuname, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                              SizedBox(width: 80, child: Text(s.stugender, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                              SizedBox(width: 120, child: Text(s.stumobile, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -615,16 +789,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // RIGHT — Student Details (only if selected)
           Expanded(
             child: _selectedStudent == null
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.person_search_rounded, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                        const SizedBox(height: 12),
-                        Text('Select a student to view details', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 14, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  )
+                ? _selectedClassFilter != null
+                    ? _buildClassStudentTable(_selectedClassFilter!)
+                    : Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.person_search_rounded, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                            const SizedBox(height: 12),
+                            Text('Select a student to view details', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 14, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      )
                 : Column(
                     children: [
                       Expanded(
@@ -1204,7 +1380,6 @@ class _ExcelImportDialog extends StatefulWidget {
   final String? selectedYrId;
   final String? selectedYrLabel;
   final VoidCallback onImportDone;
-
   const _ExcelImportDialog({
     required this.years,
     required this.selectedYrId,

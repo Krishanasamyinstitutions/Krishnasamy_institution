@@ -120,118 +120,68 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         ),
         const SizedBox(height: 16),
 
-        // Tab bar at the top
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            indicator: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+        // Tab buttons with colored active states
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            final tabColors = [AppColors.accent, Colors.green.shade600, Colors.red.shade600];
+            final tabBgColors = [AppColors.accent.withValues(alpha: 0.1), Colors.green.shade50, Colors.red.shade50];
+            final tabIcons = [Icons.list_alt_rounded, Icons.check_circle_rounded, Icons.error_rounded];
+            final tabLabels = ['All', 'Paid', 'Failed'];
+            final tabCounts = [
+              _paidTransactions.length + _failedTransactions.length,
+              _paidTransactions.length,
+              _failedTransactions.length,
+            ];
+
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+              children: List.generate(3, (i) {
+                final isActive = selected == i;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(i),
+                    child: Container(
+                      margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isActive ? tabColors[i] : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(tabIcons[i], size: 16, color: isActive ? Colors.white : tabColors[i]),
+                          const SizedBox(width: 8),
+                          Text(tabLabels[i], style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textPrimary)),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isActive ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${tabCounts[i]}',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isActive ? Colors.white : tabColors[i]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
             ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            dividerColor: Colors.transparent,
-            labelColor: AppColors.textPrimary,
-            unselectedLabelColor: AppColors.textSecondary,
-            labelStyle:
-                const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            tabs: [
-              Tab(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.list_alt_rounded,
-                        size: 16, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    const Text('All'),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_paidTransactions.length + _failedTransactions.length}',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Tab(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle_rounded,
-                        size: 16, color: Colors.green.shade600),
-                    const SizedBox(width: 8),
-                    const Text('Paid'),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_paidTransactions.length}',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Tab(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_rounded,
-                        size: 16, color: Colors.red.shade600),
-                    const SizedBox(width: 8),
-                    const Text('Failed'),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_failedTransactions.length}',
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
         const SizedBox(height: 16),
 

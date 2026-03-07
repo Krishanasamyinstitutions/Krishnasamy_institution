@@ -6,11 +6,12 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
 import '../students/students_screen.dart';
-import '../fees/fees_screen.dart';
 import '../fees/fee_collection_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
 import '../admin/settings_screen.dart';
+import '../notices/notices_screen.dart';
+import '../notifications/notification_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -64,11 +65,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, 'Students'),
     _NavItem(Icons.domain_add_rounded, 'Institution creation'),
-    _NavItem(Icons.account_balance_wallet_rounded, 'Fees'),
     _NavItem(Icons.receipt_long_rounded, 'Transactions'),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation'),
     _NavItem(Icons.settings_rounded, 'Designation & Role'),
     _NavItem(Icons.notifications_rounded, 'Notices'),
+    _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
 
   @override
@@ -470,7 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Stack(
             children: [
               IconButton(
-                onPressed: () {},
+                onPressed: () => setState(() => _selectedNavIndex = 8),
                 icon: const Icon(Icons.notifications_outlined, size: 22),
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.surface,
@@ -592,7 +593,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fees' || label == 'Institution creation' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role';
+    return label == 'Dashboard' || label == 'Students' || label == 'Institution creation' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -605,9 +606,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _navigateToStudent = null;
       return StudentsScreen(key: student != null ? ValueKey(student.stuId) : null, initialStudent: student);
     }
-    if (selectedMenu == 'Fees') {
-      return const FeesScreen();
-    }
     if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();
     }
@@ -616,6 +614,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Designation & Role') {
       return const SettingsScreen();
+    }
+    if (selectedMenu == 'Notices') {
+      return const NoticesScreen();
+    }
+    if (selectedMenu == 'Notifications') {
+      return const NotificationScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();
@@ -643,13 +647,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Split layout: LEFT = Institution Info | RIGHT = Affiliation + Address
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // LEFT — Institution Information
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -665,14 +666,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: Row(children: [
                           Icon(Icons.domain_add_rounded, color: AppColors.accent, size: 20),
                           SizedBox(width: 8),
-                          Text('Institution Information',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          Text('Institution Information', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                         ]),
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20),
-                        child: Divider(color: AppColors.border),
-                      ),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(color: AppColors.border)),
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
@@ -689,16 +686,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               )),
                               const SizedBox(height: 14),
                               _insRow2(
-                                _insField(label: 'Institution Name *', child: TextFormField(
-                                  controller: _institutionNameController,
-                                  decoration: _insDec('Enter institution name'),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                )),
-                                _insField(label: 'Institution Code *', child: TextFormField(
-                                  controller: _institutionCodeController,
-                                  decoration: _insDec('Enter institution code'),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                )),
+                                _insField(label: 'Institution Name *', child: TextFormField(controller: _institutionNameController, decoration: _insDec('Enter institution name'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                                _insField(label: 'Institution Code *', child: TextFormField(controller: _institutionCodeController, decoration: _insDec('Enter institution code'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
                               ),
                               const SizedBox(height: 14),
                               _insField(
@@ -706,49 +695,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: InkWell(
                                   onTap: _pickInstitutionStartDate,
                                   child: InputDecorator(
-                                    decoration: _insDec('Select date').copyWith(
-                                      suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
-                                    ),
+                                    decoration: _insDec('Select date').copyWith(suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary)),
                                     child: Text(
                                       _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
-                                      style: TextStyle(
-                                        color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                                        fontSize: 13,
-                                        fontWeight: _institutionStartDate != null ? FontWeight.w700 : FontWeight.normal,
-                                      ),
+                                      style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _institutionStartDate != null ? FontWeight.w700 : FontWeight.normal),
                                     ),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 14),
                               _insRow2(
-                                _insField(label: 'Authorized Username', child: TextFormField(
-                                  controller: _authorizedUsernameController,
-                                  decoration: _insDec('Enter authorized username'),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                )),
-                                _insField(label: 'Designation', child: TextFormField(
-                                  controller: _designationController,
-                                  decoration: _insDec('Enter designation'),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                )),
+                                _insField(label: 'Authorized Username', child: TextFormField(controller: _authorizedUsernameController, decoration: _insDec('Enter authorized username'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                                _insField(label: 'Designation', child: TextFormField(controller: _designationController, decoration: _insDec('Enter designation'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
                               ),
                               const SizedBox(height: 14),
                               _insRow2(
-                                _insField(label: 'Mobile Number', child: TextFormField(
-                                  controller: _mobileNumberController,
-                                  decoration: _insDec('Enter mobile number'),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                  keyboardType: TextInputType.phone,
-                                )),
+                                _insField(label: 'Mobile Number', child: TextFormField(controller: _mobileNumberController, decoration: _insDec('Enter mobile number'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary), keyboardType: TextInputType.phone)),
                                 _insField(label: 'Institution Recognized', child: DropdownButtonFormField<String>(
                                   initialValue: _institutionRecognized,
                                   decoration: _insDec('Select'),
                                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                  items: const [
-                                    DropdownMenuItem(value: 'Yes', child: Text('Yes')),
-                                    DropdownMenuItem(value: 'No', child: Text('No')),
-                                  ],
+                                  items: const [DropdownMenuItem(value: 'Yes', child: Text('Yes')), DropdownMenuItem(value: 'No', child: Text('No'))],
                                   onChanged: (v) { if (v != null) setState(() => _institutionRecognized = v); },
                                 )),
                               ),
@@ -760,117 +727,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 16),
-
-              // RIGHT — Affiliation + Address
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      // Affiliation card
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(children: [
-                              Icon(Icons.verified_rounded, color: AppColors.accent, size: 20),
-                              SizedBox(width: 8),
-                              Text('Affiliation Information', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                            ]),
-                            const SizedBox(height: 4),
-                            const Divider(color: AppColors.border),
-                            const SizedBox(height: 12),
-                            _insRow2(
-                              _insField(label: 'Institution Affiliation', child: TextFormField(
-                                controller: _institutionAffiliationController,
-                                decoration: _insDec('Enter affiliation'),
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                              )),
-                              _insField(label: 'Affiliation Number', child: TextFormField(
-                                controller: _affiliationNumberController,
-                                decoration: _insDec('Enter affiliation number'),
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                              )),
+                        width: double.infinity, padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Row(children: [Icon(Icons.verified_rounded, color: AppColors.accent, size: 20), SizedBox(width: 8), Text('Affiliation Information', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary))]),
+                          const SizedBox(height: 4), const Divider(color: AppColors.border), const SizedBox(height: 12),
+                          _insRow2(
+                            _insField(label: 'Institution Affiliation', child: TextFormField(controller: _institutionAffiliationController, decoration: _insDec('Enter affiliation'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                            _insField(label: 'Affiliation Number', child: TextFormField(controller: _affiliationNumberController, decoration: _insDec('Enter affiliation number'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                          ),
+                          const SizedBox(height: 14),
+                          _insField(label: 'Affiliation Start Year', child: InkWell(
+                            onTap: _pickAffiliationStartYear,
+                            child: InputDecorator(
+                              decoration: _insDec('Select year').copyWith(suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary)),
+                              child: Text(_affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year', style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _affiliationStartYear != null ? FontWeight.w700 : FontWeight.normal)),
                             ),
-                            const SizedBox(height: 14),
-                            _insField(
-                              label: 'Affiliation Start Year',
-                              child: InkWell(
-                                onTap: _pickAffiliationStartYear,
-                                child: InputDecorator(
-                                  decoration: _insDec('Select year').copyWith(
-                                    suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
-                                  ),
-                                  child: Text(
-                                    _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
-                                    style: TextStyle(
-                                      color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                                      fontSize: 13,
-                                      fontWeight: _affiliationStartYear != null ? FontWeight.w700 : FontWeight.normal,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          )),
+                        ]),
                       ),
                       const SizedBox(height: 16),
-                      // Address card
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(children: [
-                              Icon(Icons.location_on_rounded, color: AppColors.accent, size: 20),
-                              SizedBox(width: 8),
-                              Text('Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                            ]),
-                            const SizedBox(height: 4),
-                            const Divider(color: AppColors.border),
-                            const SizedBox(height: 12),
-                            _insField(label: 'Address Line 1 *', child: TextFormField(
-                              controller: _address1Controller,
-                              decoration: _insDec('Enter address line 1'),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                            )),
-                            const SizedBox(height: 14),
-                            _insField(label: 'Address Line 2', child: TextFormField(
-                              controller: _address2Controller,
-                              decoration: _insDec('Enter address line 2'),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                            )),
-                            const SizedBox(height: 14),
-                            _insRow2(
-                              _insField(label: 'Address Line 3', child: TextFormField(
-                                controller: _address3Controller,
-                                decoration: _insDec('Enter address line 3'),
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                              )),
-                              _insField(label: 'Pin Code', child: TextFormField(
-                                controller: _pinCodeController,
-                                decoration: _insDec('Enter pin code'),
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
-                                keyboardType: TextInputType.number,
-                              )),
-                            ),
-                          ],
-                        ),
+                        width: double.infinity, padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Row(children: [Icon(Icons.location_on_rounded, color: AppColors.accent, size: 20), SizedBox(width: 8), Text('Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary))]),
+                          const SizedBox(height: 4), const Divider(color: AppColors.border), const SizedBox(height: 12),
+                          _insField(label: 'Address Line 1 *', child: TextFormField(controller: _address1Controller, decoration: _insDec('Enter address line 1'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                          const SizedBox(height: 14),
+                          _insField(label: 'Address Line 2', child: TextFormField(controller: _address2Controller, decoration: _insDec('Enter address line 2'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                          const SizedBox(height: 14),
+                          _insRow2(
+                            _insField(label: 'Address Line 3', child: TextFormField(controller: _address3Controller, decoration: _insDec('Enter address line 3'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary))),
+                            _insField(label: 'Pin Code', child: TextFormField(controller: _pinCodeController, decoration: _insDec('Enter pin code'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary), keyboardType: TextInputType.number)),
+                          ),
+                        ]),
                       ),
                       const SizedBox(height: 24),
                     ],

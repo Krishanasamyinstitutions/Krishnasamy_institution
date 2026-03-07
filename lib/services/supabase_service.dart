@@ -120,6 +120,36 @@ class SupabaseService {
     }
   }
 
+  /// Lightweight: fetch only stu_id, stuname, stuadmno for name lookups
+  static Future<Map<int, Map<String, String>>> getStudentNameMap(int insId) async {
+    try {
+      const batchSize = 1000;
+      int offset = 0;
+      final Map<int, Map<String, String>> result = {};
+      while (true) {
+        final batch = await client
+            .from('students')
+            .select('stu_id, stuname, stuadmno')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1)
+            .range(offset, offset + batchSize - 1);
+        final list = batch as List;
+        for (final s in list) {
+          result[s['stu_id'] as int] = {
+            'stuname': s['stuname'] as String? ?? '',
+            'stuadmno': s['stuadmno'] as String? ?? '',
+          };
+        }
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching student name map: $e');
+      return {};
+    }
+  }
+
   /// Add a new student record — returns the new stu_id
   static Future<int> addStudent(Map<String, dynamic> data) async {
     final response = await client
@@ -696,6 +726,24 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       debugPrint('Error fetching paid transactions: $e');
+      return [];
+    }
+  }
+
+  // ==================== ROLES ====================
+
+  /// Get active roles for an institution from custuserroles table
+  static Future<List<Map<String, dynamic>>> getRoles(int insId) async {
+    try {
+      final response = await client
+          .from('custuserroles')
+          .select('ur_id, urname')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('ur_id', ascending: true);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
       return [];
     }
   }

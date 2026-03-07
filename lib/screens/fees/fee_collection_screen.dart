@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
-import '../../models/student_model.dart';
 
 const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
@@ -106,8 +105,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   Map<String, dynamic>? _selectedPayment; // selected payment data
   List<Map<String, dynamic>>? _feeDetails;
   bool _loadingFeeDetails = false;
-  // Pending fees drilldown
+  // Card drilldowns
   bool _showPendingFees = false;
+  bool _showTotalCollection = false;
+  bool _showTodayCollection = false;
   String? _selectedPendingFeeGroup; // null = group list, non-null = student drilldown
   List<Map<String, dynamic>> _demands = [];
   Map<int, String> _feeGroupMap = {};
@@ -115,6 +116,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   Map<String, String> _admNoToName = {};
   String? _pendingFeeTypeFilter;
   String? _pendingClassFilter;
+  String _pendingSearchQuery = '';
+  int _pendingPage = 0;
+  static const int _pendingPageSize = 10;
+  String _pendingStudentSearch = '';
+  final TextEditingController _pendingStudentSearchController = TextEditingController();
+  // Collection drilldown filters
+  String? _collectionMethodFilter;
+  String? _collectionClassFilter;
+  String _collectionSearchQuery = '';
 
   @override
   bool get wantKeepAlive => true;
@@ -125,6 +135,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     _fetchData();
   }
 
+  @override
+  void dispose() {
+    _pendingStudentSearchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
@@ -132,37 +148,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     setState(() => _isLoading = true);
 
-    final results = await Future.wait([
-      SupabaseService.getPaymentsByDateRange(
-        insId,
-        fromDate: _fromDate,
-        toDate: _toDate,
-      ),
-      SupabaseService.getFeeDemands(insId),
+    // Stage 1: Fast — payments + fee group map (no pagination loops)
+    final fastResults = await Future.wait([
+      SupabaseService.getPaymentsByDateRange(insId, fromDate: _fromDate, toDate: _toDate),
       SupabaseService.getFeeGroupMap(insId),
-      SupabaseService.getStudents(insId),
     ]);
 
-    final payments = results[0] as List<Map<String, dynamic>>;
-    final demands = results[1] as List<Map<String, dynamic>>;
-    final feeGroupMap = results[2] as Map<int, String>;
-    final students = results[3] as List<StudentModel>;
+    final payments = fastResults[0] as List<Map<String, dynamic>>;
+    final feeGroupMap = fastResults[1] as Map<int, String>;
 
-    // Build student name maps
-    final stuIdToName = <int, String>{};
-    final admNoToName = <String, String>{};
-    for (final s in students) {
-      stuIdToName[s.stuId] = s.stuname;
-      admNoToName[s.stuadmno] = s.stuname;
-    }
-
-    // Compute pending fees from demands
-    double pendingFees = 0;
-    for (final d in demands) {
-      pendingFees += (d['balancedue'] as num?)?.toDouble() ?? 0;
-    }
-
-    // Compute today's collection from payments
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     double todayCollection = 0;
@@ -186,20 +180,46 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       }
       return _DateGroup(date: e.key, payments: e.value, totalAmount: total);
     }).toList();
-
     dateGroups.sort((a, b) => b.date.compareTo(a.date));
 
+    // Show table immediately — no waiting for heavy data
     if (mounted) {
       setState(() {
         _payments = payments;
         _dateGroups = dateGroups;
-        _pendingFees = pendingFees;
         _todayCollection = todayCollection;
-        _demands = demands;
         _feeGroupMap = feeGroupMap;
+        _isLoading = false;
+      });
+    }
+
+    // Stage 2: Background — demands + student names (lightweight columns only)
+    final slowResults = await Future.wait([
+      SupabaseService.getFeeDemands(insId),
+      SupabaseService.getStudentNameMap(insId),
+    ]);
+
+    final demands = slowResults[0] as List<Map<String, dynamic>>;
+    final studentNameMap = slowResults[1] as Map<int, Map<String, String>>;
+
+    double pendingFees = 0;
+    for (final d in demands) {
+      pendingFees += (d['balancedue'] as num?)?.toDouble() ?? 0;
+    }
+
+    final stuIdToName = <int, String>{};
+    final admNoToName = <String, String>{};
+    for (final entry in studentNameMap.entries) {
+      stuIdToName[entry.key] = entry.value['stuname'] ?? '';
+      admNoToName[entry.value['stuadmno'] ?? ''] = entry.value['stuname'] ?? '';
+    }
+
+    if (mounted) {
+      setState(() {
+        _demands = demands;
+        _pendingFees = pendingFees;
         _stuIdToName = stuIdToName;
         _admNoToName = admNoToName;
-        _isLoading = false;
       });
     }
   }
@@ -426,13 +446,31 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             // Summary cards
             Row(
               children: [
-                _buildSummaryCard(Icons.currency_rupee, AppColors.accent, _formatCurrency(_totalCollection), 'Total Collection'),
+                _buildClickableSummaryCard(Icons.currency_rupee, AppColors.accent, _formatCurrency(_totalCollection), 'Total Collection', () {
+                  setState(() {
+                    _showTotalCollection = true;
+                    _showTodayCollection = false;
+                    _showPendingFees = false;
+                    _selectedDate = null;
+                    _selectedPayId = null;
+                  });
+                }),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.today_rounded, Colors.blue, _formatCurrency(_todayCollection), 'Today Collection'),
+                _buildClickableSummaryCard(Icons.today_rounded, Colors.blue, _formatCurrency(_todayCollection), 'Today Collection', () {
+                  setState(() {
+                    _showTodayCollection = true;
+                    _showTotalCollection = false;
+                    _showPendingFees = false;
+                    _selectedDate = null;
+                    _selectedPayId = null;
+                  });
+                }),
                 const SizedBox(width: 16),
                 _buildClickableSummaryCard(Icons.pending_actions_rounded, Colors.orange, _formatCurrency(_pendingFees), 'Pending Fees', () {
                   setState(() {
                     _showPendingFees = true;
+                    _showTotalCollection = false;
+                    _showTodayCollection = false;
                     _selectedDate = null;
                     _selectedPayId = null;
                     _pendingFeeTypeFilter = null;
@@ -443,7 +481,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             ),
             const SizedBox(height: 16),
             // Show drilldown or date list based on selection
-            if (_showPendingFees)
+            if (_showTotalCollection)
+              _buildCollectionDrilldown(false)
+            else if (_showTodayCollection)
+              _buildCollectionDrilldown(true)
+            else if (_showPendingFees)
               _buildPendingFeesView()
             else if (_selectedPayId != null && _selectedDate != null)
               _buildFeeDetailDrilldown()
@@ -458,6 +500,346 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ),
       ),
     );
+  }
+
+  Widget _buildCollectionDrilldown(bool todayOnly) {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    // Base filter: today or all
+    var basePayments = todayOnly
+        ? _payments.where((p) => _extractDate(p['paydate']) == todayStr).toList()
+        : List<Map<String, dynamic>>.from(_payments);
+
+    // Get unique methods and classes for dropdowns (before applying filters)
+    final methods = basePayments.map((p) => p['paymethod']?.toString() ?? 'Unknown').toSet().toList()..sort();
+    // Get classes from student map via stu_id -> demand stuclass
+    final classSet = <String>{};
+    for (final p in basePayments) {
+      final stuId = p['stu_id'] as int?;
+      if (stuId != null) {
+        final demand = _demands.firstWhere((d) => d['stu_id'] == stuId, orElse: () => {});
+        final cls = demand['stuclass']?.toString();
+        if (cls != null && cls.isNotEmpty) classSet.add(cls);
+      }
+    }
+    final classes = classSet.toList()..sort(_compareClass);
+
+    // Apply filters
+    final filtered = basePayments.where((p) {
+      if (_collectionMethodFilter != null && (p['paymethod']?.toString() ?? 'Unknown') != _collectionMethodFilter) return false;
+      if (_collectionClassFilter != null) {
+        final stuId = p['stu_id'] as int?;
+        if (stuId == null) return false;
+        final demand = _demands.firstWhere((d) => d['stu_id'] == stuId, orElse: () => {});
+        if (demand['stuclass']?.toString() != _collectionClassFilter) return false;
+      }
+      if (_collectionSearchQuery.isNotEmpty) {
+        final query = _collectionSearchQuery.toLowerCase();
+        final stuId = p['stu_id'] as int?;
+        final stuName = (stuId != null && _stuIdToName.containsKey(stuId)) ? _stuIdToName[stuId]! : '';
+        final payNo = p['paynumber']?.toString() ?? '';
+        final admNo = p['stuadmno']?.toString() ?? '';
+        if (!stuName.toLowerCase().contains(query) && !payNo.toLowerCase().contains(query) && !admNo.toLowerCase().contains(query)) return false;
+      }
+      return true;
+    }).toList();
+
+    // Group by payment method
+    final Map<String, List<Map<String, dynamic>>> byMethod = {};
+    for (final p in filtered) {
+      final method = p['paymethod']?.toString() ?? 'Unknown';
+      byMethod.putIfAbsent(method, () => []).add(p);
+    }
+    final methodKeys = byMethod.keys.toList()..sort();
+
+    // Totals
+    double total = 0;
+    int totalCount = 0;
+    final allStuIds = <String>{};
+    for (final p in filtered) {
+      total += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+      totalCount++;
+      final sid = p['stu_id']?.toString();
+      if (sid != null) allStuIds.add(sid);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Back + header + filters
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              onPressed: () => setState(() {
+                _showTotalCollection = false;
+                _showTodayCollection = false;
+                _collectionMethodFilter = null;
+                _collectionClassFilter = null;
+                _collectionSearchQuery = '';
+              }),
+              tooltip: 'Back',
+            ),
+            const SizedBox(width: 4),
+            Text(
+              todayOnly ? 'Today Collection' : 'Total Collection',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            ),
+            if (todayOnly) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(todayStr, style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.w500)),
+              ),
+            ],
+            const Spacer(),
+            // Search field
+            SizedBox(
+              width: 180,
+              height: 34,
+              child: TextField(
+                onChanged: (v) => setState(() => _collectionSearchQuery = v),
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  hintText: 'Search student / pay no...',
+                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Payment Method dropdown
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _collectionMethodFilter,
+                  hint: const Text('All Methods', style: TextStyle(fontSize: 12)),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  isDense: true,
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                    ...methods.map((m) => DropdownMenuItem<String?>(value: m, child: Text(m))),
+                  ],
+                  onChanged: (v) => setState(() => _collectionMethodFilter = v),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Class dropdown
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _collectionClassFilter,
+                  hint: const Text('All Classes', style: TextStyle(fontSize: 12)),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  isDense: true,
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
+                    ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+                  ],
+                  onChanged: (v) => setState(() => _collectionClassFilter = v),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Summary row
+        Row(
+          children: [
+            _buildSummaryCard(Icons.receipt_long, AppColors.accent, '$totalCount', 'Transactions'),
+            const SizedBox(width: 12),
+            _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, '${allStuIds.length}', 'Students'),
+            const SizedBox(width: 12),
+            _buildSummaryCard(Icons.currency_rupee, AppColors.success, _formatCurrency(total), 'Total Amount'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Payment method-wise table
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: const Row(
+                  children: [
+                    SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 3, child: Text('Payment Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Transactions', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Students', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 3, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                  ],
+                ),
+              ),
+              if (methodKeys.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Center(child: Text('No collections found', style: TextStyle(color: AppColors.textSecondary))),
+                )
+              else
+                ...methodKeys.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final method = entry.value;
+                  final items = byMethod[method]!;
+                  double mTotal = 0;
+                  final mStuIds = <String>{};
+                  for (final p in items) {
+                    mTotal += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                    final sid = p['stu_id']?.toString();
+                    if (sid != null) mStuIds.add(sid);
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 40, child: Text('${idx + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+                        Expanded(flex: 3, child: Text(method, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                        Expanded(flex: 2, child: Text('${items.length}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
+                        Expanded(flex: 2, child: Text('${mStuIds.length}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
+                        Expanded(flex: 3, child: Text(_formatCurrency(mTotal), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.success))),
+                      ],
+                    ),
+                  );
+                }),
+              // Total row
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 40),
+                    const Expanded(flex: 3, child: Text('Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                    Expanded(flex: 2, child: Text('$totalCount', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                    Expanded(flex: 2, child: Text('${allStuIds.length}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                    Expanded(flex: 3, child: Text(_formatCurrency(total), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.success))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Individual payment list
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    const Text('Payment Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text('${filtered.length} records', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              // Table header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                color: Colors.grey.shade50,
+                child: const Row(
+                  children: [
+                    SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Pay No', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 3, child: Text('Student', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Date', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                  ],
+                ),
+              ),
+              if (filtered.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Center(child: Text('No payments found', style: TextStyle(color: AppColors.textSecondary))),
+                )
+              else
+                ...filtered.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final p = entry.value;
+                  final stuId = p['stu_id'] as int?;
+                  final stuName = (stuId != null && _stuIdToName.containsKey(stuId))
+                      ? _stuIdToName[stuId]!
+                      : (p['stuadmno']?.toString() ?? '-');
+                  final amount = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 40, child: Text('${idx + 1}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                        Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontSize: 12))),
+                        Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
+                        Expanded(flex: 2, child: Text(_formatDate(p['paydate']), style: const TextStyle(fontSize: 12))),
+                        Expanded(flex: 2, child: Text(p['paymethod']?.toString() ?? '-', style: const TextStyle(fontSize: 12))),
+                        Expanded(flex: 2, child: Text(_formatCurrency(amount), textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success))),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '-';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {
+      return '-';
+    }
   }
 
   Widget _buildClickableSummaryCard(IconData icon, Color iconColor, String value, String label, VoidCallback onTap) {
@@ -515,6 +897,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final filtered = pendingDemands.where((d) {
       if (_pendingFeeTypeFilter != null && d['demfeetype']?.toString() != _pendingFeeTypeFilter) return false;
       if (_pendingClassFilter != null && d['stuclass']?.toString() != _pendingClassFilter) return false;
+      if (_pendingSearchQuery.isNotEmpty) {
+        final query = _pendingSearchQuery.toLowerCase();
+        final stuName = _getStudentName(d).toLowerCase();
+        final admNo = d['stuadmno']?.toString().toLowerCase() ?? '';
+        if (!stuName.contains(query) && !admNo.contains(query)) return false;
+      }
       return true;
     }).toList();
 
@@ -556,12 +944,36 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back_rounded, size: 20),
-              onPressed: () => setState(() => _showPendingFees = false),
+              onPressed: () => setState(() {
+                _showPendingFees = false;
+                _pendingSearchQuery = '';
+                _pendingFeeTypeFilter = null;
+                _pendingClassFilter = null;
+                _selectedPendingFeeGroup = null;
+              }),
               tooltip: 'Back',
             ),
             const SizedBox(width: 4),
             const Text('Pending Fees', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const Spacer(),
+            // Search field
+            SizedBox(
+              width: 180,
+              height: 34,
+              child: TextField(
+                onChanged: (v) => setState(() => _pendingSearchQuery = v),
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  hintText: 'Search student / adm no...',
+                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Fee Type dropdown
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -726,7 +1138,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       byStudent.putIfAbsent(key, () => []).add(d);
     }
 
-    final studentKeys = byStudent.keys.toList();
+    var studentKeys = byStudent.keys.toList();
     // Sort by class first, then by student name
     studentKeys.sort((a, b) {
       final classA = byStudent[a]!.first['stuclass']?.toString() ?? '';
@@ -738,13 +1150,36 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       return nameA.compareTo(nameB);
     });
 
-    // Compute totals
-    double totalDemand = 0, totalPaid = 0, totalBalance = 0;
-    for (final d in groupDemands) {
-      totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-      totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-      totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+    // Apply student search filter
+    if (_pendingStudentSearch.isNotEmpty) {
+      final query = _pendingStudentSearch.toLowerCase();
+      studentKeys = studentKeys.where((key) {
+        final demands = byStudent[key]!;
+        final stuName = _getStudentName(demands.first).toLowerCase();
+        final admNo = demands.first['stuadmno']?.toString().toLowerCase() ?? '';
+        return stuName.contains(query) || admNo.contains(query);
+      }).toList();
     }
+
+    // Compute totals (from all filtered students)
+    double totalDemand = 0, totalPaid = 0, totalBalance = 0;
+    for (final key in studentKeys) {
+      for (final d in byStudent[key]!) {
+        totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+        totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+        totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+      }
+    }
+
+    // Pagination
+    final totalStudents = studentKeys.length;
+    final totalPages = (totalStudents / _pendingPageSize).ceil();
+    if (_pendingPage >= totalPages && totalPages > 0) {
+      _pendingPage = totalPages - 1;
+    }
+    final startIdx = _pendingPage * _pendingPageSize;
+    final endIdx = (startIdx + _pendingPageSize).clamp(0, totalStudents);
+    final pagedKeys = studentKeys.sublist(startIdx, endIdx);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -754,7 +1189,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back_rounded, size: 20),
-              onPressed: () => setState(() => _selectedPendingFeeGroup = null),
+              onPressed: () => setState(() {
+                _selectedPendingFeeGroup = null;
+                _pendingStudentSearch = '';
+                _pendingPage = 0;
+              }),
               tooltip: 'Back to Fee Groups',
             ),
             const SizedBox(width: 4),
@@ -764,6 +1203,40 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             const SizedBox(width: 4),
             Text(feeGroupName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             const Spacer(),
+            // Search field
+            SizedBox(
+              width: 220,
+              height: 34,
+              child: TextField(
+                controller: _pendingStudentSearchController,
+                onChanged: (v) => setState(() {
+                  _pendingStudentSearch = v;
+                  _pendingPage = 0;
+                }),
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  hintText: 'Search student / adm no...',
+                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.search, size: 16),
+                  suffixIcon: _pendingStudentSearch.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          onPressed: () => setState(() {
+                            _pendingStudentSearchController.clear();
+                            _pendingStudentSearch = '';
+                            _pendingPage = 0;
+                          }),
+                          splashRadius: 14,
+                          padding: EdgeInsets.zero,
+                        )
+                      : null,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Fee Type dropdown
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -783,7 +1256,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
                     ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
                   ],
-                  onChanged: (v) => setState(() => _pendingFeeTypeFilter = v),
+                  onChanged: (v) => setState(() { _pendingFeeTypeFilter = v; _pendingPage = 0; }),
                 ),
               ),
             ),
@@ -807,7 +1280,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
                     ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
                   ],
-                  onChanged: (v) => setState(() => _pendingClassFilter = v),
+                  onChanged: (v) => setState(() { _pendingClassFilter = v; _pendingPage = 0; }),
                 ),
               ),
             ),
@@ -817,7 +1290,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         // Summary row
         Row(
           children: [
-            _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, '${studentKeys.length}', 'Students'),
+            _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, '$totalStudents', 'Students'),
             const SizedBox(width: 12),
             _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(totalDemand), 'Total Demand'),
             const SizedBox(width: 12),
@@ -828,110 +1301,147 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ),
         const SizedBox(height: 12),
         // Student table
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              // Table header
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        SizedBox(
+          height: MediaQuery.of(context).size.height - 380,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                // Table header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.05),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
+                  child: const Row(
+                    children: [
+                      SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Adm No', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 3, child: Text('Student Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Class', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Fee Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Paid', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Balance', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 1, child: Text('Status', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                    ],
+                  ),
                 ),
-                child: const Row(
-                  children: [
-                    SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 2, child: Text('Adm No', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 3, child: Text('Student Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 2, child: Text('Class', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 2, child: Text('Fee Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 2, child: Text('Paid', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 2, child: Text('Balance', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    Expanded(flex: 1, child: Text('Status', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                  ],
-                ),
-              ),
-              if (studentKeys.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary))),
-                )
-              else
-                ...studentKeys.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final stuKey = entry.value;
-                  final demands = byStudent[stuKey]!;
-                  final first = demands.first;
-                  final admNo = first['stuadmno']?.toString() ?? '-';
-                  final stuName = _getStudentName(first);
-                  final stuClass = first['stuclass']?.toString() ?? '-';
-                  double sDemand = 0, sPaid = 0, sBalance = 0;
-                  for (final d in demands) {
-                    sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-                    sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  }
-                  final isPaid = sBalance <= 0;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 40, child: Text('${idx + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        Expanded(flex: 2, child: Text(admNo, style: const TextStyle(fontSize: 13))),
-                        Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                        Expanded(flex: 2, child: Text(stuClass, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
-                        Expanded(flex: 2, child: Text(_formatCurrency(sDemand), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
-                        Expanded(flex: 2, child: Text(_formatCurrency(sPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, color: AppColors.success))),
-                        Expanded(flex: 2, child: Text(_formatCurrency(sBalance), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange))),
-                        Expanded(
-                          flex: 1,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                // Table body
+                Expanded(
+                  child: pagedKeys.isEmpty
+                      ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary)))
+                      : ListView.builder(
+                          padding: EdgeInsets.zero,
+                          itemCount: pagedKeys.length,
+                          itemBuilder: (context, idx) {
+                            final stuKey = pagedKeys[idx];
+                            final demands = byStudent[stuKey]!;
+                            final first = demands.first;
+                            final admNo = first['stuadmno']?.toString() ?? '-';
+                            final stuName = _getStudentName(first);
+                            final stuClass = first['stuclass']?.toString() ?? '-';
+                            double sDemand = 0, sPaid = 0, sBalance = 0;
+                            for (final d in demands) {
+                              sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                              sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                              sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+                            }
+                            final isPaid = sBalance <= 0;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               decoration: BoxDecoration(
-                                color: isPaid ? AppColors.success.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
+                                border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
                               ),
-                              child: Text(
-                                isPaid ? 'Paid' : 'Unpaid',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : Colors.red),
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 40, child: Text('${startIdx + idx + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(admNo, style: const TextStyle(fontSize: 13))),
+                                  Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                                  Expanded(flex: 2, child: Text(stuClass, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13))),
+                                  Expanded(flex: 2, child: Text(_formatCurrency(sDemand), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
+                                  Expanded(flex: 2, child: Text(_formatCurrency(sPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, color: AppColors.success))),
+                                  Expanded(flex: 2, child: Text(_formatCurrency(sBalance), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.orange))),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Center(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: isPaid ? AppColors.success.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          isPaid ? 'Paid' : 'Unpaid',
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : Colors.red),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
-                  );
-                }),
-              // Total row
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                 ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 40),
-                    const Expanded(flex: 2, child: SizedBox()),
-                    Expanded(flex: 3, child: Text('Total (${studentKeys.length} students)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
-                    const Expanded(flex: 2, child: SizedBox()),
-                    Expanded(flex: 2, child: Text(_formatCurrency(totalDemand), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
-                    Expanded(flex: 2, child: Text(_formatCurrency(totalPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.success))),
-                    Expanded(flex: 2, child: Text(_formatCurrency(totalBalance), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.orange))),
-                    const Expanded(flex: 1, child: SizedBox()),
-                  ],
+                // Pagination footer
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.05),
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.first_page_rounded, size: 20),
+                        onPressed: _pendingPage > 0 ? () => setState(() => _pendingPage = 0) : null,
+                        tooltip: 'First page',
+                        splashRadius: 18,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                        onPressed: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
+                        tooltip: 'Previous page',
+                        splashRadius: 18,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${_pendingPage + 1} / ${totalPages == 0 ? 1 : totalPages}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                        onPressed: _pendingPage < totalPages - 1 ? () => setState(() => _pendingPage++) : null,
+                        tooltip: 'Next page',
+                        splashRadius: 18,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.last_page_rounded, size: 20),
+                        onPressed: _pendingPage < totalPages - 1 ? () => setState(() => _pendingPage = totalPages - 1) : null,
+                        tooltip: 'Last page',
+                        splashRadius: 18,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
