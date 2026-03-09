@@ -36,9 +36,39 @@ class _NoticesScreenState extends State<NoticesScreen> {
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .order('createdat', ascending: false);
+
+      final all = List<Map<String, dynamic>>.from(data);
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+
+      // Auto-expire notices past their todate
+      final expiredIds = all
+          .where((n) {
+            final toDate = n['noticetodate']?.toString();
+            return toDate != null && toDate.isNotEmpty && toDate.compareTo(todayStr) < 0;
+          })
+          .map((n) => n['notice_id'] ?? n['id'])
+          .where((id) => id != null)
+          .toList();
+
+      if (expiredIds.isNotEmpty) {
+        try {
+          await SupabaseService.client
+              .from('notice')
+              .update({'activestatus': 9})
+              .inFilter('notice_id', expiredIds);
+        } catch (_) {}
+      }
+
+      final active = all.where((n) {
+        final toDate = n['noticetodate']?.toString();
+        if (toDate == null || toDate.isEmpty) return true;
+        return toDate.compareTo(todayStr) >= 0;
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _notices = List<Map<String, dynamic>>.from(data);
+          _notices = active;
           _isLoading = false;
         });
       }
@@ -473,6 +503,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   List<String> _availableClasses = [];
   bool _isLoadingClasses = false;
   bool _isSending = false;
+  DateTime? _fromDate;
+  DateTime? _toDate;
 
   static const _priorities = ['Normal', 'Medium', 'High', 'Urgent'];
   static const _categories = ['General', 'Exam', 'Holiday', 'Event', 'Fee', 'Result'];
@@ -489,6 +521,26 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     _titleController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final initial = isFrom ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now().add(const Duration(days: 7)));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+          if (_toDate != null && _toDate!.isBefore(picked)) _toDate = null;
+        } else {
+          _toDate = picked;
+        }
+      });
+    }
   }
 
   Future<void> _loadClasses() async {
@@ -552,6 +604,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         'noticetodate': _toDate?.toIso8601String(),
         'createdby': userName,
         'createdat': DateTime.now().toIso8601String(),
+        'noticefromdate': _fromDate?.toIso8601String().split('T').first,
+        'noticetodate': _toDate?.toIso8601String().split('T').first,
         'activestatus': 1,
       });
 
@@ -843,6 +897,75 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       ),
                     ),
                   ],
+
+                  const SizedBox(height: 20),
+
+                  // From / To Date
+                  const Text('Notice Period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickDate(true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _fromDate != null ? AppColors.accent : AppColors.border),
+                              borderRadius: BorderRadius.circular(10),
+                              color: AppColors.surface,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 15, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _fromDate != null
+                                      ? '${_fromDate!.day.toString().padLeft(2,'0')}/${_fromDate!.month.toString().padLeft(2,'0')}/${_fromDate!.year}'
+                                      : 'From Date',
+                                  style: TextStyle(fontSize: 13, color: _fromDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickDate(false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _toDate != null ? AppColors.error : AppColors.border),
+                              borderRadius: BorderRadius.circular(10),
+                              color: AppColors.surface,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.event_busy_rounded, size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _toDate != null
+                                      ? '${_toDate!.day.toString().padLeft(2,'0')}/${_toDate!.month.toString().padLeft(2,'0')}/${_toDate!.year}'
+                                      : 'To Date (Auto-expire)',
+                                  style: TextStyle(fontSize: 13, color: _toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Notice will be automatically removed after the To Date.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
 
                   const SizedBox(height: 28),
 
