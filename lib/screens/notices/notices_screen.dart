@@ -466,6 +466,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   final _descController = TextEditingController();
   String _priority = 'Normal';
   String _category = 'General';
+  DateTime? _fromDate;
+  DateTime? _toDate;
   String _targetType = 'All Students';
   List<String> _selectedClasses = [];
   List<String> _availableClasses = [];
@@ -546,6 +548,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         'noticepriority': _priority,
         'noticecategory': _category,
         'noticetarget': targetLabel,
+        'noticefromdate': _fromDate?.toIso8601String(),
+        'noticetodate': _toDate?.toIso8601String(),
         'createdby': userName,
         'createdat': DateTime.now().toIso8601String(),
         'activestatus': 1,
@@ -707,6 +711,16 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v!))),
                       const SizedBox(width: 16),
                       Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v!))),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // From Date & To Date row
+                  Row(
+                    children: [
+                      Expanded(child: _buildDatePicker('From Date', _fromDate, (d) => setState(() => _fromDate = d))),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildDatePicker('To Date', _toDate, (d) => setState(() => _toDate = d))),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -922,6 +936,53 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
       default:
         return AppColors.accent;
     }
+  }
+
+  String _formatDateDisplay(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Widget _buildDatePicker(String label, DateTime? selectedDate, ValueChanged<DateTime> onSelected) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) onSelected(picked);
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    selectedDate != null ? _formatDateDisplay(selectedDate) : 'Select date...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {

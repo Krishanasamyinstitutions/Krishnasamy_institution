@@ -1,10 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/payment_model.dart';
 import '../../models/student_model.dart';
+import '../../widgets/receipt_widget.dart';
 
 class FailedTransactionsScreen extends StatefulWidget {
   const FailedTransactionsScreen({super.key});
@@ -21,6 +27,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   List<PaymentModel> _paidTransactions = [];
   List<PaymentModel> _failedTransactions = [];
   Map<int, String> _stuIdToName = {};
+  Map<int, StudentModel> _stuIdToStudent = {};
+  String? _insName;
+  String? _insLogoUrl;
+  String? _insAddress;
 
   List<PaymentModel> get _allTransactions {
     final all = [..._paidTransactions, ..._failedTransactions];
@@ -56,6 +66,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         SupabaseService.getPaidTransactions(insId),
         SupabaseService.getFailedTransactions(insId),
         SupabaseService.getStudents(insId),
+        SupabaseService.getInstitutionInfo(insId),
       ]);
 
       final paidData = results[0] as List<Map<String, dynamic>>;
@@ -63,9 +74,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       final students = results[2] as List<StudentModel>;
 
       final stuIdToName = <int, String>{};
+      final stuIdToStudent = <int, StudentModel>{};
       for (final s in students) {
         stuIdToName[s.stuId] = s.stuname;
+        stuIdToStudent[s.stuId] = s;
       }
+
+      final insInfo = results[3] as ({String? name, String? logo, String? address});
 
       setState(() {
         _paidTransactions =
@@ -73,6 +88,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         _failedTransactions =
             failedData.map((e) => PaymentModel.fromJson(e)).toList();
         _stuIdToName = stuIdToName;
+        _stuIdToStudent = stuIdToStudent;
+        _insName = insInfo.name;
+        _insLogoUrl = insInfo.logo;
+        _insAddress = insInfo.address;
       });
     } catch (e) {
       debugPrint('Error loading transactions: $e');
@@ -86,6 +105,507 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       return _stuIdToName[t.stuId]!;
     }
     return '-';
+  }
+
+  Widget _buildDownloadButton(PaymentModel t) {
+    return IconButton(
+      icon: const Icon(Icons.download_rounded, size: 20, color: AppColors.accent),
+      tooltip: 'Download Receipt',
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      onPressed: () => _showReceiptOptions(t),
+    );
+  }
+
+  Future<ReceiptData> _buildReceiptData(PaymentModel t) async {
+    final stuName = _getStudentName(t);
+    final student = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
+    final auth = context.read<AuthProvider>();
+    final date = t.paydate ?? t.createdat;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    final dateStr = '${months[date.month - 1]} ${date.day}, ${date.year}';
+
+    // Fetch fee details from feedemand table
+    List<ReceiptTermDetail> feeDetails = [];
+    try {
+      final details = await SupabaseService.getFeeDetailsByPayId(t.payId);
+      if (details.isNotEmpty) {
+        // Group by demfeeterm
+        final termMap = <String, List<ReceiptFeeItem>>{};
+        for (final d in details) {
+          final term = d['demfeeterm']?.toString() ?? '-';
+          final feeType = d['demfeetype']?.toString() ?? d['feegroupname']?.toString() ?? 'Fee';
+          final amount = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
+          termMap.putIfAbsent(term, () => []);
+          termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: amount));
+        }
+        feeDetails = termMap.entries
+            .map((e) => ReceiptTermDetail(term: e.key, fees: e.value))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching fee details: $e');
+    }
+
+    // Fallback if no fee details found
+    if (feeDetails.isEmpty) {
+      feeDetails = [
+        ReceiptTermDetail(
+          term: t.yrlabel ?? '-',
+          fees: [ReceiptFeeItem(type: 'Payment', amount: t.transtotalamount)],
+        ),
+      ];
+    }
+
+    return ReceiptData(
+      receiptNo: t.paynumber ?? '${t.payId}',
+      date: dateStr,
+      studentName: stuName,
+      mobileNo: student?.stumobile ?? '-',
+      address: student?.stuaddress ?? '-',
+      admissionNo: student?.stuadmno ?? '-',
+      className: student?.stuclass ?? '-',
+      schoolName: _insName ?? auth.inscode ?? 'Institution',
+      schoolAddress: _insAddress ?? '-',
+      schoolLogoUrl: _insLogoUrl,
+      feeDetails: feeDetails,
+      paymentMethod: t.paymethod ?? '-',
+      paymentDate: dateStr,
+      status: t.isSuccess ? 'paid' : (t.paystatus == 'F' ? 'failed' : 'pending'),
+      total: t.transtotalamount,
+    );
+  }
+
+  void _showReceiptOptions(PaymentModel t) async {
+    final receiptData = await _buildReceiptData(t);
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: SizedBox(
+          width: 620,
+          height: 920,
+          child: Column(
+            children: [
+              // Action bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _downloadReceiptAsPdf(t);
+                      },
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('Download'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _printReceipt(t);
+                      },
+                      icon: const Icon(Icons.print_rounded, size: 18),
+                      label: const Text('Print'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Receipt preview
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ReceiptWidget(data: receiptData),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<pw.Document> _buildReceiptPdf(PaymentModel t) async {
+    final data = await _buildReceiptData(t);
+
+    final font = await PdfGoogleFonts.montserratRegular();
+    final fontMedium = await PdfGoogleFonts.montserratMedium();
+    final fontSemiBold = await PdfGoogleFonts.montserratSemiBold();
+    final fontItalic = await PdfGoogleFonts.montserratItalic();
+    final fontPtSerif = await PdfGoogleFonts.pTSerifRegular();
+
+    const primaryBlue = PdfColor.fromInt(0xFF2f5daa);
+    const darkBlue = PdfColor.fromInt(0xFF010165);
+    const textDark = PdfColor.fromInt(0xFF2a2a2a);
+    const textMedium = PdfColor.fromInt(0xFF4c4c4c);
+    const headerBg = PdfColor.fromInt(0xFFeaeff6);
+    const borderColor = PdfColor.fromInt(0xFFd9d9d9);
+    const paidGreen = PdfColor.fromInt(0xFF34c759);
+    const dividerColor = PdfColor.fromInt(0xFFACBEDD);
+
+    final sSemiBold = pw.TextStyle(font: fontSemiBold, fontSize: 10, color: textDark);
+    final sMedium = pw.TextStyle(font: fontMedium, fontSize: 10, color: textMedium);
+    final sMediumDark = pw.TextStyle(font: fontMedium, fontSize: 10, color: textDark);
+
+    pw.Widget labelValue(String label, String value) {
+      return pw.Row(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          pw.Text(label, style: sSemiBold),
+          pw.SizedBox(width: 6),
+          pw.Text(value, style: sMedium),
+        ],
+      );
+    }
+
+    pw.Widget tableCell(String text, pw.TextStyle style, {pw.Alignment alignment = pw.Alignment.center}) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        alignment: alignment,
+        child: pw.Text(text, style: style),
+      );
+    }
+
+    // Load logo image if available
+    pw.ImageProvider? logoImage;
+    if (data.schoolLogoUrl != null) {
+      try {
+        logoImage = await networkImage(data.schoolLogoUrl!);
+      } catch (_) {}
+    }
+
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(60),
+        theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
+        build: (pw.Context ctx) {
+          String formatAmount(double amount) {
+            if (amount == amount.truncateToDouble()) {
+              return amount.toInt().toString().replaceAllMapped(
+                RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+            }
+            return amount.toStringAsFixed(2).replaceAllMapped(
+              RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
+          }
+
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Header: Logo + School info (left) | Receipt title + No/Date (right)
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left: Logo + School name + Address
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        if (logoImage != null)
+                          pw.SizedBox(width: 64, height: 64,
+                            child: pw.Image(logoImage, fit: pw.BoxFit.cover)),
+                        if (logoImage != null) pw.SizedBox(height: 8),
+                        pw.Text(data.schoolName, style: pw.TextStyle(font: fontSemiBold, fontSize: 14, color: darkBlue)),
+                        pw.SizedBox(height: 6),
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text('Address:  ', style: sSemiBold),
+                            pw.Expanded(child: pw.Text(data.schoolAddress, style: sMedium, maxLines: 3)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 20),
+                  // Right: Receipt title + No + Date
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
+                      pw.SizedBox(height: 12),
+                      labelValue('Receipt No:', data.receiptNo),
+                      pw.SizedBox(height: 6),
+                      labelValue('Date:', data.date),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+              pw.Container(height: 1, color: dividerColor),
+              pw.SizedBox(height: 12),
+              // To section
+              pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 12, color: textDark)),
+              pw.SizedBox(height: 8),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        labelValue('Name:', data.studentName),
+                        pw.SizedBox(height: 6),
+                        labelValue('Mobile No:', data.mobileNo),
+                        pw.SizedBox(height: 6),
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text('Address:', style: sSemiBold),
+                            pw.SizedBox(width: 6),
+                            pw.Expanded(child: pw.Text(data.address, style: sMedium)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 20),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      labelValue('Admission No:', data.admissionNo),
+                      pw.SizedBox(height: 6),
+                      labelValue('Class:', data.className),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              // Fee Table with stamp overlay
+              pw.Stack(
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Table(
+                        border: pw.TableBorder.all(color: borderColor, width: 0.5),
+                        columnWidths: {
+                          0: const pw.FixedColumnWidth(46),
+                          1: const pw.FixedColumnWidth(125),
+                          2: const pw.FlexColumnWidth(),
+                          3: const pw.FixedColumnWidth(120),
+                        },
+                        children: [
+                          pw.TableRow(
+                            decoration: const pw.BoxDecoration(color: headerBg),
+                            children: [
+                              tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
+                              tableCell('Term', sSemiBold.copyWith(color: primaryBlue)),
+                              tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
+                              tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
+                            ],
+                          ),
+                          for (var i = 0; i < data.feeDetails.length; i++)
+                            pw.TableRow(
+                              children: [
+                                pw.Container(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  alignment: pw.Alignment.topCenter,
+                                  child: pw.Text('${i + 1}.', style: sMediumDark),
+                                ),
+                                pw.Container(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  alignment: pw.Alignment.topCenter,
+                                  child: pw.Text(data.feeDetails[i].term, style: sMediumDark),
+                                ),
+                                pw.Container(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: pw.Column(
+                                    children: [
+                                      for (final fee in data.feeDetails[i].fees)
+                                        pw.Padding(
+                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                          child: pw.Text(fee.type, style: sMediumDark, textAlign: pw.TextAlign.center),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                pw.Container(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: pw.Column(
+                                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                                    children: [
+                                      for (final fee in data.feeDetails[i].fees)
+                                        pw.Padding(
+                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                          child: pw.Text('\u20B9${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      // Sub Total row
+                      pw.Row(
+                        children: [
+                          pw.SizedBox(width: 172),
+                          pw.Expanded(
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              decoration: const pw.BoxDecoration(color: primaryBlue),
+                              child: pw.Row(
+                                children: [
+                                  pw.Expanded(
+                                    child: pw.Text('Sub Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                  ),
+                                  pw.SizedBox(
+                                    width: 119,
+                                    child: pw.Text('\u20B9${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  // Status stamp overlay on table
+                  if (data.status == 'paid' || data.status == 'failed')
+                    pw.Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 40,
+                      child: pw.Center(
+                        child: pw.Opacity(
+                          opacity: 0.55,
+                          child: pw.Transform.rotateBox(
+                            angle: -0.52,
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColor.fromInt(data.status == 'paid' ? 0x66c2eecd : 0x66FFD6D6),
+                                borderRadius: pw.BorderRadius.circular(10),
+                                border: pw.Border.all(
+                                  color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: pw.Text(
+                                data.status == 'paid' ? 'PAID' : 'FAILED',
+                                style: pw.TextStyle(
+                                  font: fontSemiBold,
+                                  fontSize: 22,
+                                  color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              // Payment info
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  labelValue('Receipt Method:', data.paymentMethod),
+                  pw.SizedBox(height: 6),
+                  labelValue('Date:', data.paymentDate),
+                ],
+              ),
+              pw.Spacer(),
+              // Footer
+              pw.Center(
+                child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Text(
+                  'For any further inquiries, please contact us at [contact@innovatex.com] or\ncall [+61 3 9493 5345]',
+                  style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMedium),
+                  textAlign: pw.TextAlign.center,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    return pdf;
+  }
+
+  Future<void> _downloadReceiptAsPdf(PaymentModel t) async {
+    try {
+      final pdf = await _buildReceiptPdf(t);
+      final bytes = await pdf.save();
+      final fileName = 'Receipt_${(t.paynumber ?? '${t.payId}').replaceAll('/', '_')}.pdf';
+
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Receipt',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null) {
+        final file = File(result);
+        await file.writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Receipt saved to $result'), backgroundColor: AppColors.accent),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error downloading receipt: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _printReceipt(PaymentModel t) async {
+    try {
+      final pdf = await _buildReceiptPdf(t);
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Receipt_${(t.paynumber ?? '${t.payId}').replaceAll('/', '_')}',
+      );
+    } catch (e) {
+      debugPrint('Error printing receipt: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   @override
@@ -362,6 +882,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 DataColumn(label: Text('Reference')),
                 DataColumn(label: Text('Date')),
                 DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Download Receipt')),
               ],
               rows: List.generate(transactions.length, (i) {
                 final t = transactions[i];
@@ -418,6 +939,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         ),
                       ),
                     )),
+                    DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                   ],
                 );
               }),
@@ -499,6 +1021,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 DataColumn(label: Text('Reference')),
                 DataColumn(label: Text('Date')),
                 DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Download Receipt')),
               ],
               rows: List.generate(transactions.length, (i) {
                 final t = transactions[i];
@@ -556,6 +1079,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         ),
                       ),
                     )),
+                    DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                   ],
                 );
               }),

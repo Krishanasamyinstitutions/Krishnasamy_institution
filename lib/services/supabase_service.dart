@@ -56,21 +56,43 @@ class SupabaseService {
 
   // ==================== INSTITUTION ====================
 
-  /// Get institution name and logo from the institution table
-  static Future<({String? name, String? logo})> getInstitutionInfo(int insId) async {
+  /// Get institution name, logo, and address from the institution table
+  static Future<({String? name, String? logo, String? address})> getInstitutionInfo(int insId) async {
     try {
       final result = await client
           .from('institution')
-          .select('insname, inslogo')
+          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, cit_id, sta_id, cou_id, inspincode')
           .eq('ins_id', insId)
           .maybeSingle();
+
+      if (result == null) return (name: null, logo: null, address: null);
+
+      // Build full address from individual columns (split into two lines)
+      final line1Parts = <String>[
+        if (result['insaddress1'] != null && (result['insaddress1'] as String).isNotEmpty) result['insaddress1'] as String,
+        if (result['insaddress2'] != null && (result['insaddress2'] as String).isNotEmpty) result['insaddress2'] as String,
+      ];
+      final line2Parts = <String>[
+        if (result['insaddress3'] != null && (result['insaddress3'] as String).isNotEmpty) result['insaddress3'] as String,
+        if (result['inspincode'] != null && (result['inspincode'] as String).isNotEmpty) result['inspincode'] as String,
+      ];
+      final lines = <String>[
+        if (line1Parts.isNotEmpty) line1Parts.join(', '),
+        if (line2Parts.isNotEmpty) line2Parts.join(', '),
+      ];
+      final address = lines.isNotEmpty ? lines.join('\n') : null;
+
+      // inslogo column stores the full public URL directly
+      final logoUrl = result['inslogo'] as String?;
+
       return (
-        name: result?['insname'] as String?,
-        logo: result?['inslogo'] as String?,
+        name: result['insname'] as String?,
+        logo: logoUrl,
+        address: address,
       );
     } catch (e) {
       debugPrint('Error fetching institution info: $e');
-      return (name: null, logo: null);
+      return (name: null, logo: null, address: null);
     }
   }
 
