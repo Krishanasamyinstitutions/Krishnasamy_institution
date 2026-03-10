@@ -98,6 +98,19 @@ class SupabaseService {
     }
   }
 
+  /// Create a new institution and return the inserted row (with ins_id)
+  static Future<Map<String, dynamic>?> createInstitution(Map<String, dynamic> data) async {
+    try {
+      final response = await client.from('institution').insert(data).select().single();
+      return response;
+    } catch (e, st) {
+      debugPrint('Error creating institution: $e');
+      debugPrint('Data: $data');
+      debugPrint('Stack: $st');
+      return null;
+    }
+  }
+
   // ==================== STUDENTS ====================
 
   /// Get total active student count for an institution
@@ -441,7 +454,7 @@ class SupabaseService {
   }
 
   /// Terminate (deactivate) an institution user
-  static Future<bool> terminateInstitutionUser(int useId, {required String terminatedBy}) async {
+  static Future<bool> terminateInstitutionUser(int useId, {required String terminatedBy, required String terminatedReason}) async {
     try {
       debugPrint('Terminating user with use_id: $useId');
       final now = DateTime.now().toIso8601String();
@@ -451,6 +464,7 @@ class SupabaseService {
             'activestatus': 9,
             'terminatedby': terminatedBy,
             'terminateddate': now,
+            'terminatedreason': terminatedReason,
           })
           .eq('use_id', useId);
       debugPrint('Terminate user success');

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -29,10 +30,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   String? _selectedFeeYear;
   final _feeTermController = TextEditingController();
   String? _selectedConcessionCategory;
+  String? _selectedConcession;
   List<String> _classes = [];
   List<String> _feeTypes = [];
   List<Map<String, dynamic>> _years = [];
   List<Map<String, dynamic>> _concessions = [];
+  List<String> _concessionList = [];
 
   bool _isLoading = false;
   bool _isSaving = false;
@@ -51,7 +54,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   String? _errorMsg;
 
   // Fee demand list
-  List<Map<String, dynamic>> _feeDemands = [];
   List<Map<String, dynamic>> _classSummary = [];
   bool _loadingDemands = false;
   String? _drilldownClass;
@@ -69,11 +71,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'demfeetype',
     'yr_id',
     'demfeeterm',
+    'demconcategory',
     'con_id',
     'feeamount',
     'conamount',
+    'balancedue',
     'duedate',
-    'concession',
   ];
 
   static const Map<String, String> _importFieldLabels = {
@@ -82,11 +85,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'demfeetype': 'Fee Type',
     'yr_id': 'Fee Year',
     'demfeeterm': 'Fee Term',
-    'con_id': 'Concession Category',
+    'demconcategory': 'Category',
+    'con_id': 'Concession',
     'feeamount': 'Fee Amount',
     'conamount': 'Concession Amount',
+    'balancedue': 'Balance Due',
     'duedate': 'Due Date',
-    'concession': 'Concession',
   };
 
   static const _requiredFields = {'stuadmno', 'demfeetype', 'feeamount'};
@@ -128,6 +132,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         _classes = results[0] as List<String>;
         _years = results[1] as List<Map<String, dynamic>>;
         _concessions = results[2] as List<Map<String, dynamic>>;
+        _concessionList = _concessions
+            .map((c) => c['condesc']?.toString())
+            .where((s) => s != null && s.isNotEmpty)
+            .cast<String>()
+            .toList();
         _feeTypes = results[3] as List<String>;
         _isLoading = false;
       });
@@ -144,14 +153,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
     setState(() => _loadingDemands = true);
     try {
-      final results = await Future.wait([
-        SupabaseService.getFeeDemandSummary(insId),
-        SupabaseService.getFeeDemands(insId),
-      ]);
+      final summary = await SupabaseService.getFeeDemandSummary(insId);
       if (mounted) {
         setState(() {
-          _classSummary = results[0];
-          _feeDemands = results[1];
+          _classSummary = summary;
           _loadingDemands = false;
         });
       }
@@ -214,7 +219,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         'yr_id': _selectedFeeYear != null ? int.tryParse(_selectedFeeYear!) : null,
         'demfeeyear': yearLabel,
         'demfeeterm': _feeTermController.text.trim(),
-        'con_id': _selectedConcessionCategory != null ? int.tryParse(_selectedConcessionCategory!) : null,
+        'demconcategory': _selectedConcessionCategory,
+        'con_id': _selectedConcession != null ? int.tryParse(_selectedConcession!) : null,
         'feeamount': double.tryParse(_feeAmountController.text.trim()) ?? 0,
         'conamount': double.tryParse(_conAmountController.text.trim()) ?? 0,
         'balancedue': double.tryParse(_balanceDueController.text.trim()) ?? ((double.tryParse(_feeAmountController.text.trim()) ?? 0) - (double.tryParse(_conAmountController.text.trim()) ?? 0)),
@@ -259,6 +265,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       _selectedFeeYear = null;
       _feeTermController.clear();
       _selectedConcessionCategory = null;
+      _selectedConcession = null;
       _dueDate = null;
     });
   }
@@ -283,11 +290,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'feetype': 'demfeetype', 'demfeetype': 'demfeetype', 'type': 'demfeetype',
       'feeyear': 'yr_id', 'yrid': 'yr_id', 'year': 'yr_id',
       'feeterm': 'demfeeterm', 'demfeeterm': 'demfeeterm', 'term': 'demfeeterm',
-      'concessioncategory': 'con_id', 'conid': 'con_id', 'concessioncat': 'con_id',
+      'category': 'demconcategory', 'demconcategory': 'demconcategory',
+      'concession': 'con_id', 'conid': 'con_id', 'concessioncategory': 'con_id', 'con': 'con_id',
       'feeamount': 'feeamount', 'amount': 'feeamount', 'fee': 'feeamount',
       'concessionamount': 'conamount', 'conamount': 'conamount', 'conamt': 'conamount',
+      'balancedue': 'balancedue', 'balance': 'balancedue', 'baldue': 'balancedue',
       'duedate': 'duedate', 'due': 'duedate',
-      'concession': 'concession', 'con': 'concession',
     };
     return aliases[h];
   }
@@ -388,29 +396,62 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         final feeAmount = double.tryParse(_cellByKey(row, 'feeamount') ?? '0') ?? 0;
         final conAmount = double.tryParse(_cellByKey(row, 'conamount') ?? '0') ?? 0;
 
-        final yrIdStr = _cellByKey(row, 'yr_id');
-        final yrId = int.tryParse(yrIdStr ?? '');
+        final yrRaw = _cellByKey(row, 'yr_id');
+        int? yrId;
         String? yrLabel;
-        if (yrId != null) {
-          final yearEntry = _years.firstWhere(
-            (y) => y['yr_id'] == yrId,
+
+        // Try matching by yr_id (integer)
+        final yrInt = int.tryParse(yrRaw ?? '');
+        if (yrInt != null) {
+          // Check if it's a yr_id
+          final byId = _years.firstWhere(
+            (y) => y['yr_id'] == yrInt,
             orElse: () => <String, dynamic>{},
           );
-          yrLabel = yearEntry['yrlabel']?.toString();
+          if (byId.isNotEmpty) {
+            yrId = yrInt;
+            yrLabel = byId['yrlabel']?.toString();
+          }
+        }
+
+        // If not found by id, try matching by label (e.g. "2025-2026")
+        if (yrId == null && yrRaw != null) {
+          final byLabel = _years.firstWhere(
+            (y) => y['yrlabel']?.toString() == yrRaw,
+            orElse: () => <String, dynamic>{},
+          );
+          if (byLabel.isNotEmpty) {
+            yrId = byLabel['yr_id'] as int?;
+            yrLabel = byLabel['yrlabel']?.toString();
+          }
+        }
+
+        // Try partial match (e.g. "2025" matches "2025-2026")
+        if (yrId == null && yrRaw != null) {
+          final byPartial = _years.firstWhere(
+            (y) => y['yrlabel']?.toString().startsWith(yrRaw) == true,
+            orElse: () => <String, dynamic>{},
+          );
+          if (byPartial.isNotEmpty) {
+            yrId = byPartial['yr_id'] as int?;
+            yrLabel = byPartial['yrlabel']?.toString();
+          }
         }
 
         final data = {
           'ins_id': insId,
+          'inscode': auth.inscode ?? '',
           'stuadmno': _cellByKey(row, 'stuadmno'),
           'stuclass': _cellByKey(row, 'stuclass'),
           'demfeetype': _cellByKey(row, 'demfeetype'),
           'yr_id': yrId,
-          'demfeeyear': yrLabel,
+          'demfeeyear': yrLabel ?? yrRaw ?? '',
           'demfeeterm': _cellByKey(row, 'demfeeterm'),
+          'demconcategory': _cellByKey(row, 'demconcategory'),
           'con_id': int.tryParse(_cellByKey(row, 'con_id') ?? ''),
           'feeamount': feeAmount,
           'conamount': conAmount,
-          'balancedue': feeAmount - conAmount,
+          'balancedue': double.tryParse(_cellByKey(row, 'balancedue') ?? '') ?? (feeAmount - conAmount),
           'duedate': _cellByKey(row, 'duedate'),
           'paidstatus': 'U',
           'paidamount': 0,
@@ -421,6 +462,32 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
         // Remove null values
         data.removeWhere((k, v) => v == null);
+
+        // Duplicate check: Admission No + Fee Type + Fee Year + Fee Term
+        final admNo = data['stuadmno']?.toString() ?? '';
+        final feeType = data['demfeetype']?.toString() ?? '';
+        final feeYear = data['demfeeyear']?.toString() ?? '';
+        final feeTerm = data['demfeeterm']?.toString() ?? '';
+
+        if (admNo.isNotEmpty && feeType.isNotEmpty) {
+          var query = SupabaseService.client
+              .from('feedemand')
+              .select('dem_id')
+              .eq('ins_id', insId)
+              .eq('stuadmno', admNo)
+              .eq('demfeetype', feeType);
+          if (feeYear.isNotEmpty) query = query.eq('demfeeyear', feeYear);
+          if (feeTerm.isNotEmpty) query = query.eq('demfeeterm', feeTerm);
+
+          final existing = await query.maybeSingle();
+          if (existing != null) {
+            setState(() {
+              _skipped++;
+              _importErrors.add('Row ${i + 2}: Duplicate - $admNo / $feeType / $feeYear / $feeTerm already exists');
+            });
+            continue;
+          }
+        }
 
         await SupabaseService.client.from('feedemand').insert(data);
         setState(() => _imported++);
@@ -608,13 +675,27 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Concession Category
-                    _buildLabel('Concession Category'),
+                    // Category
+                    _buildLabel('Category'),
                     DropdownButtonFormField<String>(
                       value: _selectedConcessionCategory,
-                      decoration: _inputDecoration('Select concession category'),
-                      items: _concessions.map((c) => DropdownMenuItem(value: c['con_id'].toString(), child: Text(c['condesc']?.toString() ?? '-'))).toList(),
+                      decoration: _inputDecoration('Select category'),
+                      items: const [
+                        DropdownMenuItem(value: 'General', child: Text('General')),
+                        DropdownMenuItem(value: 'Concession', child: Text('Concession')),
+                      ],
                       onChanged: (v) => setState(() => _selectedConcessionCategory = v),
+                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Concession
+                    _buildLabel('Concession'),
+                    DropdownButtonFormField<String>(
+                      value: _selectedConcession,
+                      decoration: _inputDecoration('Select concession'),
+                      items: _concessions.map((c) => DropdownMenuItem(value: c['con_id'].toString(), child: Text(c['condesc']?.toString() ?? '-'))).toList(),
+                      onChanged: (v) => setState(() => _selectedConcession = v),
                       style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 16),
@@ -837,7 +918,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     ? '${_filteredStudentDemands.length} records'
                     : _drilldownClass != null
                         ? '${_studentSummary.length} students'
-                        : '${_feeDemands.length} total',
+                        : '${_classSummary.fold<int>(0, (sum, c) => sum + ((c['student_count'] as num?)?.toInt() ?? 0))} students',
                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
@@ -1275,67 +1356,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   // ─── Import UI ──────────────────────────────────────────────────────────
 
   Widget _buildImportSection() {
-    switch (_importStep) {
-      case 0:
-        return _buildImportPickStep();
-      case 1:
-        return _buildImportMapStep();
-      case 2:
-        return _buildImportProgressStep();
-      case 3:
-        return _buildImportDoneStep();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
+    if (_importStep == 2) return _buildImportProgressStep();
+    if (_importStep == 3) return _buildImportDoneStep();
 
-  Widget _buildImportPickStep() {
-    return Center(
-      child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.upload_file_rounded, size: 64, color: AppColors.accent.withValues(alpha: 0.6)),
-            const SizedBox(height: 16),
-            const Text('Import Fee Demands', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            const Text(
-              'Upload a CSV or Excel file with columns:\nAdmission No, Class, Fee Type, Fee Year, Fee Term,\nConcession Category, Fee Amount, Concession Amount, Due Date',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _pickFile,
-              icon: const Icon(Icons.folder_open_rounded, size: 18),
-              label: const Text('Choose File'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-            if (_errorMsg != null) ...[
-              const SizedBox(height: 12),
-              Text(_errorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImportMapStep() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1344,91 +1369,304 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title bar
           Row(
             children: [
-              Icon(Icons.file_present_rounded, size: 18, color: AppColors.accent),
+              Icon(Icons.upload_file_rounded, size: 20, color: AppColors.accent),
               const SizedBox(width: 8),
-              Text('File: $_fileName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              const Text('Import Fee Demands', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const Spacer(),
-              Text('${_rows.length} rows found', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text('Map Columns', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Expanded(
-            child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 12,
-                children: List.generate(_headers.length, (i) {
-                  return SizedBox(
-                    width: 280,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(_headers[i], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.arrow_forward, size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String?>(
-                            value: _mappings[i],
-                            isDense: true,
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              isDense: true,
-                            ),
-                            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                            items: [
-                              const DropdownMenuItem<String?>(value: null, child: Text('— Skip —', style: TextStyle(color: AppColors.textSecondary))),
-                              ..._importFieldKeys.map((k) => DropdownMenuItem(value: k, child: Text(_importFieldLabels[k] ?? k))),
-                            ],
-                            onChanged: (v) => setState(() => _mappings[i] = v),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton(
-                onPressed: _resetImport,
-                child: const Text('Cancel'),
-              ),
+              if (_fileName != null)
+                Text(_fileName!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
               const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: _mappings.contains('stuadmno') && _mappings.contains('feeamount') ? _startImport : null,
-                icon: const Icon(Icons.upload_rounded, size: 18),
-                label: Text('Import ${_rows.length} rows'),
+                onPressed: _pickFile,
+                icon: const Icon(Icons.folder_open_rounded, size: 16),
+                label: const Text('Browse'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _exportTemplate,
+                icon: const Icon(Icons.table_chart_rounded, size: 16),
+                label: const Text('Move to Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF217346),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+          if (_errorMsg != null) ...[
+            const SizedBox(height: 8),
+            Text(_errorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+          ],
+          const SizedBox(height: 12),
+
+          // Data grid
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  // Header row
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B2A4A),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(7),
+                        topRight: Radius.circular(7),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _gridHeaderCell('S.No', width: 45, center: true),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Adm No *', flex: 2),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Class', flex: 1),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Fee Type *', flex: 2),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Year', flex: 1),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Term', flex: 1),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Category', flex: 2),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Concession', flex: 2),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Fee Amt *', flex: 2, center: true),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Con. Amt', flex: 2, center: true),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Bal. Due', flex: 2, center: true),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Due Date', flex: 2, center: true),
+                      ],
+                    ),
+                  ),
+                  // Data rows
+                  Expanded(
+                    child: _rows.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.grid_on_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                const SizedBox(height: 8),
+                                const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                const SizedBox(height: 4),
+                                const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _rows.length,
+                            itemBuilder: (context, index) {
+                              final row = _rows[index];
+                              final isEven = index % 2 == 0;
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: isEven ? Colors.white : AppColors.surface,
+                                  border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _gridDataCell('${index + 1}', width: 45, center: true),
+                                    _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 2),
+                                    _gridDataCell(_mappedCell(row, 'stuclass'), flex: 1),
+                                    _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
+                                    _gridDataCell(_mappedCell(row, 'yr_id'), flex: 1),
+                                    _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 1),
+                                    _gridDataCell(_mappedCell(row, 'demconcategory'), flex: 2),
+                                    _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
+                                    _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
+                                    _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
+                                    _gridDataCell(_mappedCell(row, 'balancedue'), flex: 2, center: true),
+                                    _gridDataCell(_mappedCell(row, 'duedate'), flex: 2, center: true),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Bottom bar with row count and action buttons
+          Row(
+            children: [
+              Text(
+                '${_rows.length} rows',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _rows.isEmpty ? null : () => _validateImportData(),
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Validate'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _rows.isNotEmpty && _mappings.contains('stuadmno') && _mappings.contains('feeamount') ? _startImport : null,
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Save'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: _resetImport,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Close'),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  String _mappedCell(List<dynamic> row, String fieldKey) {
+    final idx = _mappings.indexOf(fieldKey);
+    if (idx < 0 || idx >= row.length) return '';
+    return row[idx].toString().trim();
+  }
+
+  Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
+  }
+
+  Widget _gridHeaderDivider() {
+    return Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.15));
+  }
+
+  Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
+  }
+
+  Future<void> _exportTemplate() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Fee Demands'];
+    // Remove default Sheet1
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Admission No',
+      'Class',
+      'Fee Type',
+      'Fee Year',
+      'Fee Term',
+      'Category',
+      'Concession',
+      'Fee Amount',
+      'Concession Amount',
+      'Balance Due',
+      'Due Date',
+    ];
+
+    for (int i = 0; i < headers.length; i++) {
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = xl.TextCellValue(headers[i]);
+    }
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Template',
+        fileName: 'fee_demand_template.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Template exported successfully'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  void _validateImportData() {
+    final errors = <String>[];
+    for (int i = 0; i < _rows.length; i++) {
+      final err = _validateRow(i);
+      if (err != null) errors.add('Row ${i + 2}: $err');
+    }
+    if (errors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 400,
+            height: 250,
+            child: ListView(
+              children: errors.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(e, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+              )).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildImportProgressStep() {

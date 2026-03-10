@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
+import '../../services/supabase_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -44,12 +45,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _address2Controller = TextEditingController();
   final _address3Controller = TextEditingController();
   final _pinCodeController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _emailController = TextEditingController();
 
   // Step 3: Account Setup
+  final _adminNameController = TextEditingController();
+  final _adminEmailController = TextEditingController();
+  final _adminPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  DateTime? _adminDob;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _isCreating = false;
 
   @override
   void dispose() {
@@ -65,6 +75,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _address2Controller.dispose();
     _address3Controller.dispose();
     _pinCodeController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countryController.dispose();
+    _emailController.dispose();
+    _adminNameController.dispose();
+    _adminEmailController.dispose();
+    _adminPhoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -78,16 +95,143 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKeys[2].currentState!.validate()) return;
 
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.register(
-      _authorizedUsernameController.text.trim(),
-      '', // email not collected separately in new flow
-      _passwordController.text,
-      'Admin',
-    );
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match'), backgroundColor: Colors.red),
+      );
+      return;
+    }
 
-    if (success && mounted) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+    setState(() => _isCreating = true);
+
+    try {
+      // 1. Map institution type to it_id
+      final itIdMap = {
+        'Schools (Primary, Secondary, Higher Secondary)': 1,
+        'Colleges': 2,
+        'Universities': 3,
+        'Polytechnic Institutions': 4,
+        'Vocational Training Centers': 5,
+        'Coaching Institutes': 6,
+      };
+
+      // 1. Create institution
+      final insData = <String, dynamic>{
+        'insname': _institutionNameController.text.trim(),
+        'inscode': _institutionCodeController.text.trim(),
+        'insstadate': (_institutionStartDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'insautusername': _authorizedUsernameController.text.trim(),
+        'insdesignation': _designationController.text.trim().isNotEmpty ? _designationController.text.trim() : 'Admin',
+        'insmobno': _mobileNumberController.text.trim(),
+        'insmail': _emailController.text.trim(),
+        'it_id': itIdMap[_institutionType] ?? 1,
+        'insrecognised': _institutionRecognized == 'Yes' ? 'Y' : 'N',
+        'insaffliation': _affiliationController.text.trim(),
+        'insaffno': _affiliationNumberController.text.trim(),
+        'insaffstayear': _affiliationStartYear?.year.toString(),
+        'insaddress1': _address1Controller.text.trim(),
+        'insaddress2': _address2Controller.text.trim(),
+        'insaddress3': _address3Controller.text.trim(),
+        'inscity': _cityController.text.trim(),
+        'insstate': _stateController.text.trim(),
+        'inscountry': _countryController.text.trim(),
+        'inspincode': _pinCodeController.text.trim(),
+        'insipaddress': '0.0.0.0',
+        'inssername': 'default',
+        'insserurl': 'default',
+        'updatedby': _authorizedUsernameController.text.trim(),
+        'activestatus': 1,
+      };
+
+      final insResult = await SupabaseService.createInstitution(insData);
+      if (insResult == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to create institution'), backgroundColor: Colors.red),
+          );
+          setState(() => _isCreating = false);
+        }
+        return;
+      }
+
+      final insId = insResult['ins_id'] as int;
+      final insCode = insResult['inscode']?.toString() ?? '';
+
+      // 2. Create default designation & role for the new institution
+      final desResult = await SupabaseService.createDesignation({
+        'ins_id': insId,
+        'desname': 'Chairman',
+        'activestatus': 1,
+      });
+      final roleResult = await SupabaseService.createUserRole({
+        'ins_id': insId,
+        'urname': 'Admin',
+        'activestatus': 1,
+      });
+
+      // Fetch the created des_id and ur_id
+      final designations = await SupabaseService.getDesignations(insId);
+      final roles = await SupabaseService.getUserRoles(insId);
+      final desId = designations.isNotEmpty ? designations.first['des_id'] as int : 1;
+      final urId = roles.isNotEmpty ? roles.first['ur_id'] as int : 1;
+
+      // 3. Create admin user in institutionusers
+      final userData = {
+        'ins_id': insId,
+        'inscode': insCode,
+        'usename': _adminNameController.text.trim(),
+        'usemail': _adminEmailController.text.trim(),
+        'usephone': _adminPhoneController.text.trim(),
+        'usepassword': _passwordController.text,
+        'usestadate': DateTime.now().toIso8601String().split('T').first,
+        'useotpstatus': 0,
+        'usedob': _adminDob != null ? _adminDob!.toIso8601String().split('T').first : '2000-01-01',
+        'ur_id': urId,
+        'urname': 'Admin',
+        'des_id': desId,
+        'desname': 'Chairman',
+        'userepto': 0,
+        'activestatus': 1,
+      };
+
+      final userSuccess = await SupabaseService.createInstitutionUser(userData);
+      if (!userSuccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Institution created but failed to create admin user'), backgroundColor: Colors.orange),
+          );
+          setState(() => _isCreating = false);
+        }
+        return;
+      }
+
+      // 3. Auto-login with the new admin user
+      if (mounted) {
+        final authProvider = context.read<AuthProvider>();
+        final loginSuccess = await authProvider.login(
+          userData['usemail'] as String,
+          _passwordController.text,
+        );
+
+        setState(() => _isCreating = false);
+
+        if (loginSuccess && mounted) {
+          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Account created! Please login with your credentials.'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      debugPrint('Registration error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isCreating = false);
+      }
     }
   }
 
@@ -438,6 +582,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ])),
               ]),
+              const SizedBox(height: 14),
+              _fieldLabel('Email *'),
+              TextFormField(
+                controller: _emailController,
+                decoration: _inputDec('Enter email address'),
+                style: _fieldStyle(),
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+              ),
             ],
           ),
         ),
@@ -542,6 +695,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(controller: _pinCodeController, decoration: _inputDec('Enter pin code'), style: _fieldStyle(), keyboardType: TextInputType.number),
                   ])),
                 ]),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('City'),
+                    TextFormField(controller: _cityController, decoration: _inputDec('Enter city'), style: _fieldStyle()),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('State'),
+                    TextFormField(controller: _stateController, decoration: _inputDec('Enter state'), style: _fieldStyle()),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Country'),
+                    TextFormField(controller: _countryController, decoration: _inputDec('Enter country'), style: _fieldStyle()),
+                  ])),
+                ]),
               ],
             ),
           ),
@@ -575,8 +745,83 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Account Setup', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 6),
-                const Text('Set a secure password for your institution account', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Text('Create an admin account for your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
+
+                _fieldLabel('Admin Name *'),
+                TextFormField(
+                  controller: _adminNameController,
+                  decoration: _inputDec('Enter admin name').copyWith(
+                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.textSecondary),
+                  ),
+                  style: _fieldStyle(),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
+                ),
+                const SizedBox(height: 14),
+
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Admin Email *'),
+                    TextFormField(
+                      controller: _adminEmailController,
+                      decoration: _inputDec('Enter email').copyWith(
+                        prefixIcon: const Icon(Icons.email_outlined, size: 18, color: AppColors.textSecondary),
+                      ),
+                      style: _fieldStyle(),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Admin Phone *'),
+                    TextFormField(
+                      controller: _adminPhoneController,
+                      decoration: _inputDec('Enter phone').copyWith(
+                        prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: AppColors.textSecondary),
+                      ),
+                      style: _fieldStyle(),
+                      keyboardType: TextInputType.phone,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Phone is required' : null,
+                    ),
+                  ])),
+                ]),
+                const SizedBox(height: 14),
+
+                _fieldLabel('Date of Birth *'),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _adminDob ?? DateTime(1990),
+                      firstDate: DateTime(1940),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setState(() => _adminDob = picked);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 10),
+                      Text(
+                        _adminDob != null
+                            ? '${_adminDob!.day.toString().padLeft(2, '0')}/${_adminDob!.month.toString().padLeft(2, '0')}/${_adminDob!.year}'
+                            : 'Select date of birth',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _adminDob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6)),
+                      ),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                const Divider(height: 20, color: AppColors.border),
+                const SizedBox(height: 8),
 
                 _fieldLabel('Password *'),
                 TextFormField(
@@ -617,25 +862,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                Consumer<AuthProvider>(
-                  builder: (context, auth, _) {
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: auth.isLoading ? null : _handleRegister,
-                        icon: auth.isLoading
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.check_circle_rounded, size: 20),
-                        label: Text(auth.isLoading ? 'Creating...' : 'Create Institution', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    );
-                  },
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _isCreating ? null : _handleRegister,
+                    icon: _isCreating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.check_circle_rounded, size: 20),
+                    label: Text(_isCreating ? 'Creating...' : 'Create Institution', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ),
               ],
             ),

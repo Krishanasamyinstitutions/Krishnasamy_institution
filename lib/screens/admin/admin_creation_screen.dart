@@ -667,12 +667,29 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   }
 
   void _confirmTerminate(InstitutionUserModel u) {
+    final reasonController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Terminate User', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to terminate "${u.usename}"? This will deactivate their account.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to terminate "${u.usename}"? This will deactivate their account.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'Reason for termination *',
+                hintText: 'Enter reason...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -680,8 +697,15 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           ),
           ElevatedButton(
             onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Please enter a reason'), backgroundColor: Colors.red),
+                );
+                return;
+              }
               Navigator.pop(ctx);
-              _terminateUser(u);
+              _terminateUser(u, reason);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
@@ -695,11 +719,11 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     );
   }
 
-  Future<void> _terminateUser(InstitutionUserModel u) async {
+  Future<void> _terminateUser(InstitutionUserModel u, String reason) async {
     setState(() => _isLoading = true);
     final auth = context.read<AuthProvider>();
     final terminatedBy = auth.userName ?? '';
-    final success = await SupabaseService.terminateInstitutionUser(u.useId, terminatedBy: terminatedBy);
+    final success = await SupabaseService.terminateInstitutionUser(u.useId, terminatedBy: terminatedBy, terminatedReason: reason);
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
