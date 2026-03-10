@@ -14,6 +14,8 @@ class ReceiptData {
   final String schoolName;
   final String schoolAddress;
   final String? schoolLogoUrl;
+  final String? schoolMobile;
+  final String? schoolEmail;
   final List<ReceiptTermDetail> feeDetails;
   final String paymentMethod;
   final String paymentDate;
@@ -31,6 +33,8 @@ class ReceiptData {
     required this.schoolName,
     required this.schoolAddress,
     this.schoolLogoUrl,
+    this.schoolMobile,
+    this.schoolEmail,
     required this.feeDetails,
     required this.paymentMethod,
     required this.paymentDate,
@@ -248,39 +252,45 @@ class ReceiptWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Center(
-                  child: RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: GoogleFonts.montserrat(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: _textMedium,
-                        height: 1.6,
+                if (data.schoolEmail != null || data.schoolMobile != null)
+                  Center(
+                    child: RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: GoogleFonts.montserrat(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: _textMedium,
+                          height: 1.6,
+                        ),
+                        children: [
+                          const TextSpan(text: 'For any further inquiries, please contact us at '),
+                          if (data.schoolEmail != null)
+                            TextSpan(
+                              text: data.schoolEmail!,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _textMedium,
+                              ),
+                            ),
+                          if (data.schoolEmail != null && data.schoolMobile != null)
+                            const TextSpan(text: ' or\ncall '),
+                          if (data.schoolEmail == null && data.schoolMobile != null)
+                            const TextSpan(text: ''),
+                          if (data.schoolMobile != null)
+                            TextSpan(
+                              text: data.schoolMobile!,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _textMedium,
+                              ),
+                            ),
+                        ],
                       ),
-                      children: [
-                        const TextSpan(text: 'For any further inquiries, please contact us at '),
-                        TextSpan(
-                          text: '[contact@innovatex.com]',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _textMedium,
-                          ),
-                        ),
-                        const TextSpan(text: ' or\ncall '),
-                        TextSpan(
-                          text: '[+61 3 9493 5345]',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _textMedium,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                ),
                 const SizedBox(height: 40),
               ],
             ),

@@ -155,7 +155,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final years = results[0] as List<Map<String, dynamic>>;
     final concessions = results[1] as List<Map<String, dynamic>>;
     final rawClasses = results[2] as List<String>;
-    final insInfo = results[3] as ({String? name, String? logo});
+    final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
     final classCounts = results[4] as Map<String, int>;
     final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
     final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();

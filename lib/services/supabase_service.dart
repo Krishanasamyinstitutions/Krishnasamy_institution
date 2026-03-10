@@ -57,15 +57,15 @@ class SupabaseService {
   // ==================== INSTITUTION ====================
 
   /// Get institution name, logo, and address from the institution table
-  static Future<({String? name, String? logo, String? address})> getInstitutionInfo(int insId) async {
+  static Future<({String? name, String? logo, String? address, String? mobile, String? email})> getInstitutionInfo(int insId) async {
     try {
       final result = await client
           .from('institution')
-          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, cit_id, sta_id, cou_id, inspincode')
+          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, cit_id, sta_id, cou_id, inspincode, insmobno, insmail')
           .eq('ins_id', insId)
           .maybeSingle();
 
-      if (result == null) return (name: null, logo: null, address: null);
+      if (result == null) return (name: null, logo: null, address: null, mobile: null, email: null);
 
       // Build full address from individual columns (split into two lines)
       final line1Parts = <String>[
@@ -89,10 +89,12 @@ class SupabaseService {
         name: result['insname'] as String?,
         logo: logoUrl,
         address: address,
+        mobile: result['insmobno'] as String?,
+        email: result['insmail'] as String?,
       );
     } catch (e) {
       debugPrint('Error fetching institution info: $e');
-      return (name: null, logo: null, address: null);
+      return (name: null, logo: null, address: null, mobile: null, email: null);
     }
   }
 
@@ -150,9 +152,21 @@ class SupabaseService {
       for (final row in (response as List)) {
         map[row['stuclass']?.toString() ?? ''] = (row['student_count'] as num?)?.toInt() ?? 0;
       }
+      if (map.isNotEmpty) return map;
+    } catch (e) {
+      debugPrint('RPC get_student_counts_by_class failed, using fallback: $e');
+    }
+    // Fallback: count from direct query
+    try {
+      final students = await getStudents(insId);
+      final map = <String, int>{};
+      for (final s in students) {
+        final cls = s.stuclass.isNotEmpty ? s.stuclass : 'Unassigned';
+        map[cls] = (map[cls] ?? 0) + 1;
+      }
       return map;
     } catch (e) {
-      debugPrint('RPC get_student_counts_by_class failed: $e');
+      debugPrint('Fallback student count failed: $e');
       return {};
     }
   }
@@ -161,9 +175,38 @@ class SupabaseService {
   static Future<List<StudentModel>> getStudentsByClass(int insId, String className) async {
     try {
       final response = await client.rpc('get_students_by_class', params: {'p_ins_id': insId, 'p_class': className});
+      final list = (response as List).map((e) => StudentModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      debugPrint('RPC get_students_by_class failed, using fallback: $e');
+    }
+    // Fallback: direct query filtered by class
+    try {
+      final response = await client
+          .from('students')
+          .select('*')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('stuclass', className)
+          .order('stuname', ascending: true);
       return (response as List).map((e) => StudentModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     } catch (e) {
-      debugPrint('RPC get_students_by_class failed: $e');
+      debugPrint('Fallback getStudentsByClass failed: $e');
+      return [];
+    }
+  }
+
+  /// Get fee types (feedesc) from fee table
+  static Future<List<String>> getFeeTypes(int insId) async {
+    try {
+      final response = await client
+          .from('feetype')
+          .select('feedesc')
+          .eq('activestatus', 1)
+          .order('fee_id', ascending: true);
+      return (response as List).map((e) => e['feedesc']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Error fetching fee types: $e');
       return [];
     }
   }
@@ -243,7 +286,15 @@ class SupabaseService {
           .where((c) => c.isNotEmpty)
           .toSet()
           .toList();
-      classes.sort();
+      const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      classes.sort((a, b) {
+        final idxA = classOrder.indexOf(a.toUpperCase());
+        final idxB = classOrder.indexOf(b.toUpperCase());
+        if (idxA >= 0 && idxB >= 0) return idxA.compareTo(idxB);
+        if (idxA >= 0) return -1;
+        if (idxB >= 0) return 1;
+        return a.compareTo(b);
+      });
       return classes;
     } catch (e) {
       debugPrint('Error fetching classes: $e');
@@ -385,6 +436,28 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('Error creating institution user: $e');
+      return false;
+    }
+  }
+
+  /// Terminate (deactivate) an institution user
+  static Future<bool> terminateInstitutionUser(int useId, {required String terminatedBy}) async {
+    try {
+      debugPrint('Terminating user with use_id: $useId');
+      final now = DateTime.now().toIso8601String();
+      await client
+          .from('institutionusers')
+          .update({
+            'activestatus': 9,
+            'terminatedby': terminatedBy,
+            'terminateddate': now,
+          })
+          .eq('use_id', useId);
+      debugPrint('Terminate user success');
+      return true;
+    } catch (e, st) {
+      debugPrint('Error terminating institution user: $e');
+      debugPrint('Stack trace: $st');
       return false;
     }
   }

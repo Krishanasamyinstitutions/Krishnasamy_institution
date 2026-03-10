@@ -2135,6 +2135,16 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   String? _selectedClass;
   List<Map<String, dynamic>> _drilldownDemands = [];
   bool _drilldownLoading = false;
+  String? _drilldownAdmNo;
+  int _studentPage = 0;
+  final int _studentPageSize = 10;
+
+  // Search & filter state for class list
+  String _classSearchQuery = '';
+  String? _classFilterFeeType;
+  // Search & filter state for student drilldown
+  String _studentSearchQuery = '';
+  String? _studentStatusFilter;
 
   @override
   bool get wantKeepAlive => true;
@@ -2237,6 +2247,91 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               ],
             ),
             const SizedBox(height: 16),
+            // Search & filter bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  // Search bar
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                hintText: 'Search by class name...',
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                              style: const TextStyle(fontSize: 12),
+                              onChanged: (v) => setState(() => _classSearchQuery = v.trim().toLowerCase()),
+                            ),
+                          ),
+                          if (_classSearchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => setState(() => _classSearchQuery = ''),
+                              child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Fee type filter dropdown
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _classFilterFeeType,
+                          isExpanded: true,
+                          isDense: true,
+                          hint: const Text('All Fee Types', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                          icon: const Icon(Icons.arrow_drop_down, size: 18, color: AppColors.textSecondary),
+                          items: [
+                            const DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 12))),
+                            ...() {
+                              final allFeeTypes = <String>{};
+                              for (final g in _classGroups) {
+                                allFeeTypes.addAll(g.feeTypes);
+                              }
+                              final sorted = allFeeTypes.toList()..sort();
+                              return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: const TextStyle(fontSize: 12))));
+                            }(),
+                          ],
+                          onChanged: (v) => setState(() => _classFilterFeeType = v),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             // Class-wise table
             Container(
               decoration: BoxDecoration(
@@ -2296,8 +2391,19 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       ),
                     )
                   else
-                    ...List.generate(_classGroups.length, (i) {
-                      final g = _classGroups[i];
+                    ...() {
+                      // Apply search and fee type filter
+                      final filteredGroups = _classGroups.where((g) {
+                        if (_classSearchQuery.isNotEmpty && !g.className.toLowerCase().contains(_classSearchQuery)) {
+                          return false;
+                        }
+                        if (_classFilterFeeType != null && !g.feeTypes.contains(_classFilterFeeType)) {
+                          return false;
+                        }
+                        return true;
+                      }).toList();
+                      return List.generate(filteredGroups.length, (i) {
+                      final g = filteredGroups[i];
                       final pct = g.totalDemand > 0 ? (g.totalPaid / g.totalDemand * 100) : 0.0;
                       return InkWell(
                         onTap: () async {
@@ -2305,6 +2411,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             _selectedClass = g.className;
                             _drilldownLoading = true;
                             _drilldownDemands = [];
+                            _studentSearchQuery = '';
+                            _studentStatusFilter = null;
+                            _studentPage = 0;
                           });
                           final auth = context.read<AuthProvider>();
                           final insId = auth.insId;
@@ -2386,13 +2495,101 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           ),
                         ),
                       );
-                    }),
+                    });
+                    }(),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  String _formatCurrencyLocal(double amount) {
+    final str = amount.toStringAsFixed(0);
+    final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
+    return '₹$formatted';
+  }
+
+  Widget _buildStudentFeeDetail() {
+    final demands = _drilldownDemands;
+    final admNo = _drilldownAdmNo ?? '-';
+    final first = demands.isNotEmpty ? demands.first : null;
+    final stuName = first != null
+        ? (first['students'] is Map ? (first['students']['stuname']?.toString() ?? '-') : (first['stuname']?.toString() ?? '-'))
+        : '-';
+    final stuClass = first?['stuclass']?.toString() ?? '-';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Back button
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              onPressed: () => setState(() {
+                _drilldownAdmNo = null;
+                _drilldownDemands = [];
+              }),
+            ),
+            const SizedBox(width: 8),
+            Text('$stuName ($admNo) - $stuClass', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Fee detail table
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.05)),
+              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              columnSpacing: 16,
+              columns: const [
+                DataColumn(label: Text('Term')),
+                DataColumn(label: Text('Fee Type')),
+                DataColumn(label: Text('Amount'), numeric: true),
+                DataColumn(label: Text('Paid'), numeric: true),
+                DataColumn(label: Text('Balance'), numeric: true),
+                DataColumn(label: Text('Status')),
+              ],
+              rows: demands.map((d) {
+                final term = d['demfeeterm']?.toString() ?? '-';
+                final feeType = d['demfeetype']?.toString() ?? '-';
+                final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
+                final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                final status = d['paidstatus']?.toString() ?? '-';
+                final isPaid = status == 'Paid' || balance <= 0;
+                return DataRow(cells: [
+                  DataCell(Text(term)),
+                  DataCell(Text(feeType)),
+                  DataCell(Text(_formatCurrencyLocal(amount))),
+                  DataCell(Text(_formatCurrencyLocal(paid), style: const TextStyle(color: AppColors.success))),
+                  DataCell(Text(_formatCurrencyLocal(balance), style: TextStyle(color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
+                  DataCell(Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning)),
+                  )),
+                ]);
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -2412,7 +2609,26 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
       return _buildStudentFeeDetail();
     }
 
-    final studentKeys = byStudent.keys.toList();
+    // Apply search and status filter
+    final studentKeys = byStudent.keys.where((admNo) {
+      final studentDemands = byStudent[admNo]!;
+      final stuName = (studentDemands.first['_stuname']?.toString() ?? '').toLowerCase();
+      final admNoLower = admNo.toLowerCase();
+      // Search filter
+      if (_studentSearchQuery.isNotEmpty) {
+        if (!admNoLower.contains(_studentSearchQuery) && !stuName.contains(_studentSearchQuery)) {
+          return false;
+        }
+      }
+      // Status filter
+      if (_studentStatusFilter != null) {
+        final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
+        final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+        final status = allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid';
+        if (status != _studentStatusFilter) return false;
+      }
+      return true;
+    }).toList();
     final totalStudents = studentKeys.length;
     final totalPages = (totalStudents / _studentPageSize).ceil();
     if (_studentPage >= totalPages && totalPages > 0) _studentPage = totalPages - 1;
@@ -2436,6 +2652,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 onTap: () => setState(() {
                   _selectedClass = null;
                   _studentPage = 0;
+                  _studentSearchQuery = '';
+                  _studentStatusFilter = null;
                 }),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
@@ -2463,7 +2681,92 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        // Search & filter bar for students
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              // Search bar
+              Expanded(
+                flex: 3,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          decoration: const InputDecoration(
+                            hintText: 'Search by admission no or student name...',
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                          style: const TextStyle(fontSize: 12),
+                          onChanged: (v) => setState(() {
+                            _studentSearchQuery = v.trim().toLowerCase();
+                            _studentPage = 0;
+                          }),
+                        ),
+                      ),
+                      if (_studentSearchQuery.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _studentSearchQuery = '';
+                            _studentPage = 0;
+                          }),
+                          child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Status filter dropdown
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _studentStatusFilter,
+                    isDense: true,
+                    hint: const Text('All Status', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                    icon: const Icon(Icons.arrow_drop_down, size: 18, color: AppColors.textSecondary),
+                    items: const [
+                      DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 12))),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _studentStatusFilter = v;
+                      _studentPage = 0;
+                    }),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         // Student list with pagination
         Expanded(
           child: Container(
@@ -2669,13 +2972,18 @@ class _DateWiseTab extends StatefulWidget {
 }
 
 class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClientMixin {
-  DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
-  DateTime _toDate = DateTime.now();
+  DateTime _fromDate = DateTime(2020);
+  DateTime _toDate = DateTime.now().add(const Duration(days: 365));
   bool _isLoading = false;
   List<Map<String, dynamic>> _allDemands = [];
   List<_DateDemandGroup> _dateGroups = [];
-  String? _drilldownDate; // date string for drilldown
-  List<Map<String, dynamic>> _drilldownDemands = [];
+
+  // All fee types discovered in the filtered data (for dynamic columns)
+  List<String> _feeTypes = [];
+
+  // Search & filter state
+  String _searchQuery = '';
+  String? _filterFeeType;
 
   @override
   bool get wantKeepAlive => true;
@@ -2690,15 +2998,14 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     final str = amount.toStringAsFixed(0);
     final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
     final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
-    return '₹$formatted';
+    return '\u20B9$formatted';
   }
 
   String _formatDisplayDate(String isoDate) {
     try {
       final dt = DateTime.parse(isoDate);
-      final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${days[dt.weekday - 1]}, ${dt.day} ${months[dt.month - 1]} ${dt.year}';
+      return '${dt.day.toString().padLeft(2, '0')}-${months[dt.month - 1]}-${dt.year.toString().substring(2)}';
     } catch (_) {
       return isoDate;
     }
@@ -2731,6 +3038,13 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       return dateStr.compareTo(fromStr) >= 0 && dateStr.compareTo(toStr) <= 0;
     }).toList();
 
+    // Collect all fee types
+    final Set<String> feeTypeSet = {};
+    for (final d in filtered) {
+      final ft = d['demfeetype']?.toString() ?? '';
+      if (ft.isNotEmpty) feeTypeSet.add(ft);
+    }
+
     // Group by createdat date
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final d in filtered) {
@@ -2758,9 +3072,10 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       );
     }).toList();
 
-    dateGroups.sort((a, b) => b.date.compareTo(a.date));
+    dateGroups.sort((a, b) => a.date.compareTo(b.date));
 
     setState(() {
+      _feeTypes = feeTypeSet.toList()..sort();
       _dateGroups = dateGroups;
     });
   }
@@ -2774,7 +3089,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       context: context,
       initialDate: isFrom ? _fromDate : _toDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked != null) {
       setState(() {
@@ -2840,45 +3155,24 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   double get _totalPaid => _dateGroups.fold(0.0, (s, g) => s + g.totalPaid);
   double get _totalPending => _dateGroups.fold(0.0, (s, g) => s + g.totalPending);
 
-  String _formatShortDate(String isoDate) {
-    try {
-      final dt = DateTime.parse(isoDate);
-      final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      return '${dt.day.toString().padLeft(2, '0')}-${months[dt.month - 1]}-${dt.year.toString().substring(2)}';
-    } catch (_) {
-      return isoDate;
-    }
-  }
-
-  Widget _buildDrilldownDetail() {
-    final demands = _drilldownDemands;
-
-    // Get unique fee types from demands
-    final Set<String> feeTypeSet = {};
-    for (final d in demands) {
-      final ft = d['demfeetype']?.toString() ?? '';
-      if (ft.isNotEmpty) feeTypeSet.add(ft);
-    }
-    final feeTypes = feeTypeSet.toList()..sort();
-
-    // Group by student (stuadmno) - each student may have multiple fee type rows
+  /// Build student rows for a date group, pivoted by fee type
+  List<Map<String, dynamic>> _buildStudentRows(List<Map<String, dynamic>> demands) {
     final Map<String, List<Map<String, dynamic>>> studentMap = {};
     for (final d in demands) {
       final admNo = d['stuadmno']?.toString() ?? '-';
       studentMap.putIfAbsent(admNo, () => []).add(d);
     }
 
-    // Build student rows: each student gets one row with fee types as columns
-    final studentRows = <Map<String, dynamic>>[];
+    final rows = <Map<String, dynamic>>[];
     for (final entry in studentMap.entries) {
       final admNo = entry.key;
       final studentDemands = entry.value;
       final first = studentDemands.first;
-      final stuName = first['students'] is Map ? (first['students']['stuname']?.toString() ?? '-') : (first['stuname']?.toString() ?? '-');
+      final stuName = first['students'] is Map
+          ? (first['students']['stuname']?.toString() ?? '-')
+          : (first['stuname']?.toString() ?? '-');
       final stuClass = first['stuclass']?.toString() ?? '-';
-      final date = _extractDate(first['createdat']);
 
-      // Pivot fee types
       final Map<String, double> feeAmounts = {};
       double total = 0;
       for (final d in studentDemands) {
@@ -2890,8 +3184,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         total += amt;
       }
 
-      studentRows.add({
-        'date': date,
+      rows.add({
         'admNo': admNo,
         'stuName': stuName,
         'stuClass': stuClass,
@@ -2899,129 +3192,86 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         'total': total,
       });
     }
-
-    // Sort by admNo
-    studentRows.sort((a, b) => (a['admNo'] as String).compareTo(b['admNo'] as String));
-
-    // Calculate column totals
-    final Map<String, double> colTotals = {};
-    double grandTotal = 0;
-    for (final row in studentRows) {
-      final feeAmounts = row['feeAmounts'] as Map<String, double>;
-      for (final ft in feeTypes) {
-        colTotals[ft] = (colTotals[ft] ?? 0) + (feeAmounts[ft] ?? 0);
-      }
-      grandTotal += row['total'] as double;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Back button + title
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                onPressed: () => setState(() {
-                  _drilldownDate = null;
-                  _drilldownDemands = [];
-                }),
-                tooltip: 'Back to date list',
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.calendar_today, size: 18, color: AppColors.accent),
-              const SizedBox(width: 8),
-              Text(
-                'Date: ${_formatDisplayDate(_drilldownDate!)}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              Text('${studentRows.length} students', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            ],
-          ),
-        ),
-        // Scrollable table
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.05)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-              columnSpacing: 16,
-              horizontalMargin: 16,
-              columns: [
-                const DataColumn(label: Text('S.No')),
-                const DataColumn(label: Text('Date')),
-                const DataColumn(label: Text('Adm.No')),
-                const DataColumn(label: Text('Student Name')),
-                const DataColumn(label: Text('Class')),
-                ...feeTypes.map((ft) => DataColumn(label: Text(ft), numeric: true)),
-                const DataColumn(label: Text('TOTAL'), numeric: true),
-              ],
-              rows: [
-                ...List.generate(studentRows.length, (i) {
-                  final row = studentRows[i];
-                  final feeAmounts = row['feeAmounts'] as Map<String, double>;
-                  return DataRow(cells: [
-                    DataCell(Text('${i + 1}')),
-                    DataCell(Text(_formatShortDate(row['date'] as String))),
-                    DataCell(Text(row['admNo'] as String)),
-                    DataCell(ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 180),
-                      child: Text(row['stuName'] as String, overflow: TextOverflow.ellipsis),
-                    )),
-                    DataCell(Text(row['stuClass'] as String)),
-                    ...feeTypes.map((ft) {
-                      final amt = feeAmounts[ft] ?? 0;
-                      return DataCell(Text(amt > 0 ? _formatCurrency(amt) : '', textAlign: TextAlign.right));
-                    }),
-                    DataCell(Text(
-                      _formatCurrency(row['total'] as double),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    )),
-                  ]);
-                }),
-                // TOTAL row
-                DataRow(
-                  color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.08)),
-                  cells: [
-                    const DataCell(Text('')),
-                    const DataCell(Text('TOTAL', style: TextStyle(fontWeight: FontWeight.w700))),
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    ...feeTypes.map((ft) {
-                      final amt = colTotals[ft] ?? 0;
-                      return DataCell(Text(
-                        amt > 0 ? _formatCurrency(amt) : '',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ));
-                    }),
-                    DataCell(Text(
-                      _formatCurrency(grandTotal),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    )),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    rows.sort((a, b) => (a['admNo'] as String).compareTo(b['admNo'] as String));
+    return rows;
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    // Build the flat table data: date headers + student rows + date totals
+    final List<_TableRowData> tableRows = [];
+    int serialNo = 0;
+    final Map<String, double> grandFeeTypeTotals = {};
+    double grandTotal = 0;
+    int totalStudentCount = 0;
+
+    // Determine which fee types to use for columns (filtered or all)
+    final displayFeeTypes = _filterFeeType != null ? [_filterFeeType!] : _feeTypes;
+
+    for (final group in _dateGroups) {
+      // Filter demands by fee type if selected
+      final filteredDemands = _filterFeeType != null
+          ? group.demands.where((d) => d['demfeetype']?.toString() == _filterFeeType).toList()
+          : group.demands;
+      if (filteredDemands.isEmpty) continue;
+
+      final studentRows = _buildStudentRows(filteredDemands);
+
+      // Apply search filter
+      final filteredStudentRows = _searchQuery.isEmpty
+          ? studentRows
+          : studentRows.where((row) {
+              final admNo = (row['admNo'] as String).toLowerCase();
+              final stuName = (row['stuName'] as String).toLowerCase();
+              final stuClass = (row['stuClass'] as String).toLowerCase();
+              return admNo.contains(_searchQuery) || stuName.contains(_searchQuery) || stuClass.contains(_searchQuery);
+            }).toList();
+      if (filteredStudentRows.isEmpty) continue;
+
+      // Date header row
+      tableRows.add(_TableRowData(
+        type: _RowType.dateHeader,
+        dateLabel: _formatDisplayDate(group.date),
+        studentCount: filteredStudentRows.length,
+      ));
+
+      // Student rows
+      final Map<String, double> dateFeeTypeTotals = {};
+      double dateTotal = 0;
+      for (final row in filteredStudentRows) {
+        serialNo++;
+        final feeAmounts = row['feeAmounts'] as Map<String, double>;
+        final total = row['total'] as double;
+        tableRows.add(_TableRowData(
+          type: _RowType.student,
+          serialNo: serialNo,
+          admNo: row['admNo'] as String,
+          stuName: row['stuName'] as String,
+          stuClass: row['stuClass'] as String,
+          feeAmounts: feeAmounts,
+          total: total,
+        ));
+        // Accumulate date totals
+        for (final ft in displayFeeTypes) {
+          dateFeeTypeTotals[ft] = (dateFeeTypeTotals[ft] ?? 0) + (feeAmounts[ft] ?? 0);
+          grandFeeTypeTotals[ft] = (grandFeeTypeTotals[ft] ?? 0) + (feeAmounts[ft] ?? 0);
+        }
+        dateTotal += total;
+        grandTotal += total;
+      }
+      totalStudentCount += filteredStudentRows.length;
+
+      // Date total row
+      tableRows.add(_TableRowData(
+        type: _RowType.dateTotal,
+        feeAmounts: dateFeeTypeTotals,
+        total: dateTotal,
+        studentCount: studentRows.length,
+      ));
+    }
+
     return RefreshIndicator(
       onRefresh: _fetchData,
       child: SingleChildScrollView(
@@ -3046,7 +3296,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                   _buildDateChip('From', _fromDate, () => _pickDate(true)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text('\u2014', style: TextStyle(color: AppColors.textSecondary)),
                   ),
                   _buildDateChip('To', _toDate, () => _pickDate(false)),
                   const SizedBox(width: 12),
@@ -3098,6 +3348,80 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            // Search & filter bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  // Search bar
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              decoration: const InputDecoration(
+                                hintText: 'Search by student name, admission no, or class...',
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
+                                hintStyle: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                              style: const TextStyle(fontSize: 12),
+                              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                            ),
+                          ),
+                          if (_searchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () => setState(() => _searchQuery = ''),
+                              child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Fee type filter dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _filterFeeType,
+                        isDense: true,
+                        hint: const Text('All Fee Types', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        icon: const Icon(Icons.arrow_drop_down, size: 18, color: AppColors.textSecondary),
+                        items: [
+                          const DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 12))),
+                          ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: const TextStyle(fontSize: 12)))),
+                        ],
+                        onChanged: (v) => setState(() => _filterFeeType = v),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             // Summary cards
             Row(
@@ -3108,138 +3432,169 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                 const SizedBox(width: 16),
                 _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_totalPending), 'Total Pending'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.calendar_month, Colors.blue, '${_dateGroups.length}', 'Demand Dates'),
+                _buildSummaryCard(Icons.people_outline, Colors.blue, '$totalStudentCount', 'Total Students'),
               ],
             ),
             const SizedBox(height: 16),
-            // Date-wise demand table or drilldown detail
-            if (_drilldownDate != null)
-              _buildDrilldownDetail()
-            else
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
+            // Spreadsheet-like table
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  // Title bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.table_chart_rounded, size: 18, color: AppColors.accent),
+                        const SizedBox(width: 8),
+                        const Text('Date-wise Fee Demand Register', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Text('${_dateGroups.length} dates  |  $totalStudentCount students',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_dateGroups.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.date_range, size: 18, color: AppColors.accent),
-                          const SizedBox(width: 8),
-                          const Text('Date-wise Fee Demand', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          const Spacer(),
-                          Text('${_dateGroups.length} dates', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        ],
+                      padding: const EdgeInsets.all(48),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.search_off, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                            const SizedBox(height: 8),
+                            const Text('No fee demands found', style: TextStyle(color: AppColors.textSecondary)),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Divider(height: 1),
-                    // Table header
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      color: AppColors.surface,
-                      child: const Row(
-                        children: [
-                          SizedBox(width: 36),
-                          Expanded(flex: 3, child: Text('Date', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          Expanded(flex: 1, child: Text('Students', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          Expanded(flex: 2, child: Text('Demand', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          Expanded(flex: 2, child: Text('Paid', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          Expanded(flex: 2, child: Text('Pending', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          Expanded(flex: 1, child: Text('% Collected', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                          SizedBox(width: 26),
+                    )
+                  else
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                        headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        columnSpacing: 20,
+                        horizontalMargin: 16,
+                        dataRowMinHeight: 36,
+                        dataRowMaxHeight: 40,
+                        headingRowHeight: 42,
+                        columns: [
+                          const DataColumn(label: Text('S.No')),
+                          const DataColumn(label: Text('ADMN.NO')),
+                          const DataColumn(label: Text('STUDENT NAME')),
+                          const DataColumn(label: Text('CLASS')),
+                          ...displayFeeTypes.map((ft) => DataColumn(label: Text(ft.toUpperCase()), numeric: true)),
+                          const DataColumn(label: Text('TOTAL'), numeric: true),
                         ],
-                      ),
-                    ),
-                    if (_isLoading)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (_dateGroups.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(48),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.search_off, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                              const SizedBox(height: 8),
-                              const Text('No fee demands found', style: TextStyle(color: AppColors.textSecondary)),
+                        rows: [
+                          // Data rows with date headers and totals
+                          ...tableRows.map((row) {
+                            switch (row.type) {
+                              case _RowType.dateHeader:
+                                return DataRow(
+                                  color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.12)),
+                                  cells: [
+                                    DataCell(Text('')),
+                                    DataCell(Text(
+                                      row.dateLabel!,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent),
+                                    )),
+                                    DataCell(Text(
+                                      '${row.studentCount} students',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                                    )),
+                                    const DataCell(Text('')),
+                                    ...displayFeeTypes.map((_) => const DataCell(Text(''))),
+                                    const DataCell(Text('')),
+                                  ],
+                                );
+                              case _RowType.student:
+                                final feeAmounts = row.feeAmounts!;
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text('${row.serialNo}', style: const TextStyle(color: AppColors.textSecondary))),
+                                    DataCell(Text(row.admNo!, style: const TextStyle(fontWeight: FontWeight.w500))),
+                                    DataCell(ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 200),
+                                      child: Text(row.stuName!, overflow: TextOverflow.ellipsis),
+                                    )),
+                                    DataCell(Text(row.stuClass!)),
+                                    ...displayFeeTypes.map((ft) {
+                                      final amt = feeAmounts[ft] ?? 0;
+                                      return DataCell(Text(
+                                        amt > 0 ? _formatCurrency(amt) : '',
+                                        textAlign: TextAlign.right,
+                                      ));
+                                    }),
+                                    DataCell(Text(
+                                      _formatCurrency(row.total!),
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    )),
+                                  ],
+                                );
+                              case _RowType.dateTotal:
+                                final feeAmounts = row.feeAmounts!;
+                                return DataRow(
+                                  color: WidgetStateProperty.all(const Color(0xFFFFF3E0)),
+                                  cells: [
+                                    const DataCell(Text('')),
+                                    DataCell(Text('TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12))),
+                                    const DataCell(Text('')),
+                                    const DataCell(Text('')),
+                                    ...displayFeeTypes.map((ft) {
+                                      final amt = feeAmounts[ft] ?? 0;
+                                      return DataCell(Text(
+                                        amt > 0 ? _formatCurrency(amt) : '',
+                                        style: const TextStyle(fontWeight: FontWeight.w700),
+                                      ));
+                                    }),
+                                    DataCell(Text(
+                                      _formatCurrency(row.total!),
+                                      style: const TextStyle(fontWeight: FontWeight.w800),
+                                    )),
+                                  ],
+                                );
+                            }
+                          }),
+                          // Grand total row
+                          DataRow(
+                            color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                            cells: [
+                              const DataCell(Text('')),
+                              DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white))),
+                              const DataCell(Text('')),
+                              const DataCell(Text('')),
+                              ...displayFeeTypes.map((ft) {
+                                final amt = grandFeeTypeTotals[ft] ?? 0;
+                                return DataCell(Text(
+                                  amt > 0 ? _formatCurrency(amt) : '',
+                                  style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                                ));
+                              }),
+                              DataCell(Text(
+                                _formatCurrency(grandTotal),
+                                style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                              )),
                             ],
                           ),
-                        ),
-                      )
-                    else
-                      ...List.generate(_dateGroups.length, (i) {
-                        final g = _dateGroups[i];
-                        final pct = g.totalDemand > 0 ? (g.totalPaid / g.totalDemand * 100) : 0.0;
-                        return InkWell(
-                          onTap: () {
-                            setState(() {
-                              _drilldownDate = g.date;
-                              _drilldownDemands = g.demands;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            decoration: const BoxDecoration(
-                              border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accent.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Center(
-                                    child: Text('${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(flex: 3, child: Text(_formatDisplayDate(g.date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
-                                Expanded(flex: 1, child: Text('${g.studentCount}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))),
-                                Expanded(flex: 2, child: Text(_formatCurrency(g.totalDemand), textAlign: TextAlign.right, style: const TextStyle(fontSize: 12))),
-                                Expanded(flex: 2, child: Text(_formatCurrency(g.totalPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.success))),
-                                Expanded(flex: 2, child: Text(_formatCurrency(g.totalPending), textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary))),
-                                Expanded(
-                                  flex: 1,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: pct >= 100
-                                            ? AppColors.success.withValues(alpha: 0.1)
-                                            : pct >= 50
-                                                ? Colors.orange.withValues(alpha: 0.1)
-                                                : AppColors.warning.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        '${pct.toStringAsFixed(0)}%',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: pct >= 100 ? AppColors.success : pct >= 50 ? Colors.orange : AppColors.warning,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                  ],
-                ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -3333,6 +3688,32 @@ class _DateDemandGroup {
     required this.totalPaid,
     required this.totalPending,
     required this.studentCount,
+  });
+}
+
+enum _RowType { dateHeader, student, dateTotal }
+
+class _TableRowData {
+  final _RowType type;
+  final int? serialNo;
+  final String? dateLabel;
+  final String? admNo;
+  final String? stuName;
+  final String? stuClass;
+  final Map<String, double>? feeAmounts;
+  final double? total;
+  final int? studentCount;
+
+  _TableRowData({
+    required this.type,
+    this.serialNo,
+    this.dateLabel,
+    this.admNo,
+    this.stuName,
+    this.stuClass,
+    this.feeAmounts,
+    this.total,
+    this.studentCount,
   });
 }
 

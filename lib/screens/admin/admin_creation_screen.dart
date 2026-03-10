@@ -642,8 +642,77 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             detailRow('Category', u.usecategory!, icon: Icons.category_rounded),
           ],
           const SizedBox(height: 16),
+          // Terminate button
+          if (u.isActive && u.urname.toLowerCase() != 'admin')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmTerminate(u),
+                  icon: const Icon(Icons.block_rounded, size: 18),
+                  label: const Text('Terminate', style: TextStyle(fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  void _confirmTerminate(InstitutionUserModel u) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Terminate User', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text('Are you sure you want to terminate "${u.usename}"? This will deactivate their account.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _terminateUser(u);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Terminate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _terminateUser(InstitutionUserModel u) async {
+    setState(() => _isLoading = true);
+    final auth = context.read<AuthProvider>();
+    final terminatedBy = auth.userName ?? '';
+    final success = await SupabaseService.terminateInstitutionUser(u.useId, terminatedBy: terminatedBy);
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User terminated successfully'), backgroundColor: Colors.green),
+        );
+        setState(() => _selectedUser = null);
+        _fetchUsers();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to terminate user'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

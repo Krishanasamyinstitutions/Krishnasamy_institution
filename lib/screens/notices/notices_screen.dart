@@ -503,8 +503,6 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   List<String> _availableClasses = [];
   bool _isLoadingClasses = false;
   bool _isSending = false;
-  DateTime? _fromDate;
-  DateTime? _toDate;
 
   static const _priorities = ['Normal', 'Medium', 'High', 'Urgent'];
   static const _categories = ['General', 'Exam', 'Holiday', 'Event', 'Fee', 'Result'];

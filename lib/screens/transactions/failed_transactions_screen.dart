@@ -31,6 +31,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   String? _insName;
   String? _insLogoUrl;
   String? _insAddress;
+  String? _insMobile;
+  String? _insEmail;
 
   List<PaymentModel> get _allTransactions {
     final all = [..._paidTransactions, ..._failedTransactions];
@@ -80,7 +82,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         stuIdToStudent[s.stuId] = s;
       }
 
-      final insInfo = results[3] as ({String? name, String? logo, String? address});
+      final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
 
       setState(() {
         _paidTransactions =
@@ -92,6 +94,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         _insName = insInfo.name;
         _insLogoUrl = insInfo.logo;
         _insAddress = insInfo.address;
+        _insMobile = insInfo.mobile;
+        _insEmail = insInfo.email;
       });
     } catch (e) {
       debugPrint('Error loading transactions: $e');
@@ -168,6 +172,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       schoolName: _insName ?? auth.inscode ?? 'Institution',
       schoolAddress: _insAddress ?? '-',
       schoolLogoUrl: _insLogoUrl,
+      schoolMobile: _insMobile,
+      schoolEmail: _insEmail,
       feeDetails: feeDetails,
       paymentMethod: t.paymethod ?? '-',
       paymentDate: dateStr,
@@ -544,13 +550,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
               ),
               pw.SizedBox(height: 8),
-              pw.Center(
-                child: pw.Text(
-                  'For any further inquiries, please contact us at [contact@innovatex.com] or\ncall [+61 3 9493 5345]',
-                  style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMedium),
-                  textAlign: pw.TextAlign.center,
+              if (data.schoolEmail != null || data.schoolMobile != null)
+                pw.Center(
+                  child: pw.Text(
+                    'For any further inquiries, please contact us at '
+                    '${data.schoolEmail ?? ''}'
+                    '${data.schoolEmail != null && data.schoolMobile != null ? ' or\ncall ' : ''}'
+                    '${data.schoolMobile ?? ''}',
+                    style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMedium),
+                    textAlign: pw.TextAlign.center,
+                  ),
                 ),
-              ),
             ],
           );
         },
