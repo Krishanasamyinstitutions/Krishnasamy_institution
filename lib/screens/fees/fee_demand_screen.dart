@@ -128,8 +128,15 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       ]);
 
       if (!mounted) return;
+      final classes = results[0] as List<String>;
+      const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      classes.sort((a, b) {
+        final aIdx = classOrder.indexOf(a);
+        final bIdx = classOrder.indexOf(b);
+        return (aIdx == -1 ? 999 : aIdx).compareTo(bIdx == -1 ? 999 : bIdx);
+      });
       setState(() {
-        _classes = results[0] as List<String>;
+        _classes = classes;
         _years = results[1] as List<Map<String, dynamic>>;
         _concessions = results[2] as List<Map<String, dynamic>>;
         _concessionList = _concessions
@@ -155,6 +162,15 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     try {
       final summary = await SupabaseService.getFeeDemandSummary(insId);
       if (mounted) {
+        final summary = results[0];
+        const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+        summary.sort((a, b) {
+          final aClass = a['stuclass']?.toString() ?? '';
+          final bClass = b['stuclass']?.toString() ?? '';
+          final aIdx = classOrder.indexOf(aClass);
+          final bIdx = classOrder.indexOf(bClass);
+          return (aIdx == -1 ? 999 : aIdx).compareTo(bIdx == -1 ? 999 : bIdx);
+        });
         setState(() {
           _classSummary = summary;
           _loadingDemands = false;

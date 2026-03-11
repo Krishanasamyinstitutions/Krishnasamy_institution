@@ -553,6 +553,31 @@ class SupabaseService {
     }
   }
 
+  /// Fetch paynumber lookup map: pay_id → paynumber
+  static Future<Map<int, String>> getPayNumberMap(List<int> payIds) async {
+    if (payIds.isEmpty) return {};
+    try {
+      final Map<int, String> result = {};
+      // Batch in chunks of 500 to avoid query size limits
+      for (var i = 0; i < payIds.length; i += 500) {
+        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+        final response = await client
+            .from('payment')
+            .select('pay_id, paynumber')
+            .inFilter('pay_id', chunk);
+        for (final row in (response as List)) {
+          final id = row['pay_id'] as int?;
+          final num = row['paynumber']?.toString();
+          if (id != null && num != null) result[id] = num;
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching pay numbers: $e');
+      return {};
+    }
+  }
+
   /// Aggregate summary per class — one row per class, no row-limit issues
   static Future<List<Map<String, dynamic>>> getFeeDemandSummary(int insId) async {
     try {
@@ -715,7 +740,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('feedemand')
-          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus')
+          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus, duedate')
           .eq('pay_id', payId)
           .eq('activestatus', 1);
       final details = List<Map<String, dynamic>>.from(response as List);

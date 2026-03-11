@@ -134,12 +134,22 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     try {
       final details = await SupabaseService.getFeeDetailsByPayId(t.payId);
       if (details.isNotEmpty) {
-        // Group by demfeeterm
+        // Group by term — show month name from duedate for TUITION/VAN fees
+        const monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
         final termMap = <String, List<ReceiptFeeItem>>{};
         for (final d in details) {
-          final term = d['demfeeterm']?.toString() ?? '-';
+          String term = d['demfeeterm']?.toString() ?? '-';
           final feeType = d['demfeetype']?.toString() ?? d['feegroupname']?.toString() ?? 'Fee';
           final amount = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
+          if (monthFeeTypes.contains(feeType.toUpperCase())) {
+            final duedate = d['duedate'];
+            if (duedate != null) {
+              try {
+                final dt = DateTime.parse(duedate.toString());
+                term = months[dt.month - 1].toUpperCase();
+              } catch (_) {}
+            }
+          }
           termMap.putIfAbsent(term, () => []);
           termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: amount));
         }
