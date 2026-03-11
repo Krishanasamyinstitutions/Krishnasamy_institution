@@ -1445,7 +1445,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     ),
                     child: Row(
                       children: [
-                        _gridHeaderCell('S.No', width: 45, center: true),
+                        _gridHeaderCell('S.No', width: 60, center: true),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Adm No *', flex: 2),
                         _gridHeaderDivider(),
@@ -1498,7 +1498,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    _gridDataCell('${index + 1}', width: 45, center: true),
+                                    _gridDataCell('${index + 1}', width: 60, center: true),
                                     _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 2),
                                     _gridDataCell(_mappedCell(row, 'stuclass'), flex: 1),
                                     _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
@@ -1619,9 +1619,21 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'Due Date',
     ];
 
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+
+    const columnWidths = [18.0, 12.0, 18.0, 14.0, 12.0, 16.0, 16.0, 16.0, 20.0, 16.0, 14.0];
+
     for (int i = 0; i < headers.length; i++) {
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = xl.TextCellValue(headers[i]);
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, columnWidths[i]);
     }
+    sheet.setRowHeight(0, 32);
 
     try {
       final savePath = await FilePicker.platform.saveFile(

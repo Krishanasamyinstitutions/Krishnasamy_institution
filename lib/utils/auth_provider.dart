@@ -15,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   int? _insId;
   String? _inscode;
+  String? _insName;
   InstitutionUserModel? _currentUser;
 
   bool get isAuthenticated => _isAuthenticated;
@@ -25,6 +26,7 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int? get insId => _insId;
   String? get inscode => _inscode;
+  String? get insName => _insName;
   InstitutionUserModel? get currentUser => _currentUser;
 
   Future<bool> login(String email, String password) async {
@@ -48,6 +50,14 @@ class AuthProvider extends ChangeNotifier {
         _inscode = user.inscode;
         _isLoading = false;
         notifyListeners();
+
+        // Fetch institution name in background
+        if (user.insId != null) {
+          final insInfo = await SupabaseService.getInstitutionInfo(user.insId!);
+          _insName = insInfo.name;
+          notifyListeners();
+        }
+
         return true;
       } else {
         _errorMessage = 'Invalid email or password. Please try again.';
@@ -126,6 +136,7 @@ class AuthProvider extends ChangeNotifier {
     _userRole = null;
     _insId = null;
     _inscode = null;
+    _insName = null;
     _errorMessage = null;
     notifyListeners();
   }

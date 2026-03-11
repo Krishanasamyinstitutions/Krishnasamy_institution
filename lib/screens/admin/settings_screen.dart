@@ -333,7 +333,7 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                     color: Colors.grey.shade50,
                     child: const Row(
                       children: [
-                        SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                        SizedBox(width: 40, child: Text('S No.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         Expanded(flex: 3, child: Text('Designation Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         Expanded(flex: 3, child: Text('Reports To', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         SizedBox(width: 80, child: Text('Actions', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
@@ -622,7 +622,7 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                     color: Colors.grey.shade50,
                     child: const Row(
                       children: [
-                        SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                        SizedBox(width: 40, child: Text('S No.', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         Expanded(flex: 3, child: Text('Role Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         Expanded(flex: 2, child: Text('Ins Code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                         SizedBox(width: 80, child: Text('Actions', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),

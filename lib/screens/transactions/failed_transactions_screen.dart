@@ -508,34 +508,30 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       ),
                     ],
                   ),
-                  // Status stamp overlay on table
+                  // Status stamp overlay – between Term and Fee Type columns
                   if (data.status == 'paid' || data.status == 'failed')
                     pw.Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 40,
-                      child: pw.Center(
-                        child: pw.Opacity(
-                          opacity: 0.55,
-                          child: pw.Transform.rotateBox(
-                            angle: -0.52,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                              decoration: pw.BoxDecoration(
-                                color: PdfColor.fromInt(data.status == 'paid' ? 0x66c2eecd : 0x66FFD6D6),
-                                borderRadius: pw.BorderRadius.circular(10),
-                                border: pw.Border.all(
-                                  color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
-                                  width: 2.5,
-                                ),
+                      left: 120, top: 40,
+                      child: pw.Opacity(
+                        opacity: 0.55,
+                        child: pw.Transform.rotateBox(
+                          angle: -0.40,
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromInt(data.status == 'paid' ? 0x66c2eecd : 0x66FFD6D6),
+                              borderRadius: pw.BorderRadius.circular(10),
+                              border: pw.Border.all(
+                                color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
+                                width: 2.5,
                               ),
-                              child: pw.Text(
-                                data.status == 'paid' ? 'PAID' : 'FAILED',
-                                style: pw.TextStyle(
-                                  font: fontSemiBold,
-                                  fontSize: 22,
-                                  color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
-                                ),
+                            ),
+                            child: pw.Text(
+                              data.status == 'paid' ? 'PAID' : 'FAILED',
+                              style: pw.TextStyle(
+                                font: fontSemiBold,
+                                fontSize: 20,
+                                color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
                               ),
                             ),
                           ),
@@ -893,7 +889,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               ),
               columnSpacing: 20,
               columns: const [
-                DataColumn(label: Text('#')),
+                DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('Pay No')),
                 DataColumn(label: Text('Student')),
                 DataColumn(label: Text('Amount')),
@@ -1032,7 +1028,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               ),
               columnSpacing: 20,
               columns: const [
-                DataColumn(label: Text('#')),
+                DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('Pay No')),
                 DataColumn(label: Text('Student')),
                 DataColumn(label: Text('Amount')),

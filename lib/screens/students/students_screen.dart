@@ -65,7 +65,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   final _payMobileController = TextEditingController();
 
   bool _isUploadingPhoto = false;
-  bool _isFormEnabled = false;
+  bool _isFormEnabled = true;
   List<StudentModel> _students = [];
   Map<String, int> _classCounts = {};
   Map<String, List<StudentModel>> _cachedClassStudents = {};
@@ -278,6 +278,161 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _photoUrl = s.stuphoto;
       _isFormEnabled = false; // view mode — buttons disabled
     });
+  }
+
+  void _clearForm() {
+    _admNoController.clear();
+    _nameController.clear();
+    _mobileController.clear();
+    _emailController.clear();
+    _addressController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _countryController.clear();
+    _pinController.clear();
+    _fatherNameController.clear();
+    _fatherMobileController.clear();
+    _fatherOccController.clear();
+    _motherNameController.clear();
+    _motherMobileController.clear();
+    _motherOccController.clear();
+    _guardianNameController.clear();
+    _guardianMobileController.clear();
+    _guardianOccController.clear();
+    _payNameController.clear();
+    _payMobileController.clear();
+    setState(() {
+      _selectedGender = null;
+      _selectedBloodGroup = null;
+      _selectedClass = null;
+      _selectedConId = null;
+      _admDate = null;
+      _dob = null;
+      _photoUrl = null;
+      _selectedParentTab = 'Father';
+      _selectedStudent = null;
+      _isFormEnabled = true;
+      if (_years.isNotEmpty) {
+        _selectedYrId = _years.first['yr_id'].toString();
+        _selectedYrLabel = _years.first['yrlabel'];
+      }
+    });
+  }
+
+  bool _isSaving = false;
+
+  Future<void> _saveNewStudent() async {
+    if (_admNoController.text.trim().isEmpty ||
+        _nameController.text.trim().isEmpty ||
+        _selectedClass == null ||
+        _mobileController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields (Adm No, Name, Class, Mobile)'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId ?? 1;
+    final inscode = auth.inscode ?? '';
+    final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
+    final yrLabel = _selectedYrLabel ?? '';
+    final now = DateTime.now().toIso8601String().split('T').first;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final stuId = await SupabaseService.addStudent({
+        'ins_id': insId,
+        'inscode': inscode,
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'stuadmno': _admNoController.text.trim(),
+        'stuadmdate': (_admDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'stuname': _nameController.text.trim(),
+        'stugender': _selectedGender == 'Female' ? 'F' : _selectedGender == 'Male' ? 'M' : 'O',
+        'studob': _dob?.toIso8601String().split('T').first,
+        'stumobile': _mobileController.text.trim(),
+        'stuemail': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+        'stuaddress': _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+        'stucity': _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : null,
+        'stustate': _stateController.text.trim().isNotEmpty ? _stateController.text.trim() : null,
+        'stucountry': _countryController.text.trim().isNotEmpty ? _countryController.text.trim() : null,
+        'stupin': _pinController.text.trim().isNotEmpty ? _pinController.text.trim() : null,
+        'stubloodgrp': _selectedBloodGroup,
+        'stuclass': _selectedClass,
+        'stuphoto': _photoUrl,
+        'stuser_id': _admNoController.text.trim(),
+        'stuotpstatus': 0,
+        'approvedby': '',
+        'approveddate': now,
+        'suspendedby': '',
+        'terminatedby': '',
+        'activestatus': 1,
+        'createdon': now,
+      });
+
+      // Save parent
+      final fatherMob = _fatherMobileController.text.trim().isNotEmpty ? _fatherMobileController.text.trim() : null;
+      final motherMob = _motherMobileController.text.trim().isNotEmpty ? _motherMobileController.text.trim() : null;
+      final payMob = _payMobileController.text.trim().isNotEmpty ? _payMobileController.text.trim() : null;
+
+      final existingParId = await SupabaseService.findParentByMobile(
+        fatherMobile: fatherMob,
+        motherMobile: motherMob,
+        payMobile: payMob,
+      );
+
+      final parId = existingParId ?? await SupabaseService.saveParent({
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'partype': 'P',
+        'fathername': _fatherNameController.text.trim().isNotEmpty ? _fatherNameController.text.trim() : null,
+        'fathermobile': fatherMob,
+        'fatheroccupation': _fatherOccController.text.trim().isNotEmpty ? _fatherOccController.text.trim() : null,
+        'mothername': _motherNameController.text.trim().isNotEmpty ? _motherNameController.text.trim() : null,
+        'mothermobile': motherMob,
+        'motheroccupation': _motherOccController.text.trim().isNotEmpty ? _motherOccController.text.trim() : null,
+        'guardianname': _guardianNameController.text.trim().isNotEmpty ? _guardianNameController.text.trim() : null,
+        'guardianmobile': _guardianMobileController.text.trim().isNotEmpty ? _guardianMobileController.text.trim() : null,
+        'guardianoccupation': _guardianOccController.text.trim().isNotEmpty ? _guardianOccController.text.trim() : null,
+        'payincharge': _payNameController.text.trim().isNotEmpty ? _payNameController.text.trim() : null,
+        'payinchargemob': payMob,
+        'parotpstatus': 0,
+        'approveddate': now,
+        'activestatus': 1,
+      });
+
+      // Link parent to student
+      await SupabaseService.saveParentDetail({
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'par_id': parId,
+        'stu_id': stuId,
+        'ins_id': insId,
+        'inscode': inscode,
+        'stuadmno': _admNoController.text.trim(),
+        'stuname': _nameController.text.trim(),
+        'stuclass': _selectedClass,
+        'activestatus': 1,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Student added successfully'), backgroundColor: AppColors.success),
+        );
+        _clearForm();
+        _loadDropdowns();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving student: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Widget _avatarPlaceholder() {
@@ -681,7 +836,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             color: AppColors.surface,
             child: const Row(
               children: [
-                SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                SizedBox(width: 40, child: Text('S No.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                 SizedBox(width: 100, child: Text('Adm No', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                 Expanded(child: Text('Student Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                 SizedBox(width: 80, child: Text('Gender', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
@@ -817,21 +972,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
           const SizedBox(width: 16),
 
-          // RIGHT — Student Details (only if selected)
+          // RIGHT — Student Details or Add New Student form
           Expanded(
-            child: _selectedStudent == null
-                ? _selectedClassFilter != null
-                    ? _buildClassStudentTable(_selectedClassFilter!)
-                    : Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.person_search_rounded, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                            const SizedBox(height: 12),
-                            Text('Select a student to view details', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 14, fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      )
+            child: _selectedStudent == null && _selectedClassFilter != null
+                ? _buildClassStudentTable(_selectedClassFilter!)
                 : Column(
                     children: [
                       Expanded(
@@ -877,7 +1021,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   const SizedBox(width: 8),
                                                   Flexible(
                                                     child: Text(
-                                                      _insName ?? context.read<AuthProvider>().inscode ?? '',
+                                                      _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
                                                       style: const TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
@@ -936,6 +1080,58 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                       _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
                                       const SizedBox(height: 16),
                                       _panel(title: 'Payment In Charge', icon: Icons.payments_rounded, child: _buildPaymentFields()),
+                                      if (_selectedStudent == null) ...[
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton.icon(
+                                                onPressed: _isSaving ? null : _clearForm,
+                                                icon: const Icon(Icons.close_rounded, size: 18),
+                                                label: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: AppColors.textSecondary,
+                                                  side: const BorderSide(color: AppColors.border),
+                                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: ElevatedButton.icon(
+                                                onPressed: _isSaving ? null : _saveNewStudent,
+                                                icon: _isSaving
+                                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                    : const Icon(Icons.save_rounded, size: 18),
+                                                label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.accent,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ] else if (_selectedStudent!.isActive) ...[
+                                        const SizedBox(height: 16),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton.icon(
+                                            onPressed: () => _confirmTerminateStudent(_selectedStudent!),
+                                            icon: const Icon(Icons.block_rounded, size: 18),
+                                            label: const Text('Terminate Student', style: TextStyle(fontWeight: FontWeight.w600)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.error,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 24),
                                     ],
                                   ),
@@ -963,6 +1159,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Academic Year *', child: DropdownButtonFormField<String>(
             initialValue: _selectedYrId,
             decoration: _dec('Select year'),
+            dropdownColor: Colors.white,
             style: _inputStyle,
             items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']))).toList(),
             onChanged: (v) => setState(() {
@@ -982,47 +1179,48 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ),
         const SizedBox(height: 14),
 
-        _fieldFull(
-          label: 'Admission Date *',
-          child: InkWell(
-            onTap: () async {
-              final d = await showDatePicker(
-                context: context,
-                initialDate: _admDate ?? DateTime.now(),
-                firstDate: DateTime(2000),
-                lastDate: DateTime.now(),
-              );
-              if (d != null) setState(() => _admDate = d);
-            },
-            child: InputDecorator(
-              decoration: _dec('Select admission date').copyWith(
-                suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
-              ),
-              child: Text(
-                _admDate != null
-                    ? '${_admDate!.day.toString().padLeft(2, '0')}/${_admDate!.month.toString().padLeft(2, '0')}/${_admDate!.year}'
-                    : 'Select admission date',
-                style: TextStyle(
-                  color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                  fontSize: 13,
-                  fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
+        _fieldFull(label: 'Student Name *', child: TextFormField(
+          controller: _nameController,
+          decoration: _dec('Enter full name'),
+          style: _inputStyle,
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        )),
+        const SizedBox(height: 14),
+
+        _row2(
+          _fieldFull(
+            label: 'Admission Date *',
+            child: InkWell(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _admDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime.now(),
+                );
+                if (d != null) setState(() => _admDate = d);
+              },
+              child: InputDecorator(
+                decoration: _dec('Select admission date').copyWith(
+                  suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
+                ),
+                child: Text(
+                  _admDate != null
+                      ? '${_admDate!.day.toString().padLeft(2, '0')}/${_admDate!.month.toString().padLeft(2, '0')}/${_admDate!.year}'
+                      : 'Select admission date',
+                  style: TextStyle(
+                    color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                    fontSize: 13,
+                    fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 14),
-
-        _row2(
-          _fieldFull(label: 'Student Name *', child: TextFormField(
-            controller: _nameController,
-            decoration: _dec('Enter full name'),
-            style: _inputStyle,
-            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-          )),
           _fieldFull(label: 'Gender *', child: DropdownButtonFormField<String>(
             initialValue: _selectedGender,
             decoration: _dec('Select gender'),
+            dropdownColor: Colors.white,
             style: _inputStyle,
             items: _genders.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
             onChanged: (v) => setState(() => _selectedGender = v),
@@ -1076,6 +1274,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Class *', child: DropdownButtonFormField<String>(
             initialValue: _selectedClass,
             decoration: _dec('Select class'),
+            dropdownColor: Colors.white,
             style: _inputStyle,
             items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
             onChanged: (v) => setState(() => _selectedClass = v),
@@ -1089,6 +1288,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             initialValue: _selectedBloodGroup,
             isExpanded: true,
             decoration: _dec('Select'),
+            dropdownColor: Colors.white,
             style: _inputStyle,
             items: _bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
@@ -1335,6 +1535,80 @@ class _StudentsScreenState extends State<StudentsScreen> {
         },
       ),
     );
+  }
+
+  // ─── Student Termination ─────────────────────────────────────────────────────
+
+  void _confirmTerminateStudent(StudentModel s) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Terminate Student', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to terminate "${s.stuname}"? This will deactivate the student record.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'Reason for termination *',
+                hintText: 'Enter reason...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Please enter a reason'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              _terminateStudent(s, reason);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Terminate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _terminateStudent(StudentModel s, String reason) async {
+    final auth = context.read<AuthProvider>();
+    final terminatedBy = auth.userName ?? '';
+    final success = await SupabaseService.terminateStudent(s.stuId, terminatedBy: terminatedBy, terminatedReason: reason);
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Student terminated successfully'), backgroundColor: Colors.green),
+        );
+        setState(() => _selectedStudent = null);
+        _loadDropdowns();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to terminate student'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1875,7 +2149,7 @@ class _ExcelImportDialogState extends State<_ExcelImportDialog> {
                   horizontalMargin: 8,
                   headingRowColor: WidgetStateProperty.all(AppColors.info.withValues(alpha: 0.04)),
                   columns: [
-                    const DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11))),
+                    const DataColumn(label: Text('S No.', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11))),
                     const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11))),
                     for (int c = 0; c < _headers.length; c++)
                       DataColumn(
