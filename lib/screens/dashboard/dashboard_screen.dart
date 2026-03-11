@@ -13,6 +13,7 @@ import '../admin/settings_screen.dart';
 import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
+import '../fees/fee_demand_approval_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -36,9 +37,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_alt_rounded, 'Students'),
-    _NavItem(Icons.request_page_rounded, 'Fee Demand'),
+    _NavItem(Icons.people_alt_rounded, 'Students', accountantHidden: true),
+    _NavItem(Icons.request_page_rounded, 'Fee Demand', accountantHidden: true),
     _NavItem(Icons.receipt_long_rounded, 'Transactions'),
+    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', accountantOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.settings_rounded, 'Designation & Role', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
@@ -50,8 +52,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<_NavItem> _getNavItems(BuildContext context) {
     final auth = context.read<AuthProvider>();
     final isAdmin = auth.currentUser?.urname == 'Admin';
-    if (isAdmin) return _allNavItems.toList();
-    return _allNavItems.where((item) => !item.adminOnly).toList();
+    final isAccountant = auth.currentUser?.desname == 'Accountant';
+    if (isAdmin) return _allNavItems.where((item) => !item.accountantOnly).toList();
+    return _allNavItems.where((item) {
+      if (item.adminOnly) return false;
+      if (item.accountantOnly && !isAccountant) return false;
+      if (isAccountant && item.accountantHidden) return false;
+      return true;
+    }).toList();
   }
 
   @override
@@ -570,7 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -585,6 +593,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();
+    }
+    if (selectedMenu == 'Fee Demand Approval') {
+      return const FeeDemandApprovalScreen();
     }
     if (selectedMenu == 'User Creation') {
       return const AdminCreationScreen();
@@ -608,6 +619,8 @@ class _NavItem {
   final IconData icon;
   final String label;
   final bool adminOnly;
-  const _NavItem(this.icon, this.label, {this.adminOnly = false});
+  final bool accountantHidden;
+  final bool accountantOnly;
+  const _NavItem(this.icon, this.label, {this.adminOnly = false, this.accountantHidden = false, this.accountantOnly = false});
 }
 
