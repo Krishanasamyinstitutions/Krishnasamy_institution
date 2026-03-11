@@ -39,3 +39,7 @@ app.*.map.json
 
 # Web build output
 /web/
+
+# Reference/asset files
+assets/Code React App with Supabase/
+nul

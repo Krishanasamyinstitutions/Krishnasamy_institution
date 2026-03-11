@@ -36,9 +36,39 @@ class _NoticesScreenState extends State<NoticesScreen> {
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .order('createdat', ascending: false);
+
+      final all = List<Map<String, dynamic>>.from(data);
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+
+      // Auto-expire notices past their todate
+      final expiredIds = all
+          .where((n) {
+            final toDate = n['noticetodate']?.toString();
+            return toDate != null && toDate.isNotEmpty && toDate.compareTo(todayStr) < 0;
+          })
+          .map((n) => n['notice_id'] ?? n['id'])
+          .where((id) => id != null)
+          .toList();
+
+      if (expiredIds.isNotEmpty) {
+        try {
+          await SupabaseService.client
+              .from('notice')
+              .update({'activestatus': 9})
+              .inFilter('notice_id', expiredIds);
+        } catch (_) {}
+      }
+
+      final active = all.where((n) {
+        final toDate = n['noticetodate']?.toString();
+        if (toDate == null || toDate.isEmpty) return true;
+        return toDate.compareTo(todayStr) >= 0;
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _notices = List<Map<String, dynamic>>.from(data);
+          _notices = active;
           _isLoading = false;
         });
       }
@@ -466,6 +496,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   final _descController = TextEditingController();
   String _priority = 'Normal';
   String _category = 'General';
+  DateTime? _fromDate;
+  DateTime? _toDate;
   String _targetType = 'All Students';
   List<String> _selectedClasses = [];
   List<String> _availableClasses = [];
@@ -487,6 +519,26 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     _titleController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final initial = isFrom ? (_fromDate ?? DateTime.now()) : (_toDate ?? DateTime.now().add(const Duration(days: 7)));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+          if (_toDate != null && _toDate!.isBefore(picked)) _toDate = null;
+        } else {
+          _toDate = picked;
+        }
+      });
+    }
   }
 
   Future<void> _loadClasses() async {
@@ -546,8 +598,12 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         'noticepriority': _priority,
         'noticecategory': _category,
         'noticetarget': targetLabel,
+        'noticefromdate': _fromDate?.toIso8601String(),
+        'noticetodate': _toDate?.toIso8601String(),
         'createdby': userName,
         'createdat': DateTime.now().toIso8601String(),
+        'noticefromdate': _fromDate?.toIso8601String().split('T').first,
+        'noticetodate': _toDate?.toIso8601String().split('T').first,
         'activestatus': 1,
       });
 
@@ -711,6 +767,16 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   ),
                   const SizedBox(height: 20),
 
+                  // From Date & To Date row
+                  Row(
+                    children: [
+                      Expanded(child: _buildDatePicker('From Date', _fromDate, (d) => setState(() => _fromDate = d))),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildDatePicker('To Date', _toDate, (d) => setState(() => _toDate = d))),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
                   // Target Audience
                   const Text('Target Audience', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -830,6 +896,75 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     ),
                   ],
 
+                  const SizedBox(height: 20),
+
+                  // From / To Date
+                  const Text('Notice Period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickDate(true),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _fromDate != null ? AppColors.accent : AppColors.border),
+                              borderRadius: BorderRadius.circular(10),
+                              color: AppColors.surface,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 15, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _fromDate != null
+                                      ? '${_fromDate!.day.toString().padLeft(2,'0')}/${_fromDate!.month.toString().padLeft(2,'0')}/${_fromDate!.year}'
+                                      : 'From Date',
+                                  style: TextStyle(fontSize: 13, color: _fromDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pickDate(false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _toDate != null ? AppColors.error : AppColors.border),
+                              borderRadius: BorderRadius.circular(10),
+                              color: AppColors.surface,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.event_busy_rounded, size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _toDate != null
+                                      ? '${_toDate!.day.toString().padLeft(2,'0')}/${_toDate!.month.toString().padLeft(2,'0')}/${_toDate!.year}'
+                                      : 'To Date (Auto-expire)',
+                                  style: TextStyle(fontSize: 13, color: _toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Notice will be automatically removed after the To Date.',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+
                   const SizedBox(height: 28),
 
                   // Preview section
@@ -922,6 +1057,53 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
       default:
         return AppColors.accent;
     }
+  }
+
+  String _formatDateDisplay(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  Widget _buildDatePicker(String label, DateTime? selectedDate, ValueChanged<DateTime> onSelected) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) onSelected(picked);
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    selectedDate != null ? _formatDateDisplay(selectedDate) : 'Select date...',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {

@@ -67,6 +67,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
   bool _isUploadingPhoto = false;
   bool _isFormEnabled = false;
   List<StudentModel> _students = [];
+  Map<String, int> _classCounts = {};
+  Map<String, List<StudentModel>> _cachedClassStudents = {};
+  bool _loadingClassStudents = false;
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   final _searchController = TextEditingController();
@@ -139,19 +142,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
 
-    // Load lightweight data in parallel so class list appears immediately
+    // Stage 1: parallel — includes class counts so list shows immediately with correct counts
     final results = await Future.wait<dynamic>([
       SupabaseService.getYears(insId),
       SupabaseService.getConcessions(insId),
       SupabaseService.getClasses(insId),
       SupabaseService.getInstitutionInfo(insId),
+      SupabaseService.getStudentCountsByClass(insId),
     ]);
 
     if (!mounted) return;
     final years = results[0] as List<Map<String, dynamic>>;
     final concessions = results[1] as List<Map<String, dynamic>>;
     final rawClasses = results[2] as List<String>;
-    final insInfo = results[3] as ({String? name, String? logo});
+    final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
+    final classCounts = results[4] as Map<String, int>;
     final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
     final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
 
@@ -159,6 +164,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _years = years;
       _concessions = concessions;
       _classes = [...ordered, ...extra];
+      _classCounts = classCounts;
       _insName = insInfo.name;
       _insLogo = insInfo.logo;
       if (years.isNotEmpty) {
@@ -167,7 +173,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
     });
 
-    // Load students in background — class list is already visible
+    // Stage 2: background — load all students for search/export
     final students = await SupabaseService.getStudents(insId);
     if (!mounted) return;
     setState(() => _students = students);
@@ -426,24 +432,39 @@ class _StudentsScreenState extends State<StudentsScreen> {
   // ─── Left Panel Builders ─────────────────────────────────────────────────────
 
   Widget _buildClassList() {
-    final grouped = _groupedStudents;
-    if (grouped.isEmpty) {
-      return const Center(child: Text('No classes found', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)));
+    if (_classes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: grouped.length,
+      itemCount: _classes.length,
       itemBuilder: (context, index) {
-        final className = grouped.keys.elementAt(index);
-        final students = grouped[className]!;
+        final className = _classes[index];
+        // Use background-loaded count if available, else RPC count
+        final count = _groupedStudents[className]?.length ?? _classCounts[className] ?? 0;
         final classColor = _getClassColor(className);
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() {
-              _selectedClassFilter = className;
-              _searchController.clear();
-            }),
+            onTap: () async {
+              setState(() {
+                _selectedClassFilter = className;
+                _searchController.clear();
+              });
+              // Lazy-load if background load hasn't provided this class yet
+              if ((_groupedStudents[className]?.isEmpty ?? true) && _cachedClassStudents[className] == null) {
+                setState(() => _loadingClassStudents = true);
+                final auth = context.read<AuthProvider>();
+                final insId = auth.insId ?? 1;
+                final classStudents = await SupabaseService.getStudentsByClass(insId, className);
+                if (mounted) {
+                  setState(() {
+                    _cachedClassStudents[className] = classStudents;
+                    _loadingClassStudents = false;
+                  });
+                }
+              }
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: const BoxDecoration(
@@ -466,7 +487,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Class $className', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        Text('${students.length} students', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                        Text('$count students', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -476,7 +497,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       color: classColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text('${students.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: classColor)),
+                    child: Text('$count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: classColor)),
                   ),
                   const SizedBox(width: 8),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
@@ -490,7 +511,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   Widget _buildStudentListForClass(String className) {
-    final allStudents = _groupedStudents[className] ?? [];
+    final allStudents = _groupedStudents[className]?.isNotEmpty == true
+        ? _groupedStudents[className]!
+        : _cachedClassStudents[className] ?? [];
+    if (_loadingClassStudents && allStudents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final q = _searchController.text.toLowerCase();
     final students = q.isEmpty
         ? allStudents
@@ -583,7 +609,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   Widget _buildClassStudentTable(String className) {
-    final allStudents = _groupedStudents[className] ?? [];
+    final allStudents = _groupedStudents[className]?.isNotEmpty == true
+        ? _groupedStudents[className]!
+        : _cachedClassStudents[className] ?? [];
+    if (_loadingClassStudents && allStudents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final classColor = _getClassColor(className);
 
     return Container(
@@ -736,7 +767,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 color: AppColors.accent.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Text('${_students.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
                             ),
                             const SizedBox(width: 8),
                             SizedBox(

@@ -18,7 +18,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   int? _selectedReportTo;
-  int? _editingDesId;
+
 
   @override
   void initState() {
@@ -56,25 +56,17 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
 
     setState(() => _isLoading = true);
 
-    bool success;
-    if (_editingDesId != null) {
-      success = await SupabaseService.updateDesignation(_editingDesId!, {
-        'desname': _nameController.text.trim(),
-        'desrepto': _selectedReportTo,
-      });
-    } else {
-      success = await SupabaseService.createDesignation({
-        'ins_id': insId,
-        'desname': _nameController.text.trim(),
-        'desrepto': _selectedReportTo,
-        'activestatus': 1,
-      });
-    }
+    final success = await SupabaseService.createDesignation({
+      'ins_id': insId,
+      'desname': _nameController.text.trim(),
+      'desrepto': _selectedReportTo,
+      'activestatus': 1,
+    });
 
     if (mounted) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_editingDesId != null ? 'Designation updated' : 'Designation created'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('Designation created'), backgroundColor: AppColors.success),
         );
         _resetForm();
         _fetchDesignations();
@@ -87,13 +79,6 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
     }
   }
 
-  void _editDesignation(Map<String, dynamic> des) {
-    setState(() {
-      _editingDesId = des['des_id'] as int;
-      _nameController.text = des['desname']?.toString() ?? '';
-      _selectedReportTo = des['desrepto'] as int?;
-    });
-  }
 
   Future<void> _deleteDesignation(int desId) async {
     final confirm = await showDialog<bool>(
@@ -127,7 +112,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
   void _resetForm() {
     _nameController.clear();
     _selectedReportTo = null;
-    _editingDesId = null;
+
   }
 
   String _getDesignationName(int? desId) {
@@ -173,7 +158,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                         Icon(Icons.badge_rounded, color: AppColors.accent, size: 22),
                         const SizedBox(width: 8),
                         Text(
-                          _editingDesId != null ? 'Edit Designation' : 'Add Designation',
+                          'Add Designation',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         ),
                       ],
@@ -203,8 +188,8 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _isLoading ? null : _saveDesignation,
-                            icon: Icon(_editingDesId != null ? Icons.save : Icons.add, size: 18),
-                            label: Text(_editingDesId != null ? 'Update' : 'Add'),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
@@ -213,13 +198,6 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                             ),
                           ),
                         ),
-                        if (_editingDesId != null) ...[
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () => setState(() => _resetForm()),
-                            child: const Text('Cancel'),
-                          ),
-                        ],
                       ],
                     ),
                   ],
@@ -302,15 +280,6 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  InkWell(
-                                    onTap: () => _editDesignation(des),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.edit_rounded, size: 16, color: AppColors.accent),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
                                   InkWell(
                                     onTap: () => _deleteDesignation(des['des_id'] as int),
                                     borderRadius: BorderRadius.circular(6),

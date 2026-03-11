@@ -56,21 +56,58 @@ class SupabaseService {
 
   // ==================== INSTITUTION ====================
 
-  /// Get institution name and logo from the institution table
-  static Future<({String? name, String? logo})> getInstitutionInfo(int insId) async {
+  /// Get institution name, logo, and address from the institution table
+  static Future<({String? name, String? logo, String? address, String? mobile, String? email})> getInstitutionInfo(int insId) async {
     try {
       final result = await client
           .from('institution')
-          .select('insname, inslogo')
+          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, cit_id, sta_id, cou_id, inspincode, insmobno, insmail')
           .eq('ins_id', insId)
           .maybeSingle();
+
+      if (result == null) return (name: null, logo: null, address: null, mobile: null, email: null);
+
+      // Build full address from individual columns (split into two lines)
+      final line1Parts = <String>[
+        if (result['insaddress1'] != null && (result['insaddress1'] as String).isNotEmpty) result['insaddress1'] as String,
+        if (result['insaddress2'] != null && (result['insaddress2'] as String).isNotEmpty) result['insaddress2'] as String,
+      ];
+      final line2Parts = <String>[
+        if (result['insaddress3'] != null && (result['insaddress3'] as String).isNotEmpty) result['insaddress3'] as String,
+        if (result['inspincode'] != null && (result['inspincode'] as String).isNotEmpty) result['inspincode'] as String,
+      ];
+      final lines = <String>[
+        if (line1Parts.isNotEmpty) line1Parts.join(', '),
+        if (line2Parts.isNotEmpty) line2Parts.join(', '),
+      ];
+      final address = lines.isNotEmpty ? lines.join('\n') : null;
+
+      // inslogo column stores the full public URL directly
+      final logoUrl = result['inslogo'] as String?;
+
       return (
-        name: result?['insname'] as String?,
-        logo: result?['inslogo'] as String?,
+        name: result['insname'] as String?,
+        logo: logoUrl,
+        address: address,
+        mobile: result['insmobno'] as String?,
+        email: result['insmail'] as String?,
       );
     } catch (e) {
       debugPrint('Error fetching institution info: $e');
-      return (name: null, logo: null);
+      return (name: null, logo: null, address: null, mobile: null, email: null);
+    }
+  }
+
+  /// Create a new institution and return the inserted row (with ins_id)
+  static Future<Map<String, dynamic>?> createInstitution(Map<String, dynamic> data) async {
+    try {
+      final response = await client.from('institution').insert(data).select().single();
+      return response;
+    } catch (e, st) {
+      debugPrint('Error creating institution: $e');
+      debugPrint('Data: $data');
+      debugPrint('Stack: $st');
+      return null;
     }
   }
 
@@ -116,6 +153,73 @@ class SupabaseService {
       return allResults.map((e) => StudentModel.fromJson(e)).toList();
     } catch (e) {
       debugPrint('Error fetching students: $e');
+      return [];
+    }
+  }
+
+  /// Count of students per class — one row per class, used for fast class list display
+  static Future<Map<String, int>> getStudentCountsByClass(int insId) async {
+    try {
+      final response = await client.rpc('get_student_counts_by_class', params: {'p_ins_id': insId});
+      final map = <String, int>{};
+      for (final row in (response as List)) {
+        map[row['stuclass']?.toString() ?? ''] = (row['student_count'] as num?)?.toInt() ?? 0;
+      }
+      if (map.isNotEmpty) return map;
+    } catch (e) {
+      debugPrint('RPC get_student_counts_by_class failed, using fallback: $e');
+    }
+    // Fallback: count from direct query
+    try {
+      final students = await getStudents(insId);
+      final map = <String, int>{};
+      for (final s in students) {
+        final cls = s.stuclass.isNotEmpty ? s.stuclass : 'Unassigned';
+        map[cls] = (map[cls] ?? 0) + 1;
+      }
+      return map;
+    } catch (e) {
+      debugPrint('Fallback student count failed: $e');
+      return {};
+    }
+  }
+
+  /// Students for a single class — used for lazy drilldown
+  static Future<List<StudentModel>> getStudentsByClass(int insId, String className) async {
+    try {
+      final response = await client.rpc('get_students_by_class', params: {'p_ins_id': insId, 'p_class': className});
+      final list = (response as List).map((e) => StudentModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      if (list.isNotEmpty) return list;
+    } catch (e) {
+      debugPrint('RPC get_students_by_class failed, using fallback: $e');
+    }
+    // Fallback: direct query filtered by class
+    try {
+      final response = await client
+          .from('students')
+          .select('*')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('stuclass', className)
+          .order('stuname', ascending: true);
+      return (response as List).map((e) => StudentModel.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    } catch (e) {
+      debugPrint('Fallback getStudentsByClass failed: $e');
+      return [];
+    }
+  }
+
+  /// Get fee types (feedesc) from fee table
+  static Future<List<String>> getFeeTypes(int insId) async {
+    try {
+      final response = await client
+          .from('feetype')
+          .select('feedesc')
+          .eq('activestatus', 1)
+          .order('fee_id', ascending: true);
+      return (response as List).map((e) => e['feedesc']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Error fetching fee types: $e');
       return [];
     }
   }
@@ -195,7 +299,15 @@ class SupabaseService {
           .where((c) => c.isNotEmpty)
           .toSet()
           .toList();
-      classes.sort();
+      const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+      classes.sort((a, b) {
+        final idxA = classOrder.indexOf(a.toUpperCase());
+        final idxB = classOrder.indexOf(b.toUpperCase());
+        if (idxA >= 0 && idxB >= 0) return idxA.compareTo(idxB);
+        if (idxA >= 0) return -1;
+        if (idxB >= 0) return 1;
+        return a.compareTo(b);
+      });
       return classes;
     } catch (e) {
       debugPrint('Error fetching classes: $e');
@@ -341,6 +453,29 @@ class SupabaseService {
     }
   }
 
+  /// Terminate (deactivate) an institution user
+  static Future<bool> terminateInstitutionUser(int useId, {required String terminatedBy, required String terminatedReason}) async {
+    try {
+      debugPrint('Terminating user with use_id: $useId');
+      final now = DateTime.now().toIso8601String();
+      await client
+          .from('institutionusers')
+          .update({
+            'activestatus': 9,
+            'terminatedby': terminatedBy,
+            'terminateddate': now,
+            'terminatedreason': terminatedReason,
+          })
+          .eq('use_id', useId);
+      debugPrint('Terminate user success');
+      return true;
+    } catch (e, st) {
+      debugPrint('Error terminating institution user: $e');
+      debugPrint('Stack trace: $st');
+      return false;
+    }
+  }
+
   // ==================== FEE GROUPS ====================
 
   /// Get all active fee groups for an institution
@@ -407,63 +542,64 @@ class SupabaseService {
 
   /// Get all fee demands for an institution (with student name)
   static Future<List<Map<String, dynamic>>> getFeeDemands(int insId) async {
-    const batchSize = 1000;
-    final List<Map<String, dynamic>> allResults = [];
-    bool useJoin = true;
-    int offset = 0;
-
-    // Test join on first batch
     try {
-      final firstBatch = await client
-          .from('feedemand')
-          .select('*, students(stuname)')
-          .eq('ins_id', insId)
-          .eq('activestatus', 1)
-          .order('stuclass', ascending: true)
-          .range(0, batchSize - 1);
-      allResults.addAll(List<Map<String, dynamic>>.from(firstBatch as List));
-      if ((firstBatch as List).length < batchSize) return allResults;
-      offset = batchSize;
+      // RETURNS json (json_agg) — single scalar bypasses PostgREST row limit
+      final response = await client.rpc('get_fee_demands', params: {'p_ins_id': insId});
+      if (response == null) return [];
+      return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
-      debugPrint('Left join failed in getFeeDemands, using fallback: $e');
-      useJoin = false;
-      // Fetch first batch without join
-      try {
-        final firstBatch = await client
-            .from('feedemand')
-            .select('*')
-            .eq('ins_id', insId)
-            .eq('activestatus', 1)
-            .order('stuclass', ascending: true)
-            .range(0, batchSize - 1);
-        allResults.addAll(List<Map<String, dynamic>>.from(firstBatch as List));
-        if ((firstBatch as List).length < batchSize) return allResults;
-        offset = batchSize;
-      } catch (e2) {
-        debugPrint('Error fetching fee demands (fallback): $e2');
-        return [];
-      }
+      debugPrint('RPC get_fee_demands failed: $e');
+      return [];
     }
+  }
 
-    // Fetch remaining batches
+  /// Fetch paynumber lookup map: pay_id → paynumber
+  static Future<Map<int, String>> getPayNumberMap(List<int> payIds) async {
+    if (payIds.isEmpty) return {};
     try {
-      while (true) {
-        final selectStr = useJoin ? '*, students(stuname)' : '*';
-        final batch = await client
-            .from('feedemand')
-            .select(selectStr)
-            .eq('ins_id', insId)
-            .eq('activestatus', 1)
-            .order('stuclass', ascending: true)
-            .range(offset, offset + batchSize - 1);
-        allResults.addAll(List<Map<String, dynamic>>.from(batch as List));
-        if ((batch as List).length < batchSize) break;
-        offset += batchSize;
+      final Map<int, String> result = {};
+      // Batch in chunks of 500 to avoid query size limits
+      for (var i = 0; i < payIds.length; i += 500) {
+        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+        final response = await client
+            .from('payment')
+            .select('pay_id, paynumber')
+            .inFilter('pay_id', chunk);
+        for (final row in (response as List)) {
+          final id = row['pay_id'] as int?;
+          final num = row['paynumber']?.toString();
+          if (id != null && num != null) result[id] = num;
+        }
       }
+      return result;
     } catch (e) {
-      debugPrint('Error fetching remaining fee demands: $e');
+      debugPrint('Error fetching pay numbers: $e');
+      return {};
     }
-    return allResults;
+  }
+
+  /// Aggregate summary per class — one row per class, no row-limit issues
+  static Future<List<Map<String, dynamic>>> getFeeDemandSummary(int insId) async {
+    try {
+      final response = await client.rpc('get_fee_demand_summary', params: {'p_ins_id': insId});
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('RPC get_fee_demand_summary failed: $e');
+      return [];
+    }
+  }
+
+  /// Individual demand rows for a single class — used for drilldown
+  static Future<List<Map<String, dynamic>>> getFeeDemandsByClass(int insId, String className) async {
+    try {
+      // RETURNS json (json_agg) — single scalar bypasses PostgREST row limit
+      final response = await client.rpc('get_fee_demands_by_class', params: {'p_ins_id': insId, 'p_class': className});
+      if (response == null) return [];
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('RPC get_fee_demands_by_class failed: $e');
+      return [];
+    }
   }
 
   /// Get fee collection summary for an institution
@@ -520,7 +656,7 @@ class SupabaseService {
 
   // ==================== PAYMENTS ====================
 
-  /// Get payments for an institution within a date range
+  /// Get payments for an institution within a date range via RPC function
   static Future<List<Map<String, dynamic>>> getPaymentsByDateRange(
     int insId, {
     required DateTime fromDate,
@@ -528,25 +664,35 @@ class SupabaseService {
   }) async {
     try {
       final from = fromDate.toIso8601String().split('T').first;
-      final to = '${toDate.toIso8601String().split('T').first}T23:59:59';
+      final to = toDate.toIso8601String().split('T').first;
 
-      // Try with student join first
-      try {
-        final response = await client
-            .from('payment')
-            .select('*, students(stuname, stuadmno, stuclass)')
-            .eq('ins_id', insId)
-            .eq('activestatus', 1)
-            .eq('paystatus', 'C')
-            .gte('paydate', from)
-            .lte('paydate', to)
-            .order('paydate', ascending: false);
-        return List<Map<String, dynamic>>.from(response as List);
-      } catch (e) {
-        debugPrint('Left join failed, trying fallback: $e');
+      final response = await client.rpc('get_payments_by_date_range', params: {
+        'p_ins_id': insId,
+        'p_from_date': from,
+        'p_to_date': to,
+      });
+
+      // Normalise: wrap flat student fields into nested 'students' map
+      // so existing UI code (p['students']['stuname'] etc.) keeps working
+      final payments = List<Map<String, dynamic>>.from(response as List);
+      for (final p in payments) {
+        if (p['stuname'] != null && !p.containsKey('students')) {
+          p['students'] = {
+            'stuname': p['stuname'],
+            'stuadmno': p['stuadmno'],
+            'stuclass': p['stuclass'],
+          };
+        }
       }
+      return payments;
+    } catch (e) {
+      debugPrint('RPC get_payments_by_date_range failed, using fallback: $e');
+    }
 
-      // Fallback: fetch payments then manually look up students
+    // Fallback if RPC not yet created
+    try {
+      final from = fromDate.toIso8601String().split('T').first;
+      final to = '${toDate.toIso8601String().split('T').first}T23:59:59';
       final response = await client
           .from('payment')
           .select('*')
@@ -594,7 +740,7 @@ class SupabaseService {
     try {
       final response = await client
           .from('feedemand')
-          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus')
+          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus, duedate')
           .eq('pay_id', payId)
           .eq('activestatus', 1);
       final details = List<Map<String, dynamic>>.from(response as List);
