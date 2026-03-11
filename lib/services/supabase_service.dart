@@ -61,7 +61,7 @@ class SupabaseService {
     try {
       final result = await client
           .from('institution')
-          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, cit_id, sta_id, cou_id, inspincode, insmobno, insmail')
+          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, inspincode, insmobno, insmail')
           .eq('ins_id', insId)
           .maybeSingle();
 
@@ -476,6 +476,29 @@ class SupabaseService {
     }
   }
 
+  /// Terminate (deactivate) a student
+  static Future<bool> terminateStudent(int stuId, {required String terminatedBy, required String terminatedReason}) async {
+    try {
+      debugPrint('Terminating student with stu_id: $stuId');
+      final now = DateTime.now().toIso8601String();
+      await client
+          .from('students')
+          .update({
+            'activestatus': 9,
+            'terminatedby': terminatedBy,
+            'terminateddate': now,
+            'terminatedreason': terminatedReason,
+          })
+          .eq('stu_id', stuId);
+      debugPrint('Terminate student success');
+      return true;
+    } catch (e, st) {
+      debugPrint('Error terminating student: $e');
+      debugPrint('Stack trace: $st');
+      return false;
+    }
+  }
+
   // ==================== FEE GROUPS ====================
 
   /// Get all active fee groups for an institution
@@ -549,6 +572,83 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       debugPrint('RPC get_fee_demands failed: $e');
+      return [];
+    }
+  }
+
+  /// Get paid fee demands with payment date (for date-wise tab)
+  /// Uses RPC to bypass row limits; falls back to direct query
+  static Future<List<Map<String, dynamic>>> getPaidFeeDemands(int insId) async {
+    try {
+      final response = await client.rpc('get_paid_fee_demands', params: {'p_ins_id': insId});
+      if (response == null) return [];
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('RPC get_paid_fee_demands failed, using fallback: $e');
+    }
+
+    // Fallback: fetch paid feedemand rows, then batch-fetch payment dates
+    try {
+      final demands = await client
+          .from('feedemand')
+          .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, pay_id')
+          .eq('ins_id', insId)
+          .eq('paidstatus', 'P')
+          .eq('activestatus', 1);
+      final demandList = List<Map<String, dynamic>>.from(demands as List);
+      if (demandList.isEmpty) return [];
+
+      // Collect unique pay_ids and fetch paydate
+      final payIds = demandList
+          .map((d) => d['pay_id'])
+          .where((id) => id != null)
+          .toSet()
+          .toList();
+      final Map<int, String> payDateMap = {};
+      for (var i = 0; i < payIds.length; i += 500) {
+        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+        final payRows = await client
+            .from('payment')
+            .select('pay_id, paydate')
+            .inFilter('pay_id', chunk);
+        for (final row in (payRows as List)) {
+          final id = row['pay_id'] as int?;
+          final date = row['paydate']?.toString();
+          if (id != null && date != null) payDateMap[id] = date;
+        }
+      }
+
+      // Collect unique stu_ids and fetch student names
+      final stuIds = demandList
+          .map((d) => d['stu_id'])
+          .where((id) => id != null)
+          .toSet()
+          .toList();
+      final Map<int, String> stuNameMap = {};
+      for (var i = 0; i < stuIds.length; i += 500) {
+        final chunk = stuIds.sublist(i, (i + 500).clamp(0, stuIds.length));
+        final stuRows = await client
+            .from('students')
+            .select('stu_id, stuname')
+            .inFilter('stu_id', chunk);
+        for (final row in (stuRows as List)) {
+          final id = row['stu_id'] as int?;
+          final name = row['stuname']?.toString();
+          if (id != null && name != null) stuNameMap[id] = name;
+        }
+      }
+
+      // Enrich demand rows with paydate and stuname
+      for (final d in demandList) {
+        final payId = d['pay_id'] as int?;
+        if (payId != null) d['paydate'] = payDateMap[payId];
+        final stuId = d['stu_id'] as int?;
+        if (stuId != null) d['stuname'] = stuNameMap[stuId] ?? '';
+      }
+
+      return demandList;
+    } catch (e) {
+      debugPrint('Error fetching paid fee demands: $e');
       return [];
     }
   }
