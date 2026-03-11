@@ -162,7 +162,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     try {
       final summary = await SupabaseService.getFeeDemandSummary(insId);
       if (mounted) {
-        final summary = results[0];
         const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
         summary.sort((a, b) {
           final aClass = a['stuclass']?.toString() ?? '';
