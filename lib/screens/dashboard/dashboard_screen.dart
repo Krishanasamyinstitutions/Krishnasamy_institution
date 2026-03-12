@@ -7,6 +7,7 @@ import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
 import '../students/students_screen.dart';
 import '../fees/fee_collection_screen.dart';
+import '../fees/student_fee_collection_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
 import '../admin/settings_screen.dart';
@@ -14,6 +15,7 @@ import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
 import '../fees/fee_demand_approval_screen.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -39,6 +41,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, 'Students', accountantHidden: true),
     _NavItem(Icons.request_page_rounded, 'Fee Demand', accountantHidden: true),
+    _NavItem(Icons.payments_rounded, 'Fee Collection'),
+    _NavItem(Icons.people_alt_rounded, 'Students'),
+    _NavItem(Icons.request_page_rounded, 'Fee Demand'),
+
     _NavItem(Icons.receipt_long_rounded, 'Transactions'),
     _NavItem(Icons.approval_rounded, 'Fee Demand Approval', accountantOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
@@ -578,7 +584,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -590,6 +596,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Fee Demand') {
       return const FeeDemandScreen();
+    }
+    if (selectedMenu == 'Fee Collection') {
+      return const StudentFeeCollectionScreen();
     }
     if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();

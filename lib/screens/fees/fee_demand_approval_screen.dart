@@ -553,13 +553,16 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                         const Divider(height: 1),
                         // Rows
                         Expanded(
-                          child: ListView.separated(
-                            padding: EdgeInsets.zero,
-                            itemCount: demands.length,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, i) =>
-                                _buildRow(demands[i]),
+                          child: RefreshIndicator(
+                            onRefresh: _loadDemands,
+                            child: ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: demands.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, i) =>
+                                  _buildRow(demands[i]),
+                            ),
                           ),
                         ),
                       ],

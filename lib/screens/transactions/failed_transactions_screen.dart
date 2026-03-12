@@ -65,15 +65,15 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
-        SupabaseService.getPaidTransactions(insId),
-        SupabaseService.getFailedTransactions(insId),
+        SupabaseService.getAllTransactions(insId),
         SupabaseService.getStudents(insId),
         SupabaseService.getInstitutionInfo(insId),
       ]);
 
-      final paidData = results[0] as List<Map<String, dynamic>>;
-      final failedData = results[1] as List<Map<String, dynamic>>;
-      final students = results[2] as List<StudentModel>;
+      final allData = results[0] as List<Map<String, dynamic>>;
+      final paidData = allData.where((t) => t['paystatus'] == 'C').toList();
+      final failedData = allData.where((t) => t['paystatus'] == 'F').toList();
+      final students = results[1] as List<StudentModel>;
 
       final stuIdToName = <int, String>{};
       final stuIdToStudent = <int, StudentModel>{};
@@ -82,7 +82,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         stuIdToStudent[s.stuId] = s;
       }
 
-      final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
+      final insInfo = results[2] as ({String? name, String? logo, String? address, String? mobile, String? email});
 
       setState(() {
         _paidTransactions =
