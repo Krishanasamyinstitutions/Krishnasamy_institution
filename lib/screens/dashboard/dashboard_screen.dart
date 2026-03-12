@@ -8,6 +8,7 @@ import '../../models/student_model.dart';
 import '../students/students_screen.dart';
 import '../fees/fee_collection_screen.dart';
 import '../fees/student_fee_collection_screen.dart';
+import '../fees/student_ledger_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
 import '../admin/settings_screen.dart';
@@ -39,10 +40,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_alt_rounded, 'Students'),
-    _NavItem(Icons.request_page_rounded, 'Fee Demand'),
+    _NavItem(Icons.people_alt_rounded, 'Students', hideForAccountant: true),
+    _NavItem(Icons.request_page_rounded, 'Fee Demand', hideForAccountant: true),
     _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
-    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
+    _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
+    _NavItem(Icons.receipt_long_rounded, 'Transactions', hideForAccountant: true),
     _NavItem(Icons.approval_rounded, 'Fee Demand Approval', accountantOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.settings_rounded, 'Designation & Role', adminOnly: true),
@@ -60,6 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _allNavItems.where((item) {
       if (item.adminOnly) return false;
       if (item.accountantOnly && !isAccountant) return false;
+      if (item.hideForAccountant && isAccountant) return false;
       return true;
     }).toList();
   }
@@ -580,7 +583,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -595,6 +598,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Fee Collection') {
       return const StudentFeeCollectionScreen();
+    }
+    if (selectedMenu == 'Student Ledger') {
+      return const StudentLedgerScreen();
     }
     if (selectedMenu == 'Transactions') {
       return const FailedTransactionsScreen();
@@ -625,6 +631,7 @@ class _NavItem {
   final String label;
   final bool adminOnly;
   final bool accountantOnly;
-  const _NavItem(this.icon, this.label, {this.adminOnly = false, this.accountantOnly = false});
+  final bool hideForAccountant;
+  const _NavItem(this.icon, this.label, {this.adminOnly = false, this.accountantOnly = false, this.hideForAccountant = false});
 }
 

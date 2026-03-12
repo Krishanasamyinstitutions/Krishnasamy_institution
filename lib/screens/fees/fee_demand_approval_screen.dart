@@ -276,7 +276,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             Checkbox(
               value: allSelected ? true : (someSelected ? null : false),
               tristate: true,
-              onChanged: (v) => _toggleSelectAll(v ?? true),
+              onChanged: (_) => _toggleSelectAll(!allSelected),
               activeColor: AppColors.accent,
             ),
             const Text(
