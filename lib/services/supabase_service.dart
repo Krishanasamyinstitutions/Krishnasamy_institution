@@ -995,35 +995,27 @@ class SupabaseService {
     }
   }
 
-  /// Get failed transactions for an institution
-  static Future<List<Map<String, dynamic>>> getFailedTransactions(int insId) async {
+  /// Get all transactions for an institution via RPC
+  static Future<List<Map<String, dynamic>>> getAllTransactions(int insId) async {
     try {
-      final response = await client
-          .from('payment')
-          .select('*')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'F')
-          .order('createdat', ascending: false);
+      final response = await client.rpc('fn_get_transactions', params: {'p_ins_id': insId});
       return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
-      debugPrint('Error fetching failed transactions: $e');
+      debugPrint('Error fetching transactions: $e');
       return [];
     }
   }
 
+  /// Get failed transactions (filtered from RPC)
+  static Future<List<Map<String, dynamic>>> getFailedTransactions(int insId) async {
+    final all = await getAllTransactions(insId);
+    return all.where((t) => t['paystatus'] == 'F').toList();
+  }
+
+  /// Get paid transactions (filtered from RPC)
   static Future<List<Map<String, dynamic>>> getPaidTransactions(int insId) async {
-    try {
-      final response = await client
-          .from('payment')
-          .select('*')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'C')
-          .order('paydate', ascending: false);
-      return List<Map<String, dynamic>>.from(response as List);
-    } catch (e) {
-      debugPrint('Error fetching paid transactions: $e');
-      return [];
-    }
+    final all = await getAllTransactions(insId);
+    return all.where((t) => t['paystatus'] == 'C').toList();
   }
 
   // ==================== ROLES ====================

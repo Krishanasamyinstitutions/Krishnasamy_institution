@@ -22,7 +22,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   final _admNoController = TextEditingController();
   final _feeAmountController = TextEditingController();
   final _conAmountController = TextEditingController();
-  final _balanceDueController = TextEditingController();
   DateTime? _dueDate;
 
   String? _selectedClass;
@@ -75,7 +74,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'con_id',
     'feeamount',
     'conamount',
-    'balancedue',
     'duedate',
   ];
 
@@ -89,7 +87,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'con_id': 'Concession',
     'feeamount': 'Fee Amount',
     'conamount': 'Concession Amount',
-    'balancedue': 'Balance Due',
     'duedate': 'Due Date',
   };
 
@@ -107,7 +104,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     _admNoController.dispose();
     _feeAmountController.dispose();
     _conAmountController.dispose();
-    _balanceDueController.dispose();
+
     _feeTermController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -225,10 +222,28 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         yearLabel = yearEntry['yrlabel']?.toString();
       }
 
+      final feeAmount = double.tryParse(_feeAmountController.text.trim()) ?? 0;
+      final conAmount = double.tryParse(_conAmountController.text.trim()) ?? 0;
+
+      // Lookup stu_id from admission number
+      final admNo = _admNoController.text.trim();
+      int? stuId;
+      if (admNo.isNotEmpty) {
+        final stuResult = await SupabaseService.client
+            .from('students')
+            .select('stu_id')
+            .eq('ins_id', insId)
+            .eq('stuadmno', admNo)
+            .eq('activestatus', 1)
+            .maybeSingle();
+        stuId = stuResult?['stu_id'] as int?;
+      }
+
       final data = {
         'ins_id': insId,
         'inscode': inscode ?? '',
-        'stuadmno': _admNoController.text.trim(),
+        'stuadmno': admNo,
+        'stu_id': stuId,
         'stuclass': _selectedClass,
         'demfeetype': _selectedFeeType,
         'yr_id': _selectedFeeYear != null ? int.tryParse(_selectedFeeYear!) : null,
@@ -236,18 +251,17 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         'demfeeterm': _feeTermController.text.trim(),
         'demconcategory': _selectedConcessionCategory,
         'con_id': _selectedConcession != null ? int.tryParse(_selectedConcession!) : null,
-        'feeamount': double.tryParse(_feeAmountController.text.trim()) ?? 0,
-        'conamount': double.tryParse(_conAmountController.text.trim()) ?? 0,
-        'balancedue': double.tryParse(_balanceDueController.text.trim()) ?? ((double.tryParse(_feeAmountController.text.trim()) ?? 0) - (double.tryParse(_conAmountController.text.trim()) ?? 0)),
+        'feeamount': feeAmount,
+        'conamount': conAmount,
+        'balancedue': feeAmount,
         'duedate': _dueDate?.toIso8601String().split('T').first,
-        'paidstatus': 'U',
-        'paidamount': 0,
         'activestatus': 1,
         'createdat': DateTime.now().toIso8601String(),
         'createdby': auth.userName,
+        'isapproved': false,
       };
 
-      await SupabaseService.client.from('feedemand').insert(data);
+      await SupabaseService.client.from('tempfeedemand').insert(data);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -268,12 +282,31 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     }
   }
 
+  Future<void> _lookupStudentClass(String admNo) async {
+    if (admNo.isEmpty) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final result = await SupabaseService.client
+          .from('students')
+          .select('stuclass')
+          .eq('ins_id', insId)
+          .eq('stuadmno', admNo)
+          .eq('activestatus', 1)
+          .maybeSingle();
+      if (mounted && result != null) {
+        setState(() => _selectedClass = result['stuclass']?.toString());
+      }
+    } catch (_) {}
+  }
+
   void _resetForm() {
     _formKey.currentState?.reset();
     _admNoController.clear();
     _feeAmountController.clear();
     _conAmountController.clear();
-    _balanceDueController.clear();
+
     setState(() {
       _selectedClass = null;
       _selectedFeeType = null;
@@ -309,7 +342,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'concession': 'con_id', 'conid': 'con_id', 'concessioncategory': 'con_id', 'con': 'con_id',
       'feeamount': 'feeamount', 'amount': 'feeamount', 'fee': 'feeamount',
       'concessionamount': 'conamount', 'conamount': 'conamount', 'conamt': 'conamount',
-      'balancedue': 'balancedue', 'balance': 'balancedue', 'baldue': 'balancedue',
       'duedate': 'duedate', 'due': 'duedate',
     };
     return aliases[h];
@@ -453,26 +485,56 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           }
         }
 
+        // Lookup stu_id from admission number
+        final admNoRaw = _cellByKey(row, 'stuadmno');
+        int? stuId;
+        if (admNoRaw != null && admNoRaw.isNotEmpty) {
+          final stuResult = await SupabaseService.client
+              .from('students')
+              .select('stu_id')
+              .eq('ins_id', insId)
+              .eq('stuadmno', admNoRaw)
+              .eq('activestatus', 1)
+              .maybeSingle();
+          stuId = stuResult?['stu_id'] as int?;
+        }
+
+        // Lookup con_id from concession name
+        final conName = _cellByKey(row, 'con_id');
+        int? conId;
+        if (conName != null && conName.isNotEmpty) {
+          // Try parsing as int first (in case Excel has the ID)
+          conId = int.tryParse(conName);
+          if (conId == null) {
+            // Lookup by condesc
+            final conMatch = _concessions.firstWhere(
+              (c) => c['condesc']?.toString().toUpperCase() == conName.toUpperCase(),
+              orElse: () => <String, dynamic>{},
+            );
+            conId = conMatch.isNotEmpty ? conMatch['con_id'] as int? : null;
+          }
+        }
+
         final data = {
           'ins_id': insId,
           'inscode': auth.inscode ?? '',
-          'stuadmno': _cellByKey(row, 'stuadmno'),
+          'stuadmno': admNoRaw,
+          'stu_id': stuId,
           'stuclass': _cellByKey(row, 'stuclass'),
           'demfeetype': _cellByKey(row, 'demfeetype'),
           'yr_id': yrId,
           'demfeeyear': yrLabel ?? yrRaw ?? '',
           'demfeeterm': _cellByKey(row, 'demfeeterm'),
           'demconcategory': _cellByKey(row, 'demconcategory'),
-          'con_id': int.tryParse(_cellByKey(row, 'con_id') ?? ''),
+          'con_id': conId,
           'feeamount': feeAmount,
           'conamount': conAmount,
-          'balancedue': double.tryParse(_cellByKey(row, 'balancedue') ?? '') ?? (feeAmount - conAmount),
+          'balancedue': feeAmount,
           'duedate': _cellByKey(row, 'duedate'),
-          'paidstatus': 'U',
-          'paidamount': 0,
           'activestatus': 1,
           'createdat': now,
           'createdby': auth.userName,
+          'isapproved': false,
         };
 
         // Remove null values
@@ -486,8 +548,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
         if (admNo.isNotEmpty && feeType.isNotEmpty) {
           var query = SupabaseService.client
-              .from('feedemand')
-              .select('dem_id')
+              .from('tempfeedemand')
+              .select('temp_id')
               .eq('ins_id', insId)
               .eq('stuadmno', admNo)
               .eq('demfeetype', feeType);
@@ -504,7 +566,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           }
         }
 
-        await SupabaseService.client.from('feedemand').insert(data);
+        await SupabaseService.client.from('tempfeedemand').insert(data);
         setState(() => _imported++);
       } catch (e) {
         setState(() {
@@ -630,6 +692,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       decoration: _inputDecoration('Enter admission number'),
                       style: const TextStyle(fontSize: 13),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      onChanged: (v) => _lookupStudentClass(v.trim()),
                     ),
                     const SizedBox(height: 16),
 
@@ -751,16 +814,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Balance Due
-                    _buildLabel('Balance Due'),
-                    TextFormField(
-                      controller: _balanceDueController,
-                      decoration: _inputDecoration('Enter balance due'),
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 13),
                     ),
                     const SizedBox(height: 16),
 
@@ -1463,8 +1516,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Con. Amt', flex: 2, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Bal. Due', flex: 2, center: true),
-                        _gridHeaderDivider(),
                         _gridHeaderCell('Due Date', flex: 2, center: true),
                       ],
                     ),
@@ -1504,7 +1555,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                     _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
                                     _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
                                     _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
-                                    _gridDataCell(_mappedCell(row, 'balancedue'), flex: 2, center: true),
                                     _gridDataCell(_mappedCell(row, 'duedate'), flex: 2, center: true),
                                   ],
                                 ),
@@ -1614,7 +1664,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'Concession',
       'Fee Amount',
       'Concession Amount',
-      'Balance Due',
       'Due Date',
     ];
 
