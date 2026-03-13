@@ -18,6 +18,7 @@ class StudentModel {
   final String? stubloodgrp;
   final String? stuphoto;
   final String stuclass;
+  final int? conId;
   final String stuserId;
   final int activestatus;
   final DateTime createdon;
@@ -41,6 +42,7 @@ class StudentModel {
     this.stubloodgrp,
     this.stuphoto,
     required this.stuclass,
+    this.conId,
     required this.stuserId,
     this.activestatus = 1,
     required this.createdon,
@@ -74,6 +76,7 @@ class StudentModel {
       stubloodgrp: json['stubloodgrp'],
       stuphoto: json['stuphoto'],
       stuclass: json['stuclass'] ?? '',
+      conId: json['con_id'] as int?,
       stuserId: json['stuser_id'] ?? '',
       activestatus: json['activestatus'] ?? 1,
       createdon: json['createdon'] != null
