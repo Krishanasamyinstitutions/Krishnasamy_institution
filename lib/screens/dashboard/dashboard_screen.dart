@@ -40,7 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_alt_rounded, 'Students', hideForAccountant: true),
+    _NavItem(Icons.people_alt_rounded, 'Students', adminOnly: true),
     _NavItem(Icons.request_page_rounded, 'Fee Demand', hideForAccountant: true),
     _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
     _NavItem(Icons.menu_book_rounded, 'Student Ledger'),

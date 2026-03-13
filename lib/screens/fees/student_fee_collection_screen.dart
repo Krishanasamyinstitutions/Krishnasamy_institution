@@ -27,7 +27,10 @@ class StudentFeeCollectionScreen extends StatefulWidget {
 class _StudentFeeCollectionScreenState
     extends State<StudentFeeCollectionScreen> {
   final _admNoController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _classController = TextEditingController();
   final _remarksController = TextEditingController();
+  List<Map<String, dynamic>> _studentSuggestions = [];
 
   bool _searching = false;
   String? _errorMsg;
@@ -49,6 +52,8 @@ class _StudentFeeCollectionScreenState
   @override
   void dispose() {
     _admNoController.dispose();
+    _nameController.dispose();
+    _classController.dispose();
     _remarksController.dispose();
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
@@ -62,7 +67,10 @@ class _StudentFeeCollectionScreenState
     _conCtrl.clear();
     setState(() {
       _admNoController.clear();
+      _nameController.clear();
+      _classController.clear();
       _remarksController.clear();
+      _studentSuggestions = [];
       _student = null;
       _parent = null;
       _allDemands = [];
@@ -71,6 +79,34 @@ class _StudentFeeCollectionScreenState
       _selected.clear();
       _paymentMode = 'Cash';
     });
+  }
+
+  Future<void> _searchByName(String name) async {
+    if (name.trim().length < 2) {
+      setState(() => _studentSuggestions = []);
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final rows = await SupabaseService.client
+          .from('students')
+          .select('stu_id, stuname, stuadmno, stuclass')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .ilike('stuname', '%${name.trim()}%')
+          .limit(10);
+      setState(() => _studentSuggestions = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
+  }
+
+  void _selectSuggestion(Map<String, dynamic> student) {
+    _admNoController.text = student['stuadmno']?.toString() ?? '';
+    _nameController.text = student['stuname']?.toString() ?? '';
+    _classController.text = student['stuclass']?.toString() ?? '';
+    setState(() => _studentSuggestions = []);
+    _search();
   }
 
   Future<void> _search() async {
@@ -117,10 +153,14 @@ class _StudentFeeCollectionScreenState
       final student = Map<String, dynamic>.from(studentRows.first as Map);
       final stuId = student['stu_id'] as int;
 
+      _nameController.text = student['stuname']?.toString() ?? '';
+      _classController.text = student['stuclass']?.toString() ?? '';
+
       setState(() {
         _student = student;
         _searching = false;
         _loadingDemands = true;
+        _studentSuggestions = [];
       });
 
       // Fetch parent and demands in parallel
@@ -128,10 +168,11 @@ class _StudentFeeCollectionScreenState
       final demandsFuture = SupabaseService.client
           .from('feedemand')
           .select(
-              'dem_id, demfeetype, demfeeterm, feeamount, conamount, balancedue, duedate, paidstatus, stuclass, demconcategory')
+              'dem_id, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, duedate, paidstatus, stuclass, demconcategory')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
           .eq('paidstatus', 'U')
+          .gt('balancedue', 0)
           .order('duedate', ascending: true);
 
       final parent = await parentFuture;
@@ -329,6 +370,43 @@ class _StudentFeeCollectionScreenState
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _nameController,
+            decoration: _inputDec('Student Name'),
+            onChanged: _searchByName,
+          ),
+          if (_studentSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _studentSuggestions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final s = _studentSuggestions[i];
+                  return ListTile(
+                    dense: true,
+                    title: Text(s['stuname']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: const TextStyle(fontSize: 11)),
+                    onTap: () => _selectSuggestion(s),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _classController,
+            decoration: _inputDec('Class'),
+            readOnly: true,
+          ),
           if (_errorMsg != null) ...[
             const SizedBox(height: 10),
             Container(
@@ -424,17 +502,19 @@ class _StudentFeeCollectionScreenState
                     color: AppColors.textPrimary,
                   )),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _termChip('All', _selectedTerm == null, () {
-                setState(() => _selectedTerm = null);
-              }),
-              ..._terms.map((t) => _termChip(t, _selectedTerm == t, () {
-                    setState(() => _selectedTerm = t);
-                  })),
+          DropdownButtonFormField<String?>(
+            value: _selectedTerm,
+            isExpanded: true,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13))),
+              ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
             ],
+            onChanged: (v) => setState(() => _selectedTerm = v),
           ),
         ],
       ),
@@ -818,6 +898,8 @@ class _StudentFeeCollectionScreenState
     );
   }
 
+  bool _processing = false;
+
   void _onCollectAndReceipt() {
     final totalNet = _totalNetSelected;
     showDialog(
@@ -853,7 +935,10 @@ class _StudentFeeCollectionScreenState
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _processPayment();
+            },
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
@@ -864,6 +949,193 @@ class _StudentFeeCollectionScreenState
         ],
       ),
     );
+  }
+
+  Future<void> _processPayment() async {
+    if (_processing || _student == null) return;
+    setState(() => _processing = true);
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final inscode = auth.currentUser?.inscode ?? '';
+    final createdBy = auth.currentUser?.usename ?? '';
+    final stuId = _student!['stu_id'] as int;
+    final totalNet = _totalNetSelected;
+
+    int? payId;
+
+    try {
+      // 1. Get yr_id from first selected demand
+      final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
+      final yrId = firstDemand['yr_id'] as int?;
+      final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
+
+      // 2. Create payment record with status = 'I' (initiated), no paynumber yet
+      final payResponse = await SupabaseService.client.from('payment').insert({
+        'ins_id': insId,
+        'inscode': inscode,
+        'stu_id': stuId,
+        'yr_id': yrId,
+        'yrlabel': yrlabel,
+        'transtotalamount': totalNet,
+        'transcurrency': 'INR',
+        'paydate': DateTime.now().toIso8601String(),
+        'paystatus': 'I',
+        'paymethod': _paymentMode.toLowerCase(),
+        'payreference': '$_paymentMode collection by $createdBy',
+        'createdby': createdBy,
+      }).select('pay_id').single();
+
+      payId = payResponse['pay_id'] as int;
+
+      // 3. Create paymentdetails + update feedemand for each selected demand
+      final payDetailRows = <Map<String, dynamic>>[];
+      final feedemandUpdates = <Future>[];
+
+      for (final key in _selected) {
+        final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+        if (d.isEmpty) continue;
+
+        final demId = d['dem_id'] as int;
+        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+        final fine = _fine(key);
+        final con = _con(key);
+        final net = bal + fine - con;
+
+        payDetailRows.add({
+          'pay_id': payId,
+          'dem_id': demId,
+          'yr_id': d['yr_id'],
+          'yrlabel': d['demfeeyear']?.toString() ?? '',
+          'ins_id': insId,
+          'transcurrency': 'INR',
+          'transtotalamount': net,
+        });
+
+        final currentPaid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final newPaid = currentPaid + net;
+        final newBalance = bal - net + fine;
+
+        feedemandUpdates.add(
+          SupabaseService.client.from('feedemand').update({
+            'paidamount': newPaid,
+            'balancedue': newBalance <= 0 ? 0 : newBalance,
+            'paidstatus': newBalance <= 0 ? 'P' : 'U',
+            'pay_id': payId,
+          }).eq('dem_id', demId),
+        );
+      }
+
+      // 4. Insert payment details and update feedemand in parallel
+      await Future.wait([
+        SupabaseService.client.from('paymentdetails').insert(payDetailRows),
+        ...feedemandUpdates,
+      ]);
+
+      // 5. Payment successful — generate paynumber and update status to 'C'
+      String payNumber;
+      try {
+        final rpcResult = await SupabaseService.client.rpc('generate_payment_number');
+        payNumber = rpcResult as String;
+      } catch (_) {
+        final sequence = await SupabaseService.client
+            .from('sequence')
+            .select('seq_id, sequid, seqwidth, seqcurno')
+            .limit(1)
+            .single();
+        final sequid = sequence['sequid'] as String;
+        final seqWidth = sequence['seqwidth'] as int;
+        final seqCurNo = (sequence['seqcurno'] as num).toInt();
+        final newSeqNo = seqCurNo + 1;
+        final prefix = sequid.replaceAll(RegExp(r'\d+$'), '');
+        payNumber = '$prefix${newSeqNo.toString().padLeft(seqWidth, '0')}';
+        await SupabaseService.client.from('sequence').update({
+          'seqcurno': newSeqNo,
+        }).eq('seq_id', sequence['seq_id'] as int);
+      }
+
+      await SupabaseService.client.from('payment').update({
+        'paystatus': 'C',
+        'paynumber': payNumber,
+        'paydate': DateTime.now().toIso8601String(),
+      }).eq('pay_id', payId);
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
+                const SizedBox(height: 12),
+                const Text('Payment Successful', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text('Receipt No: $payNumber', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                Text('Mode: $_paymentMode', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _clear();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Payment failed — generate paynumber and update status to 'F'
+      if (payId != null) {
+        try {
+          String payNumber;
+          try {
+            final rpcResult = await SupabaseService.client.rpc('generate_payment_number');
+            payNumber = rpcResult as String;
+          } catch (_) {
+            final sequence = await SupabaseService.client
+                .from('sequence')
+                .select('seq_id, sequid, seqwidth, seqcurno')
+                .limit(1)
+                .single();
+            final sequid = sequence['sequid'] as String;
+            final seqWidth = sequence['seqwidth'] as int;
+            final seqCurNo = (sequence['seqcurno'] as num).toInt();
+            final newSeqNo = seqCurNo + 1;
+            final prefix = sequid.replaceAll(RegExp(r'\d+$'), '');
+            payNumber = '$prefix${newSeqNo.toString().padLeft(seqWidth, '0')}';
+            await SupabaseService.client.from('sequence').update({
+              'seqcurno': newSeqNo,
+            }).eq('seq_id', sequence['seq_id'] as int);
+          }
+
+          await SupabaseService.client.from('payment').update({
+            'paystatus': 'F',
+            'paynumber': payNumber,
+            'paydate': DateTime.now().toIso8601String(),
+          }).eq('pay_id', payId);
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
   }
 
   // ── Helpers ──
