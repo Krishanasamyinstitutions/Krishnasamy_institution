@@ -118,7 +118,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     try {
       debugPrint('LEDGER: insId=$insId stuId=${student.stuId} stuadmno=${student.stuadmno}');
 
-      final parentFuture = SupabaseService.getStudentParent(student.stuId);
+      final parentFuture = SupabaseService.getStudentParent(student.stuId, stuadmno: student.stuadmno);
 
       // Try stuadmno first (primary key used in feedemand)
       final demandsByAdmno = await SupabaseService.client
@@ -147,7 +147,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
       final paymentsFuture = SupabaseService.client
           .from('payment')
-          .select('pay_id, paynumber, paydate, transtotalamount, paystatus, paymode')
+          .select('pay_id, paynumber, paydate, transtotalamount, paystatus, paymethod')
           .eq('ins_id', insId)
           .eq('stu_id', student.stuId)
           .order('paydate', ascending: false);
@@ -196,7 +196,7 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
         'date': raw.length >= 10 ? raw.substring(0, 10) : raw,
         'docno': p['paynumber']?.toString() ?? '-',
         'term': '-',
-        'feetype': 'Payment (${p['paymode'] ?? '-'})',
+        'feetype': 'Payment (${p['paymethod'] ?? '-'})',
         'reference': p['paynumber']?.toString() ?? '-',
         'debit': 0.0,
         'credit': (p['transtotalamount'] as num?)?.toDouble() ?? 0.0,

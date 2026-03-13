@@ -506,13 +506,20 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final tableH = constraints.maxHeight;
-          return Column(
+          final viewportW = constraints.maxWidth;
+          const contentW = 1200.0;
+          final effectiveW = contentW > viewportW ? contentW : viewportW;
+          const scrollbarH = 18.0;
+          return Stack(
             children: [
               // ── Table (header + rows) ──────────────────────────────────
               SizedBox(
                 height: tableH,
-                child: SizedBox(
-                  width: constraints.maxWidth,
+                child: SingleChildScrollView(
+                  controller: _hScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: effectiveW,
                     child: Column(
                       children: [
                         // Header
@@ -562,6 +569,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                     ),
                   ),
                 ),
+              ),
+              // ── Horizontal scrollbar ───────────────────────────────────
+              Positioned(
+                left: 0, right: 0, bottom: 0,
+                child: _buildWinScrollbar(viewportW, effectiveW, scrollbarH),
+              ),
             ],
           );
         },
@@ -575,6 +588,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       listenable: _hScrollController,
       builder: (context, _) {
         final canScroll = contentW > viewportW;
+        if (!canScroll) return const SizedBox.shrink();
         final maxScroll = canScroll ? contentW - viewportW : 1.0;
         final offset = (_hScrollController.hasClients && canScroll)
             ? _hScrollController.offset.clamp(0.0, maxScroll)
@@ -597,8 +611,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         return Container(
           height: barH,
           decoration: const BoxDecoration(
-            color: Color(0xFFD4D0C8),
-            border: Border(top: BorderSide(color: Color(0xFF808080))),
+            color: Color(0xFFB0B0B0),
+            border: Border(top: BorderSide(color: Color(0xFF555555))),
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
           ),
           child: Row(
@@ -622,7 +636,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                     children: [
                       // Track
                       Positioned.fill(
-                        child: Container(color: const Color(0xFFD4D0C8)),
+                        child: Container(color: const Color(0xFFB0B0B0)),
                       ),
                       // Thumb
                       if (canScroll)
@@ -664,8 +678,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         height: h,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFD4D0C8),
-          border: Border.all(color: const Color(0xFF808080), width: 0.5),
+          color: const Color(0xFFB0B0B0),
+          border: Border.all(color: const Color(0xFF555555), width: 0.5),
         ),
         child: Text(
           label,
@@ -680,8 +694,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   Widget _winThumb(double w) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFD4D0C8),
-        border: Border.all(color: const Color(0xFF808080), width: 0.5),
+        color: const Color(0xFFB0B0B0),
+        border: Border.all(color: const Color(0xFF555555), width: 0.5),
       ),
       child: Center(
         child: Row(
@@ -695,7 +709,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               decoration: const BoxDecoration(
                 border: Border(
                   left: BorderSide(color: Colors.white, width: 1),
-                  right: BorderSide(color: Color(0xFF808080), width: 1),
+                  right: BorderSide(color: Color(0xFF555555), width: 1),
                 ),
               ),
             ),

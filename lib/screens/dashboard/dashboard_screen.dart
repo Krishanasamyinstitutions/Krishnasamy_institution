@@ -29,6 +29,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
 
+  // Notification unread count
+  int _unreadNotifCount = 0;
+
   // Global search
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -71,6 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadStudentsForSearch();
+    _loadUnreadNotifCount();
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus) {
         // Delay removal so overlay tap events can fire first
@@ -86,6 +90,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final insId = auth.insId;
     if (insId == null) return;
     _allStudents = await SupabaseService.getStudents(insId);
+  }
+
+  Future<void> _loadUnreadNotifCount() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final insId = auth.insId;
+      if (insId == null) return;
+      final rows = await SupabaseService.client
+          .from('notification')
+          .select('isread')
+          .eq('ins_id', insId);
+      final unread = (rows as List).where((n) => n['isread'] != true && n['isread'] != 1).length;
+      if (mounted) setState(() => _unreadNotifCount = unread);
+    } catch (_) {}
   }
 
   void _onSearchChanged(String query) {
@@ -305,10 +323,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => setState(() => _selectedNavIndex = index),
+                      onTap: () {
+                        setState(() => _selectedNavIndex = index);
+                        _loadUnreadNotifCount();
+                      },
                       borderRadius: BorderRadius.circular(12),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
+                        clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.symmetric(
                           horizontal: collapsed ? 12 : 16,
                           vertical: 12,
@@ -461,7 +483,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Stack(
             children: [
               IconButton(
-                onPressed: () => setState(() => _selectedNavIndex = _navItems.indexWhere((i) => i.label == 'Notifications')),
+                onPressed: () {
+                  setState(() => _selectedNavIndex = _navItems.indexWhere((i) => i.label == 'Notifications'));
+                  _loadUnreadNotifCount();
+                },
                 icon: const Icon(Icons.notifications_outlined, size: 22),
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.surface,
@@ -470,18 +495,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.error,
-                    shape: BoxShape.circle,
+              if (_unreadNotifCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(width: 12),

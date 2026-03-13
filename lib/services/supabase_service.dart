@@ -385,13 +385,22 @@ class SupabaseService {
   }
 
   /// Fetch parent record for a given student (via parentdetail → parents)
-  static Future<Map<String, dynamic>?> getStudentParent(int stuId) async {
+  static Future<Map<String, dynamic>?> getStudentParent(int stuId, {String? stuadmno}) async {
     try {
-      final detail = await client
+      // Try by stu_id first
+      var detail = await client
           .from('parentdetail')
           .select('par_id')
           .eq('stu_id', stuId)
           .maybeSingle();
+      // Fallback: try by stuadmno if stu_id lookup returned nothing
+      if (detail == null && stuadmno != null && stuadmno.isNotEmpty) {
+        detail = await client
+            .from('parentdetail')
+            .select('par_id')
+            .eq('stuadmno', stuadmno)
+            .maybeSingle();
+      }
       if (detail == null) return null;
       final parId = detail['par_id'] as int;
       final parent = await client

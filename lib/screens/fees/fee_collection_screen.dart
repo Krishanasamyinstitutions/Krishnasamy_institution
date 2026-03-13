@@ -2631,6 +2631,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   String _studentSearchQuery = '';
   String? _studentStatusFilter;
 
+  final ScrollController _classTableScrollController = ScrollController();
+
   @override
   bool get wantKeepAlive => true;
 
@@ -2638,6 +2640,12 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   void initState() {
     super.initState();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _classTableScrollController.dispose();
+    super.dispose();
   }
 
   String _formatCurrency(double amount) {
@@ -2712,35 +2720,31 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
       return _buildStudentDrilldown(group, _drilldownDemands, _drilldownLoading);
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        child: Column(
+    return Column(
+      children: [
+        // Summary cards (fixed, no scroll needed)
+        Row(
           children: [
-            // Summary cards
-            Row(
-              children: [
-                _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, _totalStudents.toString(), 'Total Students'),
-                const SizedBox(width: 12),
-                _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_totalDemand), 'Total Demand'),
-                const SizedBox(width: 12),
-                _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_totalPaid), 'Total Collected'),
-                const SizedBox(width: 12),
-                _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_totalPending), 'Total Pending'),
-              ],
+            _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, _totalStudents.toString(), 'Total Students'),
+            const SizedBox(width: 12),
+            _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_totalDemand), 'Total Demand'),
+            const SizedBox(width: 12),
+            _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_totalPaid), 'Total Collected'),
+            const SizedBox(width: 12),
+            _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_totalPending), 'Total Pending'),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Class-wise table card — Expanded so height is bounded
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
             ),
-            const SizedBox(height: 16),
-            // Class-wise table card with title + search/filter header
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                children: [
+            child: Column(
+              children: [
                   // Card header: title left, search+filter right
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -2802,22 +2806,25 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     ),
                   ),
                   // Table content
-            if (_isLoading)
-              const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
-            else
-              Builder(builder: (context) {
+            Expanded(child:
+            _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Builder(builder: (context) {
                 final filteredGroups = _classGroups.where((g) {
                   if (_classSearchQuery.isNotEmpty && !g.className.toLowerCase().contains(_classSearchQuery)) return false;
                   if (_classFilterFeeType != null && !g.feeTypes.contains(_classFilterFeeType)) return false;
                   return true;
                 }).toList();
                 return LayoutBuilder(builder: (context, constraints) {
-                  final totalColumns = 9;
-                  final minTableWidth = totalColumns * 120.0;
-                  final effectiveMin = minTableWidth > constraints.maxWidth ? minTableWidth : constraints.maxWidth;
-                  return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: effectiveMin),
-                    child: DataTable(dividerThickness: 0,
+                  final viewportW = constraints.maxWidth;
+                  const contentW = 1000.0;
+                  final effectiveW = contentW > viewportW ? contentW : viewportW;
+                  const scrollbarH = 18.0;
+                  return Stack(
+                    children: [
+                  SingleChildScrollView(controller: _classTableScrollController, scrollDirection: Axis.horizontal, child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: effectiveW),
+                    child: SingleChildScrollView(scrollDirection: Axis.vertical, child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
                       headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
@@ -2875,13 +2882,24 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                               DataCell(Text('${i + 1}')),
                               DataCell(Text(g.className, style: const TextStyle(fontWeight: FontWeight.w600))),
                               DataCell(Text('${g.studentCount}')),
-                              DataCell(Wrap(
-                                spacing: 4, runSpacing: 4,
-                                children: g.feeTypes.map((ft) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6)),
-                                  child: Text(ft, style: const TextStyle(fontSize: 9, color: AppColors.accent)),
-                                )).toList(),
+                              DataCell(SizedBox(
+                                width: 220,
+                                child: Wrap(
+                                  spacing: 4, runSpacing: 4,
+                                  children: [
+                                    ...g.feeTypes.take(4).map((ft) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6)),
+                                      child: Text(ft, style: const TextStyle(fontSize: 9, color: AppColors.accent)),
+                                    )),
+                                    if (g.feeTypes.length > 4)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+                                        child: Text('+${g.feeTypes.length - 4}', style: const TextStyle(fontSize: 9, color: AppColors.textSecondary)),
+                                      ),
+                                  ],
+                                ),
                               )),
                               DataCell(Text(_formatCurrency(g.totalDemand))),
                               DataCell(Text(_formatCurrency(g.totalPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
@@ -2929,16 +2947,21 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         ),
                       ],
                     ),
-                  ));
+                  ))),
+                  Positioned(
+                    left: 0, right: 0, bottom: 0,
+                    child: _buildWinScrollbar(viewportW, effectiveW, scrollbarH),
+                  ),
+                  ],
+                  );
                 });
-              }),
+              })),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ],
+      );
   }
 
   String _formatCurrencyLocal(double amount) {
@@ -3420,6 +3443,99 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWinScrollbar(double viewportW, double contentW, double barH) {
+    return ListenableBuilder(
+      listenable: _classTableScrollController,
+      builder: (context, _) {
+        final canScroll = contentW > viewportW;
+        // Hide scrollbar entirely when content fits in viewport
+        if (!canScroll) return const SizedBox.shrink();
+        final maxScroll = canScroll ? contentW - viewportW : 1.0;
+        final offset = (_classTableScrollController.hasClients && canScroll)
+            ? _classTableScrollController.offset.clamp(0.0, maxScroll)
+            : 0.0;
+        final ratio = canScroll ? offset / maxScroll : 0.0;
+        const btnW = 18.0;
+        final trackW = viewportW - btnW * 2;
+        final thumbW = canScroll ? (viewportW / contentW * trackW).clamp(30.0, trackW) : trackW;
+        final thumbLeft = ratio * (trackW - thumbW);
+
+        void scrollBy(double delta) {
+          if (!_classTableScrollController.hasClients) return;
+          _classTableScrollController.jumpTo(
+              (_classTableScrollController.offset + delta).clamp(0.0, maxScroll));
+        }
+
+        return Container(
+          height: barH,
+          decoration: const BoxDecoration(
+            color: Color(0xFFB0B0B0),
+            border: Border(top: BorderSide(color: Color(0xFF555555))),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
+          ),
+          child: Row(
+            children: [
+              _winArrowBtn('◄', canScroll ? () => scrollBy(-60) : null, btnW, barH),
+              Expanded(
+                child: GestureDetector(
+                  onTapDown: (d) {
+                    if (!canScroll) return;
+                    _classTableScrollController.jumpTo(
+                        (d.localPosition.dx / trackW * maxScroll).clamp(0.0, maxScroll));
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      Positioned.fill(child: Container(color: const Color(0xFFB0B0B0))),
+                      if (canScroll)
+                        Positioned(
+                          left: thumbLeft,
+                          top: 1,
+                          bottom: 1,
+                          width: thumbW,
+                          child: GestureDetector(
+                            onHorizontalDragUpdate: (d) {
+                              final scale = maxScroll / (trackW - thumbW);
+                              scrollBy(d.delta.dx * scale);
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF555555),
+                                borderRadius: BorderRadius.circular(3),
+                                border: Border.all(color: const Color(0xFF333333)),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              _winArrowBtn('►', canScroll ? () => scrollBy(60) : null, btnW, barH),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _winArrowBtn(String arrow, VoidCallback? onTap, double w, double h) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: w,
+        height: h,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFB0B0B0),
+          border: Border(right: BorderSide(color: const Color(0xFF555555), width: arrow == '◄' ? 1 : 0),
+                        left: BorderSide(color: const Color(0xFF555555), width: arrow == '►' ? 1 : 0)),
+        ),
+        child: Text(arrow, style: TextStyle(fontSize: 8, color: onTap != null ? const Color(0xFF333333) : const Color(0xFFAAAAAA))),
       ),
     );
   }
@@ -4073,7 +4189,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_left, size: 14, color: Color(0xFF606060)),
+                                    child: const Icon(Icons.chevron_left, size: 14, color: Color(0xFF333333)),
                                   ),
                                 ),
                                 // Scrollbar track + thumb
@@ -4145,7 +4261,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF606060)),
+                                    child: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF333333)),
                                   ),
                                 ),
                               ],

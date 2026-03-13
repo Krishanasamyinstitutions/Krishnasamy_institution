@@ -164,7 +164,7 @@ class _StudentFeeCollectionScreenState
       });
 
       // Fetch parent and demands in parallel
-      final parentFuture = SupabaseService.getStudentParent(stuId);
+      final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: admNo);
       final demandsFuture = SupabaseService.client
           .from('feedemand')
           .select(
