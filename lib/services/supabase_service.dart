@@ -157,6 +157,36 @@ class SupabaseService {
     }
   }
 
+  /// Fetch student remarks (stucondesc) as a map keyed by stu_id
+  static Future<Map<int, String>> getStudentRemarks(int insId) async {
+    try {
+      const batchSize = 1000;
+      int offset = 0;
+      final Map<int, String> result = {};
+      while (true) {
+        final batch = await client
+            .from('students')
+            .select('stu_id, stucondesc')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1)
+            .range(offset, offset + batchSize - 1);
+        final list = batch as List;
+        for (final s in list) {
+          final desc = s['stucondesc']?.toString() ?? '';
+          if (desc.isNotEmpty) {
+            result[s['stu_id'] as int] = desc;
+          }
+        }
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching student remarks: $e');
+      return {};
+    }
+  }
+
   /// Count of students per class — one row per class, used for fast class list display
   static Future<Map<String, int>> getStudentCountsByClass(int insId) async {
     try {
@@ -578,9 +608,74 @@ class SupabaseService {
       // RETURNS json (json_agg) — single scalar bypasses PostgREST row limit
       final response = await client.rpc('get_fee_demands', params: {'p_ins_id': insId});
       if (response == null) return [];
-      return List<Map<String, dynamic>>.from(response as List);
+      final list = List<Map<String, dynamic>>.from(response as List);
+      // If RPC doesn't include demfeeterm, enrich from fallback
+      if (list.isNotEmpty && !list.first.containsKey('demfeeterm')) {
+        debugPrint('RPC get_fee_demands missing demfeeterm, enriching with fallback');
+        final termMap = await _getFeeDemandTermMap(insId);
+        for (final row in list) {
+          final feeId = row['fee_id'];
+          if (feeId != null && termMap.containsKey(feeId)) {
+            row['demfeeterm'] = termMap[feeId];
+          }
+        }
+      }
+      return list;
     } catch (e) {
       debugPrint('RPC get_fee_demands failed: $e');
+      return _getFeeDemandsFallback(insId);
+    }
+  }
+
+  /// Fetch only fee_id -> demfeeterm mapping for enrichment
+  static Future<Map<int, String>> _getFeeDemandTermMap(int insId) async {
+    try {
+      const batchSize = 1000;
+      int offset = 0;
+      final Map<int, String> result = {};
+      while (true) {
+        final batch = await client
+            .from('feedemand')
+            .select('fee_id, demfeeterm')
+            .eq('ins_id', insId)
+            .range(offset, offset + batchSize - 1);
+        final list = batch as List;
+        for (final row in list) {
+          final feeId = row['fee_id'] as int?;
+          final term = row['demfeeterm']?.toString() ?? '';
+          if (feeId != null && term.isNotEmpty) {
+            result[feeId] = term;
+          }
+        }
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching term map: $e');
+      return {};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> _getFeeDemandsFallback(int insId) async {
+    try {
+      const batchSize = 1000;
+      int offset = 0;
+      final List<Map<String, dynamic>> allResults = [];
+      while (true) {
+        final batch = await client
+            .from('feedemand')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
+            .eq('ins_id', insId)
+            .range(offset, offset + batchSize - 1);
+        final list = batch as List;
+        allResults.addAll(list.cast<Map<String, dynamic>>());
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+      return allResults;
+    } catch (e) {
+      debugPrint('Fallback getFeeDemands failed: $e');
       return [];
     }
   }
@@ -600,7 +695,7 @@ class SupabaseService {
     try {
       final demands = await client
           .from('feedemand')
-          .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, pay_id')
+          .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
           .eq('ins_id', insId)
           .eq('paidstatus', 'P')
           .eq('activestatus', 1);

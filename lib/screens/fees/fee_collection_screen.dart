@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1094,6 +1095,24 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: filtered.isNotEmpty ? () {
+                final pendingFiltered = filtered.where((d) => d['paidstatus']?.toString() == 'U').toList();
+                if (pendingFiltered.isNotEmpty) {
+                  _exportPendingToExcel(pendingFiltered, totalDemand, totalPaid, totalBalance, totalStudents);
+                }
+              } : null,
+              icon: const Icon(Icons.download_rounded, size: 20),
+              color: AppColors.accent,
+              tooltip: 'Export to Excel',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1509,12 +1528,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 DataColumn(label: Text('PAID'), numeric: true),
                 DataColumn(label: Text('BALANCE'), numeric: true),
                 DataColumn(label: Text('STATUS')),
-                DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
               ],
               rows: pagedKeys.isEmpty ? [
                 const DataRow(cells: [
                   DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')), DataCell(Text('')),
-                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
+                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
                 ]),
               ] : [
                 ...pagedKeys.asMap().entries.map((entry) {
@@ -1554,24 +1572,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ),
                         child: Text(isPaid ? 'Paid' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : Colors.red)),
                       )),
-                      DataCell(Align(
-                        alignment: Alignment.centerRight,
-                        child: InkWell(
-                          onTap: () => setState(() {
-                            _selectedStudentKey = stuKey;
-                            _selectedStudentDemands = demands;
-                          }),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
-                            ]),
-                          ),
-                        ),
-                      )),
                     ],
                   );
                 }),
@@ -1586,7 +1586,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     DataCell(Text(_formatCurrency(totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
                     DataCell(Text(_formatCurrency(totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
                     DataCell(Text(_formatCurrency(totalBalance), style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
-                    const DataCell(Text('')),
                     const DataCell(Text('')),
                   ],
                 ),
@@ -2602,6 +2601,370 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ],
       ),
     );
+  }
+
+  Future<void> _exportPendingToExcel(List<Map<String, dynamic>> demands, double appTotalDemand, double appTotalPaid, double appTotalBalance, int appTotalStudents) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 1;
+
+    // Fetch fresh data directly from feedemand table for accurate export
+    // Supabase default limit is 1000, so fetch in pages
+    final allFresh = <Map<String, dynamic>>[];
+    const pageSize = 1000;
+    int offset = 0;
+    while (true) {
+      final batch = await SupabaseService.client
+          .from('feedemand')
+          .select('stu_id, stuadmno, stuclass, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidstatus')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('paidstatus', 'U')
+          .range(offset, offset + pageSize - 1);
+      allFresh.addAll(List<Map<String, dynamic>>.from(batch));
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
+    demands = allFresh;
+
+    // Enrich with student names from original demands
+    final nameMap = <String, String>{};
+    for (final d in _demands) {
+      final admNo = d['stuadmno']?.toString() ?? '';
+      final name = _getStudentName(d);
+      if (admNo.isNotEmpty && name.isNotEmpty) nameMap[admNo] = name;
+    }
+
+    String insName = auth.insName ?? '';
+    String insAddress = '';
+    String insMobile = '';
+    String insEmail = '';
+    if (auth.insId != null) {
+      final insInfo = await SupabaseService.getInstitutionInfo(auth.insId!);
+      if (insInfo.name != null) insName = insInfo.name!;
+      if (insInfo.address != null) insAddress = insInfo.address!;
+      if (insInfo.mobile != null) insMobile = insInfo.mobile!;
+      if (insInfo.email != null) insEmail = insInfo.email!;
+    }
+
+    // Fetch student remarks
+    final remarksMap = auth.insId != null
+        ? await SupabaseService.getStudentRemarks(auth.insId!)
+        : <int, String>{};
+
+    final excel = xl.Excel.createExcel();
+    const sheetName = 'Pending Fees';
+    excel.rename('Sheet1', sheetName);
+    final sheet = excel[sheetName];
+
+    // Term/month columns
+    const termCols = [
+      'I TERM', 'II TERM', 'III TERM',
+      'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+      'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY',
+    ];
+
+    String mapTermToCol(String? term) {
+      if (term == null || term.isEmpty) return '';
+      final t = term.toUpperCase().trim();
+      if (t == 'I' || t == 'I TERM' || t == 'TERM I' || t == 'TERM 1' || t == '1') return 'I TERM';
+      if (t == 'II' || t == 'II TERM' || t == 'TERM II' || t == 'TERM 2' || t == '2') return 'II TERM';
+      if (t == 'III' || t == 'III TERM' || t == 'TERM III' || t == 'TERM 3' || t == '3') return 'III TERM';
+      const months = {
+        'JUNE': 'JUNE', 'JUN': 'JUNE', 'JULY': 'JULY', 'JUL': 'JULY',
+        'AUGUST': 'AUGUST', 'AUG': 'AUGUST', 'SEPTEMBER': 'SEPTEMBER', 'SEP': 'SEPTEMBER',
+        'OCTOBER': 'OCTOBER', 'OCT': 'OCTOBER', 'NOVEMBER': 'NOVEMBER', 'NOV': 'NOVEMBER',
+        'DECEMBER': 'DECEMBER', 'DEC': 'DECEMBER', 'JANUARY': 'JANUARY', 'JAN': 'JANUARY',
+        'FEBRUARY': 'FEBRUARY', 'FEB': 'FEBRUARY', 'MARCH': 'MARCH', 'MAR': 'MARCH',
+        'APRIL': 'APRIL', 'APR': 'APRIL', 'MAY': 'MAY',
+      };
+      return months[t] ?? t;
+    }
+
+    // Styles
+    final insStyle = xl.CellStyle(bold: true, fontSize: 14, horizontalAlign: xl.HorizontalAlign.Center);
+    final insDetailStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Center);
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final colHeaderStyle = xl.CellStyle(
+      bold: true, fontSize: 10,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+    final totalStyle = xl.CellStyle(bold: true, fontSize: 11, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
+    final grandTotalStyle = xl.CellStyle(
+      bold: true, fontSize: 11,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+
+    final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...termCols, 'Total', 'Remarks'];
+    final totalCols = headers.length;
+    int row = 0;
+
+    // Institution name
+    final insNameCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    insNameCell.value = xl.TextCellValue(insName.toUpperCase());
+    insNameCell.cellStyle = insStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+    row++;
+
+    if (insAddress.isNotEmpty) {
+      final addrCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      addrCell.value = xl.TextCellValue(insAddress);
+      addrCell.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+      row++;
+    }
+
+    final contactParts = <String>[];
+    if (insMobile.isNotEmpty) contactParts.add('Ph: $insMobile');
+    if (insEmail.isNotEmpty) contactParts.add('Email: $insEmail');
+    if (contactParts.isNotEmpty) {
+      final c = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      c.value = xl.TextCellValue(contactParts.join('  |  '));
+      c.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+      row++;
+    }
+
+    // PENDING FEE REPORT date
+    final now = DateTime.now();
+    final reportDate = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final reportCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    reportCell.value = xl.TextCellValue('PENDING FEE REPORT AS ON $reportDate');
+    reportCell.cellStyle = labelStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    row++;
+
+    // FEE TYPE filter label
+    final feeTypeLabel = _pendingFeeTypeFilter ?? 'ALL FEE TYPE';
+    final ftCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    ftCell.value = xl.TextCellValue('FEE TYPE : $feeTypeLabel');
+    ftCell.cellStyle = labelStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    row++;
+    row++; // blank
+
+    // Column headers
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = xl.TextCellValue(headers[c]);
+      cell.cellStyle = colHeaderStyle;
+    }
+    row++;
+
+    // DEBUG: Check what data we have
+    debugPrint('EXPORT DEBUG: Total demands received: ${demands.length}');
+    int hasTermCount = 0;
+    int noTermCount = 0;
+    int unpaidCount = 0;
+    final termValues = <String>{};
+    for (final d in demands) {
+      final term = d['demfeeterm']?.toString() ?? '';
+      final ps = d['paidstatus']?.toString() ?? '';
+      if (term.isNotEmpty) {
+        hasTermCount++;
+        termValues.add(term);
+      } else {
+        noTermCount++;
+      }
+      if (ps == 'U') unpaidCount++;
+    }
+    debugPrint('EXPORT DEBUG: Has demfeeterm: $hasTermCount, Missing demfeeterm: $noTermCount');
+    debugPrint('EXPORT DEBUG: Unpaid (paidstatus=U): $unpaidCount');
+    debugPrint('EXPORT DEBUG: Unique demfeeterm values: $termValues');
+    // Print first 5 rows for inspection
+    for (var i = 0; i < demands.length && i < 5; i++) {
+      final d = demands[i];
+      debugPrint('EXPORT DEBUG ROW $i: paidstatus=${d['paidstatus']}, demfeeterm=${d['demfeeterm']}, balancedue=${d['balancedue']}, stuadmno=${d['stuadmno']}, stuclass=${d['stuclass']}');
+    }
+
+    // Group demands by student (stu_id)
+    final Map<String, List<Map<String, dynamic>>> byStudent = {};
+    for (final d in demands) {
+      final stuId = d['stu_id']?.toString() ?? '';
+      if (stuId.isNotEmpty) {
+        byStudent.putIfAbsent(stuId, () => []).add(d);
+      }
+    }
+
+    // Build student rows with term amounts
+    final studentRows = <Map<String, dynamic>>[];
+    for (final entry in byStudent.entries) {
+      final stuDemands = entry.value;
+      final first = stuDemands.first;
+      final stuClass = first['stuclass']?.toString() ?? '-';
+      final admNo = first['stuadmno']?.toString() ?? '-';
+      final stuName = nameMap[admNo] ?? _getStudentName(first);
+      final stuId = first['stu_id'] as int?;
+      final remarks = stuId != null ? (remarksMap[stuId] ?? '') : '';
+
+      final Map<String, double> termAmounts = {};
+      double total = 0;
+      for (final d in stuDemands) {
+        final term = mapTermToCol(d['demfeeterm']?.toString());
+        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+        if (term.isNotEmpty && bal > 0) {
+          termAmounts[term] = (termAmounts[term] ?? 0) + bal;
+        }
+        total += bal;
+      }
+
+      studentRows.add({
+        'class': stuClass,
+        'admNo': admNo,
+        'stuName': stuName,
+        'termAmounts': termAmounts,
+        'total': total,
+        'remarks': remarks,
+      });
+    }
+
+    // Sort by class then admNo
+    studentRows.sort((a, b) {
+      final classCmp = _compareClass(a['class'] as String, b['class'] as String);
+      if (classCmp != 0) return classCmp;
+      return (a['admNo'] as String).compareTo(b['admNo'] as String);
+    });
+
+    // Write rows grouped by class
+    int sno = 0;
+    String? currentClass;
+    final Map<String, double> grandTermTotals = {};
+
+    for (var i = 0; i < studentRows.length; i++) {
+      final sr = studentRows[i];
+      final stuClass = sr['class'] as String;
+      final termAmounts = sr['termAmounts'] as Map<String, double>;
+      final total = sr['total'] as double;
+
+      if (currentClass != null && stuClass != currentClass) {
+        _writePendingClassTotal(sheet, row, 'Total', termCols, studentRows, currentClass, totalStyle);
+        row++;
+      }
+
+      currentClass = stuClass;
+
+      sno++;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.IntCellValue(sno);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(stuClass);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(sr['admNo'] as String);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(sr['stuName'] as String);
+
+      for (var t = 0; t < termCols.length; t++) {
+        final amt = termAmounts[termCols[t]] ?? 0;
+        if (amt > 0) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row)).value = xl.DoubleCellValue(amt);
+        }
+      }
+
+      final totalColIdx = 4 + termCols.length;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: row)).value = xl.DoubleCellValue(total);
+
+      final remarksStr = sr['remarks'] as String;
+      if (remarksStr.isNotEmpty) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalColIdx + 1, rowIndex: row)).value = xl.TextCellValue(remarksStr);
+      }
+
+      for (final tc in termCols) {
+        grandTermTotals[tc] = (grandTermTotals[tc] ?? 0) + (termAmounts[tc] ?? 0);
+      }
+      row++;
+    }
+
+    // Last class total
+    if (currentClass != null) {
+      _writePendingClassTotal(sheet, row, 'Total', termCols, studentRows, currentClass, totalStyle);
+      row++;
+    }
+
+    // G.Total (grand total)
+    final gtLabelCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+    gtLabelCell.value = xl.TextCellValue('G.Total');
+    gtLabelCell.cellStyle = grandTotalStyle;
+    for (var c = 0; c < 4; c++) {
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = grandTotalStyle;
+    }
+    for (var t = 0; t < termCols.length; t++) {
+      final amt = grandTermTotals[termCols[t]] ?? 0;
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row));
+      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      cell.cellStyle = grandTotalStyle;
+    }
+    final gtTotalCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length, rowIndex: row));
+    gtTotalCell.value = xl.DoubleCellValue(appTotalBalance);
+    gtTotalCell.cellStyle = grandTotalStyle;
+    sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length + 1, rowIndex: row)).cellStyle = grandTotalStyle;
+
+    // Column widths
+    sheet.setColumnWidth(0, 6);
+    sheet.setColumnWidth(1, 8);
+    sheet.setColumnWidth(2, 12);
+    sheet.setColumnWidth(3, 22);
+    for (var t = 0; t < termCols.length; t++) {
+      sheet.setColumnWidth(4 + t, 10);
+    }
+    sheet.setColumnWidth(4 + termCols.length, 10);
+    sheet.setColumnWidth(4 + termCols.length + 1, 25);
+
+    // Save
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Pending Fee Report',
+      fileName: 'Pending_Fee_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
+
+    if (result != null) {
+      final path = result.endsWith('.xlsx') ? result : '$result.xlsx';
+      final bytes = excel.encode();
+      if (bytes != null) {
+        await File(path).writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Exported to $path'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    }
+  }
+
+  void _writePendingClassTotal(
+    xl.Sheet sheet, int row, String label,
+    List<String> termCols, List<Map<String, dynamic>> studentRows,
+    String className, xl.CellStyle style,
+  ) {
+    final classStudents = studentRows.where((r) => r['class'] == className).toList();
+    final Map<String, double> classTotals = {};
+    double classTotal = 0;
+    for (final sr in classStudents) {
+      final ta = sr['termAmounts'] as Map<String, double>;
+      for (final tc in termCols) {
+        classTotals[tc] = (classTotals[tc] ?? 0) + (ta[tc] ?? 0);
+      }
+      classTotal += sr['total'] as double;
+    }
+
+    final labelCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+    labelCell.value = xl.TextCellValue(label);
+    labelCell.cellStyle = style;
+    for (var c = 0; c < 4; c++) {
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = style;
+    }
+    for (var t = 0; t < termCols.length; t++) {
+      final amt = classTotals[termCols[t]] ?? 0;
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row));
+      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      cell.cellStyle = style;
+    }
+    final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length, rowIndex: row));
+    tCell.value = xl.DoubleCellValue(classTotal);
+    tCell.cellStyle = style;
+    sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length + 1, rowIndex: row)).cellStyle = style;
   }
 }
 
@@ -3791,23 +4154,27 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
   /// Build student rows for a date group, pivoted by fee type
   List<Map<String, dynamic>> _buildStudentRows(List<Map<String, dynamic>> demands) {
-    final Map<String, List<Map<String, dynamic>>> studentMap = {};
+    // Group by pay_id (each payment is a row)
+    final Map<int, List<Map<String, dynamic>>> paymentMap = {};
     for (final d in demands) {
-      final admNo = d['stuadmno']?.toString() ?? '-';
-      studentMap.putIfAbsent(admNo, () => []).add(d);
+      final payId = d['pay_id'] as int?;
+      if (payId != null) {
+        paymentMap.putIfAbsent(payId, () => []).add(d);
+      }
     }
 
     final rows = <Map<String, dynamic>>[];
-    for (final entry in studentMap.entries) {
-      final admNo = entry.key;
+
+    for (final entry in paymentMap.entries) {
+      final payId = entry.key;
       final studentDemands = entry.value;
       final first = studentDemands.first;
       final stuName = first['students'] is Map
           ? (first['students']['stuname']?.toString() ?? '-')
           : (first['stuname']?.toString() ?? '-');
       final stuClass = first['stuclass']?.toString() ?? '-';
-      final payId = first['pay_id'] as int?;
-      final payNo = payId != null ? (_payNumberMap[payId] ?? '-') : '-';
+      final admNo = first['stuadmno']?.toString() ?? '-';
+      final payNo = _payNumberMap[payId] ?? '-';
 
       final Map<String, double> feeAmounts = {};
       double total = 0;
@@ -3829,7 +4196,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         'total': total,
       });
     }
-    rows.sort((a, b) => (a['admNo'] as String).compareTo(b['admNo'] as String));
+
+    rows.sort((a, b) => (a['payNo'] as String).compareTo(b['payNo'] as String));
     return rows;
   }
 
@@ -3837,14 +4205,15 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   Widget build(BuildContext context) {
     super.build(context);
 
-    // Build flat table rows (DATE column per student, no date header/total rows)
+    // Build flat table rows with date headers and S.Total rows
     final List<Map<String, dynamic>> flatRows = [];
-    int serialNo = 0;
+    int globalSno = 0;
     final Map<String, double> grandFeeTypeTotals = {};
     double grandTotal = 0;
     int totalStudentCount = 0;
+    int totalDateCount = 0;
 
-    // Use all fee types from feetype table for columns
+    // Use all fee types from feetype table so all columns show
     final displayFeeTypes = _filterFeeType != null ? [_filterFeeType!] : _allFeeTypes;
 
     for (final group in _dateGroups) {
@@ -3865,12 +4234,21 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
             }).toList();
       if (filteredStudentRows.isEmpty) continue;
 
+      totalDateCount++;
+
+      // Date header row
+      flatRows.add({'_type': 'dateHeader', 'date': _formatDisplayDate(group.date)});
+
+      final Map<String, double> dateTotals = {};
+      double dateTotal = 0;
+
       for (final row in filteredStudentRows) {
-        serialNo++;
+        globalSno++;
         final feeAmounts = row['feeAmounts'] as Map<String, double>;
         final total = row['total'] as double;
         flatRows.add({
-          'date': _formatDisplayDate(group.date),
+          '_type': 'data',
+          'sno': globalSno,
           'payNo': row['payNo'] as String,
           'admNo': row['admNo'] as String,
           'stuName': row['stuName'] as String,
@@ -3879,12 +4257,20 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           'total': total,
         });
         for (final ft in displayFeeTypes) {
+          dateTotals[ft] = (dateTotals[ft] ?? 0) + (feeAmounts[ft] ?? 0);
           grandFeeTypeTotals[ft] = (grandFeeTypeTotals[ft] ?? 0) + (feeAmounts[ft] ?? 0);
         }
+        dateTotal += total;
         grandTotal += total;
       }
       totalStudentCount += filteredStudentRows.length;
+
+      // S.Total row
+      flatRows.add({'_type': 'subTotal', 'feeAmounts': dateTotals, 'total': dateTotal});
     }
+
+    // Filter display fee types to only those with actual payments
+    final activeDisplayFeeTypes = displayFeeTypes.where((ft) => (grandFeeTypeTotals[ft] ?? 0) > 0).toList();
 
     _updateCanScroll();
 
@@ -4002,10 +4388,23 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             color: AppColors.accent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text('${_dateGroups.length} dates  |  $totalStudentCount students',
+                          child: Text('$totalDateCount dates  |  $totalStudentCount students',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent)),
                         ),
                         const Spacer(),
+                        IconButton(
+                          onPressed: flatRows.isNotEmpty ? () => _exportToExcel(flatRows, activeDisplayFeeTypes, grandFeeTypeTotals, grandTotal) : null,
+                          icon: const Icon(Icons.download_rounded, size: 20),
+                          color: AppColors.accent,
+                          tooltip: 'Export to Excel',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         SizedBox(
                           width: 200,
                           height: 34,
@@ -4072,83 +4471,126 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                       children: [
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final tableWidget = DataTable(dividerThickness: 0,
-                              showCheckboxColumn: false,
-                              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
-                              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-                              columnSpacing: 20,
-                              horizontalMargin: 16,
-                              dataRowMinHeight: 36,
-                              dataRowMaxHeight: 40,
-                              headingRowHeight: 42,
-                              columns: [
-                                const DataColumn(label: Text('DATE')),
-                                const DataColumn(label: Text('PAY NO')),
-                                const DataColumn(label: Text('ADMN.NO')),
-                                const DataColumn(label: Text('STUDENT NAME')),
-                                const DataColumn(label: Text('CLASS')),
-                                ...displayFeeTypes.map((ft) => DataColumn(label: Text(ft.toUpperCase()), numeric: true)),
-                                const DataColumn(label: Text('TOTAL'), numeric: true),
-                              ],
-                              rows: [
-                                ...flatRows.map((row) {
-                                  final feeAmounts = row['feeAmounts'] as Map<String, double>;
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(Text(
-                                        row['date'] as String,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent),
-                                      )),
-                                      DataCell(Text(row['payNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                      DataCell(Text(row['admNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                      DataCell(ConstrainedBox(
-                                        constraints: const BoxConstraints(maxWidth: 200),
-                                        child: Text(row['stuName'] as String, overflow: TextOverflow.ellipsis),
-                                      )),
-                                      DataCell(Text(row['stuClass'] as String)),
-                                      ...displayFeeTypes.map((ft) {
-                                        final amt = feeAmounts[ft] ?? 0;
-                                        return DataCell(Text(
-                                          amt > 0 ? _formatCurrency(amt) : '',
-                                          textAlign: TextAlign.right,
-                                        ));
-                                      }),
-                                      DataCell(Text(
-                                        _formatCurrency(row['total'] as double),
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                      )),
-                                    ],
-                                  );
-                                }),
-                                // Grand total row
-                                DataRow(
-                                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                            const headerBg = Color(0xFF2D3748);
+                            const subTotalBg = Color(0xFFE2E8F0);
+
+                            final dataRows = <DataRow>[];
+                            for (final row in flatRows) {
+                              final type = row['_type'] as String;
+
+                              if (type == 'dateHeader') {
+                                // Date header row (5 fixed + feeTypes + 1 total)
+                                final totalCols = 5 + activeDisplayFeeTypes.length + 1;
+                                dataRows.add(DataRow(
+                                  color: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
                                   cells: [
+                                    DataCell(Text(row['date'] as String,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent))),
+                                    ...List.generate(totalCols - 1, (_) => const DataCell(Text(''))),
+                                  ],
+                                ));
+                              } else if (type == 'subTotal') {
+                                final feeAmts = row['feeAmounts'] as Map<String, double>;
+                                final total = row['total'] as double;
+                                dataRows.add(DataRow(
+                                  color: WidgetStateProperty.all(subTotalBg),
+                                  cells: [
+                                    DataCell(Text('S.Total', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
                                     const DataCell(Text('')),
                                     const DataCell(Text('')),
-                                    DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white))),
                                     const DataCell(Text('')),
                                     const DataCell(Text('')),
-                                    ...displayFeeTypes.map((ft) {
-                                      final amt = grandFeeTypeTotals[ft] ?? 0;
+                                    ...activeDisplayFeeTypes.map((ft) {
+                                      final amt = feeAmts[ft] ?? 0;
                                       return DataCell(Text(
-                                        amt > 0 ? _formatCurrency(amt) : '',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                                        amt > 0 ? amt.toStringAsFixed(0) : '',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
                                       ));
                                     }),
                                     DataCell(Text(
-                                      _formatCurrency(grandTotal),
-                                      style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                                      total.toStringAsFixed(0),
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                                     )),
                                   ],
-                                ),
+                                ));
+                              } else {
+                                // Data row
+                                final feeAmts = row['feeAmounts'] as Map<String, double>;
+                                dataRows.add(DataRow(
+                                  cells: [
+                                    DataCell(Text('${row['sno']}', style: const TextStyle(fontSize: 12))),
+                                    DataCell(Text(row['payNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11))),
+                                    DataCell(Text(row['admNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500))),
+                                    DataCell(ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 180),
+                                      child: Text(row['stuName'] as String, overflow: TextOverflow.ellipsis),
+                                    )),
+                                    DataCell(Text(row['stuClass'] as String)),
+                                    ...activeDisplayFeeTypes.map((ft) {
+                                      final amt = feeAmts[ft] ?? 0;
+                                      return DataCell(Text(
+                                        amt > 0 ? amt.toStringAsFixed(0) : '',
+                                        textAlign: TextAlign.right,
+                                      ));
+                                    }),
+                                    DataCell(Text(
+                                      (row['total'] as double).toStringAsFixed(0),
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    )),
+                                  ],
+                                ));
+                              }
+                            }
+
+                            // Grand total row
+                            dataRows.add(DataRow(
+                              color: WidgetStateProperty.all(headerBg),
+                              cells: [
+                                const DataCell(Text('')),
+                                const DataCell(Text('')),
+                                const DataCell(Text('')),
+                                DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white))),
+                                const DataCell(Text('')),
+                                ...activeDisplayFeeTypes.map((ft) {
+                                  final amt = grandFeeTypeTotals[ft] ?? 0;
+                                  return DataCell(Text(
+                                    amt > 0 ? amt.toStringAsFixed(0) : '',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                                  ));
+                                }),
+                                DataCell(Text(
+                                  grandTotal.toStringAsFixed(0),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                                )),
                               ],
+                            ));
+
+                            final tableWidget = DataTable(
+                              dividerThickness: 0,
+                              showCheckboxColumn: false,
+                              headingRowColor: WidgetStateProperty.all(headerBg),
+                              headingTextStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                              columnSpacing: 12,
+                              horizontalMargin: 12,
+                              dataRowMinHeight: 32,
+                              dataRowMaxHeight: 38,
+                              headingRowHeight: 40,
+                              columns: [
+                                const DataColumn(label: Text('SNO')),
+                                const DataColumn(label: Text('RECPT.NO')),
+                                const DataColumn(label: Text('ADMN.NO')),
+                                const DataColumn(label: Text('NAME')),
+                                const DataColumn(label: Text('CLASS')),
+                                ...activeDisplayFeeTypes.map((ft) => DataColumn(label: Text(ft.toUpperCase()), numeric: true)),
+                                const DataColumn(label: Text('TOTAL'), numeric: true),
+                              ],
+                              rows: dataRows,
                             );
 
                             // Minimum width to keep columns readable
-                            final totalColumns = 6 + displayFeeTypes.length;
-                            final minTableWidth = totalColumns * 100.0;
+                            final totalColumns = 6 + activeDisplayFeeTypes.length;
+                            final minTableWidth = totalColumns * 80.0;
                             final effectiveMin = minTableWidth > constraints.maxWidth
                                 ? minTableWidth
                                 : constraints.maxWidth;
@@ -4276,6 +4718,202 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         ),
       ),
     );
+  }
+
+  Future<void> _exportToExcel(
+    List<Map<String, dynamic>> flatRows,
+    List<String> feeTypes,
+    Map<String, double> grandFeeTypeTotals,
+    double grandTotal,
+  ) async {
+    // Fetch institution info
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    String insName = auth.insName ?? '';
+    String insAddress = '';
+    String insMobile = '';
+    String insEmail = '';
+    if (auth.insId != null) {
+      final insInfo = await SupabaseService.getInstitutionInfo(auth.insId!);
+      if (insInfo.name != null) insName = insInfo.name!;
+      if (insInfo.address != null) insAddress = insInfo.address!;
+      if (insInfo.mobile != null) insMobile = insInfo.mobile!;
+      if (insInfo.email != null) insEmail = insInfo.email!;
+    }
+
+    final excel = xl.Excel.createExcel();
+    final sheetName = 'Collection';
+    excel.rename('Sheet1', sheetName);
+    final sheet = excel[sheetName];
+
+    // Styles
+    final insStyle = xl.CellStyle(bold: true, fontSize: 14, horizontalAlign: xl.HorizontalAlign.Center);
+    final insDetailStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Center);
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final colHeaderStyle = xl.CellStyle(
+      bold: true, fontSize: 10,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+    final dateHeaderStyle = xl.CellStyle(bold: true, fontSize: 11, fontColorHex: xl.ExcelColor.fromHexString('#2563EB'));
+    final subTotalStyle = xl.CellStyle(bold: true, fontSize: 11, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
+    final totalRowStyle = xl.CellStyle(
+      bold: true, fontSize: 11,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+
+    // Filter fee types to only those with actual payments
+    final activeFeeTypes = feeTypes.where((ft) => (grandFeeTypeTotals[ft] ?? 0) > 0).toList();
+
+    final totalCols = 5 + activeFeeTypes.length + 1;
+    int row = 0;
+
+    // Institution name
+    final insNameCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    insNameCell.value = xl.TextCellValue(insName.toUpperCase());
+    insNameCell.cellStyle = insStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+    row++;
+
+    // Institution address
+    if (insAddress.isNotEmpty) {
+      final addrCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      addrCell.value = xl.TextCellValue(insAddress);
+      addrCell.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+      row++;
+    }
+
+    // Contact
+    final contactParts = <String>[];
+    if (insMobile.isNotEmpty) contactParts.add('Ph: $insMobile');
+    if (insEmail.isNotEmpty) contactParts.add('Email: $insEmail');
+    if (contactParts.isNotEmpty) {
+      final c = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      c.value = xl.TextCellValue(contactParts.join('  |  '));
+      c.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+      row++;
+    }
+    row++; // blank
+
+    // "FEE COLLECTED BY : ALL USERS"
+    final feeLabel = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    feeLabel.value = xl.TextCellValue('FEE COLLECTED BY : ALL USERS');
+    feeLabel.cellStyle = labelStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    row++;
+
+    // Column headers (no Challan No.)
+    final headers = ['SNO', 'Recpt. No.', 'Admn. No.', 'Name', 'Class', ...activeFeeTypes.map((ft) => ft.toUpperCase()), 'TOTAL'];
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = xl.TextCellValue(headers[c]);
+      cell.cellStyle = colHeaderStyle;
+    }
+    row++;
+
+    // Data rows
+    for (final r in flatRows) {
+      final type = r['_type'] as String;
+
+      if (type == 'dateHeader') {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+        cell.value = xl.TextCellValue(r['date'] as String);
+        cell.cellStyle = dateHeaderStyle;
+        row++;
+      } else if (type == 'subTotal') {
+        final feeAmts = r['feeAmounts'] as Map<String, double>;
+        final total = r['total'] as double;
+        final stCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+        stCell.value = xl.TextCellValue('S.Total');
+        stCell.cellStyle = subTotalStyle;
+        for (var i = 1; i < 5; i++) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: row)).cellStyle = subTotalStyle;
+        }
+        for (var i = 0; i < activeFeeTypes.length; i++) {
+          final amt = feeAmts[activeFeeTypes[i]] ?? 0;
+          final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
+          if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+          cell.cellStyle = subTotalStyle;
+        }
+        final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
+        tCell.value = xl.DoubleCellValue(total);
+        tCell.cellStyle = subTotalStyle;
+        row++;
+      } else {
+        // Data row
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.IntCellValue(r['sno'] as int);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['payNo'] as String);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['admNo'] as String);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['stuName'] as String);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['stuClass'] as String);
+
+        final feeAmts = r['feeAmounts'] as Map<String, double>;
+        for (var i = 0; i < activeFeeTypes.length; i++) {
+          final amt = feeAmts[activeFeeTypes[i]] ?? 0;
+          if (amt > 0) {
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row)).value = xl.DoubleCellValue(amt);
+          }
+        }
+        final total = r['total'] as double;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row)).value = xl.DoubleCellValue(total);
+        row++;
+      }
+    }
+
+    // Grand total row
+    final gtLabel = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    gtLabel.value = xl.TextCellValue('GRAND TOTAL');
+    gtLabel.cellStyle = totalRowStyle;
+    for (var c = 1; c < 5; c++) {
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = totalRowStyle;
+    }
+    for (var i = 0; i < activeFeeTypes.length; i++) {
+      final amt = grandFeeTypeTotals[activeFeeTypes[i]] ?? 0;
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
+      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      cell.cellStyle = totalRowStyle;
+    }
+    final gtCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
+    gtCell.value = xl.DoubleCellValue(grandTotal);
+    gtCell.cellStyle = totalRowStyle;
+
+    // Column widths
+    sheet.setColumnWidth(0, 8);
+    sheet.setColumnWidth(1, 16);
+    sheet.setColumnWidth(2, 12);
+    sheet.setColumnWidth(3, 22);
+    sheet.setColumnWidth(4, 8);
+    for (var i = 0; i < activeFeeTypes.length; i++) {
+      sheet.setColumnWidth(5 + i, 14);
+    }
+    sheet.setColumnWidth(5 + activeFeeTypes.length, 12);
+
+    // Save
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Date-wise Collection',
+      fileName: 'DateWise_Collection_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
+
+    if (result != null) {
+      final path = result.endsWith('.xlsx') ? result : '$result.xlsx';
+      final bytes = excel.encode();
+      if (bytes != null) {
+        await File(path).writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Exported to $path'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildSummaryCard(IconData icon, Color iconColor, String value, String label) {

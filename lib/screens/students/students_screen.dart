@@ -422,6 +422,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'stupin': _pinController.text.trim().isNotEmpty ? _pinController.text.trim() : null,
         'stubloodgrp': _selectedBloodGroup,
         'stuclass': _selectedClass,
+        'con_id': _selectedConId != null ? int.tryParse(_selectedConId!) : null,
+        'stucondesc': _selectedConId != null ? _concessions.firstWhere((c) => c['con_id'].toString() == _selectedConId, orElse: () => {})['condesc'] : null,
         'stuphoto': _photoUrl,
         'stuser_id': _admNoController.text.trim(),
         'stuotpstatus': 0,
@@ -1134,10 +1136,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
           const SizedBox(width: 16),
 
-          // RIGHT — Student Details or Add New Student form
+          // RIGHT — Student Details or Class Table
           Expanded(
-            child: _selectedStudent == null && _selectedClassFilter != null
-                ? _buildClassStudentTable(_selectedClassFilter!)
+            child: _selectedStudent == null
+                ? (_selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : const SizedBox())
                 : Column(
                     children: [
                       // Back breadcrumb
@@ -1153,7 +1155,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           child: Row(
                             children: [
                               InkWell(
-                                onTap: () => setState(() => _selectedStudent = null),
+                                onTap: () => setState(() { _selectedStudent = null; _selectedClassFilter = null; }),
                                 borderRadius: BorderRadius.circular(6),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1688,8 +1690,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'guardian mobile': 'guardianmobile', 'guardianmobile': 'guardianmobile', 'guardian phone': 'guardianmobile',
       'guardian occupation': 'guardianoccupation', 'guardianoccupation': 'guardianoccupation',
       'concession': 'concession', 'concession category': 'concession',
-      'payment in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
-      'payment mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob', 'pay mobile': 'payinchargemob',
+      'payment in charge': 'payincharge', 'pay in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
+      'payment mobile': 'payinchargemob', 'pay mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob',
     };
     return map[h] ?? '';
   }
@@ -1862,6 +1864,22 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return v.isEmpty ? null : v;
   }
 
+  /// Returns null if the value is null, empty, or whitespace-only
+  static String? _nullIfEmpty(String? v) {
+    if (v == null) return null;
+    final trimmed = v.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Validates email format; returns null if invalid
+  static String? _validEmail(String? v) {
+    final e = _nullIfEmpty(v);
+    if (e == null) return null;
+    // Basic email check — must contain @ and .
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return regex.hasMatch(e) ? e : null;
+  }
+
   String? _validateImportRow(int rowIdx) {
     final row = _importRows[rowIdx];
     final missing = <String>[];
@@ -1915,7 +1933,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final inscode = auth.inscode ?? '';
     final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
     final yrLabel = _selectedYrLabel ?? '';
-    final now = DateTime.now().toIso8601String();
 
     setState(() {
       _importStep = 2;
@@ -1925,128 +1942,106 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _importErrors = [];
     });
 
+    // 1. Validate and build staging rows
+    final stagingRows = <Map<String, dynamic>>[];
     for (int i = 0; i < _importRows.length; i++) {
-      final row = _importRows[i];
       final err = _validateImportRow(i);
       if (err != null) {
-        setState(() {
-          _skippedCount++;
-          _importErrors.add('Row ${i + 2}: $err');
-        });
+        _skippedCount++;
+        _importErrors.add('Row ${i + 2}: $err');
         continue;
       }
+      final row = _importRows[i];
+      final dob = _parseDate(_importCellByKey(row, 'studob'));
+      final admDate = _parseDate(_importCellByKey(row, 'stuadmdate'));
+      stagingRows.add({
+        'ins_id': insId,
+        'inscode': inscode,
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'stuadmno': _importCellByKey(row, 'stuadmno'),
+        'stuname': _importCellByKey(row, 'stuname'),
+        'stugender': _normalizeGender(_importCellByKey(row, 'stugender')),
+        'studob': dob?.toIso8601String().split('T').first,
+        'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'stuclass': _importCellByKey(row, 'stuclass'),
+        'stumobile': _importCellByKey(row, 'stumobile'),
+        'stuemail': _validEmail(_importCellByKey(row, 'stuemail')),
+        'concession': _nullIfEmpty(_importCellByKey(row, 'concession')),
+        'stuaddress': _nullIfEmpty(_importCellByKey(row, 'stuaddress')),
+        'stucity': _nullIfEmpty(_importCellByKey(row, 'stucity')),
+        'stustate': _nullIfEmpty(_importCellByKey(row, 'stustate')),
+        'stucountry': _nullIfEmpty(_importCellByKey(row, 'stucountry')),
+        'stupin': _nullIfEmpty(_importCellByKey(row, 'stupin')),
+        'stubloodgrp': _nullIfEmpty(_importCellByKey(row, 'stubloodgrp')),
+        'fathername': _nullIfEmpty(_importCellByKey(row, 'fathername')),
+        'fathermobile': _nullIfEmpty(_importCellByKey(row, 'fathermobile')),
+        'fatheroccupation': _nullIfEmpty(_importCellByKey(row, 'fatheroccupation')),
+        'mothername': _nullIfEmpty(_importCellByKey(row, 'mothername')),
+        'mothermobile': _nullIfEmpty(_importCellByKey(row, 'mothermobile')),
+        'motheroccupation': _nullIfEmpty(_importCellByKey(row, 'motheroccupation')),
+        'guardianname': _nullIfEmpty(_importCellByKey(row, 'guardianname')),
+        'guardianmobile': _nullIfEmpty(_importCellByKey(row, 'guardianmobile')),
+        'guardianoccupation': _nullIfEmpty(_importCellByKey(row, 'guardianoccupation')),
+        'payincharge': _nullIfEmpty(_importCellByKey(row, 'payincharge')) ?? '-',
+        'payinchargemob': _nullIfEmpty(_importCellByKey(row, 'payinchargemob')),
+        'status': 'PENDING',
+      });
+    }
 
-      int? stuId;
-      int? newParId; // track newly created parent for rollback
-      try {
-        final admNo = _importCellByKey(row, 'stuadmno')!;
-        final stuName = _importCellByKey(row, 'stuname')!;
-        final stuClass = _importCellByKey(row, 'stuclass')!;
-        final dob = _parseDate(_importCellByKey(row, 'studob'));
-        final admDate = _parseDate(_importCellByKey(row, 'stuadmdate'));
+    if (stagingRows.isEmpty) {
+      setState(() => _importStep = 3);
+      return;
+    }
 
-        // 1. Insert student
-        stuId = await SupabaseService.addStudent({
-          'ins_id': insId,
-          'inscode': inscode,
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'stuadmno': admNo,
-          'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
-          'stuname': stuName,
-          'stugender': _normalizeGender(_importCellByKey(row, 'stugender')),
-          'studob': dob?.toIso8601String().split('T').first,
-          'stumobile': _importCellByKey(row, 'stumobile')!,
-          'stuemail': _importCellByKey(row, 'stuemail'),
-          'stuaddress': _importCellByKey(row, 'stuaddress'),
-          'stucity': _importCellByKey(row, 'stucity'),
-          'stustate': _importCellByKey(row, 'stustate'),
-          'stucountry': _importCellByKey(row, 'stucountry'),
-          'stupin': _importCellByKey(row, 'stupin'),
-          'stubloodgrp': _importCellByKey(row, 'stubloodgrp'),
-          'stuclass': stuClass,
-          'stuser_id': admNo,
-          'stuotpstatus': 0,
-          'approvedby': '',
-          'approveddate': now,
-          'suspendedby': '',
-          'terminatedby': '',
-          'activestatus': 1,
-          'createdon': now,
-        });
+    setState(() {});
 
-        // 2. Insert or reuse parent record
-        final fatherMob = _importCellByKey(row, 'fathermobile');
-        final motherMob = _importCellByKey(row, 'mothermobile');
-        final payMob = _importCellByKey(row, 'payinchargemob');
-
-        final existingParId = await SupabaseService.findParentByMobile(
-          fatherMobile: fatherMob,
-          motherMobile: motherMob,
-          payMobile: payMob,
-        );
-
-        int parId;
-        if (existingParId != null) {
-          parId = existingParId;
-        } else {
-          parId = await SupabaseService.saveParent({
-            'yr_id': yrId,
-            'yrlabel': yrLabel,
-            'partype': 'P',
-            'fathername': _importCellByKey(row, 'fathername'),
-            'fathermobile': fatherMob,
-            'fatheroccupation': _importCellByKey(row, 'fatheroccupation'),
-            'mothername': _importCellByKey(row, 'mothername'),
-            'mothermobile': motherMob,
-            'motheroccupation': _importCellByKey(row, 'motheroccupation'),
-            'guardianname': _importCellByKey(row, 'guardianname'),
-            'guardianmobile': _importCellByKey(row, 'guardianmobile'),
-            'guardianoccupation': _importCellByKey(row, 'guardianoccupation'),
-            'payincharge': _importCellByKey(row, 'payincharge'),
-            'payinchargemob': payMob,
-            'parotpstatus': 0,
-            'approveddate': now,
-            'activestatus': 1,
-          });
-          newParId = parId;
-        }
-
-        // 3. Link parent to student
-        await SupabaseService.saveParentDetail({
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'par_id': parId,
-          'stu_id': stuId,
-          'ins_id': insId,
-          'inscode': inscode,
-          'stuadmno': admNo,
-          'stuname': stuName,
-          'stuclass': stuClass,
-          'activestatus': 1,
-        });
-
-        setState(() => _importedCount++);
-      } catch (e) {
-        // Rollback: delete any partially inserted records
-        try {
-          if (stuId != null) {
-            await SupabaseService.client.from('parentdetail').delete().eq('stu_id', stuId);
-            await SupabaseService.client.from('students').delete().eq('stu_id', stuId);
-          }
-          if (newParId != null) {
-            await SupabaseService.client.from('parents').delete().eq('par_id', newParId);
-          }
-        } catch (_) {}
-
-        final msg = e is PostgrestException
-            ? (e.code == '23505' ? 'Duplicate Adm No' : 'DB: ${e.message}')
-            : '$e';
+    try {
+      // 2. Bulk insert into staging table (batches of 200)
+      for (int i = 0; i < stagingRows.length; i += 200) {
+        final batch = stagingRows.sublist(i, (i + 200).clamp(0, stagingRows.length));
+        await SupabaseService.client.from('student_import').insert(batch);
         setState(() {
-          _skippedCount++;
-          _importErrors.add('Row ${i + 2}: $msg');
+          _importedCount = i + batch.length;
         });
       }
+
+      // 3. Call DB function to move data to original tables
+      setState(() {
+        _importedCount = 0;
+      });
+      final result = await SupabaseService.client.rpc('process_student_import', params: {'p_ins_id': insId});
+
+      if (result is List && result.isNotEmpty) {
+        final r = result.first;
+        _importedCount = (r['imported'] as num?)?.toInt() ?? 0;
+        _skippedCount += (r['skipped'] as num?)?.toInt() ?? 0;
+      }
+
+      // 4. Fetch errors from staging table
+      final errors = await SupabaseService.client
+          .from('student_import')
+          .select('imp_id, stuadmno, error_msg, status')
+          .eq('ins_id', insId)
+          .inFilter('status', ['ERROR', 'NO_PARENT']);
+      for (final e in errors) {
+        final status = e['status'];
+        if (status == 'NO_PARENT') {
+          _importErrors.add('Adm ${e['stuadmno']}: No payinchargemob - parent not linked');
+        } else {
+          _importErrors.add('Adm ${e['stuadmno']}: ${e['error_msg']}');
+        }
+      }
+
+      // 5. Clean up processed staging rows
+      await SupabaseService.client
+          .from('student_import')
+          .delete()
+          .eq('ins_id', insId)
+          .inFilter('status', ['DONE', 'ERROR', 'NO_PARENT']);
+
+    } catch (e) {
+      _importErrors.add('Import failed: $e');
     }
 
     setState(() => _importStep = 3);
