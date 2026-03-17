@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:webview_windows/webview_windows.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
@@ -27,7 +30,14 @@ class StudentFeeCollectionScreen extends StatefulWidget {
 class _StudentFeeCollectionScreenState
     extends State<StudentFeeCollectionScreen> {
   final _admNoController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _classController = TextEditingController();
   final _remarksController = TextEditingController();
+  final _chequeNoController = TextEditingController();
+  final _chequeDateController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  DateTime? _chequeDate;
+  List<Map<String, dynamic>> _studentSuggestions = [];
 
   bool _searching = false;
   String? _errorMsg;
@@ -49,6 +59,8 @@ class _StudentFeeCollectionScreenState
   @override
   void dispose() {
     _admNoController.dispose();
+    _nameController.dispose();
+    _classController.dispose();
     _remarksController.dispose();
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
@@ -62,7 +74,10 @@ class _StudentFeeCollectionScreenState
     _conCtrl.clear();
     setState(() {
       _admNoController.clear();
+      _nameController.clear();
+      _classController.clear();
       _remarksController.clear();
+      _studentSuggestions = [];
       _student = null;
       _parent = null;
       _allDemands = [];
@@ -70,7 +85,39 @@ class _StudentFeeCollectionScreenState
       _selectedTerm = null;
       _selected.clear();
       _paymentMode = 'Cash';
+      _chequeNoController.clear();
+      _chequeDateController.clear();
+      _bankNameController.clear();
+      _chequeDate = null;
     });
+  }
+
+  Future<void> _searchByName(String name) async {
+    if (name.trim().length < 2) {
+      setState(() => _studentSuggestions = []);
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final rows = await SupabaseService.client
+          .from('students')
+          .select('stu_id, stuname, stuadmno, stuclass')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .ilike('stuname', '%${name.trim()}%')
+          .limit(10);
+      setState(() => _studentSuggestions = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
+  }
+
+  void _selectSuggestion(Map<String, dynamic> student) {
+    _admNoController.text = student['stuadmno']?.toString() ?? '';
+    _nameController.text = student['stuname']?.toString() ?? '';
+    _classController.text = student['stuclass']?.toString() ?? '';
+    setState(() => _studentSuggestions = []);
+    _search();
   }
 
   Future<void> _search() async {
@@ -117,10 +164,14 @@ class _StudentFeeCollectionScreenState
       final student = Map<String, dynamic>.from(studentRows.first as Map);
       final stuId = student['stu_id'] as int;
 
+      _nameController.text = student['stuname']?.toString() ?? '';
+      _classController.text = student['stuclass']?.toString() ?? '';
+
       setState(() {
         _student = student;
         _searching = false;
         _loadingDemands = true;
+        _studentSuggestions = [];
       });
 
       // Fetch parent and demands in parallel
@@ -128,10 +179,11 @@ class _StudentFeeCollectionScreenState
       final demandsFuture = SupabaseService.client
           .from('feedemand')
           .select(
-              'dem_id, demfeetype, demfeeterm, feeamount, conamount, balancedue, duedate, paidstatus, stuclass, demconcategory')
+              'dem_id, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, duedate, paidstatus, stuclass')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
           .eq('paidstatus', 'U')
+          .gt('balancedue', 0)
           .order('duedate', ascending: true);
 
       final parent = await parentFuture;
@@ -207,7 +259,7 @@ class _StudentFeeCollectionScreenState
 
   String get _studentCategory {
     if (_allDemands.isNotEmpty) {
-      return _allDemands.first['demconcategory']?.toString() ?? 'GENERAL';
+      return 'GENERAL';
     }
     return '-';
   }
@@ -329,6 +381,43 @@ class _StudentFeeCollectionScreenState
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _nameController,
+            decoration: _inputDec('Student Name'),
+            onChanged: _searchByName,
+          ),
+          if (_studentSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _studentSuggestions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final s = _studentSuggestions[i];
+                  return ListTile(
+                    dense: true,
+                    title: Text(s['stuname']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: const TextStyle(fontSize: 11)),
+                    onTap: () => _selectSuggestion(s),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _classController,
+            decoration: _inputDec('Class'),
+            readOnly: true,
+          ),
           if (_errorMsg != null) ...[
             const SizedBox(height: 10),
             Container(
@@ -424,17 +513,19 @@ class _StudentFeeCollectionScreenState
                     color: AppColors.textPrimary,
                   )),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _termChip('All', _selectedTerm == null, () {
-                setState(() => _selectedTerm = null);
-              }),
-              ..._terms.map((t) => _termChip(t, _selectedTerm == t, () {
-                    setState(() => _selectedTerm = t);
-                  })),
+          DropdownButtonFormField<String?>(
+            value: _selectedTerm,
+            isExpanded: true,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13))),
+              ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
             ],
+            onChanged: (v) => setState(() => _selectedTerm = v),
           ),
         ],
       ),
@@ -460,7 +551,7 @@ class _StudentFeeCollectionScreenState
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: ['Cash', 'Bank', 'Online', 'Cheque'].map((mode) {
+            children: ['Cash', 'Online', 'Cheque', 'Sponsor'].map((mode) {
               final sel = _paymentMode == mode;
               return GestureDetector(
                 onTap: () => setState(() => _paymentMode = mode),
@@ -489,6 +580,82 @@ class _StudentFeeCollectionScreenState
               );
             }).toList(),
           ),
+          if (_paymentMode == 'Cheque') ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Cheque No *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _chequeNoController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter cheque number',
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          isDense: true,
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Cheque Date *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _chequeDateController,
+                        readOnly: true,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            _chequeDate = picked;
+                            _chequeDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                          }
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'DD/MM/YYYY',
+                          suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                          isDense: true,
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text('Bank Name *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _bankNameController,
+              decoration: InputDecoration(
+                hintText: 'Enter bank name',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                isDense: true,
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ],
           const SizedBox(height: 14),
           Text('Remarks',
               style: const TextStyle(
@@ -818,7 +985,19 @@ class _StudentFeeCollectionScreenState
     );
   }
 
+  bool _processing = false;
+
   void _onCollectAndReceipt() {
+    if (_paymentMode == 'Cheque') {
+      if (_chequeNoController.text.trim().isEmpty ||
+          _chequeDateController.text.trim().isEmpty ||
+          _bankNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please fill Cheque No, Cheque Date and Bank Name'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    }
     final totalNet = _totalNetSelected;
     showDialog(
       context: context,
@@ -827,23 +1006,25 @@ class _StudentFeeCollectionScreenState
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Confirm Collection',
             style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-                'Student: ${_student!['stuname']} (${_student!['stuadmno']})'),
-            const SizedBox(height: 6),
-            Text('Demands selected: ${_selected.length}'),
-            Text(
-                'Payment Mode: $_paymentMode'),
-            const SizedBox(height: 6),
+                'Student: ${_student!['stuname']} (${_student!['stuadmno']})',
+                style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('Demands selected: ${_selected.length}',
+                style: const TextStyle(fontSize: 16)),
+            Text('Payment Mode: $_paymentMode',
+                style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 8),
             Text(
               'Total: Rs.${totalNet.toStringAsFixed(2)}',
               style: const TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 15,
+                  fontSize: 18,
                   color: AppColors.accent),
             ),
           ],
@@ -851,19 +1032,514 @@ class _StudentFeeCollectionScreenState
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+              child: const Text('Cancel', style: TextStyle(fontSize: 15))),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _processPayment();
+            },
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8))),
-            child: const Text('Confirm'),
+            child: const Text('Confirm', style: TextStyle(fontSize: 15)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _processPayment() async {
+    if (_processing || _student == null) return;
+    if (_paymentMode == 'Online') {
+      await _processOnlinePayment();
+    } else {
+      await _processDirectPayment();
+    }
+  }
+
+  // ── Generate payment number helper ──
+  Future<String> _generatePayNumber() async {
+    try {
+      final rpcResult = await SupabaseService.client.rpc('generate_payment_number');
+      return rpcResult as String;
+    } catch (_) {
+      final sequence = await SupabaseService.client
+          .from('sequence')
+          .select('seq_id, sequid, seqwidth, seqcurno')
+          .limit(1)
+          .single();
+      final sequid = sequence['sequid'] as String;
+      final seqWidth = sequence['seqwidth'] as int;
+      final seqCurNo = (sequence['seqcurno'] as num).toInt();
+      final newSeqNo = seqCurNo + 1;
+      final prefix = sequid.replaceAll(RegExp(r'\d+$'), '');
+      final payNumber = '$prefix${newSeqNo.toString().padLeft(seqWidth, '0')}';
+      await SupabaseService.client.from('sequence').update({
+        'seqcurno': newSeqNo,
+      }).eq('seq_id', sequence['seq_id'] as int);
+      return payNumber;
+    }
+  }
+
+  // ── Create paymentdetails + update feedemand ──
+  Future<void> _createPaymentDetailsAndUpdateFees(int payId, int? insId) async {
+    final payDetailRows = <Map<String, dynamic>>[];
+    final feedemandUpdates = <Future>[];
+
+    for (final key in _selected) {
+      final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+      if (d.isEmpty) continue;
+
+      final demId = d['dem_id'] as int;
+      final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+      final fine = _fine(key);
+      final con = _con(key);
+      final net = bal + fine - con;
+
+      payDetailRows.add({
+        'pay_id': payId,
+        'dem_id': demId,
+        'yr_id': d['yr_id'],
+        'yrlabel': d['demfeeyear']?.toString() ?? '',
+        'ins_id': insId,
+        'transcurrency': 'INR',
+        'transtotalamount': net,
+      });
+
+      final currentPaid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final newPaid = currentPaid + net;
+      final newBalance = bal - net + fine;
+
+      feedemandUpdates.add(
+        SupabaseService.client.from('feedemand').update({
+          'paidamount': newPaid,
+          'balancedue': newBalance <= 0 ? 0 : newBalance,
+          'paidstatus': newBalance <= 0 ? 'P' : 'U',
+          'pay_id': payId,
+        }).eq('dem_id', demId),
+      );
+    }
+
+    await Future.wait([
+      SupabaseService.client.from('paymentdetails').insert(payDetailRows),
+      ...feedemandUpdates,
+    ]);
+  }
+
+  // ── Show success dialog ──
+  void _showSuccessDialog(String payNumber, double totalNet) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
+            const SizedBox(height: 12),
+            const Text('Payment Successful', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Receipt No: $payNumber', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            Text('Mode: $_paymentMode', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _clear();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Direct payment (Cash / Bank / Cheque) ──
+  Future<void> _processDirectPayment() async {
+    setState(() => _processing = true);
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final inscode = auth.currentUser?.inscode ?? '';
+    final createdBy = auth.currentUser?.usename ?? '';
+    final stuId = _student!['stu_id'] as int;
+    final totalNet = _totalNetSelected;
+
+    int? payId;
+
+    try {
+      final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
+      final yrId = firstDemand['yr_id'] as int?;
+      final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
+
+      final payData = <String, dynamic>{
+        'ins_id': insId,
+        'inscode': inscode,
+        'stu_id': stuId,
+        'yr_id': yrId,
+        'yrlabel': yrlabel,
+        'transtotalamount': totalNet,
+        'transcurrency': 'INR',
+        'paydate': DateTime.now().toIso8601String(),
+        'paystatus': 'I',
+        'paymethod': _paymentMode.toLowerCase(),
+        'payreference': '$_paymentMode collection by $createdBy',
+        'createdby': createdBy,
+      };
+
+      if (_paymentMode == 'Cheque') {
+        payData['paychequeno'] = _chequeNoController.text.trim();
+        payData['paychequedate'] = _chequeDate != null
+            ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
+            : null;
+        payData['paybankname'] = _bankNameController.text.trim();
+      }
+
+      final payResponse = await SupabaseService.client.from('payment').insert(payData).select('pay_id').single();
+
+      payId = payResponse['pay_id'] as int;
+
+      await _createPaymentDetailsAndUpdateFees(payId, insId);
+
+      final payNumber = await _generatePayNumber();
+      await SupabaseService.client.from('payment').update({
+        'paystatus': 'C',
+        'paynumber': payNumber,
+        'paydate': DateTime.now().toIso8601String(),
+      }).eq('pay_id', payId);
+
+      _showSuccessDialog(payNumber, totalNet);
+    } catch (e) {
+      if (payId != null) {
+        try {
+          final payNumber = await _generatePayNumber();
+          await SupabaseService.client.from('payment').update({
+            'paystatus': 'F',
+            'paynumber': payNumber,
+            'paydate': DateTime.now().toIso8601String(),
+          }).eq('pay_id', payId);
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
+
+  // ── Online payment (Razorpay) ──
+  Timer? _pollTimer;
+
+  Future<void> _processOnlinePayment() async {
+    setState(() => _processing = true);
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final inscode = auth.currentUser?.inscode ?? '';
+    final createdBy = auth.currentUser?.usename ?? '';
+    final stuId = _student!['stu_id'] as int;
+    final totalNet = _totalNetSelected;
+    final amountInPaise = (totalNet * 100).round();
+
+    int? payId;
+
+    try {
+      final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
+      final yrId = firstDemand['yr_id'] as int?;
+      final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
+
+      // 1. Create payment record with status 'I'
+      final payResponse = await SupabaseService.client.from('payment').insert({
+        'ins_id': insId,
+        'inscode': inscode,
+        'stu_id': stuId,
+        'yr_id': yrId,
+        'yrlabel': yrlabel,
+        'transtotalamount': totalNet,
+        'transcurrency': 'INR',
+        'paydate': DateTime.now().toIso8601String(),
+        'paystatus': 'I',
+        'paymethod': 'razorpay',
+        'createdby': createdBy,
+      }).select('pay_id').single();
+
+      payId = payResponse['pay_id'] as int;
+
+      // 2. Create Razorpay order via edge function
+      final orderResponse = await SupabaseService.client.functions.invoke(
+        'create-razorpay-order',
+        body: {
+          'amount': amountInPaise,
+          'currency': 'INR',
+          'pay_id': payId,
+          'receipt': 'PAY-$payId',
+        },
+      );
+
+      final orderData = orderResponse.data as Map<String, dynamic>;
+      final orderId = orderData['order_id'] as String;
+
+      // 3. Build checkout HTML and open in browser
+      final studentName = _student!['stuname']?.toString() ?? '';
+      final studentMobile = _student!['stumobile']?.toString() ?? '';
+      final studentEmail = _student!['stuemail']?.toString() ?? '';
+
+      final html = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TBS School - Fee Payment</title>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+    .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .success { color: #4CAF50; font-size: 24px; }
+    .failed { color: #F44336; font-size: 24px; }
+    .info { color: #666; margin-top: 10px; }
+  </style>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <div class="container" id="status">
+    <p>Opening Razorpay Checkout...</p>
+  </div>
+  <script>
+    var options = {
+      key: 'rzp_test_RQsgJgVFwM7kov',
+      amount: $amountInPaise,
+      currency: 'INR',
+      name: 'TBS School',
+      description: 'School Fees Payment',
+      order_id: '$orderId',
+      prefill: {
+        name: '${studentName.replaceAll("'", "\\'")}',
+        contact: '$studentMobile',
+        email: '$studentEmail'
+      },
+      theme: { color: '#00B4AB' },
+      notes: { pay_id: '$payId', student_id: '$stuId' },
+      handler: function(response) {
+        document.getElementById('status').innerHTML =
+          '<p class="success">Payment Successful!</p>' +
+          '<p class="info">Payment ID: ' + response.razorpay_payment_id + '</p>' +
+          '<p class="info">You can close this window now.</p>';
+      }
+    };
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function(response) {
+      document.getElementById('status').innerHTML =
+        '<p class="failed">Payment Failed</p>' +
+        '<p class="info">' + response.error.description + '</p>' +
+        '<p class="info">You can close this window now.</p>';
+    });
+    rzp.open();
+  </script>
+</body>
+</html>
+''';
+
+      // Write temp HTML file for WebView
+      final tempDir = Directory.systemTemp;
+      final tempFile = File('${tempDir.path}/tbs_razorpay_checkout.html');
+      await tempFile.writeAsString(html);
+
+      // 4. Show WebView dialog with Razorpay checkout + polling
+      if (mounted) {
+        await _showRazorpayWebViewDialog(payId, insId, totalNet, tempFile.path);
+      }
+    } catch (e) {
+      if (payId != null) {
+        try {
+          final payNumber = await _generatePayNumber();
+          await SupabaseService.client.from('payment').update({
+            'paystatus': 'F',
+            'paynumber': payNumber,
+            'paydate': DateTime.now().toIso8601String(),
+          }).eq('pay_id', payId);
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Online payment failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      _pollTimer?.cancel();
+      if (mounted) setState(() => _processing = false);
+    }
+  }
+
+  Future<void> _showRazorpayWebViewDialog(int payId, int? insId, double totalNet, String htmlPath) async {
+    final completer = Completer<String?>(); // 'C', 'F', or null (cancelled)
+    final webviewController = WebviewController();
+
+    try {
+      await webviewController.initialize();
+      await webviewController.setBackgroundColor(Colors.white);
+      await webviewController.loadUrl('file:///$htmlPath');
+    } catch (e) {
+      if (!completer.isCompleted) completer.complete(null);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open payment window: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    // Start polling for payment status
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      try {
+        final payRecord = await SupabaseService.client
+            .from('payment')
+            .select('payorderid')
+            .eq('pay_id', payId)
+            .single();
+
+        final orderId = payRecord['payorderid']?.toString();
+        if (orderId == null || orderId.isEmpty) return;
+
+        final rpResponse = await SupabaseService.client.functions.invoke(
+          'get-razorpay-payment',
+          body: {'order_id': orderId},
+        );
+
+        final rpData = rpResponse.data as Map<String, dynamic>;
+        final rpPaymentId = rpData['payment_id']?.toString();
+        final rpStatus = rpData['status']?.toString();
+
+        if (rpPaymentId != null && rpPaymentId.isNotEmpty) {
+          if (rpStatus == 'captured' || rpStatus == 'authorized') {
+            timer.cancel();
+            await SupabaseService.client.from('payment').update({
+              'payreference': rpPaymentId,
+            }).eq('pay_id', payId);
+            if (!completer.isCompleted) completer.complete('C');
+          } else if (rpStatus == 'failed') {
+            timer.cancel();
+            await SupabaseService.client.from('payment').update({
+              'payreference': rpPaymentId,
+            }).eq('pay_id', payId);
+            if (!completer.isCompleted) completer.complete('F');
+          }
+        }
+      } catch (_) {}
+    });
+
+    // Show WebView dialog
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: SizedBox(
+            width: 500,
+            height: 620,
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: const BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.payment, color: Colors.white, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Razorpay Payment  -  Rs.${totalNet.toStringAsFixed(2)}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () {
+                          _pollTimer?.cancel();
+                          webviewController.dispose();
+                          Navigator.pop(ctx);
+                          if (!completer.isCompleted) completer.complete(null);
+                        },
+                        child: const Icon(Icons.close, color: Colors.white, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+                // WebView
+                Expanded(
+                  child: Webview(webviewController),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final result = await completer.future;
+
+    // Close dialog if still open
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    webviewController.dispose();
+
+    if (result == 'C') {
+      await _createPaymentDetailsAndUpdateFees(payId, insId);
+      final payNumber = await _generatePayNumber();
+      await SupabaseService.client.from('payment').update({
+        'paystatus': 'C',
+        'paynumber': payNumber,
+        'paydate': DateTime.now().toIso8601String(),
+      }).eq('pay_id', payId);
+      _showSuccessDialog(payNumber, totalNet);
+    } else if (result == 'F') {
+      final payNumber = await _generatePayNumber();
+      await SupabaseService.client.from('payment').update({
+        'paystatus': 'F',
+        'paynumber': payNumber,
+        'paydate': DateTime.now().toIso8601String(),
+      }).eq('pay_id', payId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Online payment failed'), backgroundColor: Colors.red),
+        );
+      }
+    } else {
+      try {
+        final payNumber = await _generatePayNumber();
+        await SupabaseService.client.from('payment').update({
+          'paystatus': 'F',
+          'paynumber': payNumber,
+          'paydate': DateTime.now().toIso8601String(),
+        }).eq('pay_id', payId);
+      } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment cancelled'), backgroundColor: Colors.orange),
+        );
+      }
+    }
   }
 
   // ── Helpers ──

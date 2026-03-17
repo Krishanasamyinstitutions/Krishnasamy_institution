@@ -76,6 +76,63 @@ class _StudentsScreenState extends State<StudentsScreen> {
   int _studentPage = 0;
   static const int _studentsPerPage = 20;
 
+  // Import state
+  bool _showImport = false;
+  String? _importFileName;
+  List<String> _importHeaders = [];
+  List<List<dynamic>> _importRows = [];
+  List<String?> _importMappings = [];
+  int _importStep = 0; // 0=grid, 2=importing, 3=done
+  int _importedCount = 0;
+  int _skippedCount = 0;
+  int _totalCount = 0;
+  List<String> _importErrors = [];
+  String? _importErrorMsg;
+
+  static const _importGridKeys = [
+    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass',
+    'stumobile', 'stuemail', 'concession',
+    'stuaddress', 'stucity', 'stustate', 'stucountry',
+    'stupin', 'stubloodgrp',
+    'fathername', 'fathermobile', 'fatheroccupation',
+    'mothername', 'mothermobile', 'motheroccupation',
+    'guardianname', 'guardianmobile', 'guardianoccupation',
+    'payincharge', 'payinchargemob',
+  ];
+
+  static const Map<String, String> _importGridLabels = {
+    'stuadmno': 'Adm No *',
+    'stuname': 'Name *',
+    'stugender': 'Gender *',
+    'studob': 'DOB *',
+    'stuadmdate': 'Adm Date',
+    'stuclass': 'Class *',
+    'stumobile': 'Mobile *',
+    'stuemail': 'Email',
+    'concession': 'Concession',
+    'stuaddress': 'Address',
+    'stucity': 'City',
+    'stustate': 'State',
+    'stucountry': 'Country',
+    'stupin': 'Pin Code',
+    'stubloodgrp': 'Blood Group',
+    'fathername': 'Father Name',
+    'fathermobile': 'Father Mobile',
+    'fatheroccupation': 'Father Occ.',
+    'mothername': 'Mother Name',
+    'mothermobile': 'Mother Mobile',
+    'motheroccupation': 'Mother Occ.',
+    'guardianname': 'Guardian Name',
+    'guardianmobile': 'Guardian Mobile',
+    'guardianoccupation': 'Guardian Occ.',
+    'payincharge': 'Pay In Charge',
+    'payinchargemob': 'Pay Mobile',
+  };
+
+  final ScrollController _importScrollController = ScrollController();
+
+  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass'};
+
   static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary);
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -116,6 +173,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   @override
   void dispose() {
+    _importScrollController.dispose();
     _admNoController.dispose();
     _nameController.dispose();
     _mobileController.dispose();
@@ -275,6 +333,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _selectedGender = s.gender;
       _selectedBloodGroup = _normalizeBloodGroup(s.stubloodgrp);
       _selectedClass = s.stuclass;
+      _selectedConId = s.conId?.toString();
       _admDate = s.stuadmdate;
       _dob = s.studob;
       _photoUrl = s.stuphoto;
@@ -363,6 +422,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'stupin': _pinController.text.trim().isNotEmpty ? _pinController.text.trim() : null,
         'stubloodgrp': _selectedBloodGroup,
         'stuclass': _selectedClass,
+        'con_id': _selectedConId != null ? int.tryParse(_selectedConId!) : null,
+        'stucondesc': _selectedConId != null ? _concessions.firstWhere((c) => c['con_id'].toString() == _selectedConId, orElse: () => {})['condesc'] : null,
         'stuphoto': _photoUrl,
         'stuser_id': _admNoController.text.trim(),
         'stuotpstatus': 0,
@@ -983,14 +1044,52 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // LEFT — Student List
-          SizedBox(
-            width: 280,
+    return Column(
+      children: [
+        // Header
+        Row(
+          children: [
+            Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22),
+            const SizedBox(width: 10),
+            Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            OutlinedButton.icon(
+              onPressed: () => setState(() {
+                _showImport = !_showImport;
+                if (!_showImport) _resetImport();
+              }),
+              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
+              label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: _loadDropdowns,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Refresh'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        Expanded(
+          child: _showImport ? _buildStudentImportSection() : Form(
+            key: _formKey,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // LEFT — Student List
+                SizedBox(
+                  width: 280,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -1019,18 +1118,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                               ),
                               child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
                             ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: IconButton(
-                                onPressed: _showExcelUploadDialog,
-                                icon: const Icon(Icons.file_download_rounded, size: 16),
-                                color: AppColors.info,
-                                padding: EdgeInsets.zero,
-                                tooltip: 'Import from Excel',
-                              ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 0),
@@ -1049,10 +1136,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
           const SizedBox(width: 16),
 
-          // RIGHT — Student Details or Add New Student form
+          // RIGHT — Student Details or Class Table
           Expanded(
-            child: _selectedStudent == null && _selectedClassFilter != null
-                ? _buildClassStudentTable(_selectedClassFilter!)
+            child: _selectedStudent == null
+                ? (_selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : const SizedBox())
                 : Column(
                     children: [
                       // Back breadcrumb
@@ -1068,7 +1155,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           child: Row(
                             children: [
                               InkWell(
-                                onTap: () => setState(() => _selectedStudent = null),
+                                onTap: () => setState(() { _selectedStudent = null; _selectedClassFilter = null; }),
                                 borderRadius: BorderRadius.circular(6),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1102,6 +1189,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             // Student Information panel
                             Expanded(
                               child: Container(
+                                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
@@ -1110,11 +1198,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1125,21 +1211,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   Text('Student Information',
                                                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                                                 ]),
-                                                const SizedBox(height: 4),
+                                                const SizedBox(height: 6),
                                                 Row(children: [
                                                   if (_insLogo != null)
                                                     Image.network(
                                                       _insLogo!,
-                                                      width: 32, height: 32, fit: BoxFit.contain,
-                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                      width: 48, height: 48, fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
                                                     )
                                                   else
-                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
                                                   const SizedBox(width: 8),
                                                   Flexible(
                                                     child: Text(
                                                       _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
-                                                      style: const TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
+                                                      style: const TextStyle(fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
@@ -1169,11 +1255,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(color: AppColors.border)),
+                                    const Divider(color: AppColors.border),
                                     Expanded(
                                       child: SingleChildScrollView(
-                                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                                        padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
                                         child: IgnorePointer(
                                           ignoring: !_isFormEnabled,
                                           child: Opacity(opacity: _isFormEnabled ? 1.0 : 0.65, child: _buildStudentFields()),
@@ -1261,8 +1346,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     ],
                   ),
           ),
-        ],
-      ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1601,8 +1689,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'guardian name': 'guardianname', 'guardianname': 'guardianname',
       'guardian mobile': 'guardianmobile', 'guardianmobile': 'guardianmobile', 'guardian phone': 'guardianmobile',
       'guardian occupation': 'guardianoccupation', 'guardianoccupation': 'guardianoccupation',
-      'payment in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
-      'payment mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob', 'pay mobile': 'payinchargemob',
+      'concession': 'concession', 'concession category': 'concession',
+      'payment in charge': 'payincharge', 'pay in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
+      'payment mobile': 'payinchargemob', 'pay mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob',
     };
     return map[h] ?? '';
   }
@@ -1638,20 +1727,643 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return 'O';
   }
 
-  void _showExcelUploadDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _ExcelImportDialog(
-        years: _years,
-        selectedYrId: _selectedYrId,
-        selectedYrLabel: _selectedYrLabel,
-        onImportDone: () {
-          // Refresh student list after import
-          _loadDropdowns();
-        },
+  // ─── Import Logic ───────────────────────────────────────────────────────
+
+  void _resetImport() {
+    setState(() {
+      _showImport = false;
+      _importStep = 0;
+      _importFileName = null;
+      _importHeaders = [];
+      _importRows = [];
+      _importMappings = [];
+      _importedCount = 0;
+      _skippedCount = 0;
+      _totalCount = 0;
+      _importErrors = [];
+      _importErrorMsg = null;
+    });
+  }
+
+  Future<void> _pickImportFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv', 'xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    final ext = (file.extension ?? '').toLowerCase();
+    try {
+      List<String> headers;
+      List<List<dynamic>> rows;
+
+      if (ext == 'csv') {
+        final csvString = utf8.decode(file.bytes!);
+        final parsed = const CsvToListConverter().convert(csvString);
+        if (parsed.isEmpty) throw Exception('CSV file is empty');
+        headers = parsed.first.map((e) => e.toString().trim()).toList();
+        rows = parsed.skip(1).where((r) => r.any((c) => c.toString().trim().isNotEmpty)).toList();
+      } else {
+        final excel = xl.Excel.decodeBytes(file.bytes!);
+        final sheetName = excel.tables.keys.first;
+        final sheet = excel.tables[sheetName]!;
+        if (sheet.rows.isEmpty) throw Exception('Excel file is empty');
+        headers = sheet.rows.first.map((c) => c?.value?.toString().trim() ?? '').toList();
+        rows = sheet.rows.skip(1)
+            .where((r) => r.any((c) => c?.value != null && c!.value.toString().trim().isNotEmpty))
+            .map((r) => r.map((c) => c?.value ?? '').toList())
+            .toList();
+      }
+
+      final mappings = headers.map((h) {
+        final m = _autoMapHeader(h);
+        return m.isEmpty ? null : m;
+      }).toList();
+
+      setState(() {
+        _importFileName = file.name;
+        _importHeaders = headers;
+        _importRows = rows;
+        _importMappings = mappings;
+        _importStep = 1;
+        _importErrorMsg = null;
+      });
+    } catch (e) {
+      setState(() => _importErrorMsg = 'Failed to parse file: $e');
+    }
+  }
+
+  Future<void> _exportStudentTemplate() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Students'];
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Adm No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Mobile', 'Email', 'Concession',
+      'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
+      'Father Name', 'Father Mobile', 'Father Occupation',
+      'Mother Name', 'Mother Mobile', 'Mother Occupation',
+      'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
+      'Payment In Charge', 'Payment Mobile',
+    ];
+
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, 18.0);
+    }
+    sheet.setRowHeight(0, 32);
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Template',
+        fileName: 'student_import_template.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Template exported successfully'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  String _importMappedCell(List<dynamic> row, String fieldKey) {
+    final idx = _importMappings.indexOf(fieldKey);
+    if (idx < 0 || idx >= row.length) return '';
+    return row[idx].toString().trim();
+  }
+
+  String? _importCellByKey(List<dynamic> row, String fieldKey) {
+    final idx = _importMappings.indexOf(fieldKey);
+    if (idx < 0 || idx >= row.length) return null;
+    final v = row[idx].toString().trim();
+    return v.isEmpty ? null : v;
+  }
+
+  /// Returns null if the value is null, empty, or whitespace-only
+  static String? _nullIfEmpty(String? v) {
+    if (v == null) return null;
+    final trimmed = v.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Validates email format; returns null if invalid
+  static String? _validEmail(String? v) {
+    final e = _nullIfEmpty(v);
+    if (e == null) return null;
+    // Basic email check — must contain @ and .
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return regex.hasMatch(e) ? e : null;
+  }
+
+  String? _validateImportRow(int rowIdx) {
+    final row = _importRows[rowIdx];
+    final missing = <String>[];
+    for (final reqKey in _importRequiredFields) {
+      final colIdx = _importMappings.indexOf(reqKey);
+      if (colIdx < 0 || colIdx >= row.length || row[colIdx].toString().trim().isEmpty) {
+        missing.add(_importGridLabels[reqKey] ?? _importFields[reqKey] ?? reqKey);
+      }
+    }
+    if (missing.isEmpty) return null;
+    return 'Missing: ${missing.join(', ')}';
+  }
+
+  void _validateImportData() {
+    final errors = <String>[];
+    for (int i = 0; i < _importRows.length; i++) {
+      final err = _validateImportRow(i);
+      if (err != null) errors.add('Row ${i + 2}: $err');
+    }
+    if (errors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 400,
+            height: 250,
+            child: ListView(
+              children: errors.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(e, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+              )).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _startStudentImport() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId ?? 1;
+    final inscode = auth.inscode ?? '';
+    final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
+    final yrLabel = _selectedYrLabel ?? '';
+
+    setState(() {
+      _importStep = 2;
+      _importedCount = 0;
+      _skippedCount = 0;
+      _totalCount = _importRows.length;
+      _importErrors = [];
+    });
+
+    // 1. Validate and build staging rows
+    final stagingRows = <Map<String, dynamic>>[];
+    for (int i = 0; i < _importRows.length; i++) {
+      final err = _validateImportRow(i);
+      if (err != null) {
+        _skippedCount++;
+        _importErrors.add('Row ${i + 2}: $err');
+        continue;
+      }
+      final row = _importRows[i];
+      final dob = _parseDate(_importCellByKey(row, 'studob'));
+      final admDate = _parseDate(_importCellByKey(row, 'stuadmdate'));
+      stagingRows.add({
+        'ins_id': insId,
+        'inscode': inscode,
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'stuadmno': _importCellByKey(row, 'stuadmno'),
+        'stuname': _importCellByKey(row, 'stuname'),
+        'stugender': _normalizeGender(_importCellByKey(row, 'stugender')),
+        'studob': dob?.toIso8601String().split('T').first,
+        'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'stuclass': _importCellByKey(row, 'stuclass'),
+        'stumobile': _importCellByKey(row, 'stumobile'),
+        'stuemail': _validEmail(_importCellByKey(row, 'stuemail')),
+        'concession': _nullIfEmpty(_importCellByKey(row, 'concession')),
+        'stuaddress': _nullIfEmpty(_importCellByKey(row, 'stuaddress')),
+        'stucity': _nullIfEmpty(_importCellByKey(row, 'stucity')),
+        'stustate': _nullIfEmpty(_importCellByKey(row, 'stustate')),
+        'stucountry': _nullIfEmpty(_importCellByKey(row, 'stucountry')),
+        'stupin': _nullIfEmpty(_importCellByKey(row, 'stupin')),
+        'stubloodgrp': _nullIfEmpty(_importCellByKey(row, 'stubloodgrp')),
+        'fathername': _nullIfEmpty(_importCellByKey(row, 'fathername')),
+        'fathermobile': _nullIfEmpty(_importCellByKey(row, 'fathermobile')),
+        'fatheroccupation': _nullIfEmpty(_importCellByKey(row, 'fatheroccupation')),
+        'mothername': _nullIfEmpty(_importCellByKey(row, 'mothername')),
+        'mothermobile': _nullIfEmpty(_importCellByKey(row, 'mothermobile')),
+        'motheroccupation': _nullIfEmpty(_importCellByKey(row, 'motheroccupation')),
+        'guardianname': _nullIfEmpty(_importCellByKey(row, 'guardianname')),
+        'guardianmobile': _nullIfEmpty(_importCellByKey(row, 'guardianmobile')),
+        'guardianoccupation': _nullIfEmpty(_importCellByKey(row, 'guardianoccupation')),
+        'payincharge': _nullIfEmpty(_importCellByKey(row, 'payincharge')) ?? '-',
+        'payinchargemob': _nullIfEmpty(_importCellByKey(row, 'payinchargemob')),
+        'status': 'PENDING',
+      });
+    }
+
+    if (stagingRows.isEmpty) {
+      setState(() => _importStep = 3);
+      return;
+    }
+
+    setState(() {});
+
+    try {
+      // 2. Bulk insert into staging table (batches of 200)
+      for (int i = 0; i < stagingRows.length; i += 200) {
+        final batch = stagingRows.sublist(i, (i + 200).clamp(0, stagingRows.length));
+        await SupabaseService.client.from('student_import').insert(batch);
+        setState(() {
+          _importedCount = i + batch.length;
+        });
+      }
+
+      // 3. Call DB function to move data to original tables
+      setState(() {
+        _importedCount = 0;
+      });
+      final result = await SupabaseService.client.rpc('process_student_import', params: {'p_ins_id': insId});
+
+      if (result is List && result.isNotEmpty) {
+        final r = result.first;
+        _importedCount = (r['imported'] as num?)?.toInt() ?? 0;
+        _skippedCount += (r['skipped'] as num?)?.toInt() ?? 0;
+      }
+
+      // 4. Fetch errors from staging table
+      final errors = await SupabaseService.client
+          .from('student_import')
+          .select('imp_id, stuadmno, error_msg, status')
+          .eq('ins_id', insId)
+          .inFilter('status', ['ERROR', 'NO_PARENT']);
+      for (final e in errors) {
+        final status = e['status'];
+        if (status == 'NO_PARENT') {
+          _importErrors.add('Adm ${e['stuadmno']}: No payinchargemob - parent not linked');
+        } else {
+          _importErrors.add('Adm ${e['stuadmno']}: ${e['error_msg']}');
+        }
+      }
+
+      // 5. Clean up processed staging rows
+      await SupabaseService.client
+          .from('student_import')
+          .delete()
+          .eq('ins_id', insId)
+          .inFilter('status', ['DONE', 'ERROR', 'NO_PARENT']);
+
+    } catch (e) {
+      _importErrors.add('Import failed: $e');
+    }
+
+    setState(() => _importStep = 3);
+    _loadDropdowns();
+  }
+
+  // ─── Import UI ──────────────────────────────────────────────────────────
+
+  Widget _buildStudentImportSection() {
+    if (_importStep == 2) return _buildImportProgressStep();
+    if (_importStep == 3) return _buildImportDoneStep();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title bar
+          Row(
+            children: [
+              Icon(Icons.upload_file_rounded, size: 20, color: AppColors.accent),
+              const SizedBox(width: 8),
+              const Text('Import Students', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (_importFileName != null)
+                Text(_importFileName!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _pickImportFile,
+                icon: const Icon(Icons.folder_open_rounded, size: 16),
+                label: const Text('Browse'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _exportStudentTemplate,
+                icon: const Icon(Icons.table_chart_rounded, size: 16),
+                label: const Text('Move to Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF217346),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          if (_importErrorMsg != null) ...[
+            const SizedBox(height: 8),
+            Text(_importErrorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+          ],
+          const SizedBox(height: 12),
+
+          // Data grid
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: Scrollbar(
+                controller: _importScrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _importScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 54 + _importGridKeys.fold<double>(0, (sum, k) => sum + _gridColWidth(k) + 1),
+                    child: Column(
+                      children: [
+                        // Header row
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1B2A4A),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(7),
+                              topRight: Radius.circular(7),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              _gridHeaderCell('S.No', width: 50, center: true),
+                              _gridHeaderDivider(),
+                              for (final key in _importGridKeys) ...[
+                                _gridHeaderCell(_importGridLabels[key] ?? key, width: _gridColWidth(key)),
+                                _gridHeaderDivider(),
+                              ],
+                            ],
+                          ),
+                        ),
+                        // Data rows
+                        Expanded(
+                          child: _importRows.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.grid_on_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                      const SizedBox(height: 8),
+                                      const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                      const SizedBox(height: 4),
+                                      const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _importRows.length,
+                                  itemBuilder: (context, index) {
+                                    final row = _importRows[index];
+                                    final isEven = index % 2 == 0;
+                                    return Container(
+                                      color: isEven ? Colors.white : AppColors.surface,
+                                      padding: const EdgeInsets.symmetric(vertical: 6),
+                                      child: Row(
+                                        children: [
+                                          _gridDataCell('${index + 1}', width: 50, center: true),
+                                          for (final key in _importGridKeys)
+                                            _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Bottom bar
+          Row(
+            children: [
+              Text(
+                '${_importRows.length} rows',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _importRows.isEmpty ? null : _validateImportData,
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Validate'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _importRows.isNotEmpty && _importMappings.contains('stuadmno') && _importMappings.contains('stuname') ? _startStudentImport : null,
+                icon: const Icon(Icons.save_rounded, size: 16),
+                label: const Text('Save'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                onPressed: _resetImport,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildImportProgressStep() {
+    final progress = _totalCount > 0 ? (_importedCount + _skippedCount) / _totalCount : 0.0;
+    return Center(
+      child: Container(
+        width: 400,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
+            const SizedBox(height: 8),
+            Text('$_importedCount imported, $_skippedCount skipped', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportDoneStep() {
+    return Center(
+      child: Container(
+        width: 500,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded, size: 64, color: AppColors.success),
+            const SizedBox(height: 16),
+            const Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text('$_importedCount imported successfully, $_skippedCount skipped', style: const TextStyle(fontSize: 13)),
+            if (_importErrors.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                height: 150,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView(
+                  children: _importErrors.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(e, style: const TextStyle(fontSize: 11, color: AppColors.error)),
+                  )).toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _resetImport,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _gridColWidth(String key) {
+    switch (key) {
+      case 'stuadmno': return 100;
+      case 'stuname': return 160;
+      case 'stugender': return 80;
+      case 'studob': return 100;
+      case 'stuadmdate': return 100;
+      case 'stuclass': return 70;
+      case 'stumobile': return 110;
+      case 'stuemail': return 160;
+      case 'concession': return 130;
+      case 'stuaddress': return 160;
+      case 'stucity': return 100;
+      case 'stustate': return 100;
+      case 'stucountry': return 100;
+      case 'stupin': return 80;
+      case 'stubloodgrp': return 90;
+      case 'fathername': case 'mothername': case 'guardianname': return 140;
+      case 'fathermobile': case 'mothermobile': case 'guardianmobile': return 120;
+      case 'fatheroccupation': case 'motheroccupation': case 'guardianoccupation': return 120;
+      case 'payincharge': return 130;
+      case 'payinchargemob': return 120;
+      default: return 110;
+    }
+  }
+
+  Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
+  }
+
+  Widget _gridHeaderDivider() {
+    return Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.15));
+  }
+
+  Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
 
   // ─── Student Termination ─────────────────────────────────────────────────────
@@ -1793,703 +2505,4 @@ class _StudentsScreenState extends State<StudentsScreen> {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Excel / CSV Import Dialog
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class _ExcelImportDialog extends StatefulWidget {
-  final List<Map<String, dynamic>> years;
-  final String? selectedYrId;
-  final String? selectedYrLabel;
-  final VoidCallback onImportDone;
-  const _ExcelImportDialog({
-    required this.years,
-    required this.selectedYrId,
-    required this.selectedYrLabel,
-    required this.onImportDone,
-  });
-
-  @override
-  State<_ExcelImportDialog> createState() => _ExcelImportDialogState();
-}
-
-class _ExcelImportDialogState extends State<_ExcelImportDialog> {
-  // 0 = pick file, 1 = preview & map, 2 = importing, 3 = done
-  int _step = 0;
-  String? _fileName;
-  List<String> _headers = [];
-  List<List<dynamic>> _rows = [];
-  // column index → field key ('' = skip)
-  List<String> _mappings = [];
-  // import progress
-  int _imported = 0;
-  int _skipped = 0;
-  int _total = 0;
-  String? _errorMsg;
-  List<String> _importErrors = [];
-
-  // Required field keys
-  static const _requiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass'};
-
-  // ─── File Picking & Parsing ───────────────────────────────────────────────
-
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['csv', 'xlsx', 'xls'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    if (file.bytes == null) return;
-
-    final ext = (file.extension ?? '').toLowerCase();
-    try {
-      List<String> headers;
-      List<List<dynamic>> rows;
-
-      if (ext == 'csv') {
-        final csvString = utf8.decode(file.bytes!);
-        final parsed = const CsvToListConverter().convert(csvString);
-        if (parsed.isEmpty) throw Exception('CSV file is empty');
-        headers = parsed.first.map((e) => e.toString().trim()).toList();
-        rows = parsed.skip(1).where((r) => r.any((c) => c.toString().trim().isNotEmpty)).toList();
-      } else {
-        final excel = xl.Excel.decodeBytes(file.bytes!);
-        final sheetName = excel.tables.keys.first;
-        final sheet = excel.tables[sheetName]!;
-        if (sheet.rows.isEmpty) throw Exception('Excel file is empty');
-        headers = sheet.rows.first.map((c) => c?.value?.toString().trim() ?? '').toList();
-        rows = sheet.rows.skip(1)
-            .where((r) => r.any((c) => c?.value != null && c!.value.toString().trim().isNotEmpty))
-            .map((r) => r.map((c) => c?.value ?? '').toList())
-            .toList();
-      }
-
-      // Auto-map columns
-      final mappings = headers.map((h) => _StudentsScreenState._autoMapHeader(h)).toList();
-
-      setState(() {
-        _fileName = file.name;
-        _headers = headers;
-        _rows = rows;
-        _mappings = mappings;
-        _step = 1;
-        _errorMsg = null;
-      });
-    } catch (e) {
-      setState(() => _errorMsg = 'Failed to parse file: $e');
-    }
-  }
-
-  // ─── Validation ───────────────────────────────────────────────────────────
-
-  /// Check if a row has all required fields mapped and non-empty
-  String? _validateRow(int rowIdx) {
-    final row = _rows[rowIdx];
-    final missing = <String>[];
-    for (final reqKey in _requiredFields) {
-      final colIdx = _mappings.indexOf(reqKey);
-      if (colIdx < 0 || colIdx >= row.length || row[colIdx].toString().trim().isEmpty) {
-        missing.add(_StudentsScreenState._importFields[reqKey] ?? reqKey);
-      }
-    }
-    if (missing.isEmpty) return null;
-    return 'Missing: ${missing.join(', ')}';
-  }
-
-  /// Get cell value by field key for a row
-  String? _cellByKey(List<dynamic> row, String fieldKey) {
-    final idx = _mappings.indexOf(fieldKey);
-    if (idx < 0 || idx >= row.length) return null;
-    final v = row[idx].toString().trim();
-    return v.isEmpty ? null : v;
-  }
-
-  // ─── Bulk Import ──────────────────────────────────────────────────────────
-
-  Future<void> _startImport() async {
-    final auth = context.read<AuthProvider>();
-    final insId = auth.insId ?? 1;
-    final inscode = auth.inscode ?? '';
-    final yrId = int.tryParse(widget.selectedYrId ?? '1') ?? 1;
-    final yrLabel = widget.selectedYrLabel ?? '';
-    final now = DateTime.now().toIso8601String();
-
-    setState(() {
-      _step = 2;
-      _imported = 0;
-      _skipped = 0;
-      _total = _rows.length;
-      _importErrors = [];
-    });
-
-    for (int i = 0; i < _rows.length; i++) {
-      final row = _rows[i];
-      final err = _validateRow(i);
-      if (err != null) {
-        setState(() {
-          _skipped++;
-          _importErrors.add('Row ${i + 1}: $err');
-        });
-        continue;
-      }
-
-      try {
-        final admNo = _cellByKey(row, 'stuadmno')!;
-        final stuName = _cellByKey(row, 'stuname')!;
-        final stuClass = _cellByKey(row, 'stuclass')!;
-        final dob = _StudentsScreenState._parseDate(_cellByKey(row, 'studob'));
-        final admDate = _StudentsScreenState._parseDate(_cellByKey(row, 'stuadmdate'));
-
-        // 1. Insert student
-        final stuId = await SupabaseService.addStudent({
-          'ins_id': insId,
-          'inscode': inscode,
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'stuadmno': admNo,
-          'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
-          'stuname': stuName,
-          'stugender': _StudentsScreenState._normalizeGender(_cellByKey(row, 'stugender')),
-          'studob': dob?.toIso8601String().split('T').first,
-          'stumobile': _cellByKey(row, 'stumobile')!,
-          'stuemail': _cellByKey(row, 'stuemail'),
-          'stuaddress': _cellByKey(row, 'stuaddress'),
-          'stucity': _cellByKey(row, 'stucity'),
-          'stustate': _cellByKey(row, 'stustate'),
-          'stucountry': _cellByKey(row, 'stucountry'),
-          'stupin': _cellByKey(row, 'stupin'),
-          'stubloodgrp': _cellByKey(row, 'stubloodgrp'),
-          'stuclass': stuClass,
-          'stuser_id': admNo,
-          'stuotpstatus': 0,
-          'approvedby': '',
-          'approveddate': now,
-          'suspendedby': '',
-          'terminatedby': '',
-          'activestatus': 1,
-          'createdon': now,
-        });
-
-        // 2. Insert or reuse parent record
-        final fatherMob = _cellByKey(row, 'fathermobile');
-        final motherMob = _cellByKey(row, 'mothermobile');
-        final payMob = _cellByKey(row, 'payinchargemob');
-
-        final existingParId = await SupabaseService.findParentByMobile(
-          fatherMobile: fatherMob,
-          motherMobile: motherMob,
-          payMobile: payMob,
-        );
-
-        final parId = existingParId ?? await SupabaseService.saveParent({
-          'ins_id': insId,
-          'inscode': inscode,
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'partype': 'P',
-          'fathername': _cellByKey(row, 'fathername'),
-          'fathermobile': fatherMob,
-          'fatheroccupation': _cellByKey(row, 'fatheroccupation'),
-          'mothername': _cellByKey(row, 'mothername'),
-          'mothermobile': motherMob,
-          'motheroccupation': _cellByKey(row, 'motheroccupation'),
-          'guardianname': _cellByKey(row, 'guardianname'),
-          'guardianmobile': _cellByKey(row, 'guardianmobile'),
-          'guardianoccupation': _cellByKey(row, 'guardianoccupation'),
-          'payincharge': _cellByKey(row, 'payincharge'),
-          'payinchargemob': payMob,
-          'parotpstatus': 0,
-          'approveddate': now,
-          'activestatus': 1,
-        });
-
-        // 3. Link parent to student
-        await SupabaseService.saveParentDetail({
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'par_id': parId,
-          'stu_id': stuId,
-          'ins_id': insId,
-          'inscode': inscode,
-          'stuadmno': admNo,
-          'stuname': stuName,
-          'stuclass': stuClass,
-          'activestatus': 1,
-        });
-
-        setState(() => _imported++);
-      } on PostgrestException catch (e) {
-        final msg = e.code == '23505'
-            ? 'Duplicate Adm No'
-            : 'DB: ${e.message}';
-        setState(() {
-          _skipped++;
-          _importErrors.add('Row ${i + 1}: $msg');
-        });
-      } catch (e) {
-        setState(() {
-          _skipped++;
-          _importErrors.add('Row ${i + 1}: $e');
-        });
-      }
-    }
-
-    setState(() => _step = 3);
-    widget.onImportDone();
-  }
-
-  // ─── Build ────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      insetPadding: const EdgeInsets.all(40),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 900,
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildHeader(),
-            const Divider(height: 1),
-            Flexible(child: _buildBody()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    final titles = ['Select File', 'Preview & Map Columns', 'Importing...', 'Import Complete'];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-      child: Row(
-        children: [
-          const Icon(Icons.table_chart_rounded, color: AppColors.info, size: 24),
-          const SizedBox(width: 10),
-          Text(titles[_step], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          const Spacer(),
-          if (_step != 2)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(context),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    switch (_step) {
-      case 0: return _buildFilePickStep();
-      case 1: return _buildPreviewStep();
-      case 2: return _buildImportingStep();
-      case 3: return _buildDoneStep();
-      default: return const SizedBox();
-    }
-  }
-
-  // ─── Step 0: File Pick ────────────────────────────────────────────────────
-
-  Widget _buildFilePickStep() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.info.withValues(alpha: 0.3), width: 2),
-              borderRadius: BorderRadius.circular(12),
-              color: AppColors.info.withValues(alpha: 0.03),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.upload_file_rounded, size: 48, color: AppColors.info.withValues(alpha: 0.7)),
-                const SizedBox(height: 12),
-                const Text('Select a CSV or Excel file', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                const Text('Supported formats: .csv, .xlsx', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _pickFile,
-                  icon: const Icon(Icons.folder_open_rounded, size: 18),
-                  label: const Text('Choose File'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.info,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_errorMsg != null) ...[
-            const SizedBox(height: 12),
-            Text(_errorMsg!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Required columns:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                SizedBox(height: 4),
-                Text('Adm No, Name, Gender, DOB, Mobile, Class',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                SizedBox(height: 8),
-                Text('Optional columns:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                SizedBox(height: 4),
-                Text('Email, Address, City, State, Country, PIN, Blood Group, Admission Date',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Step 1: Preview & Map ────────────────────────────────────────────────
-
-  Widget _buildPreviewStep() {
-    // Count valid rows
-    int validCount = 0;
-    for (int i = 0; i < _rows.length; i++) {
-      if (_validateRow(i) == null) validCount++;
-    }
-    final allRequiredMapped = _requiredFields.every((f) => _mappings.contains(f));
-
-    return Column(
-      children: [
-        // File info bar
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          color: AppColors.info.withValues(alpha: 0.05),
-          child: Row(
-            children: [
-              const Icon(Icons.description_rounded, size: 16, color: AppColors.info),
-              const SizedBox(width: 8),
-              Text(_fileName ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              const SizedBox(width: 16),
-              Text('${_rows.length} rows found', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: validCount == _rows.length ? AppColors.accent.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$validCount valid',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                      color: validCount == _rows.length ? AppColors.accent : Colors.orange[800]),
-                ),
-              ),
-              if (_rows.length - validCount > 0) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${_rows.length - validCount} invalid',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.red[700]),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        // Column mapping row
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Column Mapping', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              const Text('Map each file column to a student field. Required fields are marked with *.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              const SizedBox(height: 8),
-              if (!allRequiredMapped)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red[700]),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Not all required fields are mapped. Required: ${_requiredFields.map((f) => _StudentsScreenState._importFields[f]).join(', ')}',
-                        style: TextStyle(fontSize: 11, color: Colors.red[700]),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-        // Data table
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SingleChildScrollView(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(dividerThickness: 0,
-                  headingRowHeight: 72,
-                  dataRowMinHeight: 36,
-                  dataRowMaxHeight: 36,
-                  columnSpacing: 16,
-                  horizontalMargin: 8,
-                  headingRowColor: WidgetStateProperty.all(AppColors.info.withValues(alpha: 0.04)),
-                  columns: [
-                    const DataColumn(label: Text('S No.', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11))),
-                    const DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11))),
-                    for (int c = 0; c < _headers.length; c++)
-                      DataColumn(
-                        label: SizedBox(
-                          width: 130,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_headers[c], style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-                                  overflow: TextOverflow.ellipsis),
-                              const SizedBox(height: 4),
-                              SizedBox(
-                                height: 28,
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: _mappings[c],
-                                  isDense: true,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(4),
-                                        borderSide: BorderSide(color: _requiredFields.contains(_mappings[c]) ? AppColors.accent : AppColors.border)),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4),
-                                        borderSide: BorderSide(color: _mappings[c].isNotEmpty ? AppColors.accent : AppColors.border)),
-                                  ),
-                                  style: const TextStyle(fontSize: 10, color: AppColors.textPrimary),
-                                  items: _StudentsScreenState._importFields.entries.map((e) => DropdownMenuItem(
-                                    value: e.key,
-                                    child: Text(e.key.isEmpty ? '-- Skip --' : '${e.value}${_requiredFields.contains(e.key) ? ' *' : ''}',
-                                        style: TextStyle(fontSize: 10, color: e.key.isEmpty ? AppColors.textSecondary : AppColors.textPrimary)),
-                                  )).toList(),
-                                  onChanged: (val) {
-                                    setState(() => _mappings[c] = val ?? '');
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                  rows: [
-                    for (int r = 0; r < _rows.length; r++)
-                      DataRow(
-                        color: WidgetStateProperty.all(
-                          _validateRow(r) != null ? Colors.red.withValues(alpha: 0.04) : Colors.transparent,
-                        ),
-                        cells: [
-                          DataCell(Text('${r + 1}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                          DataCell(
-                            _validateRow(r) == null
-                                ? const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.accent)
-                                : Tooltip(
-                                    message: _validateRow(r)!,
-                                    child: Icon(Icons.error_rounded, size: 16, color: Colors.red[400]),
-                                  ),
-                          ),
-                          for (int c = 0; c < _headers.length; c++)
-                            DataCell(Text(
-                              c < _rows[r].length ? _rows[r][c].toString() : '',
-                              style: const TextStyle(fontSize: 11),
-                              overflow: TextOverflow.ellipsis,
-                            )),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Bottom actions
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => setState(() { _step = 0; _headers = []; _rows = []; _mappings = []; }),
-                child: const Text('Back'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: (validCount > 0 && allRequiredMapped) ? _startImport : null,
-                icon: const Icon(Icons.upload_rounded, size: 18),
-                label: Text('Import $validCount Students'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── Step 2: Importing ────────────────────────────────────────────────────
-
-  Widget _buildImportingStep() {
-    final progress = _total > 0 ? (_imported + _skipped) / _total : 0.0;
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 16),
-          SizedBox(
-            width: 80, height: 80,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 6,
-              backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text('Importing students...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('${_imported + _skipped} of $_total', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Step 3: Done ─────────────────────────────────────────────────────────
-
-  Widget _buildDoneStep() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            _imported > 0 ? Icons.check_circle_rounded : Icons.error_rounded,
-            size: 56,
-            color: _imported > 0 ? AppColors.accent : Colors.red,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _imported > 0 ? 'Import Complete!' : 'Import Failed',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                color: _imported > 0 ? AppColors.textPrimary : Colors.red),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _statChip('Imported', '$_imported', AppColors.accent),
-              const SizedBox(width: 12),
-              _statChip('Skipped', '$_skipped', _skipped > 0 ? Colors.orange : AppColors.textSecondary),
-              const SizedBox(width: 12),
-              _statChip('Total', '$_total', AppColors.info),
-            ],
-          ),
-          if (_importErrors.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 150),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Errors:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.red[700])),
-                    const SizedBox(height: 4),
-                    for (final err in _importErrors)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Text(err, style: TextStyle(fontSize: 11, color: Colors.red[600])),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statChip(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: color)),
-        ],
-      ),
-    );
-  }
-}
+// _ExcelImportDialog removed — import is now inline grid in _StudentsScreenState

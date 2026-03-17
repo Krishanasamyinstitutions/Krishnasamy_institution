@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:excel/excel.dart' as xl;
+import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
@@ -30,7 +33,6 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   StudentModel? _selectedStudent;
   Map<String, dynamic>? _parent;
   List<Map<String, dynamic>> _demands = [];
-  List<Map<String, dynamic>> _payments = [];
   bool _loadingLedger = false;
 
   static const List<String> _classOrder = [
@@ -89,7 +91,6 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       _selectedClass = className;
       _selectedStudent = null;
       _demands = [];
-      _payments = [];
       _searchController.clear();
     });
     if (_cachedClassStudents[className] == null) {
@@ -111,7 +112,6 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     setState(() {
       _selectedStudent = student;
       _demands = [];
-      _payments = [];
       _parent = null;
       _loadingLedger = true;
     });
@@ -121,9 +121,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       final parentFuture = SupabaseService.getStudentParent(student.stuId, stuadmno: student.stuadmno);
 
       // Try stuadmno first (primary key used in feedemand)
+      const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, balancedue, duedate, paidstatus, pay_id';
       final demandsByAdmno = await SupabaseService.client
           .from('feedemand')
-          .select('dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, balancedue, duedate, paidstatus, demconcategory')
+          .select(selectFields)
           .eq('ins_id', insId)
           .eq('stuadmno', student.stuadmno)
           .order('duedate', ascending: true);
@@ -135,7 +136,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       if ((demandsByAdmno as List).isEmpty) {
         final demandsByStuId = await SupabaseService.client
             .from('feedemand')
-            .select('dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, balancedue, duedate, paidstatus, demconcategory')
+            .select(selectFields)
             .eq('ins_id', insId)
             .eq('stu_id', student.stuId)
             .order('duedate', ascending: true);
@@ -145,22 +146,38 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         demandList = List<Map<String, dynamic>>.from(demandsByAdmno as List);
       }
 
-      final paymentsFuture = SupabaseService.client
-          .from('payment')
-          .select('pay_id, paynumber, paydate, transtotalamount, paystatus, paymethod')
-          .eq('ins_id', insId)
-          .eq('stu_id', student.stuId)
-          .order('paydate', ascending: false);
+      // Fetch payment info for paid demands
+      final payIds = demandList
+          .where((d) => d['paidstatus'] == 'P' && d['pay_id'] != null)
+          .map((d) => d['pay_id'] as int)
+          .toSet()
+          .toList();
+
+      Map<int, Map<String, dynamic>> paymentMap = {};
+      if (payIds.isNotEmpty) {
+        final payments = await SupabaseService.client
+            .from('payment')
+            .select('pay_id, paynumber, paydate, paymethod')
+            .inFilter('pay_id', payIds);
+        for (final p in (payments as List)) {
+          paymentMap[p['pay_id'] as int] = Map<String, dynamic>.from(p);
+        }
+      }
+
+      // Attach payment data to demands
+      for (var i = 0; i < demandList.length; i++) {
+        final payId = demandList[i]['pay_id'];
+        if (payId != null && paymentMap.containsKey(payId)) {
+          demandList[i]['payment'] = paymentMap[payId];
+        }
+      }
 
       final parent = await parentFuture;
-      final paymentList = List<Map<String, dynamic>>.from((await paymentsFuture) as List);
-      debugPrint('LEDGER: payments=${paymentList.length}');
 
       if (mounted) {
         setState(() {
           _parent = parent;
           _demands = demandList;
-          _payments = paymentList;
           _loadingLedger = false;
         });
       }
@@ -171,14 +188,18 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   }
 
   double get _totalDemand => _demands.fold(0.0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0));
-double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0, (s, p) => s + ((p['transtotalamount'] as num?)?.toDouble() ?? 0));
+  double get _totalPaid => _demands.where((d) => d['paidstatus'] == 'P').fold(0.0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0));
   double get _totalPending => _demands.where((d) => d['paidstatus'] == 'U').fold(0.0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0));
 
-  // Combined ledger rows: demands as debit, payments as credit, sorted by date
+  // Ledger rows from feedemand: unpaid = debit only, paid = debit + credit
   List<Map<String, dynamic>> get _ledgerRows {
     final rows = <Map<String, dynamic>>[];
     for (final d in _demands) {
       final raw = d['duedate']?.toString() ?? '';
+      final isPaid = d['paidstatus'] == 'P';
+      final payment = d['payment'];
+
+      // Demand row (debit)
       rows.add({
         'date': raw.length >= 10 ? raw.substring(0, 10) : raw,
         'docno': d['demno']?.toString() ?? d['dem_id']?.toString() ?? '-',
@@ -189,21 +210,31 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
         'credit': 0.0,
         'type': 'demand',
       });
+
+      // Payment row (credit) — only for paid demands
+      if (isPaid && payment is Map) {
+        final payDate = payment['paydate']?.toString() ?? raw;
+        final payNumber = payment['paynumber']?.toString() ?? '-';
+        final payMethod = payment['paymethod']?.toString() ?? '-';
+        rows.add({
+          'date': payDate.length >= 10 ? payDate.substring(0, 10) : payDate,
+          'docno': payNumber,
+          'term': d['demfeeterm']?.toString() ?? '-',
+          'feetype': 'Payment ($payMethod)',
+          'reference': d['demno']?.toString() ?? d['dem_id']?.toString() ?? '-',
+          'debit': 0.0,
+          'credit': (d['paidamount'] as num?)?.toDouble() ?? 0.0,
+          'type': 'payment',
+        });
+      }
     }
-    for (final p in _payments) {
-      final raw = p['paydate']?.toString() ?? '';
-      rows.add({
-        'date': raw.length >= 10 ? raw.substring(0, 10) : raw,
-        'docno': p['paynumber']?.toString() ?? '-',
-        'term': '-',
-        'feetype': 'Payment (${p['paymethod'] ?? '-'})',
-        'reference': p['paynumber']?.toString() ?? '-',
-        'debit': 0.0,
-        'credit': (p['transtotalamount'] as num?)?.toDouble() ?? 0.0,
-        'type': 'payment',
-      });
-    }
-    rows.sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
+    // Demands first (sorted by date), then payments (sorted by date)
+    rows.sort((a, b) {
+      final typeA = a['type'] == 'demand' ? 0 : 1;
+      final typeB = b['type'] == 'demand' ? 0 : 1;
+      if (typeA != typeB) return typeA.compareTo(typeB);
+      return (a['date'] as String).compareTo(b['date'] as String);
+    });
     return rows;
   }
 
@@ -479,8 +510,7 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
                 onPressed: () => setState(() {
                   _selectedStudent = null;
                   _demands = [];
-                  _payments = [];
-                  _parent = null;
+                              _parent = null;
                 }),
                 icon: const Icon(Icons.arrow_back_rounded, size: 18),
                 color: AppColors.accent,
@@ -492,10 +522,10 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.accent.withValues(alpha: 0.12),
-                backgroundImage: (s.stuphoto ?? '').startsWith('http') ? NetworkImage(s.stuphoto!) : null,
-                child: (s.stuphoto ?? '').startsWith('http')
+                backgroundImage: (s.stuphoto != null && s.stuphoto!.startsWith('http')) ? NetworkImage(s.stuphoto!) : null,
+                child: (s.stuphoto != null && s.stuphoto!.startsWith('http'))
                     ? null
-                    : Text(s.stuname[0].toUpperCase(),
+                    : Text(s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
                         style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14)),
               ),
               const SizedBox(width: 10),
@@ -515,6 +545,19 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
                 _chip('Paid', '₹${_totalPaid.toStringAsFixed(0)}', Colors.green.shade700),
                 const SizedBox(width: 8),
                 _chip('Pending', '₹${_totalPending.toStringAsFixed(0)}', AppColors.error),
+                const SizedBox(width: 12),
+                IconButton(
+                  onPressed: _demands.isNotEmpty ? _exportToExcel : null,
+                  icon: const Icon(Icons.download_rounded, size: 20),
+                  color: AppColors.accent,
+                  tooltip: 'Export to Excel',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
               ],
             ],
           ),
@@ -548,8 +591,8 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
               SizedBox(width: 90,  child: _TH('TERM')),
               Expanded(            child: _TH('FEE TYPE')),
               SizedBox(width: 110, child: _TH('REFERENCE')),
-              SizedBox(width: 100, child: _TH('DEBIT', align: TextAlign.right)),
-              SizedBox(width: 100, child: _TH('CREDIT', align: TextAlign.right)),
+              SizedBox(width: 100, child: _TH('DUE', align: TextAlign.right)),
+              SizedBox(width: 100, child: _TH('RECEIVE', align: TextAlign.right)),
             ],
           ),
         ),
@@ -752,6 +795,249 @@ double get _totalPaid => _payments.where((p) => p['paystatus'] == 'C').fold(0.0,
     );
   }
 
+
+  Future<void> _exportToExcel() async {
+    final s = _selectedStudent!;
+    final fatherName = _parent?['fathername']?.toString() ?? '-';
+    final rows = _ledgerRows;
+    final totalDebit = rows.fold(0.0, (s, r) => s + (r['debit'] as double));
+    final totalCredit = rows.fold(0.0, (s, r) => s + (r['credit'] as double));
+    final closingBal = totalDebit - totalCredit;
+
+    // Fetch institution info
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    String insName = auth.insName ?? '';
+    String insAddress = '';
+    String insMobile = '';
+    String insEmail = '';
+    if (auth.insId != null) {
+      final insInfo = await SupabaseService.getInstitutionInfo(auth.insId!);
+      if (insInfo.name != null) insName = insInfo.name!;
+      if (insInfo.address != null) insAddress = insInfo.address!;
+      if (insInfo.mobile != null) insMobile = insInfo.mobile!;
+      if (insInfo.email != null) insEmail = insInfo.email!;
+    }
+
+    final excel = xl.Excel.createExcel();
+    final sheetName = 'Ledger';
+    excel.rename('Sheet1', sheetName);
+    final sheet = excel[sheetName];
+
+    // Styles
+    final headerStyle = xl.CellStyle(
+      bold: true,
+      fontSize: 14,
+      horizontalAlign: xl.HorizontalAlign.Center,
+    );
+    final insStyle = xl.CellStyle(
+      bold: true,
+      fontSize: 12,
+      horizontalAlign: xl.HorizontalAlign.Center,
+    );
+    final insDetailStyle = xl.CellStyle(
+      fontSize: 10,
+      horizontalAlign: xl.HorizontalAlign.Center,
+    );
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final colHeaderStyle = xl.CellStyle(
+      bold: true,
+      fontSize: 11,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#1E2532'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+    final debitStyle = xl.CellStyle(
+      fontColorHex: xl.ExcelColor.fromHexString('#EF4444'),
+      bold: true,
+    );
+    final creditStyle = xl.CellStyle(
+      fontColorHex: xl.ExcelColor.fromHexString('#22C55E'),
+      bold: true,
+    );
+    final totalRowStyle = xl.CellStyle(
+      bold: true,
+      fontSize: 11,
+      backgroundColorHex: xl.ExcelColor.fromHexString('#1E2532'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+    );
+
+    int row = 0;
+
+    // Institution name
+    final insNameCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    insNameCell.value = xl.TextCellValue(insName.toUpperCase());
+    insNameCell.cellStyle = insStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+    row++;
+
+    // Institution address
+    if (insAddress.isNotEmpty) {
+      final addrCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      addrCell.value = xl.TextCellValue(insAddress);
+      addrCell.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+      row++;
+    }
+
+    // Institution contact (mobile & email)
+    final contactParts = <String>[];
+    if (insMobile.isNotEmpty) contactParts.add('Ph: $insMobile');
+    if (insEmail.isNotEmpty) contactParts.add('Email: $insEmail');
+    if (contactParts.isNotEmpty) {
+      final contactCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      contactCell.value = xl.TextCellValue(contactParts.join('  |  '));
+      contactCell.cellStyle = insDetailStyle;
+      sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+          xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+      row++;
+    }
+    row++; // blank row after institution info
+
+    // Title
+    final titleCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    titleCell.value = xl.TextCellValue('STUDENT LEDGER - YEAR:  2025-2026');
+    titleCell.cellStyle = headerStyle;
+    sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+    row += 1;
+
+    // Student info
+    void addInfo(String label, String value) {
+      final c1 = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+      c1.value = xl.TextCellValue(label);
+      c1.cellStyle = labelStyle;
+      final c2 = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row));
+      c2.value = xl.TextCellValue(value);
+      row++;
+    }
+
+    addInfo('Class', ':  ${s.stuclass}');
+    addInfo('Student Name', ':  ${s.stuname}');
+    // Add admission no on same row as student name but further right
+    final admCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row - 1));
+    admCell.value = xl.TextCellValue('Admission No : ${s.stuadmno}');
+    admCell.cellStyle = labelStyle;
+    addInfo('Father Name', ':  $fatherName');
+    row++;
+
+    // "Regular Fee Details:" label
+    final regCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    regCell.value = xl.TextCellValue('Regular Fee Details :');
+    regCell.cellStyle = labelStyle;
+    row++;
+
+    // Column headers
+    final headers = ['Date', 'Doc No.', 'Term', 'Fee Type', 'Reference', 'Debit (Rs.)', 'Credit (Rs.)'];
+    for (var c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = xl.TextCellValue(headers[c]);
+      cell.cellStyle = colHeaderStyle;
+    }
+    row++;
+
+    // Data rows
+    for (final r in rows) {
+      final isDemand = r['type'] == 'demand';
+      final debit = r['debit'] as double;
+      final credit = r['credit'] as double;
+
+      final dateStr = _fmt(r['date'] as String);
+      final docNo = r['docno'] as String;
+      final reference = isDemand ? 'Reg Demand' : 'Reg Collection${_capitalize(r['feetype'] as String)}';
+
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(dateStr);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(docNo);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['term'] as String);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(
+          isDemand ? (r['feetype'] as String) : '');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(reference);
+
+      if (debit > 0) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+        cell.value = xl.DoubleCellValue(debit);
+        cell.cellStyle = debitStyle;
+      }
+      if (credit > 0) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+        cell.value = xl.DoubleCellValue(credit);
+        cell.cellStyle = creditStyle;
+      }
+      row++;
+    }
+
+    // G Total row
+    final gtLabels = ['', '', '', '', 'G Total'];
+    for (var c = 0; c < gtLabels.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+      cell.value = xl.TextCellValue(gtLabels[c]);
+      cell.cellStyle = totalRowStyle;
+    }
+    final gtDebit = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    gtDebit.value = xl.DoubleCellValue(totalDebit);
+    gtDebit.cellStyle = totalRowStyle;
+    final gtCredit = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+    gtCredit.value = xl.DoubleCellValue(totalCredit);
+    gtCredit.cellStyle = totalRowStyle;
+    row++;
+
+    // Closing Bal row
+    final cbCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    cbCell.value = xl.TextCellValue('Closing Bal');
+    cbCell.cellStyle = labelStyle;
+    final cbVal = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    cbVal.value = xl.DoubleCellValue(closingBal.abs());
+    cbVal.cellStyle = labelStyle;
+    row++;
+
+    // Net Closing Balance row
+    final ncbCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+    ncbCell.value = xl.TextCellValue('Net Closing Balance');
+    ncbCell.cellStyle = labelStyle;
+    final ncbVal = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+    ncbVal.value = xl.DoubleCellValue(closingBal.abs());
+    ncbVal.cellStyle = labelStyle;
+
+    // Column widths
+    sheet.setColumnWidth(0, 14);
+    sheet.setColumnWidth(1, 16);
+    sheet.setColumnWidth(2, 14);
+    sheet.setColumnWidth(3, 20);
+    sheet.setColumnWidth(4, 22);
+    sheet.setColumnWidth(5, 14);
+    sheet.setColumnWidth(6, 14);
+
+    // Save
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save Student Ledger',
+      fileName: 'Ledger_${s.stuadmno}_${s.stuname.replaceAll(' ', '_')}.xlsx',
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'],
+    );
+
+    if (result != null) {
+      final path = result.endsWith('.xlsx') ? result : '$result.xlsx';
+      final bytes = excel.encode();
+      if (bytes != null) {
+        await File(path).writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ledger exported to $path'), backgroundColor: Colors.green),
+          );
+        }
+      }
+    }
+  }
+
+  String _capitalize(String s) {
+    // Extract payment method from "Payment (cash)" => "Cash"
+    final match = RegExp(r'Payment \((\w+)\)').firstMatch(s);
+    if (match != null) {
+      final method = match.group(1)!;
+      return method[0].toUpperCase() + method.substring(1);
+    }
+    return s;
+  }
 
   Widget _chip(String label, String value, Color color) {
     return Container(
