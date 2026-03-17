@@ -28,7 +28,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   String? _selectedFeeType;
   String? _selectedFeeYear;
   final _feeTermController = TextEditingController();
-  String? _selectedConcessionCategory;
   String? _selectedConcession;
   List<String> _classes = [];
   List<String> _feeTypes = [];
@@ -70,7 +69,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'demfeetype',
     'yr_id',
     'demfeeterm',
-    'demconcategory',
     'con_id',
     'feeamount',
     'conamount',
@@ -83,7 +81,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'demfeetype': 'Fee Type',
     'yr_id': 'Fee Year',
     'demfeeterm': 'Fee Term',
-    'demconcategory': 'Category',
     'con_id': 'Concession',
     'feeamount': 'Fee Amount',
     'conamount': 'Concession Amount',
@@ -249,7 +246,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         'yr_id': _selectedFeeYear != null ? int.tryParse(_selectedFeeYear!) : null,
         'demfeeyear': yearLabel,
         'demfeeterm': _feeTermController.text.trim(),
-        'demconcategory': _selectedConcessionCategory,
         'con_id': _selectedConcession != null ? int.tryParse(_selectedConcession!) : null,
         'feeamount': feeAmount,
         'conamount': conAmount,
@@ -312,7 +308,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       _selectedFeeType = null;
       _selectedFeeYear = null;
       _feeTermController.clear();
-      _selectedConcessionCategory = null;
       _selectedConcession = null;
       _dueDate = null;
     });
@@ -338,10 +333,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'feetype': 'demfeetype', 'demfeetype': 'demfeetype', 'type': 'demfeetype',
       'feeyear': 'yr_id', 'yrid': 'yr_id', 'year': 'yr_id',
       'feeterm': 'demfeeterm', 'demfeeterm': 'demfeeterm', 'term': 'demfeeterm',
-      'category': 'demconcategory', 'demconcategory': 'demconcategory',
       'concession': 'con_id', 'conid': 'con_id', 'concessioncategory': 'con_id', 'con': 'con_id',
-      'feeamount': 'feeamount', 'amount': 'feeamount', 'fee': 'feeamount',
-      'concessionamount': 'conamount', 'conamount': 'conamount', 'conamt': 'conamount',
+      'feeamount': 'feeamount', 'amount': 'feeamount', 'fee': 'feeamount', 'feeamt': 'feeamount', 'fee amount': 'feeamount', 'fee amt': 'feeamount',
+      'concessionamount': 'conamount', 'conamount': 'conamount', 'conamt': 'conamount', 'con amt': 'conamount', 'con. amt': 'conamount', 'concession amount': 'conamount',
       'duedate': 'duedate', 'due': 'duedate',
     };
     return aliases[h];
@@ -428,14 +422,33 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       _importErrors = [];
     });
 
+    // 1. Pre-fetch all student admno -> stu_id mappings
+    final stuList = await SupabaseService.client
+        .from('students')
+        .select('stu_id, stuadmno')
+        .eq('ins_id', insId)
+        .eq('activestatus', 1);
+    final stuMap = <String, int>{};
+    for (final s in stuList) {
+      stuMap[s['stuadmno']?.toString() ?? ''] = s['stu_id'] as int;
+    }
+
+    // 2. Pre-fetch concession name -> con_id mappings
+    final conMap = <String, int>{};
+    for (final c in _concessions) {
+      final desc = c['condesc']?.toString().toUpperCase() ?? '';
+      final id = c['con_id'] as int?;
+      if (desc.isNotEmpty && id != null) conMap[desc] = id;
+    }
+
+    // 3. Build all rows in memory
+    final batch = <Map<String, dynamic>>[];
     for (int i = 0; i < _rows.length; i++) {
       final row = _rows[i];
       final err = _validateRow(i);
       if (err != null) {
-        setState(() {
-          _skipped++;
-          _importErrors.add('Row ${i + 2}: $err');
-        });
+        _skipped++;
+        _importErrors.add('Row ${i + 2}: $err');
         continue;
       }
 
@@ -447,10 +460,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         int? yrId;
         String? yrLabel;
 
-        // Try matching by yr_id (integer)
         final yrInt = int.tryParse(yrRaw ?? '');
         if (yrInt != null) {
-          // Check if it's a yr_id
           final byId = _years.firstWhere(
             (y) => y['yr_id'] == yrInt,
             orElse: () => <String, dynamic>{},
@@ -460,8 +471,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             yrLabel = byId['yrlabel']?.toString();
           }
         }
-
-        // If not found by id, try matching by label (e.g. "2025-2026")
         if (yrId == null && yrRaw != null) {
           final byLabel = _years.firstWhere(
             (y) => y['yrlabel']?.toString() == yrRaw,
@@ -472,8 +481,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             yrLabel = byLabel['yrlabel']?.toString();
           }
         }
-
-        // Try partial match (e.g. "2025" matches "2025-2026")
         if (yrId == null && yrRaw != null) {
           final byPartial = _years.firstWhere(
             (y) => y['yrlabel']?.toString().startsWith(yrRaw) == true,
@@ -485,34 +492,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           }
         }
 
-        // Lookup stu_id from admission number
         final admNoRaw = _cellByKey(row, 'stuadmno');
-        int? stuId;
-        if (admNoRaw != null && admNoRaw.isNotEmpty) {
-          final stuResult = await SupabaseService.client
-              .from('students')
-              .select('stu_id')
-              .eq('ins_id', insId)
-              .eq('stuadmno', admNoRaw)
-              .eq('activestatus', 1)
-              .maybeSingle();
-          stuId = stuResult?['stu_id'] as int?;
-        }
+        final stuId = stuMap[admNoRaw];
 
-        // Lookup con_id from concession name
         final conName = _cellByKey(row, 'con_id');
         int? conId;
         if (conName != null && conName.isNotEmpty) {
-          // Try parsing as int first (in case Excel has the ID)
-          conId = int.tryParse(conName);
-          if (conId == null) {
-            // Lookup by condesc
-            final conMatch = _concessions.firstWhere(
-              (c) => c['condesc']?.toString().toUpperCase() == conName.toUpperCase(),
-              orElse: () => <String, dynamic>{},
-            );
-            conId = conMatch.isNotEmpty ? conMatch['con_id'] as int? : null;
-          }
+          conId = int.tryParse(conName) ?? conMap[conName.toUpperCase()];
         }
 
         final data = {
@@ -525,7 +511,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           'yr_id': yrId,
           'demfeeyear': yrLabel ?? yrRaw ?? '',
           'demfeeterm': _cellByKey(row, 'demfeeterm'),
-          'demconcategory': _cellByKey(row, 'demconcategory'),
           'con_id': conId,
           'feeamount': feeAmount,
           'conamount': conAmount,
@@ -536,44 +521,35 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           'createdby': auth.userName,
           'isapproved': false,
         };
-
-        // Remove null values
         data.removeWhere((k, v) => v == null);
+        batch.add(data);
+      } catch (e) {
+        _skipped++;
+        _importErrors.add('Row ${i + 2}: $e');
+      }
+    }
 
-        // Duplicate check: Admission No + Fee Type + Fee Year + Fee Term
-        final admNo = data['stuadmno']?.toString() ?? '';
-        final feeType = data['demfeetype']?.toString() ?? '';
-        final feeYear = data['demfeeyear']?.toString() ?? '';
-        final feeTerm = data['demfeeterm']?.toString() ?? '';
+    setState(() {});
 
-        if (admNo.isNotEmpty && feeType.isNotEmpty) {
-          var query = SupabaseService.client
-              .from('tempfeedemand')
-              .select('temp_id')
-              .eq('ins_id', insId)
-              .eq('stuadmno', admNo)
-              .eq('demfeetype', feeType);
-          if (feeYear.isNotEmpty) query = query.eq('demfeeyear', feeYear);
-          if (feeTerm.isNotEmpty) query = query.eq('demfeeterm', feeTerm);
-
-          final existing = await query.maybeSingle();
-          if (existing != null) {
-            setState(() {
-              _skipped++;
-              _importErrors.add('Row ${i + 2}: Duplicate - $admNo / $feeType / $feeYear / $feeTerm already exists');
-            });
-            continue;
+    // 4. Bulk insert in batches of 500
+    for (int i = 0; i < batch.length; i += 500) {
+      final chunk = batch.sublist(i, (i + 500).clamp(0, batch.length));
+      try {
+        await SupabaseService.client.from('tempfeedemand').insert(chunk);
+        _imported += chunk.length;
+      } catch (e) {
+        // If batch fails, try one by one
+        for (final row in chunk) {
+          try {
+            await SupabaseService.client.from('tempfeedemand').insert(row);
+            _imported++;
+          } catch (e2) {
+            _skipped++;
+            _importErrors.add('Adm ${row['stuadmno']}: $e2');
           }
         }
-
-        await SupabaseService.client.from('tempfeedemand').insert(data);
-        setState(() => _imported++);
-      } catch (e) {
-        setState(() {
-          _skipped++;
-          _importErrors.add('Row ${i + 2}: $e');
-        });
       }
+      setState(() {});
     }
 
     setState(() => _importStep = 3);
@@ -645,19 +621,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   }
 
   Widget _buildMainContent() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left: Form
-        SizedBox(
-          width: 400,
-          child: _buildForm(),
-        ),
-        const SizedBox(width: 16),
-        // Right: Fee demands list
-        Expanded(child: _buildDemandsList()),
-      ],
-    );
+    return _buildDemandsList();
   }
 
   Widget _buildForm() {
@@ -752,20 +716,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Category
-                    _buildLabel('Category'),
-                    DropdownButtonFormField<String>(
-                      value: _selectedConcessionCategory,
-                      decoration: _inputDecoration('Select category'),
-                      items: const [
-                        DropdownMenuItem(value: 'General', child: Text('General')),
-                        DropdownMenuItem(value: 'Concession', child: Text('Concession')),
-                      ],
-                      onChanged: (v) => setState(() => _selectedConcessionCategory = v),
-                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 16),
 
@@ -1508,8 +1458,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Term', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Category', flex: 2),
-                        _gridHeaderDivider(),
                         _gridHeaderCell('Concession', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Amt *', flex: 2, center: true),
@@ -1551,7 +1499,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                     _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
                                     _gridDataCell(_mappedCell(row, 'yr_id'), flex: 1),
                                     _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 1),
-                                    _gridDataCell(_mappedCell(row, 'demconcategory'), flex: 2),
                                     _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
                                     _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
                                     _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
@@ -1660,7 +1607,6 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'Fee Type',
       'Fee Year',
       'Fee Term',
-      'Category',
       'Concession',
       'Fee Amount',
       'Concession Amount',

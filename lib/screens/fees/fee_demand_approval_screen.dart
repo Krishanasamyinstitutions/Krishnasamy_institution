@@ -143,7 +143,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   }
 
   void _toggleSelectAll(bool? value) {
-    final keys = _pagedDemands
+    final keys = _filteredDemands
         .where((d) => !_isApproved(d))
         .map(_demKey)
         .where((k) => k.isNotEmpty)
@@ -262,10 +262,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   }
 
   Widget _buildActionBar() {
-    final paged = _pagedDemands;
-    final selectablePaged = paged.where((d) => !_isApproved(d)).toList();
-    final allSelected = selectablePaged.isNotEmpty &&
-        selectablePaged.every((d) => _selected.contains(_demKey(d)));
+    final allFiltered = _filteredDemands.where((d) => !_isApproved(d)).toList();
+    final allSelected = allFiltered.isNotEmpty &&
+        allFiltered.every((d) => _selected.contains(_demKey(d)));
     final someSelected = _selected.isNotEmpty && !allSelected;
 
     return Row(

@@ -16,6 +16,7 @@ import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
 import '../fees/fee_demand_approval_screen.dart';
+import '../admin/master_import_screen.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -47,10 +48,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.request_page_rounded, 'Fee Demand', hideForAccountant: true),
     _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
     _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
-    _NavItem(Icons.receipt_long_rounded, 'Transactions', hideForAccountant: true),
+    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
     _NavItem(Icons.approval_rounded, 'Fee Demand Approval', accountantOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.settings_rounded, 'Designation & Role', adminOnly: true),
+    _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
@@ -609,7 +611,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications' || label == 'Master Data';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -645,6 +647,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Notifications') {
       return const NotificationScreen();
+    }
+    if (selectedMenu == 'Master Data') {
+      return const MasterImportScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();
