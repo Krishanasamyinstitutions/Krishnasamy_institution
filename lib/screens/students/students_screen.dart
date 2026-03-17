@@ -1187,6 +1187,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             // Student Information panel
                             Expanded(
                               child: Container(
+                                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
@@ -1195,11 +1196,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1210,21 +1209,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   Text('Student Information',
                                                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                                                 ]),
-                                                const SizedBox(height: 4),
+                                                const SizedBox(height: 6),
                                                 Row(children: [
                                                   if (_insLogo != null)
                                                     Image.network(
                                                       _insLogo!,
-                                                      width: 32, height: 32, fit: BoxFit.contain,
-                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                      width: 48, height: 48, fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
                                                     )
                                                   else
-                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 28),
+                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
                                                   const SizedBox(width: 8),
                                                   Flexible(
                                                     child: Text(
                                                       _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
-                                                      style: const TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
+                                                      style: const TextStyle(fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
@@ -1254,11 +1253,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: Divider(color: AppColors.border)),
+                                    const Divider(color: AppColors.border),
                                     Expanded(
                                       child: SingleChildScrollView(
-                                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                                        padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
                                         child: IgnorePointer(
                                           ignoring: !_isFormEnabled,
                                           child: Opacity(opacity: _isFormEnabled ? 1.0 : 0.65, child: _buildStudentFields()),
