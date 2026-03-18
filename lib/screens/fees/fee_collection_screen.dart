@@ -140,6 +140,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   // Date drilldown filters
   String _dateDrilldownSearch = '';
   String? _dateDrilldownMethodFilter;
+  // Pagination for date list
+  int _dateListPage = 0;
+  static const int _dateListPageSize = 10;
+  // Pagination for date drilldown payments
+  int _dateDrilldownPage = 0;
+  static const int _dateDrilldownPageSize = 10;
   // Institution info for receipt
   String? _insName;
   String? _insAddress;
@@ -1697,6 +1703,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               ),
             )
           else
+            Builder(builder: (context) {
+              final totalItems = _dateGroups.length;
+              final totalPages = (totalItems / _dateListPageSize).ceil();
+              if (_dateListPage >= totalPages && totalPages > 0) _dateListPage = totalPages - 1;
+              final startIdx = _dateListPage * _dateListPageSize;
+              final endIdx = (startIdx + _dateListPageSize).clamp(0, totalItems);
+              final pagedGroups = _dateGroups.sublist(startIdx, endIdx);
+
+              return Column(children: [
             LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
@@ -1721,13 +1736,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
                       ],
                       rows: [
-                        ...List.generate(_dateGroups.length, (i) {
-                          final group = _dateGroups[i];
+                        ...pagedGroups.asMap().entries.map((entry) {
+                          final i = entry.key;
+                          final group = entry.value;
                           return DataRow(
                             color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                            onSelectChanged: (_) => setState(() => _selectedDate = group.date),
+                            onSelectChanged: (_) => setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; }),
                             cells: [
-                              DataCell(Text('${i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                              DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
                               DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600))),
                               DataCell(Text('${group.payments.length}', textAlign: TextAlign.right)),
                               DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
@@ -1763,6 +1779,46 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 );
               },
             ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Showing ${totalItems == 0 ? 0 : startIdx + 1}\u2013$endIdx of $totalItems dates',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.first_page_rounded, size: 20),
+                      onPressed: _dateListPage > 0 ? () => setState(() => _dateListPage = 0) : null,
+                      tooltip: 'First page', splashRadius: 18,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                      onPressed: _dateListPage > 0 ? () => setState(() => _dateListPage--) : null,
+                      tooltip: 'Previous page', splashRadius: 18,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
+                      child: Text('${_dateListPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                      onPressed: _dateListPage < totalPages - 1 ? () => setState(() => _dateListPage++) : null,
+                      tooltip: 'Next page', splashRadius: 18,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.last_page_rounded, size: 20),
+                      onPressed: _dateListPage < totalPages - 1 ? () => setState(() => _dateListPage = totalPages - 1) : null,
+                      tooltip: 'Last page', splashRadius: 18,
+                    ),
+                  ],
+                ),
+              ),
+              ]);
+            }),
         ],
       ),
     );
@@ -1853,7 +1909,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   width: 200,
                   height: 34,
                   child: TextField(
-                    onChanged: (v) => setState(() => _dateDrilldownSearch = v),
+                    onChanged: (v) => setState(() { _dateDrilldownSearch = v; _dateDrilldownPage = 0; }),
                     decoration: InputDecoration(
                       hintText: 'Search...',
                       hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
@@ -1885,7 +1941,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             (m) => DropdownMenuItem(value: m, child: Text(m)),
                           ),
                         ],
-                        onChanged: (v) => setState(() => _dateDrilldownMethodFilter = v),
+                        onChanged: (v) => setState(() { _dateDrilldownMethodFilter = v; _dateDrilldownPage = 0; }),
                       ),
                     ),
                   ),
@@ -1896,7 +1952,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           const Divider(height: 1),
                 LayoutBuilder(builder: (context, constraints) {
                   final searchLower = _dateDrilldownSearch.toLowerCase();
-                  final filtered = group.payments.where((p) {
+                  final allFiltered = group.payments.where((p) {
                     if (_dateDrilldownMethodFilter != null && (p['paymethod']?.toString() ?? '-') != _dateDrilldownMethodFilter) return false;
                     if (searchLower.isNotEmpty) {
                       final s = p['students'] as Map<String, dynamic>?;
@@ -1907,8 +1963,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     }
                     return true;
                   }).toList();
-                  final double grandTotal = filtered.fold(0.0, (s, p) => s + ((p['transtotalamount'] as num?)?.toDouble() ?? 0));
-                  return SingleChildScrollView(
+                  final double grandTotal = allFiltered.fold(0.0, (s, p) => s + ((p['transtotalamount'] as num?)?.toDouble() ?? 0));
+                  final ddTotalItems = allFiltered.length;
+                  final ddTotalPages = (ddTotalItems / _dateDrilldownPageSize).ceil();
+                  if (_dateDrilldownPage >= ddTotalPages && ddTotalPages > 0) _dateDrilldownPage = ddTotalPages - 1;
+                  final ddStart = _dateDrilldownPage * _dateDrilldownPageSize;
+                  final ddEnd = (ddStart + _dateDrilldownPageSize).clamp(0, ddTotalItems);
+                  final filtered = allFiltered.sublist(ddStart, ddEnd);
+                  return Column(children: [SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
@@ -1938,7 +2000,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
                               onSelectChanged: (_) => _onPaymentTap(p),
                               cells: [
-                                DataCell(Text('${i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                                DataCell(Text('${ddStart + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
                                 DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w500))),
                                 DataCell(Text(timeStr, style: const TextStyle(color: AppColors.textSecondary))),
                                 DataCell(Text(student?['stuadmno']?.toString() ?? '-')),
@@ -1975,7 +2037,26 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ],
                       ),
                     ),
-                  );
+                  ),
+                  // Pagination controls
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: const BoxDecoration(color: Color(0xFF2D3748)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(icon: const Icon(Icons.first_page_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage = 0) : null),
+                        IconButton(icon: const Icon(Icons.chevron_left_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage--) : null),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('${_dateDrilldownPage + 1} / ${ddTotalPages == 0 ? 1 : ddTotalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ),
+                        IconButton(icon: const Icon(Icons.chevron_right_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage++) : null),
+                        IconButton(icon: const Icon(Icons.last_page_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage = ddTotalPages - 1) : null),
+                      ],
+                    ),
+                  ),
+                  ]);
                 }),
         ],
       ),
@@ -2098,247 +2179,275 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       try { logoImage = await networkImage(data.schoolLogoUrl!); } catch (_) {}
     }
 
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(60),
-        theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
-        build: (pw.Context ctx) {
-          String formatAmount(double amount) {
-            if (amount == amount.truncateToDouble()) {
-              return amount.toInt().toString().replaceAllMapped(
-                RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-            }
-            return amount.toStringAsFixed(2).replaceAllMapped(
-              RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
-          }
+    String formatAmount(double amount) {
+      if (amount == amount.truncateToDouble()) {
+        return amount.toInt().toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+      }
+      return amount.toStringAsFixed(2).replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
+    }
 
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              // Header
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        if (logoImage != null)
-                          pw.SizedBox(width: 64, height: 64, child: pw.Image(logoImage, fit: pw.BoxFit.cover)),
-                        if (logoImage != null) pw.SizedBox(height: 8),
-                        pw.Text(data.schoolName, style: pw.TextStyle(font: fontSemiBold, fontSize: 14, color: darkBlue)),
-                        pw.SizedBox(height: 6),
-                        pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('Address:  ', style: sSemiBold),
-                            pw.Expanded(child: pw.Text(data.schoolAddress, style: sMedium, maxLines: 3)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(width: 20),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
-                      pw.SizedBox(height: 12),
-                      labelValue('Receipt No:', data.receiptNo),
-                      pw.SizedBox(height: 6),
-                      labelValue('Date:', data.date),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 12),
-              pw.Container(height: 1, color: dividerColor),
-              pw.SizedBox(height: 12),
-              // To section
-              pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 12, color: textDark)),
-              pw.SizedBox(height: 8),
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        labelValue('Name:', data.studentName),
-                        pw.SizedBox(height: 6),
-                        labelValue('Mobile No:', data.mobileNo),
-                        pw.SizedBox(height: 6),
-                        pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('Address:', style: sSemiBold),
-                            pw.SizedBox(width: 6),
-                            pw.Expanded(child: pw.Text(data.address, style: sMedium)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(width: 20),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      labelValue('Admission No:', data.admissionNo),
-                      pw.SizedBox(height: 6),
-                      labelValue('Class:', data.className),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              // Fee Table with stamp overlay
-              pw.Stack(
-                children: [
-                  pw.Column(
-                    children: [
-                      pw.Table(
-                        border: pw.TableBorder.all(color: borderColor, width: 0.5),
-                        columnWidths: {
-                          0: const pw.FixedColumnWidth(46),
-                          1: const pw.FixedColumnWidth(125),
-                          2: const pw.FlexColumnWidth(),
-                          3: const pw.FixedColumnWidth(120),
-                        },
+    // Split fee details into chunks that fit per page (max 8 per page)
+    const int maxItemsPerPage = 8;
+    final totalItems = data.feeDetails.length;
+    final totalPages = (totalItems / maxItemsPerPage).ceil().clamp(1, 100);
+
+    final pdf = pw.Document();
+
+    for (int page = 0; page < totalPages; page++) {
+      final startIdx = page * maxItemsPerPage;
+      final endIdx = (startIdx + maxItemsPerPage).clamp(0, totalItems);
+      final pageItems = data.feeDetails.sublist(startIdx, endIdx);
+      final isFirstPage = page == 0;
+      final isLastPage = page == totalPages - 1;
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(60),
+          theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
+          build: (pw.Context ctx) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header (on every page)
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.TableRow(
-                            decoration: const pw.BoxDecoration(color: headerBg),
+                          if (logoImage != null)
+                            pw.SizedBox(width: 64, height: 64, child: pw.Image(logoImage, fit: pw.BoxFit.cover)),
+                          if (logoImage != null) pw.SizedBox(height: 8),
+                          pw.Text(data.schoolName, style: pw.TextStyle(font: fontSemiBold, fontSize: 14, color: darkBlue)),
+                          pw.SizedBox(height: 6),
+                          pw.Row(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
                             children: [
-                              tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Term', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
+                              pw.Text('Address:  ', style: sSemiBold),
+                              pw.Expanded(child: pw.Text(data.schoolAddress, style: sMedium, maxLines: 3)),
                             ],
                           ),
-                          for (var i = 0; i < data.feeDetails.length; i++)
-                            pw.TableRow(
-                              children: [
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  alignment: pw.Alignment.topCenter,
-                                  child: pw.Text('${i + 1}.', style: sMediumDark),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  alignment: pw.Alignment.topCenter,
-                                  child: pw.Text(data.feeDetails[i].term, style: sMediumDark),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  child: pw.Column(
-                                    children: [
-                                      for (final fee in data.feeDetails[i].fees)
-                                        pw.Padding(
-                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                          child: pw.Text(fee.type, style: sMediumDark, textAlign: pw.TextAlign.center),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  child: pw.Column(
-                                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                                    children: [
-                                      for (final fee in data.feeDetails[i].fees)
-                                        pw.Padding(
-                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                          child: pw.Text('\u20B9${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                         ],
                       ),
-                      // Sub Total row
-                      pw.Row(
+                    ),
+                    pw.SizedBox(width: 20),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text('Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
+                        pw.SizedBox(height: 12),
+                        labelValue('Receipt No:', data.receiptNo),
+                        pw.SizedBox(height: 6),
+                        labelValue('Date:', data.date),
+                        if (totalPages > 1) ...[
+                          pw.SizedBox(height: 6),
+                          pw.Text('Page ${page + 1} of $totalPages', style: pw.TextStyle(font: fontMedium, fontSize: 9, color: textMediumC)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 12),
+                pw.Container(height: 1, color: dividerColor),
+                pw.SizedBox(height: 12),
+                // To section (only on first page)
+                if (isFirstPage) ...[
+                  pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 12, color: textDark)),
+                  pw.SizedBox(height: 8),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            labelValue('Name:', data.studentName),
+                            pw.SizedBox(height: 6),
+                            labelValue('Mobile No:', data.mobileNo),
+                            pw.SizedBox(height: 6),
+                            pw.Row(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text('Address:', style: sSemiBold),
+                                pw.SizedBox(width: 6),
+                                pw.Expanded(child: pw.Text(data.address, style: sMedium)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      pw.SizedBox(width: 20),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
                         children: [
-                          pw.SizedBox(width: 172),
-                          pw.Expanded(
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              decoration: const pw.BoxDecoration(color: primaryBlue),
-                              child: pw.Row(
+                          labelValue('Admission No:', data.admissionNo),
+                          pw.SizedBox(height: 6),
+                          labelValue('Class:', data.className),
+                        ],
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 20),
+                ],
+                // Fee Table with stamp overlay
+                pw.Stack(
+                  children: [
+                    pw.Column(
+                      children: [
+                        pw.Table(
+                          border: pw.TableBorder.all(color: borderColor, width: 0.5),
+                          columnWidths: {
+                            0: const pw.FixedColumnWidth(46),
+                            1: const pw.FixedColumnWidth(125),
+                            2: const pw.FlexColumnWidth(),
+                            3: const pw.FixedColumnWidth(120),
+                          },
+                          children: [
+                            pw.TableRow(
+                              decoration: const pw.BoxDecoration(color: headerBg),
+                              children: [
+                                tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
+                                tableCell('Term', sSemiBold.copyWith(color: primaryBlue)),
+                                tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
+                                tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
+                              ],
+                            ),
+                            for (var i = 0; i < pageItems.length; i++)
+                              pw.TableRow(
                                 children: [
-                                  pw.Expanded(
-                                    child: pw.Text('Sub Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    alignment: pw.Alignment.topCenter,
+                                    child: pw.Text('${startIdx + i + 1}.', style: sMediumDark),
                                   ),
-                                  pw.SizedBox(
-                                    width: 119,
-                                    child: pw.Text('\u20B9${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    alignment: pw.Alignment.topCenter,
+                                    child: pw.Text(pageItems[i].term, style: sMediumDark),
+                                  ),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    child: pw.Column(
+                                      children: [
+                                        for (final fee in pageItems[i].fees)
+                                          pw.Padding(
+                                            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                            child: pw.Text(fee.type, style: sMediumDark, textAlign: pw.TextAlign.center),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    child: pw.Column(
+                                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                                      children: [
+                                        for (final fee in pageItems[i].fees)
+                                          pw.Padding(
+                                            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                            child: pw.Text('\u20B9${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
+                          ],
+                        ),
+                        // Sub Total row (only on last page)
+                        if (isLastPage)
+                          pw.Row(
+                            children: [
+                              pw.SizedBox(width: 172),
+                              pw.Expanded(
+                                child: pw.Container(
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: const pw.BoxDecoration(color: primaryBlue),
+                                  child: pw.Row(
+                                    children: [
+                                      pw.Expanded(
+                                        child: pw.Text('Sub Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                      ),
+                                      pw.SizedBox(
+                                        width: 119,
+                                        child: pw.Text('\u20B9${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  // PAID stamp overlay – positioned at upper-left of the table
-                  if (data.status == 'paid')
-                    pw.Positioned(
-                      left: 120, top: 40,
-                      child: pw.Opacity(
-                        opacity: 0.55,
-                        child: pw.Transform.rotateBox(
-                          angle: -0.40,
-                          child: pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-                            decoration: pw.BoxDecoration(
-                              color: const PdfColor.fromInt(0x66c2eecd),
-                              borderRadius: pw.BorderRadius.circular(10),
-                              border: pw.Border.all(color: paidGreen, width: 2.5),
+                      ],
+                    ),
+                    // PAID stamp overlay
+                    if (data.status == 'paid')
+                      pw.Positioned(
+                        left: 120, top: 40,
+                        child: pw.Opacity(
+                          opacity: 0.55,
+                          child: pw.Transform.rotateBox(
+                            angle: -0.40,
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                              decoration: pw.BoxDecoration(
+                                color: const PdfColor.fromInt(0x66c2eecd),
+                                borderRadius: pw.BorderRadius.circular(10),
+                                border: pw.Border.all(color: paidGreen, width: 2.5),
+                              ),
+                              child: pw.Text('PAID', style: pw.TextStyle(font: fontSemiBold, fontSize: 20, color: paidGreen)),
                             ),
-                            child: pw.Text('PAID', style: pw.TextStyle(font: fontSemiBold, fontSize: 20, color: paidGreen)),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              // Payment info
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  labelValue('Receipt Method:', data.paymentMethod),
-                  pw.SizedBox(height: 6),
-                  labelValue('Date:', data.paymentDate),
-                ],
-              ),
-              pw.Spacer(),
-              // Footer
-              pw.Center(
-                child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
-              ),
-              pw.SizedBox(height: 8),
-              if (data.schoolEmail != null || data.schoolMobile != null)
-                pw.Center(
-                  child: pw.Text(
-                    'For any further inquiries, please contact us at '
-                    '${data.schoolEmail ?? ''}'
-                    '${data.schoolEmail != null && data.schoolMobile != null ? ' or\ncall ' : ''}'
-                    '${data.schoolMobile ?? ''}',
-                    style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC),
-                    textAlign: pw.TextAlign.center,
-                  ),
+                  ],
                 ),
-            ],
-          );
-        },
-      ),
-    );
+                if (isLastPage) ...[
+                  pw.SizedBox(height: 20),
+                  // Payment info
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      labelValue('Receipt Method:', data.paymentMethod),
+                      pw.SizedBox(height: 6),
+                      labelValue('Date:', data.paymentDate),
+                    ],
+                  ),
+                  pw.Spacer(),
+                  // Footer
+                  pw.Center(
+                    child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
+                  ),
+                  pw.SizedBox(height: 8),
+                  if (data.schoolEmail != null || data.schoolMobile != null)
+                    pw.Center(
+                      child: pw.Text(
+                        'For any further inquiries, please contact us at '
+                        '${data.schoolEmail ?? ''}'
+                        '${data.schoolEmail != null && data.schoolMobile != null ? ' or\ncall ' : ''}'
+                        '${data.schoolMobile ?? ''}',
+                        style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                    ),
+                ] else ...[
+                  pw.Spacer(),
+                  pw.Center(
+                    child: pw.Text('Continued on next page...', style: pw.TextStyle(font: fontItalic, fontSize: 10, color: textMediumC)),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      );
+    }
     return pdf;
   }
 
@@ -3246,21 +3355,15 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                               DataCell(Text(g.className, style: const TextStyle(fontWeight: FontWeight.w600))),
                               DataCell(Text('${g.studentCount}')),
                               DataCell(SizedBox(
-                                width: 220,
+                                width: 280,
                                 child: Wrap(
                                   spacing: 4, runSpacing: 4,
                                   children: [
-                                    ...g.feeTypes.take(4).map((ft) => Container(
+                                    ...g.feeTypes.map((ft) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6)),
                                       child: Text(ft, style: const TextStyle(fontSize: 9, color: AppColors.accent)),
                                     )),
-                                    if (g.feeTypes.length > 4)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
-                                        child: Text('+${g.feeTypes.length - 4}', style: const TextStyle(fontSize: 9, color: AppColors.textSecondary)),
-                                      ),
                                   ],
                                 ),
                               )),
@@ -3924,9 +4027,15 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   List<String> _feeTypes = [];
   Map<int, String> _payNumberMap = {};
   double _overallPending = 0;
+  double _overallDemand = 0;
+  double _overallCollected = 0;
 
   String _searchQuery = '';
   String? _filterFeeType;
+
+  // Pagination for date-wise table
+  int _dateWisePage = 0;
+  static const int _dateWisePageSize = 10;
 
   final ScrollController _tableScrollController = ScrollController();
   bool _canScroll = false;
@@ -4017,6 +4126,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           _allFeeTypes = feeTypes;
           _payNumberMap = payNumberMap;
           _overallPending = feeSummary.totalPending;
+          _overallDemand = feeSummary.totalDue;
+          _overallCollected = feeSummary.totalPaid;
           _isLoading = false;
         });
         _applyFilter();
@@ -4356,9 +4467,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
               children: [
                 _buildSummaryCard(Icons.people_outline, Colors.blue, '$totalStudentCount', 'Total Students'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_totalDemand), 'Total Demand'),
+                _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_overallDemand), 'Total Demand'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_totalPaid), 'Total Collected'),
+                _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_overallCollected), 'Total Collected'),
                 const SizedBox(width: 16),
                 _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_overallPending), 'Total Pending'),
               ],

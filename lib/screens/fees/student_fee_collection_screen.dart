@@ -304,13 +304,6 @@ class _StudentFeeCollectionScreenState
     });
   }
 
-  String get _studentCategory {
-    if (_allDemands.isNotEmpty) {
-      return 'GENERAL';
-    }
-    return '-';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -574,9 +567,6 @@ class _StudentFeeCollectionScreenState
           _detailRow(Icons.person_outline_rounded, 'Father', fatherName),
           const SizedBox(height: 8),
           _detailRow(Icons.school_outlined, 'Class', className),
-          const SizedBox(height: 8),
-          _detailRow(
-              Icons.group_outlined, 'Category', _studentCategory),
         ],
       ),
     );
@@ -632,7 +622,7 @@ class _StudentFeeCollectionScreenState
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: ['Cash', 'Online', 'Cheque', 'Sponsor'].map((mode) {
+            children: ['Cash', 'Online', 'Cheque'].map((mode) {
               final sel = _paymentMode == mode;
               return GestureDetector(
                 onTap: () => setState(() => _paymentMode = mode),
@@ -737,17 +727,6 @@ class _StudentFeeCollectionScreenState
               style: const TextStyle(fontSize: 13),
             ),
           ],
-          const SizedBox(height: 14),
-          Text('Remarks',
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
-          TextField(
-            controller: _remarksController,
-            maxLines: 2,
-            decoration: _inputDec('Optional remarks...'),
-            style: const TextStyle(fontSize: 13),
-          ),
         ],
       ),
     );

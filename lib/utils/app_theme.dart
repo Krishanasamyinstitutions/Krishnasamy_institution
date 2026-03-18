@@ -7,10 +7,10 @@ class AppColors {
   static const Color primaryLight = Color(0xFF2C4A6E);
   static const Color primaryDark = Color(0xFF0F1E33);
 
-  // Accent - Vibrant Teal
-  static const Color accent = Color(0xFF00BFA6);
-  static const Color accentLight = Color(0xFF5DF2D6);
-  static const Color accentDark = Color(0xFF008E76);
+  // Accent - Blue
+  static const Color accent = Color(0xFF0099E2);
+  static const Color accentLight = Color(0xFF4DB8ED);
+  static const Color accentDark = Color(0xFF0077B3);
 
   // Secondary - Warm Amber
   static const Color secondary = Color(0xFFF7A800);
@@ -47,7 +47,7 @@ class AppColors {
   static const LinearGradient accentGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF00BFA6), Color(0xFF00897B)],
+    colors: [Color(0xFF0099E2), Color(0xFF0077B3)],
   );
 
   static const LinearGradient splashGradient = LinearGradient(

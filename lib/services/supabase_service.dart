@@ -17,37 +17,28 @@ class SupabaseService {
     required String password,
   }) async {
     try {
+      final List<dynamic> result = await client.rpc('verify_user_login', params: {
+        'p_email': email.trim(),
+        'p_plain_password': password,
+      });
+
+      debugPrint('Login RPC result: $result');
+
+      if (result.isEmpty) return null;
+
+      final row = result.first as Map<String, dynamic>;
+      if (row['is_valid'] != true) return null;
+
+      final useId = row['use_id'];
       final response = await client
           .from('institutionusers')
           .select()
-          .eq('usemail', email.trim().toLowerCase())
+          .eq('use_id', useId)
           .eq('activestatus', 1)
           .maybeSingle();
 
       if (response == null) return null;
-
-      final user = InstitutionUserModel.fromJson(response);
-
-      // Check password (plain text comparison for now, matching mobile app pattern)
-      if (user.usepassword == null || user.usepassword != password) {
-        // Try verify_password RPC if available
-        try {
-          final verifyResult = await client.rpc('verify_password', params: {
-            'plain_password': password,
-            'hashed_password': user.usepassword,
-          });
-          final isValid = verifyResult == true ||
-              verifyResult == 'true' ||
-              verifyResult == 't' ||
-              verifyResult.toString() == 'true';
-          if (!isValid) return null;
-        } catch (_) {
-          // If RPC not available, fall back to direct comparison
-          if (user.usepassword != password) return null;
-        }
-      }
-
-      return user;
+      return InstitutionUserModel.fromJson(response);
     } catch (e) {
       debugPrint('Login error: $e');
       return null;
@@ -103,11 +94,10 @@ class SupabaseService {
     try {
       final response = await client.from('institution').insert(data).select().single();
       return response;
-    } catch (e, st) {
-      debugPrint('Error creating institution: $e');
-      debugPrint('Data: $data');
-      debugPrint('Stack: $st');
-      return null;
+    } catch (e) {
+      debugPrint('ERROR creating institution: $e');
+      debugPrint('Data sent: $data');
+      rethrow;
     }
   }
 
@@ -488,7 +478,8 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('Error creating institution user: $e');
-      return false;
+      debugPrint('User data: $data');
+      rethrow;
     }
   }
 
@@ -1140,7 +1131,8 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('Error creating designation: $e');
-      return false;
+      debugPrint('Designation data: $data');
+      rethrow;
     }
   }
 
@@ -1187,7 +1179,8 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('Error creating user role: $e');
-      return false;
+      debugPrint('Role data: $data');
+      rethrow;
     }
   }
 

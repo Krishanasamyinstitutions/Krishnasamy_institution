@@ -30,8 +30,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  msix: ^3.16.13
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+msix_config:
+  display_name: School Admin
+  publisher_display_name: TBS Tech
+  identity_name: com.tbstech.schooladmin
+  msix_version: 1.0.0.0
+  capabilities: internetClient

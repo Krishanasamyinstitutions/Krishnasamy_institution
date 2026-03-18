@@ -11,7 +11,6 @@ import '../fees/student_fee_collection_screen.dart';
 import '../fees/student_ledger_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
-import '../admin/settings_screen.dart';
 import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
@@ -45,13 +44,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const List<_NavItem> _allNavItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
     _NavItem(Icons.people_alt_rounded, 'Students', adminOnly: true),
-    _NavItem(Icons.request_page_rounded, 'Fee Demand', hideForAccountant: true),
+    _NavItem(Icons.request_page_rounded, 'Fee Demand', accountantOnly: true),
     _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
     _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
     _NavItem(Icons.receipt_long_rounded, 'Transactions'),
-    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', accountantOnly: true),
+    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
-    _NavItem(Icons.settings_rounded, 'Designation & Role', adminOnly: true),
     _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
@@ -62,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<_NavItem> _getNavItems(BuildContext context) {
     final auth = context.read<AuthProvider>();
     final isAdmin = auth.currentUser?.urname == 'Admin';
-    final isAccountant = auth.currentUser?.desname == 'Accountant';
+    final isAccountant = auth.currentUser?.urname == 'Accountant';
     if (isAdmin) return _allNavItems.where((item) => !item.accountantOnly).toList();
     return _allNavItems.where((item) {
       if (item.adminOnly) return false;
@@ -420,62 +418,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _navItems[_selectedNavIndex].label,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                Text(
-                  'Academic Year 2025-26',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
-                      ),
-                ),
-              ],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _navItems[_selectedNavIndex].label,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              Text(
+                'Academic Year 2025-26',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize: 12,
+                    ),
+              ),
+            ],
           ),
 
-          // Search bar (desktop only)
+          // School logo, name and address (center)
           if (isDesktop)
-            CompositedTransformTarget(
-              link: _searchLayerLink,
-              child: Container(
-                width: 350,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or admission no...',
-                    hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textLight,
-                          fontSize: 13,
-                        ),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        size: 20, color: AppColors.textLight),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
-                            onPressed: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                            },
+            Expanded(
+              child: Center(
+                child: (auth.insLogo != null || auth.insName != null)
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (auth.insLogo != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              auth.insLogo!,
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, size: 36, color: AppColors.accent),
+                            ),
                           )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
-                  ),
-                ),
+                        else
+                          const Icon(Icons.school_rounded, size: 36, color: AppColors.accent),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (auth.insName != null)
+                              Text(
+                                auth.insName!,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                              ),
+                            if (auth.insAddress != null)
+                              Text(
+                                auth.insAddress!,
+                                style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
               ),
             ),
 
@@ -611,7 +611,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Designation & Role' || label == 'Notices' || label == 'Notifications' || label == 'Master Data';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -638,9 +638,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'User Creation') {
       return const AdminCreationScreen();
-    }
-    if (selectedMenu == 'Designation & Role') {
-      return const SettingsScreen();
     }
     if (selectedMenu == 'Notices') {
       return const NoticesScreen();

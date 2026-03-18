@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
@@ -22,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _institutionType;
   String _institutionRecognized = 'Yes';
   DateTime? _institutionStartDate;
+  File? _logoFile;
   final _institutionNameController = TextEditingController();
   final _institutionCodeController = TextEditingController();
   final _authorizedUsernameController = TextEditingController();
@@ -50,7 +53,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _countryController = TextEditingController();
   final _emailController = TextEditingController();
 
+  // Academic Year
+  final _yearLabelController = TextEditingController();
+  DateTime? _yearStartDate;
+  DateTime? _yearEndDate;
+
   // Step 3: Account Setup
+  String _adminDesignation = 'Principal';
+  final List<String> _designationOptions = [
+    'Principal', 'Vice Principal', 'Director', 'Chairman',
+    'Head Master', 'Administrator', 'Manager',
+  ];
   final _adminNameController = TextEditingController();
   final _adminEmailController = TextEditingController();
   final _adminPhoneController = TextEditingController();
@@ -79,6 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _stateController.dispose();
     _countryController.dispose();
     _emailController.dispose();
+    _yearLabelController.dispose();
     _adminNameController.dispose();
     _adminEmailController.dispose();
     _adminPhoneController.dispose();
@@ -90,6 +104,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _goToStep(int step) {
     _pageController.animateToPage(step, duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
     setState(() => _currentStep = step);
+  }
+
+  String? _logoFileName;
+
+  Future<void> _pickLogo() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['png', 'jpg', 'jpeg'],
+    );
+    if (result != null && result.files.single.path != null) {
+      final file = result.files.single;
+      final ext = file.extension?.toLowerCase() ?? '';
+      if (!['png', 'jpg', 'jpeg'].contains(ext)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Only PNG, JPG, JPEG formats are allowed'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+      setState(() {
+        _logoFile = File(file.path!);
+        _logoFileName = file.name;
+      });
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -105,7 +144,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isCreating = true);
 
     try {
-      // 1. Map institution type to it_id
       final itIdMap = {
         'Schools (Primary, Secondary, Higher Secondary)': 1,
         'Colleges': 2,
@@ -115,101 +153,74 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'Coaching Institutes': 6,
       };
 
-      // 1. Create institution
-      final insData = <String, dynamic>{
-        'insname': _institutionNameController.text.trim(),
-        'inscode': _institutionCodeController.text.trim(),
-        'insstadate': (_institutionStartDate ?? DateTime.now()).toIso8601String().split('T').first,
-        'insautusername': _authorizedUsernameController.text.trim(),
-        'insdesignation': _designationController.text.trim().isNotEmpty ? _designationController.text.trim() : 'Admin',
-        'insmobno': _mobileNumberController.text.trim(),
-        'insmail': _emailController.text.trim(),
-        'it_id': itIdMap[_institutionType] ?? 1,
-        'insrecognised': _institutionRecognized == 'Yes' ? 'Y' : 'N',
-        'insaffliation': _affiliationController.text.trim(),
-        'insaffno': _affiliationNumberController.text.trim(),
-        'insaffstayear': _affiliationStartYear?.year.toString(),
-        'insaddress1': _address1Controller.text.trim(),
-        'insaddress2': _address2Controller.text.trim(),
-        'insaddress3': _address3Controller.text.trim(),
-        'inscity': _cityController.text.trim(),
-        'insstate': _stateController.text.trim(),
-        'inscountry': _countryController.text.trim(),
-        'inspincode': _pinCodeController.text.trim(),
-        'insipaddress': '0.0.0.0',
-        'inssername': 'default',
-        'insserurl': 'default',
-        'updatedby': _authorizedUsernameController.text.trim(),
-        'activestatus': 1,
-      };
+      final yrLabel = _yearLabelController.text.trim().isNotEmpty
+          ? _yearLabelController.text.trim()
+          : '${DateTime.now().year}-${DateTime.now().year + 1}';
+      final yrStaDate = _yearStartDate ?? DateTime(DateTime.now().year, 6, 1);
+      final yrEndDate = _yearEndDate ?? DateTime(DateTime.now().year + 1, 5, 31);
 
-      final insResult = await SupabaseService.createInstitution(insData);
-      if (insResult == null) {
+      // Single atomic RPC call — if anything fails, nothing is created
+      final result = await SupabaseService.client.rpc('register_institution', params: {
+        'p_insname': _institutionNameController.text.trim(),
+        'p_inscode': _institutionCodeController.text.trim(),
+        'p_insstadate': (_institutionStartDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'p_insautusername': _authorizedUsernameController.text.trim(),
+        'p_insdesignation': _designationController.text.trim().isNotEmpty ? _designationController.text.trim() : 'Principal',
+        'p_insmobno': _mobileNumberController.text.trim(),
+        'p_insmail': _emailController.text.trim(),
+        'p_it_id': itIdMap[_institutionType] ?? 1,
+        'p_insrecognised': _institutionRecognized == 'Yes' ? 'Y' : 'N',
+        'p_insaffliation': _affiliationController.text.trim(),
+        'p_insaffno': _affiliationNumberController.text.trim(),
+        'p_insaffstayear': _affiliationStartYear?.year.toString() ?? '',
+        'p_insaddress1': _address1Controller.text.trim(),
+        'p_insaddress2': _address2Controller.text.trim(),
+        'p_insaddress3': _address3Controller.text.trim(),
+        'p_inscity': _cityController.text.trim(),
+        'p_insstate': _stateController.text.trim(),
+        'p_inscountry': _countryController.text.trim(),
+        'p_inspincode': _pinCodeController.text.trim(),
+        'p_yrlabel': yrLabel,
+        'p_yrstadate': yrStaDate.toIso8601String().split('T').first,
+        'p_yrenddate': yrEndDate.toIso8601String().split('T').first,
+        'p_adminname': _adminNameController.text.trim(),
+        'p_adminemail': _adminEmailController.text.trim(),
+        'p_adminphone': _adminPhoneController.text.trim(),
+        'p_adminpassword': _passwordController.text,
+        'p_admindob': _adminDob != null ? _adminDob!.toIso8601String().split('T').first : '2000-01-01',
+        'p_admindesignation': _adminDesignation,
+      });
+
+      final regResult = result is Map ? result : (result is List && result.isNotEmpty ? result.first : null);
+      if (regResult == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to create institution'), backgroundColor: Colors.red),
+            const SnackBar(content: Text('Registration failed'), backgroundColor: Colors.red),
           );
           setState(() => _isCreating = false);
         }
         return;
       }
 
-      final insId = insResult['ins_id'] as int;
-      final insCode = insResult['inscode']?.toString() ?? '';
-
-      // 2. Create default designation & role for the new institution
-      final desResult = await SupabaseService.createDesignation({
-        'ins_id': insId,
-        'desname': 'Chairman',
-        'activestatus': 1,
-      });
-      final roleResult = await SupabaseService.createUserRole({
-        'ins_id': insId,
-        'urname': 'Admin',
-        'activestatus': 1,
-      });
-
-      // Fetch the created des_id and ur_id
-      final designations = await SupabaseService.getDesignations(insId);
-      final roles = await SupabaseService.getUserRoles(insId);
-      final desId = designations.isNotEmpty ? designations.first['des_id'] as int : 1;
-      final urId = roles.isNotEmpty ? roles.first['ur_id'] as int : 1;
-
-      // 3. Create admin user in institutionusers
-      final userData = {
-        'ins_id': insId,
-        'inscode': insCode,
-        'usename': _adminNameController.text.trim(),
-        'usemail': _adminEmailController.text.trim(),
-        'usephone': _adminPhoneController.text.trim(),
-        'usepassword': _passwordController.text,
-        'usestadate': DateTime.now().toIso8601String().split('T').first,
-        'useotpstatus': 0,
-        'usedob': _adminDob != null ? _adminDob!.toIso8601String().split('T').first : '2000-01-01',
-        'ur_id': urId,
-        'urname': 'Admin',
-        'des_id': desId,
-        'desname': 'Chairman',
-        'userepto': 0,
-        'activestatus': 1,
-      };
-
-      final userSuccess = await SupabaseService.createInstitutionUser(userData);
-      if (!userSuccess) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Institution created but failed to create admin user'), backgroundColor: Colors.orange),
-          );
-          setState(() => _isCreating = false);
+      // Upload logo if selected
+      if (_logoFile != null && regResult['inscode'] != null) {
+        try {
+          final inscode = regResult['inscode'].toString();
+          final ext = _logoFile!.path.split('.').last;
+          final path = 'logos/$inscode.$ext';
+          await SupabaseService.client.storage.from('InstitutionLogos').upload(path, _logoFile!);
+          final logoUrl = SupabaseService.client.storage.from('InstitutionLogos').getPublicUrl(path);
+          await SupabaseService.client.from('institution').update({'inslogo': logoUrl}).eq('ins_id', regResult['ins_id']);
+        } catch (e) {
+          debugPrint('Logo upload failed: $e');
         }
-        return;
       }
 
-      // 3. Auto-login with the new admin user
+      // Auto-login with the new admin user
       if (mounted) {
         final authProvider = context.read<AuthProvider>();
         final loginSuccess = await authProvider.login(
-          userData['usemail'] as String,
+          _adminEmailController.text.trim(),
           _passwordController.text,
         );
 
@@ -526,17 +537,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _fieldLabel('Institution Name *'),
-                  TextFormField(controller: _institutionNameController, decoration: _inputDec('Enter institution name'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                ])),
-                const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _fieldLabel('Institution Code *'),
-                  TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter institution code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                ])),
-              ]),
+              // Logo picker
+              _fieldLabel('Institution Logo'),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _pickLogo,
+                    child: Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border, width: 1.5),
+                      ),
+                      child: _logoFile != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(11),
+                              child: Image.file(_logoFile!, fit: BoxFit.cover, width: 80, height: 80),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_photo_alternate_outlined, size: 28, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                                const SizedBox(height: 4),
+                                Text('Upload', style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.5))),
+                              ],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  if (_logoFileName != null) ...[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_logoFileName!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text('PNG, JPG, JPEG only', style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.5))),
+                      ],
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            _fieldLabel('Institution Name *'),
+                            TextFormField(controller: _institutionNameController, decoration: _inputDec('Enter institution name'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                          ])),
+                          const SizedBox(width: 14),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            _fieldLabel('Institution Code *'),
+                            TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter institution code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                          ])),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
 
               _fieldLabel('Institution Start Date'),
@@ -716,6 +777,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 20),
+
+          // Academic Year card
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(Icons.calendar_today_rounded, color: AppColors.accent, size: 22),
+                  const SizedBox(width: 10),
+                  const Text('Academic Year', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: 6),
+                const Text('Set up the academic year for your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Divider(height: 28, color: AppColors.border),
+
+                _fieldLabel('Year Label *'),
+                TextFormField(
+                  controller: _yearLabelController,
+                  decoration: _inputDec('e.g. 2025-2026'),
+                  style: _fieldStyle(),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Start Date *'),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(context: context, initialDate: _yearStartDate ?? DateTime(DateTime.now().year, 6, 1), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                        if (picked != null) setState(() => _yearStartDate = picked);
+                      },
+                      child: InputDecorator(
+                        decoration: _inputDec('Select start date').copyWith(suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary)),
+                        child: Text(
+                          _yearStartDate != null ? _formatDate(_yearStartDate!) : 'Select start date',
+                          style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('End Date *'),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(context: context, initialDate: _yearEndDate ?? DateTime(DateTime.now().year + 1, 5, 31), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                        if (picked != null) setState(() => _yearEndDate = picked);
+                      },
+                      child: InputDecorator(
+                        decoration: _inputDec('Select end date').copyWith(suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary)),
+                        child: Text(
+                          _yearEndDate != null ? _formatDate(_yearEndDate!) : 'Select end date',
+                          style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ])),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -748,15 +878,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Text('Create an admin account for your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
-                _fieldLabel('Admin Name *'),
-                TextFormField(
-                  controller: _adminNameController,
-                  decoration: _inputDec('Enter admin name').copyWith(
-                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.textSecondary),
-                  ),
-                  style: _fieldStyle(),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
-                ),
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Admin Name *'),
+                    TextFormField(
+                      controller: _adminNameController,
+                      decoration: _inputDec('Enter admin name').copyWith(
+                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.textSecondary),
+                      ),
+                      style: _fieldStyle(),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Designation *'),
+                    DropdownButtonFormField<String>(
+                      value: _adminDesignation,
+                      decoration: _inputDec('Select designation').copyWith(
+                        prefixIcon: const Icon(Icons.badge_outlined, size: 18, color: AppColors.textSecondary),
+                      ),
+                      style: _fieldStyle(),
+                      items: _designationOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      onChanged: (v) => setState(() => _adminDesignation = v ?? 'Principal'),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                  ])),
+                ]),
                 const SizedBox(height: 14),
 
                 Row(children: [

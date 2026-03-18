@@ -58,7 +58,7 @@ class ReceiptFeeItem {
 }
 
 /// Flutter receipt widget matching the Figma design exactly
-/// Page size: 595 x 842 (A4 points)
+/// Renders multiple A4 pages (595 x 842) when fee items overflow
 class ReceiptWidget extends StatelessWidget {
   final ReceiptData data;
 
@@ -75,16 +75,71 @@ class ReceiptWidget extends StatelessWidget {
   static const _paidGreenBg = Color(0xFFc2eecd);
   static const _dividerColor = Color(0xFFACBEDD);
 
+  // Max fee items per page (first page has header+student info so fewer items fit)
+  static const _maxItemsFirstPage = 8;
+  static const _maxItemsContinuation = 12;
+
   @override
   Widget build(BuildContext context) {
+    final totalItems = data.feeDetails.length;
+
+    // Calculate pages
+    final List<_PageChunk> pages = [];
+    int remaining = totalItems;
+    int offset = 0;
+
+    if (remaining <= _maxItemsFirstPage) {
+      pages.add(_PageChunk(startIdx: 0, items: data.feeDetails, isFirst: true, isLast: true));
+    } else {
+      // First page
+      final firstCount = _maxItemsFirstPage;
+      pages.add(_PageChunk(
+        startIdx: 0,
+        items: data.feeDetails.sublist(0, firstCount),
+        isFirst: true,
+        isLast: false,
+      ));
+      remaining -= firstCount;
+      offset = firstCount;
+
+      // Continuation pages
+      while (remaining > 0) {
+        final count = remaining <= _maxItemsContinuation ? remaining : _maxItemsContinuation;
+        final isLast = count >= remaining;
+        pages.add(_PageChunk(
+          startIdx: offset,
+          items: data.feeDetails.sublist(offset, offset + count),
+          isFirst: false,
+          isLast: isLast,
+        ));
+        offset += count;
+        remaining -= count;
+      }
+    }
+
+    if (pages.length == 1) {
+      return _buildPage(pages[0], 1, 1);
+    }
+
+    return Column(
+      children: [
+        for (int i = 0; i < pages.length; i++) ...[
+          if (i > 0) const SizedBox(height: 16),
+          _buildPage(pages[i], i + 1, pages.length),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPage(_PageChunk chunk, int pageNum, int totalPages) {
     return Container(
       width: 595,
       height: 842,
       color: Colors.white,
       child: Stack(
         children: [
-          // Watermark (center of fee table area)
-          if (data.schoolLogoUrl != null)
+          // Watermark
+          if (data.schoolLogoUrl != null && chunk.isFirst)
             Positioned(
               left: (595 - 228) / 2,
               top: 278 + (286 - 228) / 2,
@@ -105,198 +160,75 @@ class ReceiptWidget extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
-                // Header row: Logo + School info (left) | Receipt title + No/Date (right)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Left: Logo + School name + Address
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (data.schoolLogoUrl != null)
-                            SizedBox(
-                              width: 64,
-                              height: 64,
-                              child: Image.network(
-                                data.schoolLogoUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                              ),
-                            ),
-                          if (data.schoolLogoUrl != null) const SizedBox(height: 8),
-                          Text(
-                            data.schoolName,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _darkBlue,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          // School address
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Address:  ',
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: _textDark,
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  data.schoolAddress,
-                                  maxLines: 3,
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                    color: _textMedium,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Right: Receipt title + No + Date
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Receipt',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w600,
-                            color: _primaryBlue,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _labelValue('Receipt No:', data.receiptNo),
-                        const SizedBox(height: 6),
-                        _labelValue('Date:', data.date),
-                      ],
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 40),
+                // Header (on every page)
+                _buildHeader(pageNum, totalPages),
                 const SizedBox(height: 12),
-                // Divider
                 Container(height: 1, color: _dividerColor),
                 const SizedBox(height: 12),
-                // To section
-                Text(
-                  'To:',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _textDark,
+                // Student info (first page only)
+                if (chunk.isFirst) ...[
+                  _buildStudentInfo(),
+                  const SizedBox(height: 20),
+                ],
+                // Fee Table for this page's items
+                _buildFeeTable(chunk),
+                if (chunk.isLast) ...[
+                  const Spacer(),
+                  // Payment info
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _labelValue('Receipt Method:', data.paymentMethod),
+                      const SizedBox(height: 6),
+                      _labelValue('Date:', data.paymentDate),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left: Name, Mobile, Address
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _labelValue('Name:', data.studentName),
-                          const SizedBox(height: 6),
-                          _labelValue('Mobile No:', data.mobileNo),
-                          const SizedBox(height: 6),
-                          _wrappedLabelValue('Address:', data.address),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Right: Admission No, Class
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _labelValue('Admission No:', data.admissionNo),
-                        const SizedBox(height: 6),
-                        _labelValue('Class:', data.className),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Fee Table
-                _buildFeeTable(),
-                const Spacer(),
-                // Payment info
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _labelValue('Receipt Method:', data.paymentMethod),
-                    const SizedBox(height: 6),
-                    _labelValue('Date:', data.paymentDate),
-                  ],
-                ),
-                const Spacer(),
-                // Footer
-                Center(
-                  child: Text(
-                    'Thank you for your payment.',
-                    style: GoogleFonts.ptSerif(
-                      fontSize: 14,
-                      color: _textDark,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (data.schoolEmail != null || data.schoolMobile != null)
+                  const Spacer(),
+                  // Footer
                   Center(
-                    child: RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: GoogleFonts.montserrat(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: _textMedium,
-                          height: 1.6,
-                        ),
-                        children: [
-                          const TextSpan(text: 'For any further inquiries, please contact us at '),
-                          if (data.schoolEmail != null)
-                            TextSpan(
-                              text: data.schoolEmail!,
-                              style: GoogleFonts.montserrat(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: _textMedium,
-                              ),
-                            ),
-                          if (data.schoolEmail != null && data.schoolMobile != null)
-                            const TextSpan(text: ' or\ncall '),
-                          if (data.schoolEmail == null && data.schoolMobile != null)
-                            const TextSpan(text: ''),
-                          if (data.schoolMobile != null)
-                            TextSpan(
-                              text: data.schoolMobile!,
-                              style: GoogleFonts.montserrat(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: _textMedium,
-                              ),
-                            ),
-                        ],
-                      ),
+                    child: Text(
+                      'Thank you for your payment.',
+                      style: GoogleFonts.ptSerif(fontSize: 14, color: _textDark),
                     ),
                   ),
-                const SizedBox(height: 40),
+                  const SizedBox(height: 8),
+                  if (data.schoolEmail != null || data.schoolMobile != null)
+                    Center(
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium, height: 1.6),
+                          children: [
+                            const TextSpan(text: 'For any further inquiries, please contact us at '),
+                            if (data.schoolEmail != null)
+                              TextSpan(text: data.schoolEmail!, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textMedium)),
+                            if (data.schoolEmail != null && data.schoolMobile != null)
+                              const TextSpan(text: ' or\ncall '),
+                            if (data.schoolEmail == null && data.schoolMobile != null)
+                              const TextSpan(text: ''),
+                            if (data.schoolMobile != null)
+                              TextSpan(text: data.schoolMobile!, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textMedium)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 40),
+                ] else ...[
+                  const Spacer(),
+                  Center(
+                    child: Text(
+                      'Continued on next page...',
+                      style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, fontStyle: FontStyle.italic, color: _textMedium),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ],
             ),
           ),
 
-          // Status stamp overlay (rotated, centered on fee table)
+          // Status stamp overlay (all pages)
           if (data.status == 'paid' || data.status == 'failed')
             Positioned(
               left: 0,
@@ -319,11 +251,7 @@ class ReceiptWidget extends StatelessWidget {
                       ),
                       child: Text(
                         data.status == 'paid' ? 'PAID' : 'FAILED',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          color: data.status == 'paid' ? _paidGreen : const Color(0xFFFF3B30),
-                        ),
+                        style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.w600, color: data.status == 'paid' ? _paidGreen : const Color(0xFFFF3B30)),
                       ),
                     ),
                   ),
@@ -335,29 +263,100 @@ class ReceiptWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildHeader(int pageNum, int totalPages) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (data.schoolLogoUrl != null)
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Image.network(
+                    data.schoolLogoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+              if (data.schoolLogoUrl != null) const SizedBox(height: 8),
+              Text(data.schoolName, style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w600, color: _darkBlue)),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Address:  ', style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
+                  Expanded(child: Text(data.schoolAddress, maxLines: 3, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium))),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text('Receipt', style: GoogleFonts.montserrat(fontSize: 32, fontWeight: FontWeight.w600, color: _primaryBlue)),
+            const SizedBox(height: 12),
+            _labelValue('Receipt No:', data.receiptNo),
+            const SizedBox(height: 6),
+            _labelValue('Date:', data.date),
+            if (totalPages > 1) ...[
+              const SizedBox(height: 6),
+              Text('Page $pageNum of $totalPages', style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStudentInfo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('To:', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _labelValue('Name:', data.studentName),
+                  const SizedBox(height: 6),
+                  _labelValue('Mobile No:', data.mobileNo),
+                  const SizedBox(height: 6),
+                  _wrappedLabelValue('Address:', data.address),
+                ],
+              ),
+            ),
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _labelValue('Admission No:', data.admissionNo),
+                const SizedBox(height: 6),
+                _labelValue('Class:', data.className),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _wrappedLabelValue(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.montserrat(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: _textDark,
-          ),
-        ),
+        Text(label, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
         const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            value,
-            style: GoogleFonts.montserrat(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: _textMedium,
-            ),
-          ),
-        ),
+        Expanded(child: Text(value, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium))),
       ],
     );
   }
@@ -366,28 +365,14 @@ class ReceiptWidget extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.montserrat(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: _textDark,
-          ),
-        ),
+        Text(label, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
         const SizedBox(width: 6),
-        Text(
-          value,
-          style: GoogleFonts.montserrat(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: _textMedium,
-          ),
-        ),
+        Text(value, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium)),
       ],
     );
   }
 
-  Widget _buildFeeTable() {
+  Widget _buildFeeTable(_PageChunk chunk) {
     return Stack(
       children: [
         Column(
@@ -414,55 +399,40 @@ class ReceiptWidget extends StatelessWidget {
               ),
             ),
             // Data Rows
-            for (var i = 0; i < data.feeDetails.length; i++)
-              _buildDataRow(i, data.feeDetails[i]),
-            // Sub Total Row
-            Row(
-              children: [
-                // Empty left area (no blue background)
-                const SizedBox(width: 172),
-                // Blue Sub Total area
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: _primaryBlue,
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(4),
-                        bottomRight: Radius.circular(4),
+            for (var i = 0; i < chunk.items.length; i++)
+              _buildDataRow(chunk.startIdx + i, chunk.items[i]),
+            // Sub Total Row (only on last page)
+            if (chunk.isLast)
+              Row(
+                children: [
+                  const SizedBox(width: 172),
+                  Expanded(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: _primaryBlue,
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(4),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text('Sub Total', textAlign: TextAlign.right,
+                              style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ),
+                          SizedBox(
+                            width: 119,
+                            child: Text('\u20B9${_formatAmount(data.total)}', textAlign: TextAlign.right,
+                              style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ),
+                        ],
                       ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Sub Total',
-                            textAlign: TextAlign.right,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 119,
-                          child: Text(
-                            '\u20B9${_formatAmount(data.total)}',
-                            textAlign: TextAlign.right,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
       ],
@@ -473,14 +443,7 @@ class ReceiptWidget extends StatelessWidget {
     final child = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       alignment: Alignment.center,
-      child: Text(
-        text,
-        style: GoogleFonts.montserrat(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: _primaryBlue,
-        ),
-      ),
+      child: Text(text, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _primaryBlue)),
     );
     return flex ? Expanded(child: child) : SizedBox(width: width, child: child);
   }
@@ -499,15 +462,10 @@ class ReceiptWidget extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // S.No
             _dataCell('${index + 1}.', width: 46, alignTop: true),
-            // Vertical divider
             Container(width: 1, color: _borderColor),
-            // Term
             _dataCell(term.term, width: 124, alignTop: true),
-            // Vertical divider
             Container(width: 1, color: _borderColor),
-            // Fee Type column
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -515,22 +473,13 @@ class ReceiptWidget extends StatelessWidget {
                   for (var fee in term.fees)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      child: Text(
-                        fee.type,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.montserrat(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: _textDark,
-                        ),
-                      ),
+                      child: Text(fee.type, textAlign: TextAlign.center,
+                        style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
                     ),
                 ],
               ),
             ),
-            // Vertical divider
             Container(width: 1, color: _borderColor),
-            // Amount column (right-aligned)
             SizedBox(
               width: 119,
               child: Column(
@@ -539,15 +488,8 @@ class ReceiptWidget extends StatelessWidget {
                   for (var fee in term.fees)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      child: Text(
-                        '\u20B9${_formatAmount(fee.amount)}',
-                        textAlign: TextAlign.right,
-                        style: GoogleFonts.montserrat(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: _textDark,
-                        ),
-                      ),
+                      child: Text('\u20B9${_formatAmount(fee.amount)}', textAlign: TextAlign.right,
+                        style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
                     ),
                 ],
               ),
@@ -564,29 +506,31 @@ class ReceiptWidget extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         alignment: alignTop ? Alignment.topCenter : Alignment.center,
-        child: Text(
-          text,
-          style: GoogleFonts.montserrat(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: _textDark,
-          ),
-        ),
+        child: Text(text, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
       ),
     );
   }
 
-
   String _formatAmount(double amount) {
     if (amount == amount.truncateToDouble()) {
       return amount.toInt().toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]},',
-      );
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
     }
     return amount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+\.)'),
-      (m) => '${m[1]},',
-    );
+      RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
   }
+}
+
+class _PageChunk {
+  final int startIdx;
+  final List<ReceiptTermDetail> items;
+  final bool isFirst;
+  final bool isLast;
+
+  const _PageChunk({
+    required this.startIdx,
+    required this.items,
+    required this.isFirst,
+    required this.isLast,
+  });
 }

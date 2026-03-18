@@ -7,6 +7,62 @@ import '../../services/supabase_service.dart';
 import 'package:provider/provider.dart';
 import '../../utils/auth_provider.dart';
 
+void _showImportResultDialog(BuildContext context, {required int imported, required int skipped, List<String> errors = const [], VoidCallback? onDone}) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => Center(
+      child: Container(
+        width: 420,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(errors.isEmpty ? Icons.check_circle_rounded : Icons.warning_rounded, size: 64, color: errors.isEmpty ? AppColors.success : AppColors.error),
+            const SizedBox(height: 16),
+            Text(errors.isEmpty ? 'Import Complete' : 'Import Completed with Errors', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text('$imported imported successfully, $skipped skipped', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            if (errors.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                height: 150,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView(
+                  children: errors.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(e, style: const TextStyle(fontSize: 11, color: AppColors.error)),
+                  )).toList(),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () { Navigator.pop(ctx); onDone?.call(); },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class MasterImportScreen extends StatefulWidget {
   const MasterImportScreen({super.key});
   @override
@@ -61,6 +117,59 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
       ],
     );
   }
+}
+
+// ═══════════════════════════════════════════════
+// STAGING TABLE IMPORT HELPER
+// ═══════════════════════════════════════════════
+
+Future<Map<String, int>> _stagingImport({
+  required int insId,
+  required String impType,
+  required List<List<dynamic>> rows,
+  required int colCount,
+}) async {
+  // 1. Clear old pending rows
+  await SupabaseService.client.from('master_import').delete().eq('ins_id', insId).eq('imp_type', impType).eq('status', 'PENDING');
+
+  // 2. Bulk insert into staging table in batches of 500
+  for (int i = 0; i < rows.length; i += 500) {
+    final batch = rows.sublist(i, (i + 500).clamp(0, rows.length));
+    final records = batch.map((row) {
+      final map = <String, dynamic>{
+        'imp_type': impType,
+        'ins_id': insId,
+      };
+      for (int c = 0; c < colCount; c++) {
+        final val = c < row.length ? row[c].toString().trim() : '';
+        map['col${c + 1}'] = val.isEmpty ? null : val;
+      }
+      return map;
+    }).toList();
+    await SupabaseService.client.from('master_import').insert(records);
+  }
+
+  // 3. Call processing function
+  final result = await SupabaseService.client.rpc('process_master_import', params: {'p_ins_id': insId});
+  final list = result is List ? result : [result];
+  final r = list.isNotEmpty ? list.first : {};
+  return {
+    'total': r['total'] ?? 0,
+    'imported': r['imported'] ?? 0,
+    'skipped': r['skipped'] ?? 0,
+  };
+}
+
+Future<List<String>> _getImportErrors(int insId, String impType) async {
+  final errors = await SupabaseService.client
+      .from('master_import')
+      .select('imp_id, error_msg')
+      .eq('ins_id', insId)
+      .eq('imp_type', impType)
+      .eq('status', 'ERROR')
+      .order('imp_id')
+      .limit(20);
+  return (errors as List).map((e) => 'Row ${e['imp_id']}: ${e['error_msg']}').toList();
 }
 
 // ═══════════════════════════════════════════════
@@ -317,20 +426,7 @@ Widget _buildImportCard({
 }
 
 // ═══════════════════════════════════════════════
-// Helper: resolve yrlabel → yr_id
-// ═══════════════════════════════════════════════
-Future<Map<String, int>> _buildYearMap(int insId) async {
-  final years = await SupabaseService.getYears(insId);
-  final map = <String, int>{};
-  for (final y in years) {
-    map[y['yrlabel'].toString().trim()] = y['yr_id'] as int;
-  }
-  return map;
-}
-
-// ═══════════════════════════════════════════════
 // 1. FEE GROUP TAB
-// Columns: Group Name *, Year *, Bank ID
 // ═══════════════════════════════════════════════
 
 class _FeeGroupTab extends StatefulWidget {
@@ -343,10 +439,9 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
-  bool _showResult = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
-  static const _headers = ['Group Name *', 'Year *', 'Bank ID'];
+  static const _headers = ['Group Name *', 'Year *'];
 
   @override
   bool get wantKeepAlive => true;
@@ -356,7 +451,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _showResult = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
   }
 
   Future<void> _save() async {
@@ -364,31 +459,16 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
-    final yearMap = await _buildYearMap(insId);
-
-    for (int i = 0; i < _rows.length; i++) {
-      final row = _rows[i];
-      final fgdesc = row.isNotEmpty ? row[0].toString().trim() : '';
-      final yrLabel = row.length > 1 ? row[1].toString().trim() : '';
-      final banId = row.length > 2 ? int.tryParse(row[2].toString().trim()) : null;
-      if (fgdesc.isEmpty) { _skipped++; _errors.add('Row ${i + 1}: Empty group name'); continue; }
-      final yrId = yearMap[yrLabel];
-      if (yrId == null) { _skipped++; _errors.add('Row ${i + 1}: Year "$yrLabel" not found'); continue; }
-      try {
-        await SupabaseService.client.from('feegroup').insert({
-          'fgdesc': fgdesc,
-          'ban_id': banId,
-          'ins_id': insId,
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'activestatus': 1,
-        });
-        _imported++;
-      } catch (e) {
-        _skipped++; _errors.add('Row ${i + 1}: $e');
-      }
+    try {
+      final result = await _stagingImport(insId: insId, impType: 'FEEGROUP', rows: _rows, colCount: 2);
+      _imported = result['imported'] ?? 0;
+      _skipped = result['skipped'] ?? 0;
+      if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEEGROUP');
+    } catch (e) {
+      _errors = ['Import failed: $e'];
     }
-    setState(() { _saving = false; _showResult = true; });
+    setState(() { _saving = false; _rows = []; _fileName = null; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
   @override
@@ -401,8 +481,8 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       onBrowse: _browse,
       onSave: _rows.isNotEmpty ? _save : null,
       onTemplate: () => _exportTemplate('Fee Group', _headers),
-      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: _showResult,
-      onDismissResult: () => setState(() => _showResult = false),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
     );
   }
 }
@@ -422,7 +502,6 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
-  bool _showResult = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional', 'Category'];
@@ -435,7 +514,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _showResult = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
   }
 
   Future<void> _save() async {
@@ -443,46 +522,16 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
-    final yearMap = await _buildYearMap(insId);
-
-    // Fetch fee groups for lookup
-    final fgList = await SupabaseService.client.from('feegroup').select('fg_id, fgdesc').eq('ins_id', insId).eq('activestatus', 1);
-    final fgMap = <String, int>{};
-    for (final fg in fgList) {
-      fgMap[fg['fgdesc'].toString().toUpperCase().trim()] = fg['fg_id'] as int;
+    try {
+      final result = await _stagingImport(insId: insId, impType: 'FEETYPE', rows: _rows, colCount: 6);
+      _imported = result['imported'] ?? 0;
+      _skipped = result['skipped'] ?? 0;
+      if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEETYPE');
+    } catch (e) {
+      _errors = ['Import failed: $e'];
     }
-
-    for (int i = 0; i < _rows.length; i++) {
-      final row = _rows[i];
-      final feedesc = row.isNotEmpty ? row[0].toString().trim() : '';
-      final feeshort = row.length > 1 ? row[1].toString().trim() : '';
-      final fgName = row.length > 2 ? row[2].toString().trim().toUpperCase() : '';
-      final yrLabel = row.length > 3 ? row[3].toString().trim() : '';
-      final feeoptional = row.length > 4 ? int.tryParse(row[4].toString().trim()) : null;
-      final feecategory = row.length > 5 ? int.tryParse(row[5].toString().trim()) : null;
-
-      if (feedesc.isEmpty || feeshort.isEmpty) { _skipped++; _errors.add('Row ${i + 1}: Missing fee name or short name'); continue; }
-      final fgId = fgMap[fgName];
-      if (fgId == null) { _skipped++; _errors.add('Row ${i + 1}: Fee group "$fgName" not found'); continue; }
-      final yrId = yearMap[yrLabel];
-      if (yrId == null) { _skipped++; _errors.add('Row ${i + 1}: Year "$yrLabel" not found'); continue; }
-      try {
-        await SupabaseService.client.from('feetype').insert({
-          'feedesc': feedesc,
-          'feeshort': feeshort,
-          'fg_id': fgId,
-          'feeoptional': feeoptional,
-          'feecategory': feecategory,
-          'yr_id': yrId,
-          'yrlabel': yrLabel,
-          'activestatus': 1,
-        });
-        _imported++;
-      } catch (e) {
-        _skipped++; _errors.add('Row ${i + 1}: $e');
-      }
-    }
-    setState(() { _saving = false; _showResult = true; });
+    setState(() { _saving = false; _rows = []; _fileName = null; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
   @override
@@ -495,8 +544,8 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onBrowse: _browse,
       onSave: _rows.isNotEmpty ? _save : null,
       onTemplate: () => _exportTemplate('Fee Type', _headers),
-      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: _showResult,
-      onDismissResult: () => setState(() => _showResult = false),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
     );
   }
 }
@@ -516,10 +565,9 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
-  bool _showResult = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
-  static const _headers = ['Concession Name *', 'Order'];
+  static const _headers = ['Concession Name *'];
 
   @override
   bool get wantKeepAlive => true;
@@ -529,7 +577,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _showResult = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
   }
 
   Future<void> _save() async {
@@ -537,25 +585,16 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
-
-    for (int i = 0; i < _rows.length; i++) {
-      final row = _rows[i];
-      final condesc = row.isNotEmpty ? row[0].toString().trim() : '';
-      final ordid = row.length > 1 ? int.tryParse(row[1].toString().trim()) : null;
-      if (condesc.isEmpty) { _skipped++; _errors.add('Row ${i + 1}: Empty concession name'); continue; }
-      try {
-        await SupabaseService.client.from('concessioncategory').insert({
-          'condesc': condesc,
-          'ins_id': insId,
-          'ordid': ordid,
-          'activestatus': 1,
-        });
-        _imported++;
-      } catch (e) {
-        _skipped++; _errors.add('Row ${i + 1}: $e');
-      }
+    try {
+      final result = await _stagingImport(insId: insId, impType: 'CONCESSION', rows: _rows, colCount: 1);
+      _imported = result['imported'] ?? 0;
+      _skipped = result['skipped'] ?? 0;
+      if (_skipped > 0) _errors = await _getImportErrors(insId, 'CONCESSION');
+    } catch (e) {
+      _errors = ['Import failed: $e'];
     }
-    setState(() { _saving = false; _showResult = true; });
+    setState(() { _saving = false; _rows = []; _fileName = null; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
   @override
@@ -568,8 +607,8 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       onBrowse: _browse,
       onSave: _rows.isNotEmpty ? _save : null,
       onTemplate: () => _exportTemplate('Concession', _headers),
-      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: _showResult,
-      onDismissResult: () => setState(() => _showResult = false),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
     );
   }
 }
@@ -589,7 +628,6 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
-  bool _showResult = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   static const _headers = ['Class *', 'Term', 'Fee Type *', 'Amount', 'Due Date', 'NOB', 'BGB', 'DHB'];
@@ -602,47 +640,24 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _showResult = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
   }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
-
-    for (int i = 0; i < _rows.length; i++) {
-      final row = _rows[i];
-      final cfclass = row.isNotEmpty ? row[0].toString().trim() : '';
-      final cfterm = row.length > 1 ? row[1].toString().trim() : '';
-      final cffeetype = row.length > 2 ? row[2].toString().trim() : '';
-      final cfamount = row.length > 3 ? double.tryParse(row[3].toString().trim()) : null;
-      final dueDateStr = row.length > 4 ? row[4].toString().trim() : '';
-      final cfnob = row.length > 5 ? int.tryParse(row[5].toString().trim()) : null;
-      final cfbgb = row.length > 6 ? int.tryParse(row[6].toString().trim()) : null;
-      final cfdhb = row.length > 7 ? int.tryParse(row[7].toString().trim()) : null;
-
-      if (cfclass.isEmpty || cffeetype.isEmpty) { _skipped++; _errors.add('Row ${i + 1}: Missing class or fee type'); continue; }
-
-      final data = <String, dynamic>{
-        'cfclass': cfclass,
-        'cfterm': cfterm.isNotEmpty ? cfterm : null,
-        'cffeetype': cffeetype,
-        'cfamount': cfamount,
-        'cfnob': cfnob,
-        'cfbgb': cfbgb,
-        'cfdhb': cfdhb,
-      };
-      if (dueDateStr.isNotEmpty) {
-        try { data['cfdduedate'] = DateTime.parse(dueDateStr).toIso8601String().split('T').first; } catch (_) {}
-      }
-
-      try {
-        await SupabaseService.client.from('classfeedemand').insert(data);
-        _imported++;
-      } catch (e) {
-        _skipped++; _errors.add('Row ${i + 1}: $e');
-      }
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 0;
+    try {
+      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: _rows, colCount: 8);
+      _imported = result['imported'] ?? 0;
+      _skipped = result['skipped'] ?? 0;
+      if (_skipped > 0) _errors = await _getImportErrors(insId, 'CLASSFEEDEMAND');
+    } catch (e) {
+      _errors = ['Import failed: $e'];
     }
-    setState(() { _saving = false; _showResult = true; });
+    setState(() { _saving = false; _rows = []; _fileName = null; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
   @override
@@ -655,8 +670,8 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onBrowse: _browse,
       onSave: _rows.isNotEmpty ? _save : null,
       onTemplate: () => _exportTemplate('Class Fee Demand', _headers),
-      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: _showResult,
-      onDismissResult: () => setState(() => _showResult = false),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
     );
   }
 }

@@ -522,9 +522,15 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.accent.withValues(alpha: 0.12),
-                backgroundImage: (s.stuphoto != null && s.stuphoto!.startsWith('http')) ? NetworkImage(s.stuphoto!) : null,
                 child: (s.stuphoto != null && s.stuphoto!.startsWith('http'))
-                    ? null
+                    ? ClipOval(
+                        child: Image.network(
+                          s.stuphoto!,
+                          width: 40, height: 40, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
+                              style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14)),
+                        ),
+                      )
                     : Text(s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
                         style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14)),
               ),
