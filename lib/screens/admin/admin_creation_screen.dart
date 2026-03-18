@@ -81,6 +81,93 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     }
   }
 
+
+  void _showAddDesignationDialog() {
+    final controller = TextEditingController();
+    int? reportsTo;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.badge_outlined, size: 18, color: AppColors.accent),
+              const SizedBox(width: 8),
+              const Text('Add Designation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Designation Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Enter designation name',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Reports To', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<int?>(
+                value: reportsTo,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('None')),
+                  ..._designationsList.map((d) => DropdownMenuItem(
+                        value: d['des_id'] as int?,
+                        child: Text(d['desname'] as String),
+                      )),
+                ],
+                onChanged: (v) => setDialogState(() => reportsTo = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add, size: 16, color: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+              onPressed: () async {
+                final name = controller.text.trim();
+                if (name.isEmpty) return;
+                final auth = Provider.of<AuthProvider>(ctx, listen: false);
+                final insId = auth.insId;
+                if (insId == null) return;
+                final ok = await SupabaseService.createDesignation({
+                  'ins_id': insId,
+                  'desname': name,
+                  'desrepto': reportsTo,
+                  'activestatus': 1,
+                });
+                if (!mounted) return;
+                if (ok) {
+                  Navigator.pop(ctx);
+                  final desigs = await SupabaseService.getDesignations(insId);
+                  setState(() {
+                    _designationsList = desigs;
+                    _selectedDesignation = name;
+                    final match = desigs.firstWhere((d) => d['desname'] == name, orElse: () => {});
+                    _selectedDesId = match['des_id'] as int?;
+                  });
+                }
+              },
+              label: const Text('Add', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _createUser() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDesignation == null || _selectedRole == null) {
@@ -232,13 +319,27 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
               decoration: _inputDecoration('Select designation'),
-              items: _designationsList
-                  .map((d) => DropdownMenuItem(
-                        value: d['desname'] as String,
-                        child: Text(d['desname'] as String),
-                      ))
-                  .toList(),
+              items: [
+                ..._designationsList.map((d) => DropdownMenuItem(
+                      value: d['desname'] as String,
+                      child: Text(d['desname'] as String),
+                    )),
+                const DropdownMenuItem(
+                  value: '__add_new__',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_circle_outline, size: 16, color: Color(0xFF00BFA5)),
+                      SizedBox(width: 8),
+                      Text('Add New Designation', style: TextStyle(color: Color(0xFF00BFA5), fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
               onChanged: (v) {
+                if (v == '__add_new__') {
+                  _showAddDesignationDialog();
+                  return;
+                }
                 final match = _designationsList.firstWhere(
                   (d) => d['desname'] == v,
                   orElse: () => {},
@@ -248,7 +349,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   _selectedDesId = match['des_id'] as int?;
                 });
               },
-              validator: (v) => v == null ? 'Required' : null,
+              validator: (v) => v == null || v == '__add_new__' ? 'Required' : null,
             ),
             const SizedBox(height: 16),
 

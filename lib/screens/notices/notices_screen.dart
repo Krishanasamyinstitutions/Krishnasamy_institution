@@ -507,7 +507,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
 
   static const _priorities = ['Normal', 'Medium', 'High', 'Urgent'];
   static const _categories = ['General', 'Exam', 'Holiday', 'Event', 'Fee', 'Result'];
-  static const _targetTypes = ['All Students', 'Specific Classes'];
+  static const _targetTypes = ['All Students', 'Specific Classes', 'Staff'];
 
   @override
   void initState() {
@@ -589,7 +589,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     try {
       final targetLabel = _targetType == 'All Students'
           ? 'All Students'
-          : _selectedClasses.join(', ');
+          : _targetType == 'Staff'
+              ? 'Staff'
+              : _selectedClasses.join(', ');
 
       // Insert notice
       await SupabaseService.client.from('notice').insert({
@@ -608,9 +610,24 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         'activestatus': 1,
       });
 
-      // Send notification to targeted students
+      // Send notification to targeted audience
       List<Map<String, dynamic>> targetStudents = [];
-      if (_targetType == 'All Students') {
+      if (_targetType == 'Staff') {
+        // Send to institution users (staff)
+        final users = await SupabaseService.getInstitutionUsers(insId);
+        if (users.isNotEmpty) {
+          final staffNotifications = users.map((u) => {
+            'ins_id': insId,
+            'stu_id': null,
+            'notititle': title,
+            'notibody': desc,
+            'notitype': 'notice',
+            'isread': 0,
+            'activestatus': 1,
+          }).toList();
+          await SupabaseService.client.from('notification').insert(staffNotifications);
+        }
+      } else if (_targetType == 'All Students') {
         final allStudents = await SupabaseService.getStudents(insId);
         targetStudents = allStudents.map((s) => {'stu_id': s.stuId, 'stuname': s.stuname}).toList();
       } else {
@@ -790,7 +807,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         child: GestureDetector(
                           onTap: () => setState(() {
                             _targetType = t;
-                            if (t == 'All Students') _selectedClasses.clear();
+                            if (t != 'Specific Classes') _selectedClasses.clear();
                           }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -803,7 +820,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  t == 'All Students' ? Icons.groups_rounded : Icons.class_rounded,
+                                  t == 'All Students' ? Icons.groups_rounded : t == 'Staff' ? Icons.badge_rounded : Icons.class_rounded,
                                   size: 16,
                                   color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
@@ -1012,7 +1029,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             Icon(Icons.people_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                             const SizedBox(width: 4),
                             Text(
-                              _targetType == 'All Students' ? 'All Students' : '${_selectedClasses.length} classes',
+                              _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : '${_selectedClasses.length} classes',
                               style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7)),
                             ),
                           ],
