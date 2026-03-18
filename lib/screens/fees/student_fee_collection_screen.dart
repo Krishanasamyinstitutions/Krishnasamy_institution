@@ -8,6 +8,13 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+int _classIndex(String c) {
+  final idx = _classOrder.indexOf(c.toUpperCase());
+  return idx >= 0 ? idx : _classOrder.length;
+}
+
 const _termOrder = [
   'I TERM', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER',
   'II TERM', 'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY',
@@ -38,6 +45,10 @@ class _StudentFeeCollectionScreenState
   final _bankNameController = TextEditingController();
   DateTime? _chequeDate;
   List<Map<String, dynamic>> _studentSuggestions = [];
+  List<String> _classList = [];
+  String? _selectedClass;
+  List<Map<String, dynamic>> _classSuggestions = [];
+
 
   bool _searching = false;
   String? _errorMsg;
@@ -55,6 +66,37 @@ class _StudentFeeCollectionScreenState
   final Map<String, TextEditingController> _fineCtrl = {};
   final Map<String, TextEditingController> _conCtrl = {};
   final Set<String> _selected = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchClasses();
+  }
+
+  Future<void> _fetchClasses() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    final classes = await SupabaseService.getClasses(insId);
+    classes.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+    if (mounted) setState(() => _classList = classes);
+  }
+
+  Future<void> _searchByClass(String className) async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final rows = await SupabaseService.client
+          .from('students')
+          .select('stu_id, stuname, stuadmno, stuclass')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('stuclass', className)
+          .order('stuname', ascending: true);
+      setState(() => _classSuggestions = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -78,6 +120,8 @@ class _StudentFeeCollectionScreenState
       _classController.clear();
       _remarksController.clear();
       _studentSuggestions = [];
+      _classSuggestions = [];
+      _selectedClass = null;
       _student = null;
       _parent = null;
       _allDemands = [];
@@ -116,7 +160,10 @@ class _StudentFeeCollectionScreenState
     _admNoController.text = student['stuadmno']?.toString() ?? '';
     _nameController.text = student['stuname']?.toString() ?? '';
     _classController.text = student['stuclass']?.toString() ?? '';
-    setState(() => _studentSuggestions = []);
+    setState(() {
+      _studentSuggestions = [];
+      _classSuggestions = [];
+    });
     _search();
   }
 
@@ -406,11 +453,45 @@ class _StudentFeeCollectionScreenState
               ),
             ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _classController,
+          DropdownButtonFormField<String>(
+            value: _selectedClass,
             decoration: _inputDec('Class'),
-            readOnly: true,
+            isExpanded: true,
+            items: _classList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedClass = val;
+                _classController.text = val ?? '';
+                _classSuggestions = [];
+              });
+              if (val != null) _searchByClass(val);
+            },
           ),
+          if (_classSuggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              constraints: const BoxConstraints(maxHeight: 220),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _classSuggestions.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final s = _classSuggestions[i];
+                  return ListTile(
+                    dense: true,
+                    title: Text(s['stuname']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: const TextStyle(fontSize: 11)),
+                    onTap: () => _selectSuggestion(s),
+                  );
+                },
+              ),
+            ),
           if (_errorMsg != null) ...[
             const SizedBox(height: 10),
             Container(
