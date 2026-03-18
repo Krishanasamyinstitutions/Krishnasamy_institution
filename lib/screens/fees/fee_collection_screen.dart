@@ -3499,14 +3499,14 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           ),
           const Divider(height: 1),
           // Fee detail table
-          LayoutBuilder(builder: (context, constraints) {
+          Expanded(child: LayoutBuilder(builder: (context, constraints) {
           double totalDemand = 0, totalPaid = 0, totalBalance = 0;
           for (final d in demands) {
             totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
             totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
             totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
           }
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return SingleChildScrollView(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
@@ -3565,8 +3565,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 ),
               ],
             ),
-          ));
-        }),
+          )));
+        })),
         ],
       ),
     );
@@ -4106,10 +4106,13 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         SupabaseService.getPaidFeeDemands(insId),
         SupabaseService.getFeeTypes(insId),
         SupabaseService.getFeeSummary(insId),
+        SupabaseService.getFeeDemandSummary(insId),
       ]);
       final demands = results[0] as List<Map<String, dynamic>>;
       final feeTypes = results[1] as List<String>;
       final feeSummary = results[2] as FeeSummary;
+      final demandSummary = results[3] as List<Map<String, dynamic>>;
+      final classWiseTotalDemand = demandSummary.fold<double>(0.0, (sum, r) => sum + ((r['total_demand'] as num?)?.toDouble() ?? 0));
 
       // Fetch paynumber map from payment table
       final payIds = demands
@@ -4126,7 +4129,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           _allFeeTypes = feeTypes;
           _payNumberMap = payNumberMap;
           _overallPending = feeSummary.totalPending;
-          _overallDemand = feeSummary.totalDue;
+          _overallDemand = classWiseTotalDemand;
           _overallCollected = feeSummary.totalPaid;
           _isLoading = false;
         });
