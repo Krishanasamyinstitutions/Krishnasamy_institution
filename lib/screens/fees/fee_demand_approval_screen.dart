@@ -465,7 +465,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       _wYear +
       _wTerm +
       _wType +
-      _wCategory +
       _wFeeAmt +
       _wConcession +
       _wBalance +
@@ -538,10 +537,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                               _headerCell('Class', 2, center: true),
                               _headerCell('Year', 3, center: true),
                               _headerCell('Fee Term', 3, center: true),
-                              _headerCell('Fee Type', 4),
-                              _headerCell('Category', 2),
+                              _headerCell('Fee Type', 3),
                               _headerCell('Fee Amount', 3, right: true),
-                              _headerCell('Concession', 3, right: true),
+                              _headerCell('Concession', 4),
                               _headerCell('Balance Due', 3, right: true),
                               const SizedBox(width: 32),
                               _headerCell('Created By', 3),
@@ -753,12 +751,11 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     final term = (d['demfeeterm'] ?? d['feeterm'] ?? d['feetermname'] ?? d['termname'] ?? '-').toString();
     // tempfeedemand: demfeetype
     final type = (d['demfeetype'] ?? d['feetype'] ?? d['feetypename'] ?? d['typename'] ?? '-').toString();
-    // tempfeedemand: demconcategory
-    final category = (d['demconcategory'] ?? d['category'] ?? d['feecategory'] ?? d['categoryname'] ?? '-').toString();
     final feeAmt = (d['feeamount'] as num?)?.toDouble() ?? 0;
-    final concession = (d['conamount'] as num?)?.toDouble() ?? 0;
+    final conAmt = (d['conamount'] as num?)?.toDouble() ?? 0;
+    final concessionName = (d['stucondesc'] ?? '-').toString();
     // use stored balancedue if available
-    final balance = (d['balancedue'] as num?)?.toDouble() ?? (feeAmt - concession);
+    final balance = (d['balancedue'] as num?)?.toDouble() ?? (feeAmt - conAmt);
     final createdBy =
         (d['createdby'] ?? d['created_by'] ?? d['createdbyname'] ?? '-')
             .toString();
@@ -831,15 +828,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               ),
               // Fee Type
               Expanded(
-                flex: 4,
+                flex: 3,
                 child: Text(type,
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              // Category
-              Expanded(
-                flex: 2,
-                child: Text(category,
                     style: const TextStyle(fontSize: 12),
                     overflow: TextOverflow.ellipsis),
               ),
@@ -852,10 +842,13 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               ),
               // Concession
               Expanded(
-                flex: 3,
-                child: Text('₹${_fmt(concession)}',
-                    style: const TextStyle(fontSize: 12),
-                    textAlign: TextAlign.right),
+                flex: 4,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Text(concessionName,
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis),
+                ),
               ),
               // Balance Due
               Expanded(
