@@ -304,31 +304,33 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
     });
 
+    String clean(String? v) => (v == null || v.toUpperCase() == 'NULL') ? '' : v;
+
     _admNoController.text = s.stuadmno;
     _nameController.text = s.stuname;
     _mobileController.text = s.stumobile;
-    _emailController.text = s.stuemail ?? '';
-    _addressController.text = s.stuaddress ?? '';
-    _cityController.text = s.stucity ?? '';
-    _stateController.text = s.stustate ?? '';
-    _countryController.text = s.stucountry ?? '';
-    _pinController.text = s.stupin ?? '';
+    _emailController.text = clean(s.stuemail);
+    _addressController.text = clean(s.stuaddress);
+    _cityController.text = clean(s.stucity);
+    _stateController.text = clean(s.stustate);
+    _countryController.text = clean(s.stucountry);
+    _pinController.text = clean(s.stupin);
 
     // Fetch parent data
     final parent = await SupabaseService.getStudentParent(s.stuId);
     if (!mounted) return;
 
-    _fatherNameController.text = parent?['fathername'] ?? '';
-    _fatherMobileController.text = parent?['fathermobile'] ?? '';
-    _fatherOccController.text = parent?['fatheroccupation'] ?? '';
-    _motherNameController.text = parent?['mothername'] ?? '';
-    _motherMobileController.text = parent?['mothermobile'] ?? '';
-    _motherOccController.text = parent?['motheroccupation'] ?? '';
-    _guardianNameController.text = parent?['guardianname'] ?? '';
-    _guardianMobileController.text = parent?['guardianmobile'] ?? '';
-    _guardianOccController.text = parent?['guardianoccupation'] ?? '';
-    _payNameController.text = parent?['payincharge'] ?? '';
-    _payMobileController.text = parent?['payinchargemob'] ?? '';
+    _fatherNameController.text = clean(parent?['fathername']?.toString());
+    _fatherMobileController.text = clean(parent?['fathermobile']?.toString());
+    _fatherOccController.text = clean(parent?['fatheroccupation']?.toString());
+    _motherNameController.text = clean(parent?['mothername']?.toString());
+    _motherMobileController.text = clean(parent?['mothermobile']?.toString());
+    _motherOccController.text = clean(parent?['motheroccupation']?.toString());
+    _guardianNameController.text = clean(parent?['guardianname']?.toString());
+    _guardianMobileController.text = clean(parent?['guardianmobile']?.toString());
+    _guardianOccController.text = clean(parent?['guardianoccupation']?.toString());
+    _payNameController.text = clean(parent?['payincharge']?.toString());
+    _payMobileController.text = clean(parent?['payinchargemob']?.toString());
 
     setState(() {
       _selectedGender = s.gender;
@@ -1245,13 +1247,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                       : _avatarPlaceholder(),
                                                 ),
                                               ),
-                                              TextButton.icon(
-                                                onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
-                                                icon: _isUploadingPhoto
-                                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                                    : const Icon(Icons.camera_alt_rounded, size: 14),
-                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: const TextStyle(fontSize: 11)),
-                                              ),
                                             ],
                                           ),
                                         ],
@@ -1317,21 +1312,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                           ],
                                         ),
                                       ] else if (_selectedStudent!.isActive) ...[
-                                        const SizedBox(height: 16),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: ElevatedButton.icon(
-                                            onPressed: () => _confirmTerminateStudent(_selectedStudent!),
-                                            icon: const Icon(Icons.block_rounded, size: 18),
-                                            label: const Text('Terminate Student', style: TextStyle(fontWeight: FontWeight.w600)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.error,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                          ),
-                                        ),
                                       ],
                                       const SizedBox(height: 24),
                                     ],
@@ -2368,81 +2348,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
       child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
-  }
-
-  // ─── Student Termination ─────────────────────────────────────────────────────
-
-  void _confirmTerminateStudent(StudentModel s) {
-    final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: const Text('Terminate Student', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to terminate "${s.stuname}"? This will deactivate the student record.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Reason for termination *',
-                hintText: 'Enter reason...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Please enter a reason'), backgroundColor: Colors.red),
-                );
-                return;
-              }
-              Navigator.pop(ctx);
-              _terminateStudent(s, reason);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Terminate'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _terminateStudent(StudentModel s, String reason) async {
-    final auth = context.read<AuthProvider>();
-    final terminatedBy = auth.userName ?? '';
-    final success = await SupabaseService.terminateStudent(s.stuId, terminatedBy: terminatedBy, terminatedReason: reason);
-    if (mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Student terminated successfully'), backgroundColor: Colors.green),
-        );
-        setState(() => _selectedStudent = null);
-        _loadDropdowns();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to terminate student'), backgroundColor: Colors.red),
-        );
-      }
-    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────

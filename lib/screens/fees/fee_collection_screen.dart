@@ -3539,8 +3539,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         DataColumn(label: Text('FEE TYPES')),
                         DataColumn(label: Text('TOTAL DEMAND'), numeric: true),
                         DataColumn(label: Text('PAID'), numeric: true),
-                        DataColumn(label: Text('PENDING'), numeric: true),
                         DataColumn(label: Text('% COLLECTED')),
+                        DataColumn(label: Text('PENDING'), numeric: true),
                         DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
                       ],
                       rows: filteredGroups.isEmpty ? [
@@ -3599,7 +3599,6 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                               )),
                               DataCell(Text(_formatCurrency(g.totalDemand))),
                               DataCell(Text(_formatCurrency(g.totalPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
-                              DataCell(Text(_formatCurrency(g.totalPending), style: TextStyle(fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary))),
                               DataCell(Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
@@ -3608,6 +3607,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 ),
                                 child: Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: pct >= 100 ? AppColors.success : pct >= 50 ? Colors.orange : AppColors.warning)),
                               )),
+                              DataCell(Text(_formatCurrency(g.totalPending), style: TextStyle(fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary))),
                               DataCell(Align(
                                 alignment: Alignment.centerRight,
                                 child: InkWell(
@@ -3636,8 +3636,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             DataCell(Text('${_classGroups.length} classes', style: const TextStyle(fontSize: 14, color: Colors.white))),
                             DataCell(Text(_formatCurrency(_totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
                             DataCell(Text(_formatCurrency(_totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text(_totalDemand > 0 ? '${(_totalPaid / _totalDemand * 100).toStringAsFixed(0)}%' : '0%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
                             DataCell(Text(_formatCurrency(_totalPending), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            const DataCell(Text('')),
                             const DataCell(Text('')),
                           ],
                         ),

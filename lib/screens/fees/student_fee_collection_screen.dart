@@ -356,8 +356,6 @@ class _StudentFeeCollectionScreenState
                         _buildStudentCard(),
                         const SizedBox(height: 12),
                         _buildTermFilter(),
-                        const SizedBox(height: 12),
-                        _buildPaymentDetails(),
                       ],
                     ],
                   ),
@@ -517,7 +515,6 @@ class _StudentFeeCollectionScreenState
     final name = _student!['stuname']?.toString() ?? '-';
     final admNo = _student!['stuadmno']?.toString() ?? '-';
     final className = _student!['stuclass']?.toString() ?? '-';
-    final photo = _student!['stuphoto']?.toString() ?? '';
     final fatherName = _parent?['fathername']?.toString() ?? '-';
 
     return _card(
@@ -528,12 +525,8 @@ class _StudentFeeCollectionScreenState
               CircleAvatar(
                 radius: 26,
                 backgroundColor: AppColors.accent.withValues(alpha: 0.12),
-                backgroundImage:
-                    photo.startsWith('http') ? NetworkImage(photo) : null,
-                child: photo.startsWith('http')
-                    ? null
-                    : Text(
-                        name[0].toUpperCase(),
+                child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
                         style: const TextStyle(
                             color: AppColors.accent,
                             fontWeight: FontWeight.w700,
@@ -598,135 +591,6 @@ class _StudentFeeCollectionScreenState
             ],
             onChanged: (v) => setState(() => _selectedTerm = v),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ── Payment Details ──
-  Widget _buildPaymentDetails() {
-    return _card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Payment Details',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  )),
-          const SizedBox(height: 10),
-          Text('Payment Mode',
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: ['Cash', 'Online', 'Cheque'].map((mode) {
-              final sel = _paymentMode == mode;
-              return GestureDetector(
-                onTap: () => setState(() => _paymentMode = mode),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: sel
-                        ? AppColors.accent
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: sel
-                            ? AppColors.accent
-                            : AppColors.border),
-                  ),
-                  child: Text(mode,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: sel
-                              ? Colors.white
-                              : AppColors.textSecondary)),
-                ),
-              );
-            }).toList(),
-          ),
-          if (_paymentMode == 'Cheque') ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cheque No *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _chequeNoController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter cheque number',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Cheque Date *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _chequeDateController,
-                        readOnly: true,
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) {
-                            _chequeDate = picked;
-                            _chequeDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                          }
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'DD/MM/YYYY',
-                          suffixIcon: const Icon(Icons.calendar_today, size: 16),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Text('Bank Name *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _bankNameController,
-              decoration: InputDecoration(
-                hintText: 'Enter bank name',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                isDense: true,
-              ),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ],
         ],
       ),
     );
@@ -1023,8 +887,8 @@ class _StudentFeeCollectionScreenState
               ElevatedButton.icon(
                 onPressed:
                     _selected.isEmpty ? null : _onCollectAndReceipt,
-                icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                label: const Text('Collect & Receipt'),
+                icon: const Icon(Icons.payment_rounded, size: 16),
+                label: const Text('Proceed to Pay'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
@@ -1048,65 +912,162 @@ class _StudentFeeCollectionScreenState
   bool _processing = false;
 
   void _onCollectAndReceipt() {
-    if (_paymentMode == 'Cheque') {
-      if (_chequeNoController.text.trim().isEmpty ||
-          _chequeDateController.text.trim().isEmpty ||
-          _bankNameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill Cheque No, Cheque Date and Bank Name'), backgroundColor: Colors.red),
-        );
-        return;
-      }
-    }
     final totalNet = _totalNetSelected;
+    _paymentMode = 'Cash';
+    _chequeNoController.clear();
+    _chequeDateController.clear();
+    _bankNameController.clear();
+    _chequeDate = null;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: const Text('Confirm Collection',
-            style:
-                TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-                'Student: ${_student!['stuname']} (${_student!['stuadmno']})',
-                style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 8),
-            Text('Demands selected: ${_selected.length}',
-                style: const TextStyle(fontSize: 16)),
-            Text('Payment Mode: $_paymentMode',
-                style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 8),
-            Text(
-              'Total: Rs.${totalNet.toStringAsFixed(2)}',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                  color: AppColors.accent),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text('Proceed to Pay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Student: ${_student!['stuname']} (${_student!['stuadmno']})', style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 4),
+                Text('Demands selected: ${_selected.length}', style: const TextStyle(fontSize: 14)),
+                const SizedBox(height: 8),
+                Text('Total: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.accent)),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text('Payment Mode *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ['Cash', 'Online', 'Cheque'].map((mode) {
+                    final sel = _paymentMode == mode;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => setState(() => _paymentMode = mode)),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: sel ? AppColors.accent : AppColors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: sel ? AppColors.accent : AppColors.border),
+                        ),
+                        child: Text(mode, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                if (_paymentMode == 'Cheque') ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Cheque No *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _chequeNoController,
+                              decoration: InputDecoration(
+                                hintText: 'Enter cheque number',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                isDense: true,
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Cheque Date *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _chequeDateController,
+                              readOnly: true,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: ctx,
+                                  initialDate: DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2030),
+                                );
+                                if (picked != null) {
+                                  _chequeDate = picked;
+                                  _chequeDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                  setDialogState(() {});
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'DD/MM/YYYY',
+                                suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                isDense: true,
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Bank Name *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _bankNameController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter bank name',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(fontSize: 14)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (_paymentMode == 'Cheque') {
+                  if (_chequeNoController.text.trim().isEmpty ||
+                      _chequeDateController.text.trim().isEmpty ||
+                      _bankNameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Please fill Cheque No, Cheque Date and Bank Name'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+                }
+                Navigator.pop(ctx);
+                _processPayment();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Confirm Payment', style: TextStyle(fontSize: 14)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(fontSize: 15))),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _processPayment();
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10))),
-            child: const Text('Confirm', style: TextStyle(fontSize: 15)),
-          ),
-        ],
       ),
     );
   }
