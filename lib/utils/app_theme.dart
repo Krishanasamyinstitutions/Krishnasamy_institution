@@ -2,35 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Primary palette - Deep Navy & Teal
-  static const Color primary = Color(0xFF1A2E4A);
-  static const Color primaryLight = Color(0xFF2C4A6E);
-  static const Color primaryDark = Color(0xFF0F1E33);
+  // Primary palette - Soft Blue (from weather UI)
+  static const Color primary = Color(0xFF6C8EEF);
+  static const Color primaryLight = Color(0xFFE9EEFF);
+  static const Color primaryDark = Color(0xFF4A6CD4);
+  static const Color primaryHover = Color(0xFF5A7DE5);
 
-  // Accent - Blue
-  static const Color accent = Color(0xFF0099E2);
-  static const Color accentLight = Color(0xFF4DB8ED);
-  static const Color accentDark = Color(0xFF0077B3);
+  // Accent - same Blue (single color theme)
+  static const Color accent = Color(0xFF6C8EEF);
+  static const Color accentLight = Color(0xFFB3C5F7);
+  static const Color accentDark = Color(0xFF4A6CD4);
 
-  // Secondary - Warm Amber
-  static const Color secondary = Color(0xFFF7A800);
-  static const Color secondaryLight = Color(0xFFFFCA28);
+  // Secondary - Grey (Neutral UI)
+  static const Color secondary = Color(0xFF6B7280);
+  static const Color secondaryLight = Color(0xFF9BA3AB);
 
   // Surfaces
-  static const Color surface = Color(0xFFF8FAFB);
+  static const Color surface = Color(0xFFF1F5FF);
   static const Color surfaceCard = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF121B2E);
+  static const Color surfaceSidebar = Color(0xFFFFFFFF);
+  static const Color surfaceDark = Color(0xFF2D3A5F);
 
   // Feedback colors
-  static const Color success = Color(0xFF2ECC71);
-  static const Color warning = Color(0xFFF39C12);
-  static const Color error = Color(0xFFE74C3C);
-  static const Color info = Color(0xFF3498DB);
+  static const Color success = Color(0xFF22C55E);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color error = Color(0xFFEF4444);
+  static const Color info = Color(0xFF38BDF8);
 
   // Text
-  static const Color textPrimary = Color(0xFF1A2E4A);
-  static const Color textSecondary = Color(0xFF6B7C93);
-  static const Color textLight = Color(0xFF9AAFC3);
+  static const Color textPrimary = Color(0xFF1E293B);
+  static const Color textSecondary = Color(0xFF94A3B8);
+  static const Color textLight = Color(0xFFCBD5E1);
   static const Color textOnPrimary = Color(0xFFFFFFFF);
 
   // Borders & Dividers
@@ -41,19 +43,19 @@ class AppColors {
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF1A2E4A), Color(0xFF2C4A6E)],
+    colors: [Color(0xFF6C8EEF), Color(0xFF4A6CD4)],
   );
 
   static const LinearGradient accentGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF0099E2), Color(0xFF0077B3)],
+    colors: [Color(0xFF6C8EEF), Color(0xFF4A6CD4)],
   );
 
   static const LinearGradient splashGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color(0xFF1A2E4A), Color(0xFF0D1B2A), Color(0xFF0A1628)],
+    colors: [Color(0xFF6C8EEF), Color(0xFF4A6CD4), Color(0xFF2D3A5F)],
   );
 }
 
@@ -121,10 +123,10 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -138,7 +140,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.border, width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
@@ -151,7 +153,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.textSecondary,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
           textStyle: GoogleFonts.plusJakartaSans(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -164,19 +166,19 @@ class AppTheme {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.accent, width: 2),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.error),
         ),
         hintStyle: GoogleFonts.plusJakartaSans(
@@ -189,11 +191,11 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: 4,
+        shadowColor: const Color(0xFF6C8EEF).withValues(alpha: 0.15),
         color: AppColors.surfaceCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
     );

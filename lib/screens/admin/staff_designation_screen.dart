@@ -193,7 +193,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
@@ -242,7 +242,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                   // Table header
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    color: const Color(0xFF2D3748),
+                    color: const Color(0xFF6C8EEF),
                     child: const Row(
                       children: [
                         SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),

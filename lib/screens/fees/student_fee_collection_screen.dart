@@ -328,9 +328,9 @@ class _StudentFeeCollectionScreenState
                 foregroundColor: AppColors.textSecondary,
                 side: BorderSide(color: AppColors.border),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(10)),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 textStyle: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w500),
               ),
@@ -406,7 +406,7 @@ class _StudentFeeCollectionScreenState
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(10)),
                     padding: EdgeInsets.zero,
                   ),
                   child: _searching
@@ -832,7 +832,7 @@ class _StudentFeeCollectionScreenState
       children: [
         // Table header (dark)
         Container(
-          color: const Color(0xFF1E2532),
+          color: const Color(0xFF6C8EEF),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
@@ -1031,9 +1031,9 @@ class _StudentFeeCollectionScreenState
                   disabledBackgroundColor: Colors.grey.shade200,
                   disabledForegroundColor: AppColors.textSecondary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                      horizontal: 28, vertical: 20),
                   textStyle: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600),
                 ),
@@ -1063,7 +1063,7 @@ class _StudentFeeCollectionScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         title: const Text('Confirm Collection',
             style:
                 TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
@@ -1101,9 +1101,9 @@ class _StudentFeeCollectionScreenState
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8))),
+                    borderRadius: BorderRadius.circular(10))),
             child: const Text('Confirm', style: TextStyle(fontSize: 15)),
           ),
         ],
@@ -1196,7 +1196,7 @@ class _StudentFeeCollectionScreenState
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1218,7 +1218,8 @@ class _StudentFeeCollectionScreenState
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Done'),
           ),
@@ -1510,7 +1511,7 @@ class _StudentFeeCollectionScreenState
         context: context,
         barrierDismissible: false,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           child: SizedBox(
             width: 500,
             height: 620,

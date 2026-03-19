@@ -135,7 +135,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton.icon(
               icon: const Icon(Icons.add, size: 16, color: Colors.white),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20)),
               onPressed: () async {
                 final name = controller.text.trim();
                 if (name.isEmpty) return;
@@ -289,7 +289,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Form(
@@ -312,13 +312,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Staff Designation
             const Text('Staff Designation *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
               decoration: _inputDecoration('Select designation'),
+              style: _inputStyle,
               items: [
                 ..._designationsList.map((d) => DropdownMenuItem(
                       value: d['desname'] as String,
@@ -356,13 +357,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Designation Report To
             const Text('Designation Report To',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
               decoration: _inputDecoration('Select reporting person'),
+              style: _inputStyle,
               items: [
                 const DropdownMenuItem(value: 0, child: Text('None')),
                 ..._users.map((u) => DropdownMenuItem(
@@ -377,13 +379,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Role
             const Text('Role *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             DropdownButtonFormField<String>(
               value: _selectedRole,
               decoration: _inputDecoration('Select role'),
+              style: _inputStyle,
               items: _rolesList
                   .map((r) => DropdownMenuItem(
                       value: r['urname'] as String,
@@ -397,13 +400,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // User Name
             const Text('User Name *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             TextFormField(
               controller: _nameController,
               decoration: _inputDecoration('Enter user name'),
+              style: _inputStyle,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
             ),
@@ -412,13 +416,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Email
             const Text('Email *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             TextFormField(
               controller: _emailController,
               decoration: _inputDecoration('Enter email'),
+              style: _inputStyle,
               keyboardType: TextInputType.emailAddress,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -428,13 +433,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Phone
             const Text('Phone *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             TextFormField(
               controller: _phoneController,
               decoration: _inputDecoration('Enter phone number'),
+              style: _inputStyle,
               keyboardType: TextInputType.phone,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -444,13 +450,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             // Password
             const Text('Password *',
                 style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
             const SizedBox(height: 6),
             TextFormField(
               controller: _passwordController,
               decoration: _inputDecoration('Enter password'),
+              style: _inputStyle,
               obscureText: true,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -464,7 +471,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   child: OutlinedButton(
                     onPressed: _clearForm,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -479,7 +486,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -501,25 +508,27 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     );
   }
 
+  static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF555555));
+
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
       filled: true,
-      fillColor: AppColors.surface,
+      fillColor: Colors.white,
     );
   }
 
@@ -532,7 +541,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -562,7 +571,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           // Simplified table header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: const Color(0xFF2D3748),
+            color: const Color(0xFF6C8EEF),
             child: const Row(
               children: [
                 SizedBox(width: 36, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
@@ -663,7 +672,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -756,7 +765,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
@@ -772,7 +781,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         title: const Text('Terminate User', style: TextStyle(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -811,7 +820,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Terminate'),
           ),

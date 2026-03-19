@@ -43,7 +43,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFA855F7),
     Color(0xFFEC4899), Color(0xFFF43F5E), Color(0xFFEF4444),
     Color(0xFFF97316), Color(0xFFF59E0B), Color(0xFF22C55E),
-    Color(0xFF14B8A6), Color(0xFF06B6D4), Color(0xFF3B82F6),
+    Color(0xFF14B8A6), Color(0xFF06B6D4), Color(0xFF6C8EEF),
     Color(0xFF2563EB), Color(0xFF7C3AED), Color(0xFF9333EA), Color(0xFFDB2777),
   ];
 
@@ -428,14 +428,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
         // Table header
         Container(
-          color: const Color(0xFF1E2532),
+          color: const Color(0xFF6C8EEF),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: const Row(
             children: [
-              SizedBox(width: 48, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70))),
-              SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70))),
-              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70))),
-              SizedBox(width: 60, child: Text('GENDER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70))),
+              SizedBox(width: 48, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 60, child: Text('GENDER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
               SizedBox(width: 40),
             ],
           ),
@@ -588,7 +588,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       children: [
         // ── Column header ──
         Container(
-          color: const Color(0xFF1E2532),
+          color: const Color(0xFF6C8EEF),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: const Row(
             children: [
@@ -716,7 +716,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             children: [
               // Total row — same dark bg as header
               Container(
-                color: const Color(0xFF1E2532),
+                color: const Color(0xFF6C8EEF),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
                   children: [
@@ -726,7 +726,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     const Expanded(
                       child: Text('TOTAL',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                              color: Colors.white70, letterSpacing: 0.5)),
+                              color: Colors.white, letterSpacing: 0.5)),
                     ),
                     const SizedBox(width: 110),
                     SizedBox(
@@ -734,21 +734,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                       child: Text('₹${totalDebit.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                              color: Color(0xFFFF6B6B))),
+                              color: Colors.white)),
                     ),
                     SizedBox(
                       width: 100,
                       child: Text('₹${totalCredit.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                              color: Color(0xFF4ADE80))),
+                              color: Colors.white)),
                     ),
                   ],
                 ),
               ),
               // Closing Balance row — slightly lighter dark
               Container(
-                color: const Color(0xFF252D3D),
+                color: const Color(0xFF6C8EEF),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                 child: Row(
                   children: [
@@ -758,7 +758,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     const Expanded(
                       child: Text('CLOSING BALANCE',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                              color: Colors.white70, letterSpacing: 0.5)),
+                              color: Colors.white, letterSpacing: 0.5)),
                     ),
                     const SizedBox(width: 110),
                     SizedBox(
@@ -769,24 +769,20 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                           decoration: BoxDecoration(
                             color: closingBalance <= 0
-                                ? const Color(0xFF4ADE80).withValues(alpha: 0.15)
-                                : const Color(0xFFFF6B6B).withValues(alpha: 0.15),
+                                ? Colors.white.withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                                color: closingBalance <= 0
-                                    ? const Color(0xFF4ADE80).withValues(alpha: 0.4)
-                                    : const Color(0xFFFF6B6B).withValues(alpha: 0.4)),
+                                color: Colors.white.withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             closingBalance <= 0
                                 ? '₹${closingBalance.abs().toStringAsFixed(0)}  Advance'
                                 : '₹${closingBalance.toStringAsFixed(0)}  Due',
-                            style: TextStyle(
+                            style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: closingBalance <= 0
-                                    ? const Color(0xFF4ADE80)
-                                    : const Color(0xFFFF6B6B)),
+                                color: Colors.white),
                           ),
                         ),
                       ),
@@ -1077,6 +1073,6 @@ class _TH extends StatelessWidget {
   const _TH(this.text, {this.align = TextAlign.left});
   @override
   Widget build(BuildContext context) =>
-      Text(text, textAlign: align, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white70));
+      Text(text, textAlign: align, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white));
 }
 
