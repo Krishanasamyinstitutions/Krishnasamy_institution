@@ -134,7 +134,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass'};
 
-  static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary);
+  static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF555555));
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _genders = ['Male', 'Female', 'Other'];
@@ -154,7 +154,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     Color(0xFF22C55E), // VI - Green
     Color(0xFF14B8A6), // VII - Teal
     Color(0xFF06B6D4), // VIII - Cyan
-    Color(0xFF3B82F6), // IX - Blue
+    Color(0xFF6C8EEF), // IX - Blue
     Color(0xFF2563EB), // X - Blue dark
     Color(0xFF7C3AED), // XI - Violet dark
     Color(0xFF9333EA), // XII - Purple dark
@@ -949,7 +949,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // Table header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: const Color(0xFF2D3748),
+            color: const Color(0xFF6C8EEF),
             child: const Row(
               children: [
                 SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
@@ -1062,8 +1062,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
               icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
               label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -1073,8 +1073,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Refresh'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -1146,7 +1146,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       // Back breadcrumb
                       if (_selectedStudent != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -1262,7 +1262,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                         padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
                                         child: IgnorePointer(
                                           ignoring: !_isFormEnabled,
-                                          child: Opacity(opacity: _isFormEnabled ? 1.0 : 0.65, child: _buildStudentFields()),
+                                          child: _buildStudentFields(),
                                         ),
                                       ),
                                     ),
@@ -1276,9 +1276,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             // Parent + Payment panels
                             Expanded(
                               child: SingleChildScrollView(
-                                child: Opacity(
-                                  opacity: _isFormEnabled ? 1.0 : 0.65,
-                                  child: Column(
+                                child: Column(
                                     children: [
                                       _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
                                       const SizedBox(height: 16),
@@ -1295,7 +1293,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 style: OutlinedButton.styleFrom(
                                                   foregroundColor: AppColors.textSecondary,
                                                   side: const BorderSide(color: AppColors.border),
-                                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                 ),
                                               ),
@@ -1311,7 +1309,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: AppColors.accent,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                 ),
                                               ),
@@ -1329,7 +1327,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: AppColors.error,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                             ),
                                           ),
@@ -1338,7 +1336,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                       const SizedBox(height: 24),
                                     ],
                                   ),
-                                ),
                               ),
                             ),
                           ],
@@ -1911,7 +1908,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
           content: SizedBox(
             width: 400,
@@ -2062,7 +2059,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2085,8 +2082,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -2098,8 +2095,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -2132,7 +2129,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         // Header row
                         Container(
                           decoration: const BoxDecoration(
-                            color: Color(0xFF1B2A4A),
+                            color: Color(0xFF6C8EEF),
                             borderRadius: BorderRadius.only(
                               topLeft: Radius.circular(7),
                               topRight: Radius.circular(7),
@@ -2221,8 +2218,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -2230,8 +2227,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
               OutlinedButton(
                 onPressed: _resetImport,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
@@ -2251,7 +2248,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -2277,7 +2274,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -2311,6 +2308,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Done'),
@@ -2379,7 +2377,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         title: const Text('Terminate Student', style: TextStyle(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2418,7 +2416,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Terminate'),
           ),
@@ -2492,7 +2491,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black)),
+        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black)),
         const SizedBox(height: 6),
         child,
       ],

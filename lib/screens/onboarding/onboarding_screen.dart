@@ -246,7 +246,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                           decoration: BoxDecoration(
                             gradient: AppColors.accentGradient,
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.accent.withValues(alpha: 0.3),

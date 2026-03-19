@@ -58,6 +58,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   List<Map<String, dynamic>> _drilldownDemands = [];
   bool _loadingDrilldown = false;
   String? _drilldownStudent; // selected student adm no for 3rd level
+  String? _drilldownStudentName; // selected student name for 3rd level
 
   // Search
   final _searchController = TextEditingController();
@@ -593,8 +594,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
               label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -604,8 +605,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Refresh'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -629,7 +630,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: _isLoading
@@ -793,7 +794,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           child: OutlinedButton(
                             onPressed: _resetForm,
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('Clear'),
@@ -811,7 +812,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
@@ -874,6 +875,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 TextButton.icon(
                   onPressed: () => setState(() {
                     _drilldownStudent = null;
+                    _drilldownStudentName = null;
                     _searchQuery = '';
                     _searchController.clear();
                   }),
@@ -892,11 +894,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   label: const Text('All Classes', style: TextStyle(fontSize: 12)),
                 ),
               if (_drilldownClass != null) const SizedBox(width: 8),
-              Icon(Icons.list_alt_rounded, size: 18, color: AppColors.accent),
-              const SizedBox(width: 8),
               Text(
                 _drilldownStudent != null
-                    ? 'Student $_drilldownStudent'
+                    ? '${_drilldownStudentName ?? ''} (Adm No: $_drilldownStudent)'
                     : _drilldownClass != null
                         ? 'Class $_drilldownClass'
                         : 'Fee Demands',
@@ -1064,7 +1064,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF2D3748),
+              color: Color(0xFF6C8EEF),
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: const Row(
@@ -1121,10 +1121,28 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     );
   }
 
+  String _formatDueDate(String dateStr) {
+    if (dateStr == '-' || dateStr.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(dateStr);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${dt.day.toString().padLeft(2, '0')}-${months[dt.month - 1]}-${dt.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
   String _formatAmount(double amount) {
-    if (amount >= 100000) return '${(amount / 100000).toStringAsFixed(1)}L';
-    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
-    return amount.toStringAsFixed(0);
+    if (amount == amount.roundToDouble()) {
+      return amount.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (match) => '${match[1]},',
+      );
+    }
+    return amount.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+\.)'),
+      (match) => '${match[1]},',
+    );
   }
 
   /// Level 2: Student-wise summary for selected class
@@ -1162,7 +1180,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF2D3748),
+              color: Color(0xFF6C8EEF),
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: const Row(
@@ -1196,6 +1214,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 return InkWell(
                   onTap: () => setState(() {
                     _drilldownStudent = admNo;
+                    _drilldownStudentName = name;
                     _searchQuery = '';
                     _searchController.clear();
                   }),
@@ -1254,8 +1273,29 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   }
 
   /// Level 3: Individual fee details for selected student
+  static const _termOrder = [
+    'I TERM', 'II TERM', 'III TERM',
+    'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER',
+    'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH',
+    'APRIL', 'MAY',
+  ];
+
+  int _termIndex(String term) {
+    final idx = _termOrder.indexOf(term.toUpperCase());
+    return idx >= 0 ? idx : _termOrder.length;
+  }
+
   Widget _buildStudentFeeDetails() {
-    final demands = _filteredStudentDemands;
+    final demands = List<Map<String, dynamic>>.from(_filteredStudentDemands)
+      ..sort((a, b) {
+        final ta = a['demfeeterm']?.toString() ?? '';
+        final tb = b['demfeeterm']?.toString() ?? '';
+        final ftA = a['demfeetype']?.toString() ?? '';
+        final ftB = b['demfeetype']?.toString() ?? '';
+        final cmp = ftA.compareTo(ftB);
+        if (cmp != 0) return cmp;
+        return _termIndex(ta).compareTo(_termIndex(tb));
+      });
     if (demands.isEmpty) {
       return Center(
         child: Column(
@@ -1272,99 +1312,91 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(4),
-      itemCount: demands.length,
-      itemBuilder: (context, i) {
-        final d = demands[i];
-        final admNo = d['stuadmno']?.toString() ?? '-';
-        final feeType = d['demfeetype']?.toString() ?? '-';
-        final term = d['demfeeterm']?.toString() ?? '-';
-        final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
-        final con = (d['conamount'] as num?)?.toDouble() ?? 0;
-        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-        final status = d['paidstatus']?.toString() ?? 'U';
-        final isPaid = status == 'Paid' || status == 'P';
+    double totalAmt = 0, totalPaid = 0, totalBal = 0;
+    for (final d in demands) {
+      totalAmt += (d['feeamount'] as num?)?.toDouble() ?? 0;
+      totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      totalBal += (d['balancedue'] as num?)?.toDouble() ?? 0;
+    }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(admNo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(feeType, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.accent)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Term: $term', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+    return LayoutBuilder(builder: (context, constraints) {
+      return SingleChildScrollView(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              dividerThickness: 0,
+              showCheckboxColumn: false,
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              columnSpacing: 20,
+              horizontalMargin: 16,
+              dataRowMinHeight: 36,
+              dataRowMaxHeight: 40,
+              headingRowHeight: 42,
+              columns: const [
+                DataColumn(label: Text('S No.')),
+                DataColumn(label: Text('TERM')),
+                DataColumn(label: Text('FEE TYPE')),
+                DataColumn(label: Text('AMOUNT'), numeric: true),
+                DataColumn(label: Text('PAID'), numeric: true),
+                DataColumn(label: Text('BALANCE'), numeric: true),
+                DataColumn(label: Text('DUE DATE')),
+                DataColumn(label: Text('STATUS')),
+              ],
+              rows: [
+                ...demands.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final d = entry.value;
+                  final term = d['demfeeterm']?.toString() ?? '-';
+                  final feeType = d['demfeetype']?.toString() ?? '-';
+                  final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
+                  final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                  final status = d['paidstatus']?.toString() ?? 'U';
+                  final isPaid = status == 'Paid' || status == 'P';
+                  final dueDate = d['duedate']?.toString() ?? '-';
+                  final formattedDueDate = _formatDueDate(dueDate);
+                  return DataRow(cells: [
+                    DataCell(Text('${i + 1}')),
+                    DataCell(Text(term)),
+                    DataCell(Text(feeType, style: const TextStyle(fontWeight: FontWeight.w500))),
+                    DataCell(Text('₹${_formatAmount(amt)}')),
+                    DataCell(Text('₹${_formatAmount(paid)}', style: TextStyle(color: paid > 0 ? AppColors.success : AppColors.textPrimary))),
+                    DataCell(Text('₹${_formatAmount(bal)}', style: TextStyle(fontWeight: FontWeight.w500, color: bal > 0 ? AppColors.warning : AppColors.success))),
+                    DataCell(Text(formattedDueDate, style: const TextStyle(fontSize: 11))),
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning)),
+                    )),
+                  ]);
+                }),
+                // Total row
+                DataRow(
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                  cells: [
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
+                    const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
+                    DataCell(Text('₹${_formatAmount(totalAmt)}', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
+                    DataCell(Text('₹${_formatAmount(totalPaid)}', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
+                    DataCell(Text('₹${_formatAmount(totalBal)}', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
+                    const DataCell(Text('')),
+                    const DataCell(Text('')),
                   ],
                 ),
-              ),
-              Expanded(
-                flex: 4,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        const Text('Amount', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text('₹${amt.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Concession', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text('₹${con.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Balance', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text('₹${bal.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: bal > 0 ? AppColors.warning : AppColors.success)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isPaid ? 'Paid' : 'Unpaid',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
   }
 
   // ─── Import UI ──────────────────────────────────────────────────────────
@@ -1377,7 +1409,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -1400,8 +1432,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1413,8 +1445,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1438,7 +1470,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   // Header row
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1B2A4A),
+                      color: const Color(0xFF6C8EEF),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(7),
                         topRight: Radius.circular(7),
@@ -1529,8 +1561,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 icon: const Icon(Icons.check_circle_outline, size: 16),
                 label: const Text('Validate'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1542,8 +1574,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1551,8 +1583,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               OutlinedButton(
                 onPressed: _resetImport,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
@@ -1670,7 +1702,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
           content: SizedBox(
             width: 400,
@@ -1698,7 +1730,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -1724,7 +1756,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -1758,6 +1790,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Done'),

@@ -353,7 +353,7 @@ class WelcomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.1),
                       ),
@@ -421,7 +421,7 @@ class _WelcomeButtonState extends State<_WelcomeButton> {
           decoration: BoxDecoration(
             gradient: widget.isPrimary ? AppColors.accentGradient : null,
             color: widget.isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             border: widget.isPrimary
                 ? null
                 : Border.all(color: AppColors.border, width: 1.5),

@@ -441,8 +441,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: auth.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: auth.isLoading

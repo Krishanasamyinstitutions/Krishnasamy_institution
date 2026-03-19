@@ -153,7 +153,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
@@ -198,7 +198,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   onPressed: _markAllAsRead,
                   icon: const Icon(Icons.done_all_rounded, size: 16),
                   label: const Text('Mark all read', style: TextStyle(fontSize: 11)),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20)),
                 ),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.textSecondary),

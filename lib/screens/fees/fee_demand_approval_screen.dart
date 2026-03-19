@@ -173,7 +173,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         title: const Text('Confirm Approval',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         content: Text(
@@ -190,8 +190,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Approve'),
           ),
@@ -308,9 +309,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             foregroundColor: Colors.white,
             disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.4),
             disabledForegroundColor: Colors.white70,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             textStyle:
                 const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
@@ -498,7 +499,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: LayoutBuilder(

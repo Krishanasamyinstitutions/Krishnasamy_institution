@@ -65,11 +65,11 @@ class ReceiptWidget extends StatelessWidget {
   const ReceiptWidget({super.key, required this.data});
 
   // Colors from Figma
-  static const _primaryBlue = Color(0xFF2f5daa);
-  static const _darkBlue = Color(0xFF010165);
+  static const _primaryBlue = Color(0xFF6C8EEF);
+  static const _darkBlue = Color(0xFF4A6CD4);
   static const _textDark = Color(0xFF2a2a2a);
   static const _textMedium = Color(0xFF4c4c4c);
-  static const _headerBg = Color(0xFFeaeff6);
+  static const _headerBg = Color(0xFFE9EEFF);
   static const _borderColor = Color(0xFFd9d9d9);
   static const _paidGreen = Color(0xFF34c759);
   static const _paidGreenBg = Color(0xFFc2eecd);
@@ -179,9 +179,9 @@ class ReceiptWidget extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _labelValue('Receipt Method:', data.paymentMethod),
+                      _labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                       const SizedBox(height: 6),
-                      _labelValue('Date:', data.paymentDate),
+                      _labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
                     ],
                   ),
                   const Spacer(),
@@ -264,50 +264,55 @@ class ReceiptWidget extends StatelessWidget {
   }
 
   Widget _buildHeader(int pageNum, int totalPages) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // Logo beside institute name and address, all centered
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              if (data.schoolLogoUrl != null)
+              if (data.schoolLogoUrl != null) ...[
                 SizedBox(
-                  width: 64,
-                  height: 64,
+                  width: 48,
+                  height: 48,
                   child: Image.network(
                     data.schoolLogoUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 ),
-              if (data.schoolLogoUrl != null) const SizedBox(height: 8),
-              Text(data.schoolName, style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w600, color: _darkBlue)),
-              const SizedBox(height: 6),
-              Row(
+                const SizedBox(width: 12),
+              ],
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Address:  ', style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
-                  Expanded(child: Text(data.schoolAddress, maxLines: 3, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium))),
+                  Text(data.schoolName, style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: _darkBlue)),
+                  const SizedBox(height: 3),
+                  Text(data.schoolAddress, maxLines: 2, style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(width: 20),
-        Column(
+        const SizedBox(height: 14),
+        // Fee Receipt details - left aligned, page number right aligned
+        Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text('Receipt', style: GoogleFonts.montserrat(fontSize: 32, fontWeight: FontWeight.w600, color: _primaryBlue)),
-            const SizedBox(height: 12),
-            _labelValue('Receipt No:', data.receiptNo),
-            const SizedBox(height: 6),
-            _labelValue('Date:', data.date),
-            if (totalPages > 1) ...[
-              const SizedBox(height: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Fee Receipt', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: _primaryBlue)),
+                const SizedBox(height: 6),
+                _labelValue('Receipt No:', data.receiptNo),
+                const SizedBox(height: 3),
+                _labelValue('Date:', data.date),
+              ],
+            ),
+            const Spacer(),
+            if (totalPages > 1)
               Text('Page $pageNum of $totalPages', style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
-            ],
           ],
         ),
       ],
