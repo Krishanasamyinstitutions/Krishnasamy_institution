@@ -757,7 +757,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                         headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                         dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 44, headingRowHeight: 42,
@@ -788,7 +788,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               DataCell(Text(_formatCurrency(mTotal), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
                             ]);
                           }),
-                          DataRow(color: WidgetStateProperty.all(const Color(0xFF2D3748)), cells: [
+                          DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
                             DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
                             DataCell(Text('$totalCount', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
@@ -836,7 +836,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                         headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                         dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -866,7 +866,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               DataCell(Text(_formatCurrency(amount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
                             ]);
                           }),
-                          DataRow(color: WidgetStateProperty.all(const Color(0xFF2D3748)), cells: [
+                          DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
                             DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
                             const DataCell(Text('')),
@@ -1141,7 +1141,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -1205,7 +1205,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 }),
                 // Grand total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
@@ -1283,7 +1283,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -1324,7 +1324,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 }),
                 // Grand total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
@@ -1521,7 +1521,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -1583,7 +1583,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 }),
                 // Grand total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
@@ -1720,7 +1720,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                       headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                       dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                       columnSpacing: 20,
@@ -1764,7 +1764,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         }),
                         // Grand total row
                         DataRow(
-                          color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                          color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                           cells: [
                             const DataCell(Text('')),
                             DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
@@ -1976,7 +1976,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                         headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                         dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -2023,7 +2023,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               ],
                             );
                           }),
-                          DataRow(color: WidgetStateProperty.all(const Color(0xFF2D3748)), cells: [
+                          DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
                             DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white))),
                             const DataCell(Text('')),
@@ -2041,7 +2041,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   // Pagination controls
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: const BoxDecoration(color: Color(0xFF2D3748)),
+                    decoration: const BoxDecoration(color: Color(0xFF6C8EEF)),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -2142,11 +2142,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final fontItalic = await PdfGoogleFonts.montserratItalic();
     final fontPtSerif = await PdfGoogleFonts.pTSerifRegular();
 
-    const primaryBlue = PdfColor.fromInt(0xFF2f5daa);
-    const darkBlue = PdfColor.fromInt(0xFF010165);
+    const primaryBlue = PdfColor.fromInt(0xFF6C8EEF);
+    const darkBlue = PdfColor.fromInt(0xFF4A6CD4);
     const textDark = PdfColor.fromInt(0xFF2a2a2a);
     const textMediumC = PdfColor.fromInt(0xFF4c4c4c);
-    const headerBg = PdfColor.fromInt(0xFFeaeff6);
+    const headerBg = PdfColor.fromInt(0xFFE9EEFF);
     const borderColor = PdfColor.fromInt(0xFFd9d9d9);
     const paidGreen = PdfColor.fromInt(0xFF34c759);
     const dividerColor = PdfColor.fromInt(0xFFACBEDD);
@@ -2414,9 +2414,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      labelValue('Receipt Method:', data.paymentMethod),
+                      labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                       pw.SizedBox(height: 6),
-                      labelValue('Date:', data.paymentDate),
+                      labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
                     ],
                   ),
                   pw.Spacer(),
@@ -2456,7 +2456,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: SizedBox(
           width: 620,
           height: 920,
@@ -2511,8 +2511,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
                         textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
@@ -2626,7 +2626,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                       headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                       dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -2673,7 +2673,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         }),
                         // Grand total row
                         DataRow(
-                          color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                          color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                           cells: [
                             const DataCell(Text('')),
                             const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
@@ -2699,8 +2699,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
@@ -3298,7 +3298,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     constraints: BoxConstraints(minWidth: effectiveW),
                     child: SingleChildScrollView(scrollDirection: Axis.vertical, child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                       headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                       dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 48, headingRowHeight: 42,
@@ -3398,7 +3398,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         }),
                         // Grand total row
                         DataRow(
-                          color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                          color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                           cells: [
                             const DataCell(Text('')),
                             const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white))),
@@ -3510,7 +3510,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -3552,7 +3552,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 }),
                 // Grand total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
@@ -3739,7 +3739,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
@@ -3815,7 +3815,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 }),
                 // Grand total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
@@ -4585,7 +4585,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                       children: [
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            const headerBg = Color(0xFF2D3748);
+                            const headerBg = Color(0xFF6C8EEF);
                             const subTotalBg = Color(0xFFE2E8F0);
 
                             final dataRows = <DataRow>[];

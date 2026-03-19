@@ -208,7 +208,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: SizedBox(
           width: 620,
           height: 920,
@@ -239,8 +239,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
                         textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
@@ -290,11 +290,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     final fontItalic = await PdfGoogleFonts.montserratItalic();
     final fontPtSerif = await PdfGoogleFonts.pTSerifRegular();
 
-    const primaryBlue = PdfColor.fromInt(0xFF2f5daa);
-    const darkBlue = PdfColor.fromInt(0xFF010165);
+    const primaryBlue = PdfColor.fromInt(0xFF6C8EEF);
+    const darkBlue = PdfColor.fromInt(0xFF4A6CD4);
     const textDark = PdfColor.fromInt(0xFF2a2a2a);
     const textMedium = PdfColor.fromInt(0xFF4c4c4c);
-    const headerBg = PdfColor.fromInt(0xFFeaeff6);
+    const headerBg = PdfColor.fromInt(0xFFE9EEFF);
     const borderColor = PdfColor.fromInt(0xFFd9d9d9);
     const paidGreen = PdfColor.fromInt(0xFF34c759);
     const dividerColor = PdfColor.fromInt(0xFFACBEDD);
@@ -557,9 +557,9 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  labelValue('Receipt Method:', data.paymentMethod),
+                  labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                   pw.SizedBox(height: 6),
-                  labelValue('Date:', data.paymentDate),
+                  labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
                 ],
               ),
               pw.Spacer(),
@@ -659,9 +659,9 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               label: const Text('Refresh'),
               style: OutlinedButton.styleFrom(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -802,7 +802,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -858,7 +858,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: const BoxDecoration(
-        color: Color(0xFF2D3748),
+        color: Color(0xFF6C8EEF),
         borderRadius: BorderRadius.only(bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14)),
       ),
       child: Row(
@@ -909,17 +909,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         child: Column(children: [
           SingleChildScrollView(
             child: SizedBox(
               width: double.infinity,
               child: DataTable(dividerThickness: 0,
-                headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                 headingTextStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
@@ -1065,17 +1065,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         child: Column(children: [
           SingleChildScrollView(
             child: SizedBox(
               width: double.infinity,
               child: DataTable(dividerThickness: 0,
-                headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                 headingTextStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 11,

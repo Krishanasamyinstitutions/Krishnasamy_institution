@@ -594,8 +594,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
               label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -605,8 +605,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Refresh'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -630,7 +630,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: _isLoading
@@ -794,7 +794,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           child: OutlinedButton(
                             onPressed: _resetForm,
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             child: const Text('Clear'),
@@ -812,7 +812,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
@@ -1064,7 +1064,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF2D3748),
+              color: Color(0xFF6C8EEF),
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: const Row(
@@ -1180,7 +1180,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFF2D3748),
+              color: Color(0xFF6C8EEF),
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: const Row(
@@ -1328,7 +1328,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             child: DataTable(
               dividerThickness: 0,
               showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
+              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
               headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
               dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
               columnSpacing: 20,
@@ -1379,7 +1379,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 }),
                 // Total row
                 DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF2D3748)),
+                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
@@ -1409,7 +1409,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -1432,8 +1432,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1445,8 +1445,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1470,7 +1470,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   // Header row
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1B2A4A),
+                      color: const Color(0xFF6C8EEF),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(7),
                         topRight: Radius.circular(7),
@@ -1561,8 +1561,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 icon: const Icon(Icons.check_circle_outline, size: 16),
                 label: const Text('Validate'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1574,8 +1574,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1583,8 +1583,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               OutlinedButton(
                 onPressed: _resetImport,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
@@ -1702,7 +1702,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
           content: SizedBox(
             width: 400,
@@ -1730,7 +1730,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -1756,7 +1756,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -1790,6 +1790,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Done'),

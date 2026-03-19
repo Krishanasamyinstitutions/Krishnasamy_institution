@@ -17,7 +17,7 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
@@ -51,8 +51,8 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
@@ -213,7 +213,7 @@ Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = 
   final child = Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
     alignment: center ? Alignment.center : Alignment.centerLeft,
-    child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+    child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -253,7 +253,7 @@ Widget _buildImportCard({
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.border),
     ),
     margin: const EdgeInsets.all(16),
@@ -277,8 +277,8 @@ Widget _buildImportCard({
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -290,8 +290,8 @@ Widget _buildImportCard({
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF217346),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
@@ -343,7 +343,7 @@ Widget _buildImportCard({
                 // Header row
                 Container(
                   decoration: const BoxDecoration(
-                    color: Color(0xFF1B2A4A),
+                    color: Color(0xFF6C8EEF),
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(7),
                       topRight: Radius.circular(7),
@@ -413,8 +413,8 @@ Widget _buildImportCard({
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),

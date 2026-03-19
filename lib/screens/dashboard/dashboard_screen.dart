@@ -269,7 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSidebar(BuildContext context, bool collapsed) {
     return Container(
-      color: AppColors.primary,
+      color: AppColors.surfaceSidebar,
       child: Column(
         children: [
           // Logo area
@@ -284,12 +284,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.15),
+                    color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.school_rounded,
-                    color: AppColors.accent,
+                    color: AppColors.primary,
                     size: 22,
                   ),
                 ),
@@ -298,7 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Text(
                     'EduDesk',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w700,
                         ),
                   ),
@@ -337,7 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.accent.withValues(alpha: 0.15)
+                              ? AppColors.primary.withValues(alpha: 0.12)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -346,8 +346,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Icon(
                               item.icon,
                               color: isSelected
-                                  ? AppColors.accent
-                                  : Colors.white.withValues(alpha: 0.5),
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
                               size: 22,
                             ),
                             if (!collapsed) ...[
@@ -359,8 +359,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     .bodyMedium
                                     ?.copyWith(
                                       color: isSelected
-                                          ? AppColors.accent
-                                          : Colors.white.withValues(alpha: 0.7),
+                                          ? AppColors.primary
+                                          : AppColors.textSecondary,
                                       fontWeight: isSelected
                                           ? FontWeight.w600
                                           : FontWeight.w400,
@@ -517,7 +517,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
