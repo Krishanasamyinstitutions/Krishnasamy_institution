@@ -630,7 +630,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   bool _saving = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
-  static const _headers = ['Class *', 'Term', 'Fee Type *', 'Amount', 'Due Date', 'NOB', 'BGB', 'DHB'];
+  static const _headers = ['Class *', 'Term', 'Fee Type *', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
 
   @override
   bool get wantKeepAlive => true;
@@ -649,7 +649,23 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: _rows, colCount: 8);
+      // Map text values to numeric codes for NOB, BGB, DHB
+      const nobMap = {'new': '1', 'old': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
+      const bgbMap = {'boys': '1', 'girls': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
+      const dhbMap = {'dayscholar': '1', 'hostel': '2', 'both': '3', 'day scholar': '1', '1': '1', '2': '2', '3': '3'};
+      final mappedRows = _rows.map((row) {
+        final mapped = List<dynamic>.from(row);
+        while (mapped.length < 8) mapped.add('');
+        // col6 = NOB (index 5), col7 = BGB (index 6), col8 = DHB (index 7)
+        final nob = mapped[5].toString().trim().toLowerCase();
+        final bgb = mapped[6].toString().trim().toLowerCase();
+        final dhb = mapped[7].toString().trim().toLowerCase();
+        mapped[5] = nobMap[nob] ?? mapped[5];
+        mapped[6] = bgbMap[bgb] ?? mapped[6];
+        mapped[7] = dhbMap[dhb] ?? mapped[7];
+        return mapped;
+      }).toList();
+      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: mappedRows, colCount: 8);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CLASSFEEDEMAND');
