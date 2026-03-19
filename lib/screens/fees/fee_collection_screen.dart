@@ -711,6 +711,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: filtered.isNotEmpty ? () => _exportCollectionSummaryExcel(filtered) : null,
+              icon: const Icon(Icons.download_rounded, size: 20, color: AppColors.accent),
+              tooltip: 'Export Fee Collection Summary',
+              splashRadius: 18,
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -2712,6 +2719,229 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     );
   }
 
+  Future<void> _exportCollectionSummaryExcel(List<Map<String, dynamic>> payments) async {
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final insId = auth.insId;
+      if (insId == null) return;
+
+      // Fetch sequence info
+      Map<String, dynamic>? seqInfo;
+      try {
+        seqInfo = await SupabaseService.client
+            .from('sequence')
+            .select('seqprefix, sequid, seqstart, seqcurno, seqwidth')
+            .eq('ins_id', insId)
+            .maybeSingle();
+      } catch (_) {}
+
+      // Fetch paymentdetails for these payments to get fee type breakdown
+      final payIds = payments.map((p) => p['pay_id'] as int?).where((id) => id != null).toSet().toList();
+      final Map<int, List<Map<String, dynamic>>> payDetailMap = {};
+
+      if (payIds.isNotEmpty) {
+        for (int i = 0; i < payIds.length; i += 50) {
+          final chunk = payIds.sublist(i, (i + 50).clamp(0, payIds.length));
+          final details = await SupabaseService.client
+              .from('paymentdetails')
+              .select('pay_id, dem_id, transtotalamount')
+              .inFilter('pay_id', chunk)
+              .eq('activestatus', 1);
+          for (final d in details) {
+            final pid = d['pay_id'] as int;
+            payDetailMap.putIfAbsent(pid, () => []).add(d);
+          }
+        }
+      }
+
+      // Fetch dem_id -> demfeetype mapping
+      final allDemIds = <int>{};
+      for (final details in payDetailMap.values) {
+        for (final d in details) {
+          final demId = d['dem_id'] as int?;
+          if (demId != null) allDemIds.add(demId);
+        }
+      }
+      final Map<int, String> demFeeTypeMap = {};
+      if (allDemIds.isNotEmpty) {
+        for (int i = 0; i < allDemIds.length; i += 50) {
+          final chunk = allDemIds.toList().sublist(i, (i + 50).clamp(0, allDemIds.length));
+          final demands = await SupabaseService.client
+              .from('feedemand')
+              .select('dem_id, demfeetype')
+              .inFilter('dem_id', chunk);
+          for (final d in demands) {
+            demFeeTypeMap[d['dem_id'] as int] = d['demfeetype']?.toString() ?? '';
+          }
+        }
+      }
+
+      // Build fee type totals by payment method (cash vs bank)
+      final Map<String, double> cashByFeeType = {};
+      final Map<String, double> bankByFeeType = {};
+      final Set<String> allFeeTypes = {};
+
+      for (final p in payments) {
+        final payId = p['pay_id'] as int?;
+        final method = (p['paymethod']?.toString() ?? '').toLowerCase();
+        final isCash = method.contains('cash');
+        final details = payDetailMap[payId] ?? [];
+
+        for (final d in details) {
+          final demId = d['dem_id'] as int?;
+          final amount = (d['transtotalamount'] as num?)?.toDouble() ?? 0;
+          final feeType = demFeeTypeMap[demId] ?? 'Unknown';
+          allFeeTypes.add(feeType);
+
+          if (isCash) {
+            cashByFeeType[feeType] = (cashByFeeType[feeType] ?? 0) + amount;
+          } else {
+            bankByFeeType[feeType] = (bankByFeeType[feeType] ?? 0) + amount;
+          }
+        }
+      }
+
+      final feeTypeList = allFeeTypes.toList()..sort();
+
+      // Build Excel
+      final workbook = xl.Excel.createExcel();
+      final sheet = workbook['Fee Collection Summary'];
+      workbook.delete('Sheet1');
+
+      final headerStyle = xl.CellStyle(
+        bold: true,
+        fontSize: 12,
+      );
+      final boldStyle = xl.CellStyle(bold: true);
+      final amountStyle = xl.CellStyle(
+        horizontalAlign: xl.HorizontalAlign.Right,
+      );
+      final boldAmountStyle = xl.CellStyle(
+        bold: true,
+        horizontalAlign: xl.HorizontalAlign.Right,
+      );
+      final totalRowStyle = xl.CellStyle(
+        bold: true,
+        fontSize: 11,
+      );
+
+      int row = 0;
+
+      // Institution header
+      final insName = _insName ?? '';
+      final insAddr = _insAddress ?? '';
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(insName.toUpperCase());
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = headerStyle;
+      row++;
+      if (insAddr.isNotEmpty) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(insAddr.toUpperCase());
+        row++;
+      }
+      row++;
+
+      // Title
+      final fromDate = '${_fromDate.day.toString().padLeft(2, '0')}/${_fromDate.month.toString().padLeft(2, '0')}/${_fromDate.year}';
+      final toDate = '${_toDate.day.toString().padLeft(2, '0')}/${_toDate.month.toString().padLeft(2, '0')}/${_toDate.year}';
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE COLLECTION SUMMARY');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = xl.CellStyle(bold: true, fontSize: 11);
+      row++;
+      row++;
+
+      // Collection period & sequence info
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Collection Period:');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('$fromDate to $toDate');
+      row++;
+      if (seqInfo != null) {
+        final prefix = seqInfo['seqprefix']?.toString() ?? '';
+        final start = seqInfo['seqstart']?.toString() ?? '1';
+        final curNo = seqInfo['seqcurno']?.toString() ?? '';
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Receipt Prefix:');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(prefix);
+        row++;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Sequence Start Number $start');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('End Number : $curNo');
+        row++;
+      }
+      row++;
+
+      // Column headers
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEETYPE');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('CASH');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue('BANK');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue('TOTAL');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = boldStyle;
+      row++;
+
+      // Data rows
+      double grandCash = 0, grandBank = 0, grandTotal = 0;
+      for (final feeType in feeTypeList) {
+        final cash = cashByFeeType[feeType] ?? 0;
+        final bank = bankByFeeType[feeType] ?? 0;
+        final total = cash + bank;
+        grandCash += cash;
+        grandBank += bank;
+        grandTotal += total;
+
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(feeType.toUpperCase());
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.DoubleCellValue(cash);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = amountStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(bank);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = amountStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(total);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = amountStyle;
+        row++;
+      }
+
+      // Grand total
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('GRAND TOTAL');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = totalRowStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.DoubleCellValue(grandCash);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldAmountStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(grandBank);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = boldAmountStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(grandTotal);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = boldAmountStyle;
+
+      // Set column widths
+      sheet.setColumnWidth(0, 30);
+      sheet.setColumnWidth(1, 15);
+      sheet.setColumnWidth(2, 15);
+      sheet.setColumnWidth(3, 15);
+
+      // Save
+      final bytes = workbook.encode();
+      if (bytes == null) return;
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Fee Collection Summary',
+        fileName: 'fee_collection_summary_${_fromDate.year}${_fromDate.month.toString().padLeft(2, '0')}${_fromDate.day.toString().padLeft(2, '0')}.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (result != null) {
+        final file = File(result);
+        await file.writeAsBytes(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fee Collection Summary exported'), backgroundColor: AppColors.success),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Export collection summary error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _exportPendingToExcel(List<Map<String, dynamic>> demands, double appTotalDemand, double appTotalPaid, double appTotalBalance, int appTotalStudents) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 1;
@@ -3609,11 +3839,6 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
       return true;
     }).toList();
     final totalStudents = studentKeys.length;
-    final totalPages = (totalStudents / _studentPageSize).ceil();
-    if (_studentPage >= totalPages && totalPages > 0) _studentPage = totalPages - 1;
-    final startIdx = _studentPage * _studentPageSize;
-    final endIdx = (startIdx + _studentPageSize).clamp(0, totalStudents);
-    final pagedKeys = studentKeys.sublist(startIdx, endIdx);
 
     return SingleChildScrollView(
       child: Column(
@@ -3753,13 +3978,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 DataColumn(label: Text('STATUS')),
                 DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
               ],
-              rows: pagedKeys.isEmpty ? [
+              rows: studentKeys.isEmpty ? [
                 const DataRow(cells: [
                   DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')),
                   DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
                 ]),
               ] : [
-                ...pagedKeys.asMap().entries.map((entry) {
+                ...studentKeys.asMap().entries.map((entry) {
                   final idx = entry.key;
                   final admNo = entry.value;
                   final studentDemands = byStudent[admNo]!;
@@ -3779,7 +4004,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       _drilldownDemands = studentDemands;
                     }),
                     cells: [
-                    DataCell(Text('${startIdx + idx + 1}')),
+                    DataCell(Text('${idx + 1}')),
                     DataCell(Text(admNo)),
                     DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
                     DataCell(Text(_formatCurrency(sDemand))),
@@ -3832,42 +4057,11 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           ));
               }),
               const SizedBox(height: 8),
-              // Pagination footer
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    Text(
-                      'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.first_page_rounded, size: 20),
-                      onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null,
-                      tooltip: 'First page', splashRadius: 18,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                      onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null,
-                      tooltip: 'Previous', splashRadius: 18,
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-                      child: Text('${_studentPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                      onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null,
-                      tooltip: 'Next', splashRadius: 18,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.last_page_rounded, size: 20),
-                      onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null,
-                      tooltip: 'Last page', splashRadius: 18,
-                    ),
-                  ],
+                child: Text(
+                  '$totalStudents students',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ),
             ],

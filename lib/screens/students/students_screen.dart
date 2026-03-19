@@ -81,6 +81,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   String? _importFileName;
   List<String> _importHeaders = [];
   List<List<dynamic>> _importRows = [];
+  bool _importValidated = false;
   List<String?> _importMappings = [];
   int _importStep = 0; // 0=grid, 2=importing, 3=done
   int _importedCount = 0;
@@ -1784,6 +1785,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _importFileName = file.name;
         _importHeaders = headers;
         _importRows = rows;
+        _importValidated = false;
         _importMappings = mappings;
         _importStep = 1;
         _importErrorMsg = null;
@@ -1897,10 +1899,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
       if (err != null) errors.add('Row ${i + 2}: $err');
     }
     if (errors.isEmpty) {
+      setState(() => _importValidated = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
       );
     } else {
+      setState(() => _importValidated = false);
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -2194,19 +2198,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               ),
               const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _importRows.isEmpty ? null : _validateImportData,
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text('Validate'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ElevatedButton.icon(
+                onPressed: _importRows.isEmpty || _importValidated ? null : _validateImportData,
+                icon: Icon(_importValidated ? Icons.check_circle : Icons.check_circle_outline, size: 16),
+                label: Text(_importValidated ? 'Validated' : 'Validate'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _importRows.isNotEmpty && !_importValidated ? Colors.orange : (_importValidated ? AppColors.success : Colors.grey),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
-                onPressed: _importRows.isNotEmpty && _importMappings.contains('stuadmno') && _importMappings.contains('stuname') ? _startStudentImport : null,
+                onPressed: _importValidated ? _startStudentImport : null,
                 icon: const Icon(Icons.save_rounded, size: 16),
                 label: const Text('Save'),
                 style: ElevatedButton.styleFrom(
