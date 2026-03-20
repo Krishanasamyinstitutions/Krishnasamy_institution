@@ -34,11 +34,6 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   String? _insMobile;
   String? _insEmail;
 
-  // Pagination
-  int _allPage = 0;
-  int _paidPage = 0;
-  int _failedPage = 0;
-  static const int _pageSize = 10;
 
   List<PaymentModel> get _allTransactions {
     final all = [..._paidTransactions, ..._failedTransactions];
@@ -667,7 +662,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         // Tab buttons with colored active states
         ListenableBuilder(
@@ -732,11 +727,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             );
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         // Summary cards
         _buildSummaryCards(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
 
         // Tab content
         Expanded(
@@ -799,7 +794,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   Widget _buildSummaryCard(
       String title, String value, String subtitle, Color color, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -808,12 +803,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -854,29 +849,6 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
-  Widget _buildPaginationControls(int currentPage, int totalPages, void Function(int) onPageChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF6C8EEF),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(14), bottomRight: Radius.circular(14)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(icon: const Icon(Icons.first_page_rounded, size: 20), color: Colors.white, onPressed: currentPage > 0 ? () => onPageChanged(0) : null),
-          IconButton(icon: const Icon(Icons.chevron_left_rounded, size: 20), color: Colors.white, onPressed: currentPage > 0 ? () => onPageChanged(currentPage - 1) : null),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text('${currentPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-          ),
-          IconButton(icon: const Icon(Icons.chevron_right_rounded, size: 20), color: Colors.white, onPressed: currentPage < totalPages - 1 ? () => onPageChanged(currentPage + 1) : null),
-          IconButton(icon: const Icon(Icons.last_page_rounded, size: 20), color: Colors.white, onPressed: currentPage < totalPages - 1 ? () => onPageChanged(totalPages - 1) : null),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAllTransactionTable() {
     final allTransactions = _allTransactions;
     if (allTransactions.isEmpty) {
@@ -899,116 +871,67 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       );
     }
 
-    final totalPages = (allTransactions.length / _pageSize).ceil();
-    if (_allPage >= totalPages && totalPages > 0) _allPage = totalPages - 1;
-    final start = _allPage * _pageSize;
-    final end = (start + _pageSize).clamp(0, allTransactions.length);
-    final transactions = allTransactions.sublist(start, end);
+    final transactions = allTransactions;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Column(children: [
-          SingleChildScrollView(
-            child: SizedBox(
-              width: double.infinity,
-              child: DataTable(dividerThickness: 0,
-                headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                headingTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  color: Colors.white,
-                ),
-                dataTextStyle: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textPrimary,
-                ),
-                columnSpacing: 20,
-                horizontalMargin: 16,
-                headingRowHeight: 42,
-                columns: const [
-                  DataColumn(label: Text('S NO.')),
-                  DataColumn(label: Text('PAY NO')),
-                  DataColumn(label: Text('STUDENT')),
-                  DataColumn(label: Text('AMOUNT')),
-                  DataColumn(label: Text('CURRENCY')),
-                  DataColumn(label: Text('METHOD')),
-                  DataColumn(label: Text('REFERENCE')),
-                  DataColumn(label: Text('DATE')),
-                  DataColumn(label: Text('STATUS')),
-                  DataColumn(label: Text('DOWNLOAD RECEIPT')),
+    return SingleChildScrollView(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: DataTable(
+            dividerThickness: 0,
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+            headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Colors.white),
+            dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            columnSpacing: 20,
+            horizontalMargin: 16,
+            headingRowHeight: 42,
+            columns: const [
+              DataColumn(label: Text('S NO.')),
+              DataColumn(label: Text('PAY NO')),
+              DataColumn(label: Text('STUDENT')),
+              DataColumn(label: Text('AMOUNT')),
+              DataColumn(label: Text('CURRENCY')),
+              DataColumn(label: Text('METHOD')),
+              DataColumn(label: Text('REFERENCE')),
+              DataColumn(label: Text('DATE')),
+              DataColumn(label: Text('STATUS')),
+              DataColumn(label: Text('DOWNLOAD RECEIPT')),
+            ],
+            rows: List.generate(transactions.length, (i) {
+              final t = transactions[i];
+              final stuName = _getStudentName(t);
+              final isPaid = t.isSuccess;
+              final statusColor = isPaid ? Colors.green : Colors.red;
+              final statusText = isPaid ? 'Paid' : 'Failed';
+              final date = t.paydate ?? t.createdat;
+              return DataRow(
+                color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
+                cells: [
+                  DataCell(Text('${i + 1}')),
+                  DataCell(Text(t.paynumber ?? '${t.payId}')),
+                  DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
+                  DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
+                  DataCell(Text(t.transcurrency)),
+                  DataCell(Text(t.paymethod ?? '-')),
+                  DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 160), child: Text(t.payreference ?? '-', overflow: TextOverflow.ellipsis))),
+                  DataCell(Text('${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}')),
+                  DataCell(Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8)),
+                    child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
+                  )),
+                  DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                 ],
-                rows: List.generate(transactions.length, (i) {
-                  final t = transactions[i];
-                  final stuName = _getStudentName(t);
-                  final isPaid = t.isSuccess;
-                  final statusColor = isPaid ? Colors.green : Colors.red;
-                  final statusText = isPaid ? 'Paid' : 'Failed';
-                  final date = t.paydate ?? t.createdat;
-
-                  return DataRow(
-                    color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
-                    cells: [
-                      DataCell(Text('${start + i + 1}')),
-                      DataCell(Text(t.paynumber ?? '${t.payId}')),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            stuName,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      DataCell(Text(
-                        t.transtotalamount.toStringAsFixed(2),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      )),
-                      DataCell(Text(t.transcurrency)),
-                      DataCell(Text(t.paymethod ?? '-')),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 160),
-                          child: Text(
-                            t.payreference ?? '-',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      DataCell(Text(
-                        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-                      )),
-                      DataCell(Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            color: statusColor.shade700,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )),
-                      DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
-                    ],
-                  );
-                }),
-              ),
-            ),
+              );
+            }),
           ),
-          _buildPaginationControls(_allPage, totalPages, (p) => setState(() => _allPage = p)),
-        ]),
+        ),
       ),
     );
   }
@@ -1049,125 +972,66 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       );
     }
 
-    final curPage = isPaid ? _paidPage : _failedPage;
-    final totalPages = (allItems.length / _pageSize).ceil();
-    final effectivePage = (curPage >= totalPages && totalPages > 0) ? totalPages - 1 : curPage;
-    if (effectivePage != curPage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() { if (isPaid) _paidPage = effectivePage; else _failedPage = effectivePage; });
-      });
-    }
-    final start = effectivePage * _pageSize;
-    final end = (start + _pageSize).clamp(0, allItems.length);
-    final transactions = allItems.sublist(start, end);
+    final transactions = allItems;
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Column(children: [
-          SingleChildScrollView(
-            child: SizedBox(
-              width: double.infinity,
-              child: DataTable(dividerThickness: 0,
-                headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                headingTextStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  color: Colors.white,
-                ),
-                dataTextStyle: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textPrimary,
-                ),
-                columnSpacing: 20,
-                horizontalMargin: 16,
-                headingRowHeight: 42,
-                columns: const [
-                  DataColumn(label: Text('S NO.')),
-                  DataColumn(label: Text('PAY NO')),
-                  DataColumn(label: Text('STUDENT')),
-                  DataColumn(label: Text('AMOUNT')),
-                  DataColumn(label: Text('CURRENCY')),
-                  DataColumn(label: Text('METHOD')),
-                  DataColumn(label: Text('REFERENCE')),
-                  DataColumn(label: Text('DATE')),
-                  DataColumn(label: Text('STATUS')),
-                  DataColumn(label: Text('DOWNLOAD RECEIPT')),
+    return SingleChildScrollView(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: DataTable(
+            dividerThickness: 0,
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+            headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: Colors.white),
+            dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            columnSpacing: 20,
+            horizontalMargin: 16,
+            headingRowHeight: 42,
+            columns: const [
+              DataColumn(label: Text('S NO.')),
+              DataColumn(label: Text('PAY NO')),
+              DataColumn(label: Text('STUDENT')),
+              DataColumn(label: Text('AMOUNT')),
+              DataColumn(label: Text('CURRENCY')),
+              DataColumn(label: Text('METHOD')),
+              DataColumn(label: Text('REFERENCE')),
+              DataColumn(label: Text('DATE')),
+              DataColumn(label: Text('STATUS')),
+              DataColumn(label: Text('DOWNLOAD RECEIPT')),
+            ],
+            rows: List.generate(transactions.length, (i) {
+              final t = transactions[i];
+              final stuName = _getStudentName(t);
+              final statusColor = isPaid ? Colors.green : Colors.red;
+              final statusText = isPaid ? 'Paid' : 'Failed';
+              final date = isPaid ? t.paydate : t.createdat;
+              return DataRow(
+                color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
+                cells: [
+                  DataCell(Text('${i + 1}')),
+                  DataCell(Text(t.paynumber ?? '${t.payId}')),
+                  DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
+                  DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
+                  DataCell(Text(t.transcurrency)),
+                  DataCell(Text(t.paymethod ?? '-')),
+                  DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 160), child: Text(t.payreference ?? '-', overflow: TextOverflow.ellipsis))),
+                  DataCell(Text(date != null ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}' : '-')),
+                  DataCell(Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8)),
+                    child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 12)),
+                  )),
+                  DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                 ],
-                rows: List.generate(transactions.length, (i) {
-                  final t = transactions[i];
-                  final stuName = _getStudentName(t);
-                  final statusColor = isPaid ? Colors.green : Colors.red;
-                  final statusText = isPaid ? 'Paid' : 'Failed';
-                  final date = isPaid ? t.paydate : t.createdat;
-
-                  return DataRow(
-                    color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
-                    cells: [
-                      DataCell(Text('${start + i + 1}')),
-                      DataCell(Text(t.paynumber ?? '${t.payId}')),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            stuName,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      DataCell(Text(
-                        t.transtotalamount.toStringAsFixed(2),
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      )),
-                      DataCell(Text(t.transcurrency)),
-                      DataCell(Text(t.paymethod ?? '-')),
-                      DataCell(
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 160),
-                          child: Text(
-                            t.payreference ?? '-',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      DataCell(Text(
-                        date != null
-                            ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
-                            : '-',
-                      )),
-                      DataCell(Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            color: statusColor.shade700,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )),
-                      DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
-                    ],
-                  );
-                }),
-              ),
-            ),
+              );
+            }),
           ),
-          _buildPaginationControls(effectivePage, totalPages, (p) => setState(() {
-            if (isPaid) _paidPage = p; else _failedPage = p;
-          })),
-        ]),
+        ),
       ),
     );
   }

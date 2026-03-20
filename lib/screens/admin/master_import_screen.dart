@@ -88,21 +88,50 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          color: AppColors.surfaceCard,
-          child: TabBar(
-            controller: _tabCtrl,
-            labelColor: AppColors.accent,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.accent,
-            tabs: const [
-              Tab(text: 'Fee Group'),
-              Tab(text: 'Fee Type'),
-              Tab(text: 'Concession'),
-              Tab(text: 'Class Fee Demand'),
-            ],
-          ),
+        ListenableBuilder(
+          listenable: _tabCtrl,
+          builder: (context, _) {
+            final selected = _tabCtrl.index;
+            final tabLabels = ['Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand'];
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: List.generate(tabLabels.length, (i) {
+                  final isActive = selected == i;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabCtrl.animateTo(i),
+                      child: Container(
+                        margin: EdgeInsets.only(right: i < tabLabels.length - 1 ? 4 : 0),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.accent : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Center(
+                          child: Text(
+                            tabLabels[i],
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isActive ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          },
         ),
+        const SizedBox(height: 10),
         Expanded(
           child: TabBarView(
             controller: _tabCtrl,
@@ -256,7 +285,6 @@ Widget _buildImportCard({
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.border),
     ),
-    margin: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

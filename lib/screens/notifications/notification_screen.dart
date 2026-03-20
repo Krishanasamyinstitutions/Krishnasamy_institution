@@ -5,7 +5,8 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 class NotificationScreen extends StatefulWidget {
-  const NotificationScreen({super.key});
+  final VoidCallback? onReadChanged;
+  const NotificationScreen({super.key, this.onReadChanged});
 
   @override
   State<NotificationScreen> createState() => _NotificationScreenState();
@@ -15,6 +16,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _notifications = [];
   String _filter = 'All'; // All, Unread, Read
+  Map<String, dynamic>? _selectedNotification;
 
   @override
   void initState() {
@@ -36,15 +38,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
           .eq('activestatus', 1)
           .isFilter('stu_id', null)
           .order('createdat', ascending: false);
-      // Deduplicate: group by title+body+type, show unique notifications only
       final allNotifications = List<Map<String, dynamic>>.from(data);
+      // Deduplicate: group by title+body+type, show unique notifications only
       final seen = <String>{};
       final unique = <Map<String, dynamic>>[];
+      // Track which unique entries are read
+      final Map<String, bool> readStatus = {};
       for (final n in allNotifications) {
         final key = '${n['notititle']}|${n['notibody']}|${n['notitype']}';
+        final isRead = n['isread'] == true || n['isread'] == 1;
         if (!seen.contains(key)) {
           seen.add(key);
           unique.add(n);
+          readStatus[key] = isRead;
+        } else {
+          // If unique entry is read but this duplicate is unread, mark it as read in DB
+          if (readStatus[key] == true && !isRead) {
+            final id = n['noti_id'];
+            if (id != null) {
+              SupabaseService.client.from('notification').update({'isread': 1}).eq('noti_id', id).then((_) {});
+            }
+          }
         }
       }
       if (mounted) {
@@ -52,6 +66,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
           _notifications = unique;
           _isLoading = false;
         });
+        // Refresh dashboard badge after syncing duplicates
+        widget.onReadChanged?.call();
       }
     } catch (e) {
       debugPrint('Error fetching notifications: $e');
@@ -66,6 +82,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   int get _unreadCount => _notifications.where((n) => n['isread'] != true && n['isread'] != 1).length;
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '-';
+    try {
+      final dt = DateTime.parse(dateStr);
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
 
   String _timeAgo(String? dateStr) {
     if (dateStr == null) return '';
@@ -121,11 +147,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Future<void> _markAsRead(Map<String, dynamic> notif) async {
-    final id = notif['noti_id'] ?? notif['id'];
-    if (id == null) return;
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
     try {
-      await SupabaseService.client.from('notification').update({'isread': 1}).eq('noti_id', id);
-      _fetchNotifications();
+      // Mark all duplicates with same title+body+type as read
+      var query = SupabaseService.client.from('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
+      final title = notif['notititle']?.toString();
+      final body = notif['notibody']?.toString();
+      final type = notif['notitype']?.toString();
+      if (title != null) query = query.eq('notititle', title);
+      if (body != null) query = query.eq('notibody', body);
+      if (type != null) query = query.eq('notitype', type);
+      await query;
+      await _fetchNotifications();
+      widget.onReadChanged?.call();
     } catch (e) {
       debugPrint('Error marking as read: $e');
     }
@@ -137,7 +173,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (insId == null) return;
     try {
       await SupabaseService.client.from('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
-      _fetchNotifications();
+      await _fetchNotifications();
+      widget.onReadChanged?.call();
     } catch (e) {
       debugPrint('Error marking all as read: $e');
     }
@@ -214,14 +251,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : filtered.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 6),
-                      itemBuilder: (context, index) => _buildNotificationTile(filtered[index]),
-                    ),
+              : _selectedNotification != null
+                  ? _buildNotificationDetail(_selectedNotification!)
+                  : filtered.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 6),
+                          itemBuilder: (context, index) => _buildNotificationTile(filtered[index]),
+                        ),
         ),
       ],
     );
@@ -255,10 +294,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return InkWell(
       onTap: () {
         if (!isRead) _markAsRead(notif);
+        setState(() => _selectedNotification = notif);
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: isRead ? Colors.white : AppColors.accent.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
@@ -269,15 +309,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
           children: [
             // Icon
             Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: _typeColor(type).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(_typeIcon(type), size: 20, color: _typeColor(type)),
+              child: Icon(_typeIcon(type), size: 22, color: _typeColor(type)),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             // Content
             Expanded(
               child: Column(
@@ -293,20 +333,146 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
                         ),
                       Expanded(
-                        child: Text(title, style: TextStyle(fontSize: 13, fontWeight: isRead ? FontWeight.w500 : FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(title, style: TextStyle(fontSize: 14, fontWeight: isRead ? FontWeight.w500 : FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
-                      Text(_timeAgo(date), style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.6))),
+                      if (type != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _typeColor(type).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _typeColor(type))),
+                        ),
                     ],
                   ),
                   if (body.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(body, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Text(body, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      const SizedBox(width: 4),
+                      Text(_formatDate(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      const SizedBox(width: 12),
+                      Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      const SizedBox(width: 4),
+                      Text(_timeAgo(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                    ],
+                  ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationDetail(Map<String, dynamic> notif) {
+    final title = notif['notititle']?.toString() ?? notif['title']?.toString() ?? 'Notification';
+    final body = notif['notibody']?.toString() ?? notif['body']?.toString() ?? notif['notidesc']?.toString() ?? '';
+    final date = notif['createdat']?.toString();
+    final type = notif['notitype']?.toString() ?? notif['type']?.toString();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Back button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: InkWell(
+              onTap: () => setState(() => _selectedNotification = null),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
+                    SizedBox(width: 6),
+                    Text('Back to Notifications', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Divider(color: AppColors.border),
+          // Detail content
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _typeColor(type).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(_typeIcon(type), size: 24, color: _typeColor(type)),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (type != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: _typeColor(type).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _typeColor(type))),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              const SizedBox(width: 4),
+                              Text(_formatDate(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                              const SizedBox(width: 10),
+                              Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              const SizedBox(width: 4),
+                              Text(_timeAgo(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (body.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Divider(color: AppColors.border),
+                  const SizedBox(height: 16),
+                  Text(body, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.6)),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

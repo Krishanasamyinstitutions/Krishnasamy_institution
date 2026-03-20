@@ -239,13 +239,12 @@ class _NoticesScreenState extends State<NoticesScreen> {
     final date = notice['createdat']?.toString() ?? notice['noticedate']?.toString();
     final priority = notice['noticepriority']?.toString() ?? notice['priority']?.toString();
     final category = notice['noticecategory']?.toString() ?? notice['category']?.toString();
-    final target = notice['noticetarget']?.toString();
 
     return InkWell(
       onTap: () => setState(() => _selectedNotice = notice),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -254,17 +253,17 @@ class _NoticesScreenState extends State<NoticesScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Category icon
+            // Icon
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: _priorityColor(priority).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(_categoryIcon(category), size: 22, color: _priorityColor(priority)),
+              child: Icon(_categoryIcon(category), size: 20, color: _priorityColor(priority)),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             // Content
             Expanded(
               child: Column(
@@ -273,10 +272,11 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       if (priority != null)
                         Container(
+                          margin: const EdgeInsets.only(left: 8),
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: _priorityColor(priority).withValues(alpha: 0.1),
@@ -284,44 +284,35 @@ class _NoticesScreenState extends State<NoticesScreen> {
                           ),
                           child: Text(priority, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
                         ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 8),
+                  if (desc.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       const SizedBox(width: 4),
-                      Text(_formatDate(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      const SizedBox(width: 12),
-                      Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      Text(_formatDate(date), style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      const SizedBox(width: 10),
+                      Icon(Icons.access_time_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       const SizedBox(width: 4),
-                      Text(_timeAgo(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      if (target != null && target.isNotEmpty) ...[
-                        const SizedBox(width: 12),
-                        Icon(Icons.people_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                        const SizedBox(width: 4),
-                        Text(target, style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      ],
+                      Text(_timeAgo(date), style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       if (category != null) ...[
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(category, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                        ),
+                        const SizedBox(width: 10),
+                        Icon(Icons.label_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                        const SizedBox(width: 4),
+                        Text(category, style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       ],
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -758,44 +749,6 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Description
-                  const Text('Description', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _descController,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      hintText: 'Enter notice description...',
-                      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Priority & Category row
-                  Row(
-                    children: [
-                      Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v!))),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v!))),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // From Date & To Date row
-                  Row(
-                    children: [
-                      Expanded(child: _buildDatePicker('From Date', _fromDate, (d) => setState(() => _fromDate = d))),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildDatePicker('To Date', _toDate, (d) => setState(() => _toDate = d))),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
                   // Target Audience
                   const Text('Target Audience', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -834,9 +787,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     }).toList(),
                   ),
 
-                  // Class selection
+                  // Class selection (shown when Specific Classes is selected)
                   if (_targetType == 'Specific Classes') ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -914,6 +867,44 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 20),
+
+                  // Description
+                  const Text('Description', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _descController,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      hintText: 'Enter notice description...',
+                      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Priority & Category row
+                  Row(
+                    children: [
+                      Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v!))),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v!))),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // From Date & To Date row
+                  Row(
+                    children: [
+                      Expanded(child: _buildDatePicker('From Date', _fromDate, (d) => setState(() => _fromDate = d))),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildDatePicker('To Date', _toDate, (d) => setState(() => _toDate = d))),
+                    ],
+                  ),
 
                   const SizedBox(height: 20),
 

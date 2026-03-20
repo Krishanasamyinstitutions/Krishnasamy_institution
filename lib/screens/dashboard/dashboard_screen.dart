@@ -100,7 +100,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final rows = await SupabaseService.client
           .from('notification')
           .select('isread')
-          .eq('ins_id', insId);
+          .eq('ins_id', insId)
+          .eq('activestatus', 1);
       final unread = (rows as List).where((n) => n['isread'] != true && n['isread'] != 1).length;
       if (mounted) setState(() => _unreadNotifCount = unread);
     } catch (_) {}
@@ -235,7 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (isDesktop || isTablet)
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
-              width: _sidebarCollapsed ? 78 : (isDesktop ? 260 : 78),
+              width: _sidebarCollapsed ? 78 : (isDesktop ? (size.width < 1400 ? 210 : 260) : 78),
               child: _buildSidebar(
                   context, _sidebarCollapsed || isTablet),
             ),
@@ -251,11 +252,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _isFullHeightScreen()
                       ? Padding(
-                          padding: EdgeInsets.all(isDesktop ? 28 : 16),
+                          padding: EdgeInsets.all(isDesktop ? (size.width < 1400 ? 16 : 28) : 16),
                           child: _buildDashboardContent(context, isDesktop),
                         )
                       : SingleChildScrollView(
-                          padding: EdgeInsets.all(isDesktop ? 28 : 16),
+                          padding: EdgeInsets.all(isDesktop ? (size.width < 1400 ? 16 : 28) : 16),
                           child: _buildDashboardContent(context, isDesktop),
                         ),
                 ),
@@ -348,23 +349,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               color: isSelected
                                   ? AppColors.primary
                                   : AppColors.textSecondary,
-                              size: 22,
+                              size: MediaQuery.of(context).size.width <= 1366 ? 18 : 22,
                             ),
                             if (!collapsed) ...[
                               const SizedBox(width: 14),
-                              Text(
-                                item.label,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : AppColors.textSecondary,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                    ),
+                              Flexible(
+                                child: Text(
+                                  item.label,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.textSecondary,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w400,
+                                      ),
+                                ),
                               ),
                             ],
                           ],
@@ -387,8 +392,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final auth = context.watch<AuthProvider>();
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? 28 : 16,
-        vertical: 16,
+        horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1400 ? 16 : 28) : 16,
+        vertical: 12,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -643,7 +648,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const NoticesScreen();
     }
     if (selectedMenu == 'Notifications') {
-      return const NotificationScreen();
+      return NotificationScreen(onReadChanged: _loadUnreadNotifCount);
     }
     if (selectedMenu == 'Master Data') {
       return const MasterImportScreen();

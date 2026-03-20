@@ -264,21 +264,25 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           const SizedBox(height: 20),
 
           // Form + User list side by side
-          Row(
+          LayoutBuilder(builder: (context, constraints) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final isCompact = screenWidth <= 1366;
+            return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Left: Creation Form
               SizedBox(
-                width: 340,
+                width: isCompact ? 260 : 340,
                 child: _buildCreationForm(),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: isCompact ? 12 : 24),
               // Right: Existing Users List
               Expanded(
                 child: _buildUserList(),
               ),
             ],
-          ),
+          );
+          }),
         ],
       ),
     );
@@ -465,13 +469,16 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             const SizedBox(height: 24),
 
             // Buttons
-            Row(
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final btnPadding = EdgeInsets.symmetric(horizontal: compact ? 20 : 28, vertical: 20);
+              return Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _clearForm,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                      padding: btnPadding,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -480,13 +487,12 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _createUser,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                      padding: btnPadding,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
@@ -501,7 +507,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   ),
                 ),
               ],
-            ),
+            );
+            }),
           ],
         ),
       ),
