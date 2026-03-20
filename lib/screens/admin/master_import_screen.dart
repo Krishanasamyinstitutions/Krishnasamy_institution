@@ -169,7 +169,22 @@ Future<List<String>> _getImportErrors(int insId, String impType) async {
       .eq('status', 'ERROR')
       .order('imp_id')
       .limit(20);
-  return (errors as List).map((e) => 'Row ${e['imp_id']}: ${e['error_msg']}').toList();
+  return (errors as List).map((e) => 'Row ${e['imp_id']}: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}').toList();
+}
+
+String _friendlyError(String msg) {
+  final m = msg.toLowerCase();
+  if (m.contains('duplicate key') || m.contains('unique constraint')) return 'Duplicate record found';
+  if (m.contains('not-null') || m.contains('null value')) {
+    final match = RegExp(r'column "(\w+)"').firstMatch(msg);
+    return '${match?.group(1) ?? 'Field'} is required';
+  }
+  if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check linked values';
+  if (m.contains('check constraint')) return 'Invalid value format';
+  if (m.contains('value too long')) return 'Value too long for the field';
+  if (m.contains('invalid input syntax')) return 'Invalid data format';
+  if (m.contains('permission denied')) return 'Permission denied';
+  return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
 }
 
 // ═══════════════════════════════════════════════

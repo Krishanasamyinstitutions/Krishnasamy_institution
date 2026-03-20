@@ -625,7 +625,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const FeeDemandScreen();
     }
     if (selectedMenu == 'Fee Collection') {
-      return const StudentFeeCollectionScreen();
+      return StudentFeeCollectionScreen(
+        onNavigateToTransactions: () {
+          final idx = _navItems.indexWhere((i) => i.label == 'Transactions');
+          if (idx >= 0) setState(() => _selectedNavIndex = idx);
+        },
+      );
     }
     if (selectedMenu == 'Student Ledger') {
       return const StudentLedgerScreen();

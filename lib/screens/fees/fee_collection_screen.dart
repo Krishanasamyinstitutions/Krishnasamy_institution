@@ -3840,10 +3840,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     }).toList();
     final totalStudents = studentKeys.length;
 
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
       children: [
-        Container(
+        Expanded(child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -3950,7 +3949,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               ),
               const Divider(height: 1),
               // Student list table
-              LayoutBuilder(builder: (context, constraints) {
+              Expanded(child: LayoutBuilder(builder: (context, constraints) {
           // Compute totals for grand total row
           double gDemand = 0, gPaid = 0, gBalance = 0;
           for (final key in studentKeys) {
@@ -3960,71 +3959,66 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
             }
           }
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 0,
-              showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
-              columns: const [
-                DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('ADM NO')),
-                DataColumn(label: Text('STUDENT NAME')),
-                DataColumn(label: Text('FEE AMOUNT'), numeric: true),
-                DataColumn(label: Text('PAID'), numeric: true),
-                DataColumn(label: Text('BALANCE'), numeric: true),
-                DataColumn(label: Text('STATUS')),
-                DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
-              ],
-              rows: studentKeys.isEmpty ? [
-                const DataRow(cells: [
-                  DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')),
-                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                ]),
-              ] : [
-                ...studentKeys.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final admNo = entry.value;
-                  final studentDemands = byStudent[admNo]!;
-                  final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
-                  double sDemand = 0, sPaid = 0, sBalance = 0;
-                  for (final d in studentDemands) {
-                    sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-                    sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  }
-                  final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
-                  final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
-                  return DataRow(
-                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                    onSelectChanged: (_) => setState(() {
-                      _drilldownAdmNo = admNo;
-                      _drilldownDemands = studentDemands;
-                    }),
-                    cells: [
-                    DataCell(Text('${idx + 1}')),
-                    DataCell(Text(admNo)),
-                    DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
-                    DataCell(Text(_formatCurrency(sDemand))),
-                    DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
-                    DataCell(Text(_formatCurrency(sBalance), style: TextStyle(fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
-                    DataCell(Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
-                    )),
-                    DataCell(Align(
-                      alignment: Alignment.centerRight,
-                      child: InkWell(
-                        onTap: () => setState(() {
-                          _drilldownAdmNo = admNo;
-                          _drilldownDemands = studentDemands;
-                        }),
+          const hStyle = TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white);
+          const dStyle = TextStyle(fontSize: 12, color: AppColors.textPrimary);
+          return Column(children: [
+            // Fixed header
+            Container(
+              color: const Color(0xFF6C8EEF),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: const Row(children: [
+                SizedBox(width: 50, child: Text('S No.', style: hStyle)),
+                SizedBox(width: 100, child: Text('ADM NO', style: hStyle)),
+                Expanded(flex: 3, child: Text('STUDENT NAME', style: hStyle)),
+                Expanded(flex: 2, child: Text('FEE AMOUNT', style: hStyle, textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text('PAID', style: hStyle, textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text('BALANCE', style: hStyle, textAlign: TextAlign.right)),
+                SizedBox(width: 70, child: Text('STATUS', style: hStyle, textAlign: TextAlign.center)),
+                SizedBox(width: 120, child: Text('ACTION', style: hStyle, textAlign: TextAlign.right)),
+              ]),
+            ),
+            // Scrollable body
+            Expanded(child: studentKeys.isEmpty
+              ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary)))
+              : ListView.builder(
+              itemCount: studentKeys.length,
+              itemBuilder: (ctx, idx) {
+                final admNo = studentKeys[idx];
+                final studentDemands = byStudent[admNo]!;
+                final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
+                double sDemand = 0, sPaid = 0, sBalance = 0;
+                for (final d in studentDemands) {
+                  sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                  sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+                }
+                final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
+                final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+                return InkWell(
+                  onTap: () => setState(() {
+                    _drilldownAdmNo = admNo;
+                    _drilldownDemands = studentDemands;
+                  }),
+                  child: Container(
+                    color: idx.isEven ? Colors.white : const Color(0xFFF7FAFC),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(children: [
+                      SizedBox(width: 50, child: Text('${idx + 1}', style: dStyle)),
+                      SizedBox(width: 100, child: Text(admNo, style: dStyle)),
+                      Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
+                      Expanded(flex: 2, child: Text(_formatCurrency(sDemand), style: dStyle, textAlign: TextAlign.right)),
+                      Expanded(flex: 2, child: Text(_formatCurrency(sPaid), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.success), textAlign: TextAlign.right)),
+                      Expanded(flex: 2, child: Text(_formatCurrency(sBalance), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary), textAlign: TextAlign.right)),
+                      SizedBox(width: 70, child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error), textAlign: TextAlign.center),
+                      )),
+                      SizedBox(width: 120, child: Align(
+                        alignment: Alignment.centerRight,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
@@ -4034,41 +4028,33 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                           ]),
                         ),
-                      ),
-                    )),
-                  ]);
-                }),
-                // Grand total row
-                DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                  cells: [
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    DataCell(Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                  ],
-                ),
-              ],
+                      )),
+                    ]),
+                  ),
+                );
+              },
+            )),
+            // Fixed footer
+            Container(
+              color: const Color(0xFF6C8EEF),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                const SizedBox(width: 50),
+                const SizedBox(width: 100),
+                Expanded(flex: 3, child: Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                Expanded(flex: 2, child: Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                const SizedBox(width: 70),
+                const SizedBox(width: 120),
+              ]),
             ),
-          ));
-              }),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  '$totalStudents students',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-              ),
+          ]);
+              })),
             ],
           ),
-        ),
+        )),
       ],
-    ),
     );
   }
 

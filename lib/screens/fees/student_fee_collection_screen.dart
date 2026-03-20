@@ -27,7 +27,8 @@ int _termIndex(String t) {
 }
 
 class StudentFeeCollectionScreen extends StatefulWidget {
-  const StudentFeeCollectionScreen({super.key});
+  final VoidCallback? onNavigateToTransactions;
+  const StudentFeeCollectionScreen({super.key, this.onNavigateToTransactions});
 
   @override
   State<StudentFeeCollectionScreen> createState() =>
@@ -1151,7 +1152,7 @@ class _StudentFeeCollectionScreenState
   }
 
   // ── Show success dialog ──
-  void _showSuccessDialog(String payNumber, double totalNet) {
+  void _showSuccessDialog(String payNumber, double totalNet, {int? payId}) {
     if (!mounted) return;
     showDialog(
       context: context,
@@ -1168,6 +1169,21 @@ class _StudentFeeCollectionScreenState
             Text('Receipt No: $payNumber', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
             Text('Mode: $_paymentMode', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _clear();
+                if (payId != null) _downloadReceipt(payId, payNumber);
+              },
+              icon: const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Download Receipt'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                side: const BorderSide(color: AppColors.accent),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -1187,6 +1203,10 @@ class _StudentFeeCollectionScreenState
         ],
       ),
     );
+  }
+
+  void _downloadReceipt(int payId, String payNumber) {
+    widget.onNavigateToTransactions?.call();
   }
 
   // ── Direct payment (Cash / Bank / Cheque) ──
@@ -1243,7 +1263,7 @@ class _StudentFeeCollectionScreenState
         'paydate': DateTime.now().toIso8601String(),
       }).eq('pay_id', payId);
 
-      _showSuccessDialog(payNumber, totalNet);
+      _showSuccessDialog(payNumber, totalNet, payId: payId);
     } catch (e) {
       if (payId != null) {
         try {
@@ -1534,7 +1554,7 @@ class _StudentFeeCollectionScreenState
         'paynumber': payNumber,
         'paydate': DateTime.now().toIso8601String(),
       }).eq('pay_id', payId);
-      _showSuccessDialog(payNumber, totalNet);
+      _showSuccessDialog(payNumber, totalNet, payId: payId);
     } else if (result == 'F') {
       final payNumber = await _generatePayNumber();
       await SupabaseService.client.from('payment').update({
