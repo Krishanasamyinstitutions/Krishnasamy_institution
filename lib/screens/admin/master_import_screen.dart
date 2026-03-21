@@ -198,7 +198,22 @@ Future<List<String>> _getImportErrors(int insId, String impType) async {
       .eq('status', 'ERROR')
       .order('imp_id')
       .limit(20);
-  return (errors as List).map((e) => 'Row ${e['imp_id']}: ${e['error_msg']}').toList();
+  return (errors as List).map((e) => 'Row ${e['imp_id']}: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}').toList();
+}
+
+String _friendlyError(String msg) {
+  final m = msg.toLowerCase();
+  if (m.contains('duplicate key') || m.contains('unique constraint')) return 'Duplicate record found';
+  if (m.contains('not-null') || m.contains('null value')) {
+    final match = RegExp(r'column "(\w+)"').firstMatch(msg);
+    return '${match?.group(1) ?? 'Field'} is required';
+  }
+  if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check linked values';
+  if (m.contains('check constraint')) return 'Invalid value format';
+  if (m.contains('value too long')) return 'Value too long for the field';
+  if (m.contains('invalid input syntax')) return 'Invalid data format';
+  if (m.contains('permission denied')) return 'Permission denied';
+  return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
 }
 
 // ═══════════════════════════════════════════════
@@ -277,6 +292,9 @@ Widget _buildImportCard({
   List<String> errors = const [],
   bool showResult = false,
   VoidCallback? onDismissResult,
+  VoidCallback? onValidate,
+  VoidCallback? onClose,
+  bool isValidated = false,
 }) {
   return Container(
     padding: const EdgeInsets.all(16),
@@ -432,19 +450,41 @@ Widget _buildImportCard({
           children: [
             Text('${rows.length} rows', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             const Spacer(),
+            OutlinedButton.icon(
+              onPressed: rows.isNotEmpty && !saving ? onValidate : null,
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+              label: const Text('Validate'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: rows.isNotEmpty && !saving ? AppColors.accent : AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
             ElevatedButton.icon(
-              onPressed: saving ? null : onSave,
+              onPressed: saving ? null : (isValidated ? onSave : null),
               icon: saving
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.save_rounded, size: 16),
               label: Text(saving ? 'Saving...' : 'Save'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
+                backgroundColor: isValidated ? AppColors.accent : Colors.grey.shade300,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: onClose,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              child: const Text('Close'),
             ),
           ],
         ),
@@ -467,6 +507,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
+  bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   static const _headers = ['Group Name *', 'Year *'];
@@ -479,7 +520,31 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+  }
+
+  void _validate() {
+    final errors = <String>[];
+    final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
+    for (int i = 0; i < _rows.length; i++) {
+      final missing = <String>[];
+      for (int j = 0; j < labels.length; j++) {
+        final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
+        if (val.isEmpty) missing.add(labels[j]);
+      }
+      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+    }
+    if (errors.isNotEmpty) {
+      setState(() { _isValidated = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    } else {
+      setState(() { _isValidated = true; });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() {
+    setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; });
   }
 
   Future<void> _save() async {
@@ -493,9 +558,9 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEEGROUP');
     } catch (e) {
-      _errors = ['Import failed: $e'];
+      _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
@@ -507,10 +572,13 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       headers: _headers,
       rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
       onBrowse: _browse,
-      onSave: _rows.isNotEmpty ? _save : null,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Group', _headers),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
     );
   }
 }
@@ -530,9 +598,10 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
+  bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
-  static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional', 'Category'];
+  static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *'];
 
   @override
   bool get wantKeepAlive => true;
@@ -542,8 +611,30 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
+
+  void _validate() {
+    final errors = <String>[];
+    final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
+    for (int i = 0; i < _rows.length; i++) {
+      final missing = <String>[];
+      for (int j = 0; j < labels.length; j++) {
+        final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
+        if (val.isEmpty) missing.add(labels[j]);
+      }
+      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+    }
+    if (errors.isNotEmpty) {
+      setState(() { _isValidated = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    } else {
+      setState(() { _isValidated = true; });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -556,9 +647,9 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEETYPE');
     } catch (e) {
-      _errors = ['Import failed: $e'];
+      _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
@@ -570,10 +661,13 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       headers: _headers,
       rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
       onBrowse: _browse,
-      onSave: _rows.isNotEmpty ? _save : null,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Type', _headers),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
     );
   }
 }
@@ -593,6 +687,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
+  bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   static const _headers = ['Concession Name *'];
@@ -605,8 +700,30 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
+
+  void _validate() {
+    final errors = <String>[];
+    final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
+    for (int i = 0; i < _rows.length; i++) {
+      final missing = <String>[];
+      for (int j = 0; j < labels.length; j++) {
+        final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
+        if (val.isEmpty) missing.add(labels[j]);
+      }
+      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+    }
+    if (errors.isNotEmpty) {
+      setState(() { _isValidated = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    } else {
+      setState(() { _isValidated = true; });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -619,9 +736,9 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CONCESSION');
     } catch (e) {
-      _errors = ['Import failed: $e'];
+      _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
@@ -633,10 +750,13 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       headers: _headers,
       rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
       onBrowse: _browse,
-      onSave: _rows.isNotEmpty ? _save : null,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Concession', _headers),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
     );
   }
 }
@@ -656,9 +776,10 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   List<List<dynamic>> _rows = [];
   String? _fileName;
   bool _saving = false;
+  bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
-  static const _headers = ['Class *', 'Term', 'Fee Type *', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
+  static const _headers = ['Class *', 'Term *', 'Fee Type *', 'Amount *', 'Due Date *', 'New/Old *', 'Boys/Girls *', 'Dayscholar/Hostel *'];
 
   @override
   bool get wantKeepAlive => true;
@@ -668,8 +789,30 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     if (result == null) return;
     final parsed = _parseExcel(result.files.single.path!);
     if (parsed.length < 2) return;
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
+
+  void _validate() {
+    final errors = <String>[];
+    final labels = ['Class', 'Term', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
+    for (int i = 0; i < _rows.length; i++) {
+      final missing = <String>[];
+      for (int j = 0; j < labels.length; j++) {
+        final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
+        if (val.isEmpty) missing.add(labels[j]);
+      }
+      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+    }
+    if (errors.isNotEmpty) {
+      setState(() { _isValidated = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    } else {
+      setState(() { _isValidated = true; });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -677,14 +820,12 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      // Map text values to numeric codes for NOB, BGB, DHB
       const nobMap = {'new': '1', 'old': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
       const bgbMap = {'boys': '1', 'girls': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
       const dhbMap = {'dayscholar': '1', 'hostel': '2', 'both': '3', 'day scholar': '1', '1': '1', '2': '2', '3': '3'};
       final mappedRows = _rows.map((row) {
         final mapped = List<dynamic>.from(row);
         while (mapped.length < 8) mapped.add('');
-        // col6 = NOB (index 5), col7 = BGB (index 6), col8 = DHB (index 7)
         final nob = mapped[5].toString().trim().toLowerCase();
         final bgb = mapped[6].toString().trim().toLowerCase();
         final dhb = mapped[7].toString().trim().toLowerCase();
@@ -698,9 +839,9 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CLASSFEEDEMAND');
     } catch (e) {
-      _errors = ['Import failed: $e'];
+      _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
   }
 
@@ -712,10 +853,13 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       headers: _headers,
       rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
       onBrowse: _browse,
-      onSave: _rows.isNotEmpty ? _save : null,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Class Fee Demand', _headers),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
     );
   }
 }

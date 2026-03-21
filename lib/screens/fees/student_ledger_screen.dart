@@ -43,7 +43,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFA855F7),
     Color(0xFFEC4899), Color(0xFFF43F5E), Color(0xFFEF4444),
     Color(0xFFF97316), Color(0xFFF59E0B), Color(0xFF22C55E),
-    Color(0xFF14B8A6), Color(0xFF06B6D4), Color(0xFF6C8EEF),
+    Color(0xFF6C8EEF), Color(0xFF06B6D4), Color(0xFF6C8EEF),
     Color(0xFF2563EB), Color(0xFF7C3AED), Color(0xFF9333EA), Color(0xFFDB2777),
   ];
 
@@ -148,7 +148,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
       // Fetch payment info for paid demands
       final payIds = demandList
-          .where((d) => d['paidstatus'] == 'P' && d['pay_id'] != null)
+          .where((d) => (d['paidstatus'] == 'P' || (d['paidstatus'] == 'U' && ((d['paidamount'] as num?)?.toDouble() ?? 0) > 0)) && d['pay_id'] != null)
           .map((d) => d['pay_id'] as int)
           .toSet()
           .toList();
@@ -188,15 +188,16 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   }
 
   double get _totalDemand => _demands.fold(0.0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0));
-  double get _totalPaid => _demands.where((d) => d['paidstatus'] == 'P').fold(0.0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0));
-  double get _totalPending => _demands.where((d) => d['paidstatus'] == 'U').fold(0.0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0));
+  double get _totalPaid => _demands.fold(0.0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0));
+  double get _totalPending => _demands.fold(0.0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0));
 
   // Ledger rows from feedemand: unpaid = debit only, paid = debit + credit
   List<Map<String, dynamic>> get _ledgerRows {
     final rows = <Map<String, dynamic>>[];
     for (final d in _demands) {
       final raw = d['duedate']?.toString() ?? '';
-      final isPaid = d['paidstatus'] == 'P';
+      final paidAmount = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final hasPaid = paidAmount > 0;
       final payment = d['payment'];
 
       // Demand row (debit)
@@ -211,19 +212,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         'type': 'demand',
       });
 
-      // Payment row (credit) — only for paid demands
-      if (isPaid && payment is Map) {
+      // Payment row (credit) — for paid and partially paid demands
+      if (hasPaid && payment is Map) {
         final payDate = payment['paydate']?.toString() ?? raw;
         final payNumber = payment['paynumber']?.toString() ?? '-';
         final payMethod = payment['paymethod']?.toString() ?? '-';
+        final balance = (d['balancedue'] as num?)?.toDouble() ?? 0.0;
+        final isPartial = balance > 0;
         rows.add({
           'date': payDate.length >= 10 ? payDate.substring(0, 10) : payDate,
           'docno': payNumber,
           'term': d['demfeeterm']?.toString() ?? '-',
-          'feetype': 'Payment ($payMethod)',
+          'feetype': isPartial ? 'Partial Payment ($payMethod)' : 'Payment ($payMethod)',
           'reference': d['demno']?.toString() ?? d['dem_id']?.toString() ?? '-',
-          'debit': 0.0,
-          'credit': (d['paidamount'] as num?)?.toDouble() ?? 0.0,
+          'debit': balance,
+          'credit': paidAmount,
           'type': 'payment',
         });
       }
@@ -596,7 +599,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
               Expanded(            child: _TH('FEE TYPE')),
               SizedBox(width: 110, child: _TH('REFERENCE')),
               SizedBox(width: 100, child: _TH('DUE', align: TextAlign.right)),
-              SizedBox(width: 100, child: _TH('RECEIVE', align: TextAlign.right)),
+              SizedBox(width: 100, child: _TH('RECEIVED', align: TextAlign.right)),
             ],
           ),
         ),

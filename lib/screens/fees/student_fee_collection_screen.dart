@@ -27,7 +27,8 @@ int _termIndex(String t) {
 }
 
 class StudentFeeCollectionScreen extends StatefulWidget {
-  const StudentFeeCollectionScreen({super.key});
+  final VoidCallback? onNavigateToTransactions;
+  const StudentFeeCollectionScreen({super.key, this.onNavigateToTransactions});
 
   @override
   State<StudentFeeCollectionScreen> createState() =>
@@ -1264,77 +1265,8 @@ class _StudentFeeCollectionScreenState
     }
   }
 
-  // ── Generate payment number helper ──
-  Future<String> _generatePayNumber() async {
-    try {
-      final rpcResult = await SupabaseService.client.rpc('generate_payment_number');
-      return rpcResult as String;
-    } catch (_) {
-      final sequence = await SupabaseService.client
-          .from('sequence')
-          .select('seq_id, sequid, seqwidth, seqcurno')
-          .limit(1)
-          .single();
-      final sequid = sequence['sequid'] as String;
-      final seqWidth = sequence['seqwidth'] as int;
-      final seqCurNo = (sequence['seqcurno'] as num).toInt();
-      final newSeqNo = seqCurNo + 1;
-      final prefix = sequid.replaceAll(RegExp(r'\d+$'), '');
-      final payNumber = '$prefix${newSeqNo.toString().padLeft(seqWidth, '0')}';
-      await SupabaseService.client.from('sequence').update({
-        'seqcurno': newSeqNo,
-      }).eq('seq_id', sequence['seq_id'] as int);
-      return payNumber;
-    }
-  }
-
-  // ── Create paymentdetails + update feedemand ──
-  Future<void> _createPaymentDetailsAndUpdateFees(int payId, int? insId) async {
-    final payDetailRows = <Map<String, dynamic>>[];
-    final feedemandUpdates = <Future>[];
-
-    for (final key in _selected) {
-      final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
-      if (d.isEmpty) continue;
-
-      final demId = d['dem_id'] as int;
-      final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-      final fine = _fine(key);
-      final con = _con(key);
-      final net = bal + fine - con;
-
-      payDetailRows.add({
-        'pay_id': payId,
-        'dem_id': demId,
-        'yr_id': d['yr_id'],
-        'yrlabel': d['demfeeyear']?.toString() ?? '',
-        'ins_id': insId,
-        'transcurrency': 'INR',
-        'transtotalamount': net,
-      });
-
-      final currentPaid = (d['paidamount'] as num?)?.toDouble() ?? 0;
-      final newPaid = currentPaid + net;
-      final newBalance = bal - net + fine;
-
-      feedemandUpdates.add(
-        SupabaseService.client.from('feedemand').update({
-          'paidamount': newPaid,
-          'balancedue': newBalance <= 0 ? 0 : newBalance,
-          'paidstatus': newBalance <= 0 ? 'P' : 'U',
-          'pay_id': payId,
-        }).eq('dem_id', demId),
-      );
-    }
-
-    await Future.wait([
-      SupabaseService.client.from('paymentdetails').insert(payDetailRows),
-      ...feedemandUpdates,
-    ]);
-  }
-
   // ── Show success dialog ──
-  void _showSuccessDialog(String payNumber, double totalNet) {
+  void _showSuccessDialog(String payNumber, double totalNet, {int? payId}) {
     if (!mounted) return;
     showDialog(
       context: context,
@@ -1351,6 +1283,21 @@ class _StudentFeeCollectionScreenState
             Text('Receipt No: $payNumber', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
             Text('Mode: $_paymentMode', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _clear();
+                if (payId != null) _downloadReceipt(payId, payNumber);
+              },
+              icon: const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Download Receipt'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                side: const BorderSide(color: AppColors.accent),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -1372,7 +1319,11 @@ class _StudentFeeCollectionScreenState
     );
   }
 
-  // ── Direct payment (Cash / Bank / Cheque) ──
+  void _downloadReceipt(int payId, String payNumber) {
+    widget.onNavigateToTransactions?.call();
+  }
+
+  // ── Direct payment (Cash / Bank / Cheque) using atomic RPCs ──
   Future<void> _processDirectPayment() async {
     setState(() => _processing = true);
 
@@ -1390,58 +1341,81 @@ class _StudentFeeCollectionScreenState
       final yrId = firstDemand['yr_id'] as int?;
       final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
 
-      final payData = <String, dynamic>{
-        'ins_id': insId,
-        'inscode': inscode,
-        'stu_id': stuId,
-        'yr_id': yrId,
-        'yrlabel': yrlabel,
-        'transtotalamount': totalNet,
-        'transcurrency': 'INR',
-        'paydate': DateTime.now().toIso8601String(),
-        'paystatus': 'I',
-        'paymethod': _paymentMode.toLowerCase(),
-        'payreference': '$_paymentMode collection by $createdBy',
-        'createdby': createdBy,
-      };
-
-      if (_paymentMode == 'Cheque') {
-        payData['paychequeno'] = _chequeNoController.text.trim();
-        payData['paychequedate'] = _chequeDate != null
-            ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
-            : null;
-        payData['paybankname'] = _bankNameController.text.trim();
+      // Build items list for atomic RPC
+      final items = <Map<String, dynamic>>[];
+      for (final key in _selected) {
+        final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+        if (d.isEmpty) continue;
+        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+        final fine = _fine(key);
+        final con = _con(key);
+        final net = bal + fine - con;
+        items.add({
+          'dem_id': d['dem_id'] as int,
+          'yr_id': d['yr_id'],
+          'yrlabel': d['demfeeyear']?.toString() ?? '',
+          'ins_id': insId,
+          'amount': net,
+        });
       }
 
-      final payResponse = await SupabaseService.client.from('payment').insert(payData).select('pay_id').single();
+      // Step 1: Initiate payment atomically (creates payment + paymentdetails, validates fees)
+      payId = await SupabaseService.client.rpc('initiate_payment_atomic', params: {
+        'p_car_id': 0, // No cart for desktop direct payment
+        'p_ins_id': insId,
+        'p_inscode': inscode,
+        'p_stu_id': stuId,
+        'p_yr_id': yrId,
+        'p_yrlabel': yrlabel,
+        'p_total_amount': totalNet,
+        'p_created_by': createdBy,
+        'p_items': items,
+      }) as int;
 
-      payId = payResponse['pay_id'] as int;
+      // Step 2: Complete payment atomically (updates feedemand, generates pay number)
+      final completeItems = items.map((i) => {
+        'dem_id': i['dem_id'],
+        'amount': i['amount'],
+      }).toList();
 
-      await _createPaymentDetailsAndUpdateFees(payId, insId);
+      String payReference = '$_paymentMode collection by $createdBy';
+      String payMethod = _paymentMode.toLowerCase();
 
-      final payNumber = await _generatePayNumber();
-      await SupabaseService.client.from('payment').update({
-        'paystatus': 'C',
-        'paynumber': payNumber,
-        'paydate': DateTime.now().toIso8601String(),
-      }).eq('pay_id', payId);
+      if (_paymentMode == 'Cheque') {
+        final chequeNo = _chequeNoController.text.trim();
+        final bankName = _bankNameController.text.trim();
+        payReference = 'Cheque $chequeNo ($bankName) by $createdBy';
+        // Update cheque details on payment record
+        await SupabaseService.client.from('payment').update({
+          'paychequeno': chequeNo,
+          'paychequedate': _chequeDate != null
+              ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
+              : null,
+          'paybankname': bankName,
+        }).eq('pay_id', payId);
+      }
 
-      _showSuccessDialog(payNumber, totalNet);
+      final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
+        'p_pay_id': payId,
+        'p_pay_method': payMethod,
+        'p_pay_reference': payReference,
+        'p_items': completeItems,
+      }) as String;
+
+      _showSuccessDialog(payNumber, totalNet, payId: payId);
     } catch (e) {
-      if (payId != null) {
-        try {
-          final payNumber = await _generatePayNumber();
-          await SupabaseService.client.from('payment').update({
-            'paystatus': 'F',
-            'paynumber': payNumber,
-            'paydate': DateTime.now().toIso8601String(),
-          }).eq('pay_id', payId);
-        } catch (_) {}
+      String errorMsg = e.toString();
+      if (errorMsg.contains('already fully paid')) {
+        errorMsg = 'One or more fees have already been paid. Please refresh and try again.';
+      } else if (errorMsg.contains('currently being processed')) {
+        errorMsg = 'These fees are already being processed. Please wait and try again.';
+      } else if (errorMsg.contains('not found or inactive')) {
+        errorMsg = 'One or more fees are no longer available. Please refresh.';
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Payment failed: $errorMsg'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -1470,22 +1444,35 @@ class _StudentFeeCollectionScreenState
       final yrId = firstDemand['yr_id'] as int?;
       final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
 
-      // 1. Create payment record with status 'I'
-      final payResponse = await SupabaseService.client.from('payment').insert({
-        'ins_id': insId,
-        'inscode': inscode,
-        'stu_id': stuId,
-        'yr_id': yrId,
-        'yrlabel': yrlabel,
-        'transtotalamount': totalNet,
-        'transcurrency': 'INR',
-        'paydate': DateTime.now().toIso8601String(),
-        'paystatus': 'I',
-        'paymethod': 'razorpay',
-        'createdby': createdBy,
-      }).select('pay_id').single();
+      // 1. Initiate payment atomically (validates fees, creates payment + paymentdetails)
+      final items = <Map<String, dynamic>>[];
+      for (final key in _selected) {
+        final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+        if (d.isEmpty) continue;
+        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+        final fine = _fine(key);
+        final con = _con(key);
+        final net = bal + fine - con;
+        items.add({
+          'dem_id': d['dem_id'] as int,
+          'yr_id': d['yr_id'],
+          'yrlabel': d['demfeeyear']?.toString() ?? '',
+          'ins_id': insId,
+          'amount': net,
+        });
+      }
 
-      payId = payResponse['pay_id'] as int;
+      payId = await SupabaseService.client.rpc('initiate_payment_atomic', params: {
+        'p_car_id': 0,
+        'p_ins_id': insId,
+        'p_inscode': inscode,
+        'p_stu_id': stuId,
+        'p_yr_id': yrId,
+        'p_yrlabel': yrlabel,
+        'p_total_amount': totalNet,
+        'p_created_by': createdBy,
+        'p_items': items,
+      }) as int;
 
       // 2. Create Razorpay order via edge function
       final orderResponse = await SupabaseService.client.functions.invoke(
@@ -1572,10 +1559,8 @@ class _StudentFeeCollectionScreenState
     } catch (e) {
       if (payId != null) {
         try {
-          final payNumber = await _generatePayNumber();
           await SupabaseService.client.from('payment').update({
             'paystatus': 'F',
-            'paynumber': payNumber,
             'paydate': DateTime.now().toIso8601String(),
           }).eq('pay_id', payId);
         } catch (_) {}
@@ -1710,19 +1695,37 @@ class _StudentFeeCollectionScreenState
     webviewController.dispose();
 
     if (result == 'C') {
-      await _createPaymentDetailsAndUpdateFees(payId, insId);
-      final payNumber = await _generatePayNumber();
-      await SupabaseService.client.from('payment').update({
-        'paystatus': 'C',
-        'paynumber': payNumber,
-        'paydate': DateTime.now().toIso8601String(),
-      }).eq('pay_id', payId);
-      _showSuccessDialog(payNumber, totalNet);
+      // Complete payment atomically
+      final completeItems = <Map<String, dynamic>>[];
+      for (final key in _selected) {
+        final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+        if (d.isEmpty) continue;
+        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+        final fine = _fine(key);
+        final con = _con(key);
+        completeItems.add({
+          'dem_id': d['dem_id'] as int,
+          'amount': bal + fine - con,
+        });
+      }
+
+      final payRecord = await SupabaseService.client
+          .from('payment')
+          .select('payreference')
+          .eq('pay_id', payId)
+          .single();
+
+      final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
+        'p_pay_id': payId,
+        'p_pay_method': 'razorpay',
+        'p_pay_reference': payRecord['payreference']?.toString() ?? '',
+        'p_items': completeItems,
+      }) as String;
+
+      _showSuccessDialog(payNumber, totalNet, payId: payId);
     } else if (result == 'F') {
-      final payNumber = await _generatePayNumber();
       await SupabaseService.client.from('payment').update({
         'paystatus': 'F',
-        'paynumber': payNumber,
         'paydate': DateTime.now().toIso8601String(),
       }).eq('pay_id', payId);
       if (mounted) {
@@ -1732,10 +1735,8 @@ class _StudentFeeCollectionScreenState
       }
     } else {
       try {
-        final payNumber = await _generatePayNumber();
         await SupabaseService.client.from('payment').update({
           'paystatus': 'F',
-          'paynumber': payNumber,
           'paydate': DateTime.now().toIso8601String(),
         }).eq('pay_id', payId);
       } catch (_) {}
