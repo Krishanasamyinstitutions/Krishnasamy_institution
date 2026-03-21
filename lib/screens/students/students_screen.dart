@@ -110,7 +110,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'stuclass': 'Class *',
     'stumobile': 'Mobile *',
     'stuemail': 'Email',
-    'concession': 'Concession',
+    'concession': 'Concession *',
     'stuaddress': 'Address',
     'stucity': 'City',
     'stustate': 'State',
@@ -126,13 +126,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'guardianname': 'Guardian Name',
     'guardianmobile': 'Guardian Mobile',
     'guardianoccupation': 'Guardian Occ.',
-    'payincharge': 'Pay In Charge',
-    'payinchargemob': 'Pay Mobile',
+    'payincharge': 'Pay In Charge *',
+    'payinchargemob': 'Pay Mobile *',
   };
 
   final ScrollController _importScrollController = ScrollController();
 
-  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass'};
+  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass', 'concession', 'payincharge', 'payinchargemob'};
 
   static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF555555));
 
@@ -152,7 +152,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     Color(0xFFF97316), // IV - Orange
     Color(0xFFF59E0B), // V - Amber
     Color(0xFF22C55E), // VI - Green
-    Color(0xFF14B8A6), // VII - Teal
+    Color(0xFF6C8EEF), // VII - Teal
     Color(0xFF06B6D4), // VIII - Cyan
     Color(0xFF6C8EEF), // IX - Blue
     Color(0xFF2563EB), // X - Blue dark
@@ -1887,6 +1887,33 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return 'Missing: ${missing.join(', ')}';
   }
 
+  static String _friendlyError(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('duplicate key') || m.contains('unique constraint')) {
+      if (m.contains('stuadmno') || m.contains('admission')) return 'Admission number already exists';
+      if (m.contains('stuemail') || m.contains('email')) return 'Email already exists';
+      if (m.contains('payinchargemob')) return 'Payment mobile already exists';
+      return 'Duplicate record found';
+    }
+    if (m.contains('not-null') || m.contains('null value')) {
+      final match = RegExp(r'column "(\w+)"').firstMatch(msg);
+      final col = match?.group(1) ?? '';
+      final labels = {'stuadmno': 'Admission No', 'stuname': 'Name', 'stugender': 'Gender', 'studob': 'Date of Birth', 'stumobile': 'Mobile', 'stuclass': 'Class', 'payincharge': 'Pay In Charge', 'payinchargemob': 'Payment Mobile'};
+      return '${labels[col] ?? col} is required';
+    }
+    if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check class, year, or concession values';
+    if (m.contains('check constraint')) {
+      if (m.contains('gender')) return 'Gender must be M, F, or T';
+      if (m.contains('email')) return 'Invalid email format';
+      if (m.contains('activestatus')) return 'Invalid status value';
+      return 'Invalid value format';
+    }
+    if (m.contains('value too long')) return 'Value too long for the field';
+    if (m.contains('invalid input syntax')) return 'Invalid data format';
+    if (m.contains('permission denied')) return 'Permission denied';
+    return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
+  }
+
   void _validateImportData() {
     final errors = <String>[];
     for (int i = 0; i < _importRows.length; i++) {
@@ -2022,10 +2049,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
           .inFilter('status', ['ERROR', 'NO_PARENT']);
       for (final e in errors) {
         final status = e['status'];
+        final admNo = e['stuadmno'] ?? '';
         if (status == 'NO_PARENT') {
-          _importErrors.add('Adm ${e['stuadmno']}: No payinchargemob - parent not linked');
+          _importErrors.add('Adm $admNo: Payment In Charge or Mobile is missing - student not created');
         } else {
-          _importErrors.add('Adm ${e['stuadmno']}: ${e['error_msg']}');
+          _importErrors.add('Adm $admNo: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}');
         }
       }
 

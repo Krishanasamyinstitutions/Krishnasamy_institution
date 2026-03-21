@@ -88,7 +88,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'duedate': 'Due Date',
   };
 
-  static const _requiredFields = {'stuadmno', 'demfeetype', 'feeamount'};
+  static const _requiredFields = {'stuadmno', 'stuclass', 'demfeetype', 'yr_id', 'demfeeterm', 'con_id', 'feeamount', 'conamount', 'duedate'};
 
   @override
   void initState() {
@@ -526,7 +526,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         batch.add(data);
       } catch (e) {
         _skipped++;
-        _importErrors.add('Row ${i + 2}: $e');
+        _importErrors.add('Row ${i + 2}: ${_friendlyError(e.toString())}');
       }
     }
 
@@ -546,7 +546,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             _imported++;
           } catch (e2) {
             _skipped++;
-            _importErrors.add('Adm ${row['stuadmno']}: $e2');
+            _importErrors.add('Adm ${row['stuadmno']}: ${_friendlyError(e2.toString())}');
           }
         }
       }
@@ -571,6 +571,21 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       _importErrors = [];
       _errorMsg = null;
     });
+  }
+
+  static String _friendlyError(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('duplicate key') || m.contains('unique constraint')) return 'Duplicate record found';
+    if (m.contains('not-null') || m.contains('null value')) {
+      final match = RegExp(r'column "(\w+)"').firstMatch(msg);
+      return '${match?.group(1) ?? 'Field'} is required';
+    }
+    if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check linked values';
+    if (m.contains('check constraint')) return 'Invalid value format';
+    if (m.contains('value too long')) return 'Value too long for the field';
+    if (m.contains('invalid input syntax')) return 'Invalid data format';
+    if (m.contains('permission denied')) return 'Permission denied';
+    return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
   }
 
   // ─── UI ─────────────────────────────────────────────────────────────────
@@ -1499,21 +1514,21 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Adm No *', flex: 2),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Class', flex: 1),
+                        _gridHeaderCell('Class *', flex: 1),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Type *', flex: 2),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Year', flex: 1),
+                        _gridHeaderCell('Year *', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Term', flex: 1),
+                        _gridHeaderCell('Term *', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Concession', flex: 2),
+                        _gridHeaderCell('Concession *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Amt *', flex: 2, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Con. Amt', flex: 2, center: true),
+                        _gridHeaderCell('Con. Amt *', flex: 2, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Due Date', flex: 2, center: true),
+                        _gridHeaderCell('Due Date *', flex: 2, center: true),
                       ],
                     ),
                   ),

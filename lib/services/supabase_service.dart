@@ -674,23 +674,28 @@ class SupabaseService {
   /// Get paid fee demands with payment date (for date-wise tab)
   /// Uses RPC to bypass row limits; falls back to direct query
   static Future<List<Map<String, dynamic>>> getPaidFeeDemands(int insId) async {
-    try {
-      final response = await client.rpc('get_paid_fee_demands', params: {'p_ins_id': insId});
-      if (response == null) return [];
-      return List<Map<String, dynamic>>.from(response as List);
-    } catch (e) {
-      debugPrint('RPC get_paid_fee_demands failed, using fallback: $e');
-    }
+    // Skip RPC — it only fetches paidstatus='P' and misses partially paid ('U') rows.
+    // Using paginated fallback which includes both 'P' and 'U' with paidamount > 0.
 
-    // Fallback: fetch paid feedemand rows, then batch-fetch payment dates
+    // Fallback: fetch paid feedemand rows (paginated), then batch-fetch payment dates
     try {
-      final demands = await client
-          .from('feedemand')
-          .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
-          .eq('ins_id', insId)
-          .eq('paidstatus', 'P')
-          .eq('activestatus', 1);
-      final demandList = List<Map<String, dynamic>>.from(demands as List);
+      final demandList = <Map<String, dynamic>>[];
+      const batchSize = 1000;
+      int offset = 0;
+      while (true) {
+        final demands = await client
+            .from('feedemand')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
+            .eq('ins_id', insId)
+            .inFilter('paidstatus', ['P', 'U'])
+            .eq('activestatus', 1)
+            .gt('paidamount', 0)
+            .range(offset, offset + batchSize - 1);
+        final rows = List<Map<String, dynamic>>.from(demands as List);
+        demandList.addAll(rows);
+        if (rows.length < batchSize) break;
+        offset += batchSize;
+      }
       if (demandList.isEmpty) return [];
 
       // Collect unique pay_ids and fetch paydate
@@ -773,6 +778,90 @@ class SupabaseService {
     }
   }
 
+  /// Fetch total fee demand (sum of feeamount), total collection (sum of transtotalamount), and total pending (sum of balancedue)
+  /// Uses RPC for server-side aggregation to avoid PostgREST row limits.
+  static Future<Map<String, double>> getFeeTotals(int insId) async {
+    try {
+      final result = await client.rpc('get_fee_totals', params: {'p_ins_id': insId});
+      return {
+        'totalDemand': (result['total_demand'] as num?)?.toDouble() ?? 0,
+        'totalPaid': (result['total_paid'] as num?)?.toDouble() ?? 0,
+        'totalPending': (result['total_pending'] as num?)?.toDouble() ?? 0,
+      };
+    } catch (e) {
+      debugPrint('RPC get_fee_totals failed, using fallback: $e');
+    }
+
+    // Fallback: paginate through all rows to avoid 1000-row cap
+    try {
+      double totalDemand = 0, totalPending = 0;
+      const batchSize = 1000;
+      int offset = 0;
+      while (true) {
+        final demandRes = await client
+            .from('feedemand')
+            .select('feeamount, balancedue')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1)
+            .range(offset, offset + batchSize - 1);
+        final rows = demandRes as List;
+        for (final row in rows) {
+          totalDemand += (row['feeamount'] as num?)?.toDouble() ?? 0;
+          totalPending += (row['balancedue'] as num?)?.toDouble() ?? 0;
+        }
+        if (rows.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      double totalPaid = 0;
+      offset = 0;
+      while (true) {
+        final payRes = await client
+            .from('payment')
+            .select('transtotalamount')
+            .eq('ins_id', insId)
+            .eq('paystatus', 'C')
+            .eq('activestatus', 1)
+            .range(offset, offset + batchSize - 1);
+        final rows = payRes as List;
+        for (final row in rows) {
+          totalPaid += (row['transtotalamount'] as num?)?.toDouble() ?? 0;
+        }
+        if (rows.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      return {'totalDemand': totalDemand, 'totalPaid': totalPaid, 'totalPending': totalPending};
+    } catch (e) {
+      debugPrint('Error fetching fee totals: $e');
+      return {'totalDemand': 0, 'totalPaid': 0, 'totalPending': 0};
+    }
+  }
+
+  /// Fetch payment amounts (transtotalamount) for given pay_ids
+  static Future<Map<int, double>> getPayAmountMap(List<int> payIds) async {
+    if (payIds.isEmpty) return {};
+    try {
+      final Map<int, double> result = {};
+      for (var i = 0; i < payIds.length; i += 500) {
+        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+        final response = await client
+            .from('payment')
+            .select('pay_id, transtotalamount')
+            .inFilter('pay_id', chunk);
+        for (final row in (response as List)) {
+          final id = row['pay_id'] as int?;
+          final amt = (row['transtotalamount'] as num?)?.toDouble();
+          if (id != null && amt != null) result[id] = amt;
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching pay amounts: $e');
+      return {};
+    }
+  }
+
   /// Aggregate summary per class — one row per class, no row-limit issues
   static Future<List<Map<String, dynamic>>> getFeeDemandSummary(int insId) async {
     try {
@@ -816,43 +905,21 @@ class SupabaseService {
   /// Pending Fees = sum of balancedue from feedemand table where paidstatus='U'
   static Future<FeeSummary> getFeeSummary(int insId) async {
     try {
-      // Use RPC for server-side aggregation of pending balance (avoids 1000-row cap)
-      final rpcResult = await client
-          .rpc('get_fee_summary', params: {'p_ins_id': insId});
+      // Use RPCs for server-side aggregation (avoids row-limit issues and slow pagination)
+      final rpcFuture = client.rpc('get_fee_summary', params: {'p_ins_id': insId});
+      final totalsFuture = getFeeTotals(insId);
+      final results = await Future.wait<dynamic>([rpcFuture, totalsFuture]);
+
+      final rpcResult = results[0];
+      final feeTotals = results[1] as Map<String, double>;
 
       final totalPending =
           (rpcResult['total_pending'] as num?)?.toDouble() ?? 0;
       final pendingCount = (rpcResult['pending_count'] as num?)?.toInt() ?? 0;
 
-      // Fetch total due from feedemand
-      final feedemandResponse = await client
-          .from('feedemand')
-          .select('feeamount, conamount')
-          .eq('ins_id', insId);
-
-      double totalDue = 0;
-      for (final row in (feedemandResponse as List)) {
-        final feeamount = (row['feeamount'] as num?)?.toDouble() ?? 0;
-        final conamount = (row['conamount'] as num?)?.toDouble() ?? 0;
-        totalDue += feeamount - conamount;
-      }
-
-      // Fetch total collection from payment table where paystatus='C' (Completed)
-      final paymentResponse = await client
-          .from('payment')
-          .select('transtotalamount')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'C')
-          .eq('activestatus', 1);
-
-      double totalPaid = 0;
-      for (final row in (paymentResponse as List)) {
-        totalPaid += (row['transtotalamount'] as num?)?.toDouble() ?? 0;
-      }
-
       return FeeSummary(
-        totalDue: totalDue,
-        totalPaid: totalPaid,
+        totalDue: feeTotals['totalDemand'] ?? 0,
+        totalPaid: feeTotals['totalPaid'] ?? 0,
         totalPending: totalPending,
         pendingCount: pendingCount,
       );
@@ -884,6 +951,7 @@ class SupabaseService {
       // Normalise: wrap flat student fields into nested 'students' map
       // so existing UI code (p['students']['stuname'] etc.) keeps working
       final payments = List<Map<String, dynamic>>.from(response as List);
+      debugPrint('RPC get_payments_by_date_range returned ${payments.length} rows');
       for (final p in payments) {
         if (p['stuname'] != null && !p.containsKey('students')) {
           p['students'] = {
@@ -893,25 +961,39 @@ class SupabaseService {
           };
         }
       }
-      return payments;
+      // If RPC returns exactly 1000 rows, it may be truncated — fall through to paginated fallback
+      if (payments.length == 1000) {
+        debugPrint('RPC may be truncated (exactly 1000 rows), using paginated fallback');
+      } else {
+        return payments;
+      }
     } catch (e) {
       debugPrint('RPC get_payments_by_date_range failed, using fallback: $e');
     }
 
-    // Fallback if RPC not yet created
+    // Fallback if RPC not yet created (paginated)
     try {
       final from = fromDate.toIso8601String().split('T').first;
       final to = '${toDate.toIso8601String().split('T').first}T23:59:59';
-      final response = await client
-          .from('payment')
-          .select('*')
-          .eq('ins_id', insId)
-          .eq('activestatus', 1)
-          .eq('paystatus', 'C')
-          .gte('paydate', from)
-          .lte('paydate', to)
-          .order('paydate', ascending: false);
-      final payments = List<Map<String, dynamic>>.from(response as List);
+      final payments = <Map<String, dynamic>>[];
+      const batchSize = 1000;
+      int offset = 0;
+      while (true) {
+        final response = await client
+            .from('payment')
+            .select('*')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1)
+            .eq('paystatus', 'C')
+            .gte('paydate', from)
+            .lte('paydate', to)
+            .order('paydate', ascending: false)
+            .range(offset, offset + batchSize - 1);
+        final rows = List<Map<String, dynamic>>.from(response as List);
+        payments.addAll(rows);
+        if (rows.length < batchSize) break;
+        offset += batchSize;
+      }
 
       // Collect unique stu_ids and fetch student info
       final stuIds = payments
@@ -1063,15 +1145,25 @@ class SupabaseService {
     } catch (e) {
       debugPrint('RPC fn_get_transactions failed, falling back to direct query: $e');
     }
-    // Fallback: query payment table directly (select all columns)
+    // Fallback: query payment table directly (paginated)
     try {
-      final response = await client
-          .from('payment')
-          .select()
-          .eq('ins_id', insId)
-          .order('createdat', ascending: false);
-      debugPrint('Payment table fallback returned ${(response as List).length} records');
-      return List<Map<String, dynamic>>.from(response);
+      final allRows = <Map<String, dynamic>>[];
+      const batchSize = 1000;
+      int offset = 0;
+      while (true) {
+        final response = await client
+            .from('payment')
+            .select()
+            .eq('ins_id', insId)
+            .order('createdat', ascending: false)
+            .range(offset, offset + batchSize - 1);
+        final rows = List<Map<String, dynamic>>.from(response as List);
+        allRows.addAll(rows);
+        if (rows.length < batchSize) break;
+        offset += batchSize;
+      }
+      debugPrint('Payment table fallback returned ${allRows.length} records');
+      return allRows;
     } catch (e) {
       debugPrint('Error fetching transactions from payment table: $e');
       return [];

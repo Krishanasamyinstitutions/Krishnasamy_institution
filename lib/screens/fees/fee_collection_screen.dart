@@ -1319,7 +1319,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
                   final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  final isPaid = balance <= 0;
+                  final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
+                  final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : Colors.red;
                   return DataRow(color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)), cells: [
                     DataCell(Text('${i + 1}')),
                     DataCell(Text(term)),
@@ -1330,10 +1331,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     DataCell(Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isPaid ? AppColors.success.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(isPaid ? 'Paid' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : Colors.red)),
+                      child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
                     )),
                   ]);
                 }),
@@ -1570,7 +1571,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
                     sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
-                  final isPaid = sBalance <= 0;
+                  final statusLabel = sBalance <= 0 ? 'Paid' : sPaid > 0 ? 'Partial' : 'Unpaid';
+                  final statusColor = sBalance <= 0 ? AppColors.success : sPaid > 0 ? AppColors.warning : Colors.red;
                   return DataRow(
                     color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
                     onSelectChanged: (_) => setState(() {
@@ -1588,10 +1590,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       DataCell(Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: isPaid ? AppColors.success.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(isPaid ? 'Paid' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : Colors.red)),
+                        child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
                       )),
                     ],
                   );
@@ -2653,8 +2655,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       rows: [
                         ...List.generate(_feeDetails!.length, (i) {
                           final fd = _feeDetails![i];
-                          final isPaid = fd['paidstatus'] == 'P';
+                          final paid = (fd['paidamount'] as num?)?.toDouble() ?? 0;
                           final balance = (fd['balancedue'] as num?)?.toDouble() ?? 0;
+                          final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Due';
+                          final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : AppColors.warning;
                           // Show month name for monthly fees (TUITION/VAN), otherwise term label
                           const _months = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
                           const _monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
@@ -2679,10 +2683,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DataCell(Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text(isPaid ? 'Paid' : 'Due', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning)),
+                              child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
                             )),
                           ]);
                         }),
@@ -3770,7 +3774,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
                   final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  final isPaid = balance <= 0;
+                  final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
+                  final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : AppColors.warning;
                   return DataRow(cells: [
                     DataCell(Text('${i + 1}')),
                     DataCell(Text(term)),
@@ -3781,10 +3786,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     DataCell(Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning)),
+                      child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
                     )),
                   ]);
                 }),
@@ -3848,10 +3853,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     }).toList();
     final totalStudents = studentKeys.length;
 
-    return SingleChildScrollView(
-      child: Column(
+    return Column(
       children: [
-        Container(
+        Expanded(child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -3958,7 +3962,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               ),
               const Divider(height: 1),
               // Student list table
-              LayoutBuilder(builder: (context, constraints) {
+              Expanded(child: LayoutBuilder(builder: (context, constraints) {
           // Compute totals for grand total row
           double gDemand = 0, gPaid = 0, gBalance = 0;
           for (final key in studentKeys) {
@@ -4042,25 +4046,27 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                           ]),
                         ),
-                      ),
-                    )),
-                  ]);
-                }),
-                // Grand total row
-                DataRow(
-                  color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                  cells: [
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    DataCell(Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                  ],
-                ),
-              ],
+                      )),
+                    ]),
+                  ),
+                );
+              },
+            )),
+            // Fixed footer
+            Container(
+              color: const Color(0xFF6C8EEF),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(children: [
+                const SizedBox(width: 50),
+                const SizedBox(width: 100),
+                Expanded(flex: 3, child: Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                Expanded(flex: 2, child: Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                const SizedBox(width: 16),
+                const SizedBox(width: 80),
+                const SizedBox(width: 120),
+              ]),
             ),
           ));
               }),
@@ -4074,9 +4080,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               ),
             ],
           ),
-        ),
+        )),
       ],
-    ),
     );
   }
 
@@ -4228,9 +4233,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   List<String> _allFeeTypes = [];
   List<String> _feeTypes = [];
   Map<int, String> _payNumberMap = {};
-  double _overallPending = 0;
-  double _overallDemand = 0;
-  double _overallCollected = 0;
+  double _summaryTotalDemand = 0;
+  double _summaryTotalPaid = 0;
+  double _summaryTotalPending = 0;
 
   String _searchQuery = '';
   String? _filterFeeType;
@@ -4307,16 +4312,13 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       final results = await Future.wait([
         SupabaseService.getPaidFeeDemands(insId),
         SupabaseService.getFeeTypes(insId),
-        SupabaseService.getFeeSummary(insId),
-        SupabaseService.getFeeDemandSummary(insId),
+        SupabaseService.getFeeTotals(insId),
       ]);
       final demands = results[0] as List<Map<String, dynamic>>;
       final feeTypes = results[1] as List<String>;
-      final feeSummary = results[2] as FeeSummary;
-      final demandSummary = results[3] as List<Map<String, dynamic>>;
-      final classWiseTotalDemand = demandSummary.fold<double>(0.0, (sum, r) => sum + ((r['total_demand'] as num?)?.toDouble() ?? 0));
+      final feeTotals = results[2] as Map<String, double>;
 
-      // Fetch paynumber map from payment table
+      // Fetch paynumber and amount maps from payment table
       final payIds = demands
           .map((d) => d['pay_id'] as int?)
           .where((id) => id != null)
@@ -4330,9 +4332,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           _allDemands = demands;
           _allFeeTypes = feeTypes;
           _payNumberMap = payNumberMap;
-          _overallPending = feeSummary.totalPending;
-          _overallDemand = classWiseTotalDemand;
-          _overallCollected = feeSummary.totalPaid;
+          _summaryTotalDemand = feeTotals['totalDemand'] ?? 0;
+          _summaryTotalPaid = feeTotals['totalPaid'] ?? 0;
+          _summaryTotalPending = feeTotals['totalPending'] ?? 0;
           _isLoading = false;
         });
         _applyFilter();
@@ -4464,9 +4466,6 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       return dt.toString().split('T').first;
     }
   }
-
-  double get _totalDemand => _dateGroups.fold(0.0, (s, g) => s + g.totalDemand);
-  double get _totalPaid => _dateGroups.fold(0.0, (s, g) => s + g.totalPaid);
 
   /// Build student rows for a date group, pivoted by fee type
   List<Map<String, dynamic>> _buildStudentRows(List<Map<String, dynamic>> demands) {
@@ -4678,11 +4677,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
               children: [
                 _buildSummaryCard(Icons.people_outline, Colors.blue, '$totalStudentCount', 'Total Students'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_overallDemand), 'Total Demand'),
+                _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_summaryTotalDemand), 'Total Demand'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_overallCollected), 'Total Collected'),
+                _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_summaryTotalPaid), 'Total Collected'),
                 const SizedBox(width: 16),
-                _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_overallPending), 'Total Pending'),
+                _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_summaryTotalPending), 'Total Pending'),
               ],
             ),
             const SizedBox(height: 16),
@@ -5456,8 +5455,10 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                     if (db == null) return -1;
                     return da.compareTo(db);
                   })).map((d) {
-                  final isPaid = d['paidstatus'] == 'P';
+                  final paidAmt = (d['paidamount'] as num?)?.toDouble() ?? 0;
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                  final statusLabel = balance <= 0 ? 'Paid' : paidAmt > 0 ? 'Partial' : 'Due';
+                  final statusColor = balance <= 0 ? AppColors.success : paidAmt > 0 ? AppColors.warning : AppColors.warning;
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
                     decoration: const BoxDecoration(
@@ -5477,12 +5478,12 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                isPaid ? 'Paid' : 'Due',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning),
+                                statusLabel,
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: statusColor),
                               ),
                             ),
                           ),
