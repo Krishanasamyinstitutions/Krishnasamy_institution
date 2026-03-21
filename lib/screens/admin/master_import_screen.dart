@@ -40,7 +40,7 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
                 child: ListView(
                   children: errors.map((e) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(e, style: const TextStyle(fontSize: 11, color: AppColors.error)),
+                    child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
                   )).toList(),
                 ),
               ),
@@ -242,7 +242,7 @@ Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = 
   final child = Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
     alignment: center ? Alignment.center : Alignment.centerLeft,
-    child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+    child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -258,7 +258,7 @@ Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = fa
     decoration: BoxDecoration(
       border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
     ),
-    child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -296,7 +296,7 @@ Widget _buildImportCard({
             Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const Spacer(),
             if (fileName != null)
-              Text(fileName, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              Text(fileName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(width: 12),
             ElevatedButton.icon(
               onPressed: onBrowse,
@@ -307,7 +307,7 @@ Widget _buildImportCard({
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
@@ -320,7 +320,7 @@ Widget _buildImportCard({
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -349,9 +349,9 @@ Widget _buildImportCard({
                   const SizedBox(height: 4),
                   ...errors.take(5).map((e) => Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(e, style: const TextStyle(fontSize: 11, color: Colors.red)),
+                    child: Text(e, style: const TextStyle(fontSize: 13, color: Colors.red)),
                   )),
-                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 ],
               ],
             ),
@@ -398,7 +398,7 @@ Widget _buildImportCard({
                               const SizedBox(height: 8),
                               const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                               const SizedBox(height: 4),
-                              const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                             ],
                           ),
                         )
@@ -430,7 +430,7 @@ Widget _buildImportCard({
         // Bottom bar
         Row(
           children: [
-            Text('${rows.length} rows', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            Text('${rows.length} rows', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             const Spacer(),
             ElevatedButton.icon(
               onPressed: saving ? null : onSave,
@@ -443,7 +443,7 @@ Widget _buildImportCard({
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
           ],

@@ -100,7 +100,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Designation Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const Text('Designation Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               TextField(
                 controller: controller,
@@ -112,7 +112,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Reports To', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const Text('Reports To', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               DropdownButtonFormField<int?>(
                 value: reportsTo,
@@ -567,10 +567,19 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text('${_users.length} users', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                  child: Text('${_users.length} users', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
                 ),
                 const SizedBox(width: 8),
-                IconButton(icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.textSecondary), onPressed: _fetchUsers),
+                TextButton.icon(
+                  onPressed: _fetchUsers,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Refresh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
               ],
             ),
           ),
@@ -581,11 +590,11 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             color: const Color(0xFF6C8EEF),
             child: const Row(
               children: [
-                SizedBox(width: 36, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                SizedBox(width: 70, child: Text('STATUS', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 36, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 70, child: Text('STATUS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
                 SizedBox(width: 30),
               ],
             ),
@@ -605,12 +614,12 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   color: i.isEven ? Colors.white : AppColors.surface,
                   child: Row(
                     children: [
-                      SizedBox(width: 36, child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                      SizedBox(width: 36, child: Text('${i + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
                       Expanded(
                         flex: 3,
                         child: Text(u.usename, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
-                      Expanded(flex: 2, child: Text(u.desname, style: const TextStyle(fontSize: 12))),
+                      Expanded(flex: 2, child: Text(u.desname, style: const TextStyle(fontSize: 13))),
                       Expanded(
                         flex: 2,
                         child: Row(
@@ -621,7 +630,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                                 color: u.urname.toLowerCase() == 'admin' ? AppColors.accent.withValues(alpha: 0.1) : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(u.urname, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: u.urname.toLowerCase() == 'admin' ? AppColors.accent : AppColors.textSecondary)),
+                              child: Text(u.urname, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: u.urname.toLowerCase() == 'admin' ? AppColors.accent : AppColors.textSecondary)),
                             ),
                           ],
                         ),
@@ -666,7 +675,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             ],
             SizedBox(
               width: 130,
-              child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             ),
             Expanded(
               child: Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: valueColor ?? AppColors.textPrimary)),
@@ -707,7 +716,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                     color: u.isActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
+                  child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
                 ),
               ],
             ),

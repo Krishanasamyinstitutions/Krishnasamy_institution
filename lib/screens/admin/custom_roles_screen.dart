@@ -230,11 +230,17 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                         const SizedBox(width: 8),
                         const Text('Custom Roles', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         const Spacer(),
-                        Text('${_roles.length} records', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text('${_roles.length} records', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         const SizedBox(width: 12),
-                        IconButton(
-                          icon: const Icon(Icons.refresh, size: 18, color: AppColors.textSecondary),
+                        TextButton.icon(
                           onPressed: _fetchRoles,
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Refresh'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
                         ),
                       ],
                     ),
@@ -245,10 +251,10 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     color: const Color(0xFF6C8EEF),
                     child: const Row(
                       children: [
-                        SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        SizedBox(width: 80, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 80, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
                       ],
                     ),
                   ),

@@ -415,7 +415,7 @@ class _OnboardingPage extends StatelessWidget {
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: data.iconColor,
                   fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                  fontSize: 13,
                 ),
           ),
         ),

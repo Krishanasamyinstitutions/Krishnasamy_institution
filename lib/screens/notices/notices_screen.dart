@@ -162,26 +162,32 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   color: AppColors.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text('${_notices.length} notices', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                child: Text('${_notices.length} notices', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: () => setState(() => _showCreateForm = true),
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Create Notice', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                label: const Text('Create Notice', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.textSecondary),
+              TextButton.icon(
                 onPressed: _fetchNotices,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Refresh'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
@@ -290,7 +296,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   ),
                   if (desc.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(desc, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                   const SizedBox(height: 4),
                   Row(
@@ -356,7 +362,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                     color: _priorityColor(priority).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(priority, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
+                  child: Text(priority, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
                 ),
             ],
           ),
@@ -409,9 +415,9 @@ class _NoticesScreenState extends State<NoticesScreen> {
                                   ),
                                   const SizedBox(width: 10),
                                 ],
-                                Text(_formatDate(date), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                Text(_formatDate(date), style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 const SizedBox(width: 8),
-                                Text(_timeAgo(date), style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.6))),
+                                Text(_timeAgo(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.6))),
                               ],
                             ),
                           ],
@@ -430,8 +436,8 @@ class _NoticesScreenState extends State<NoticesScreen> {
                       children: [
                         const Icon(Icons.people_rounded, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 6),
-                        const Text('Target: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        Text(target, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        const Text('Target: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        Text(target, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
@@ -444,8 +450,8 @@ class _NoticesScreenState extends State<NoticesScreen> {
                       children: [
                         const Icon(Icons.person_rounded, size: 16, color: AppColors.textSecondary),
                         const SizedBox(width: 6),
-                        const Text('Posted by: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        Text(createdBy, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        const Text('Posted by: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        Text(createdBy, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
@@ -703,14 +709,14 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                 ElevatedButton.icon(
                   onPressed: _submitNotice,
                   icon: const Icon(Icons.send_rounded, size: 16),
-                  label: const Text('Send Notice', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  label: const Text('Send Notice', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
-                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
             ],
@@ -778,7 +784,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                   color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
                                 const SizedBox(width: 6),
-                                Text(t, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textSecondary)),
+                                Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textSecondary)),
                               ],
                             ),
                           ),
@@ -803,17 +809,17 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         children: [
                           Row(
                             children: [
-                              const Text('Select Classes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              const Text('Select Classes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                               const Spacer(),
                               if (_selectedClasses.isNotEmpty)
                                 GestureDetector(
                                   onTap: () => setState(() => _selectedClasses.clear()),
-                                  child: const Text('Clear all', style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.w500)),
+                                  child: const Text('Clear all', style: TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w500)),
                                 ),
                               const SizedBox(width: 12),
                               GestureDetector(
                                 onTap: () => setState(() => _selectedClasses = List.from(_availableClasses)),
-                                child: const Text('Select all', style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w500)),
+                                child: const Text('Select all', style: TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w500)),
                               ),
                             ],
                           ),
@@ -851,7 +857,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                               color: isSelected ? AppColors.accent : AppColors.textSecondary,
                                             ),
                                             const SizedBox(width: 6),
-                                            Text(cls, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
+                                            Text(cls, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
                                           ],
                                         ),
                                       ),
@@ -861,7 +867,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                           if (_selectedClasses.isNotEmpty) ...[
                             const SizedBox(height: 10),
                             Text('${_selectedClasses.length} class${_selectedClasses.length > 1 ? 'es' : ''} selected',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
                           ],
                         ],
                       ),
@@ -972,7 +978,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   const SizedBox(height: 6),
                   const Text(
                     'Notice will be automatically removed after the To Date.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   ),
 
                   const SizedBox(height: 28),
@@ -993,7 +999,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                           children: [
                             const Icon(Icons.preview_rounded, size: 16, color: AppColors.accent),
                             const SizedBox(width: 6),
-                            const Text('Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                            const Text('Preview', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
                           ],
                         ),
                         const Divider(height: 20, color: AppColors.border),
@@ -1021,7 +1027,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             const SizedBox(width: 4),
                             Text(
                               _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : '${_selectedClasses.length} classes',
-                              style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.7)),
+                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
@@ -1038,7 +1044,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         Text(
                           _descController.text.isEmpty ? 'Notice description...' : _descController.text,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             height: 1.4,
                             color: _descController.text.isEmpty ? AppColors.textSecondary.withValues(alpha: 0.4) : AppColors.textSecondary,
                           ),

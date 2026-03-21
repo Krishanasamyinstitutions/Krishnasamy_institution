@@ -41,7 +41,7 @@ class SchoolAdminApp extends StatelessWidget {
       routes: AppRoutes.routes,
       builder: (context, child) {
         final width = MediaQuery.of(context).size.width;
-        final scaleFactor = width <= 1366 ? 0.85 : (width <= 1600 ? 0.92 : 1.0);
+        final scaleFactor = width <= 1366 ? 0.80 : (width <= 1600 ? 0.92 : 1.0);
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(scaleFactor),

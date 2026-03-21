@@ -531,7 +531,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   .bodyMedium
                                   ?.copyWith(
                                     color: AppColors.info,
-                                    fontSize: 12,
+                                    fontSize: 13,
                                   ),
                             ),
                           ),

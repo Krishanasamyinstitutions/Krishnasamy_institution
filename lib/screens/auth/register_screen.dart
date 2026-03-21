@@ -374,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(stepLabels[i], style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isActive ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.4))),
-                                Text(stepDescs[i], style: TextStyle(fontSize: 11, color: isActive ? Colors.white.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.2))),
+                                Text(stepDescs[i], style: TextStyle(fontSize: 13, color: isActive ? Colors.white.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.2))),
                               ],
                             ),
                           ],
@@ -431,7 +431,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   }),
                 ),
                 const Spacer(),
-                Text('Step ${_currentStep + 1} of 3', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                Text('Step ${_currentStep + 1} of 3', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -523,7 +523,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Text('Institution Information', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               ]),
               const SizedBox(height: 6),
-              const Text('Enter the basic details about your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const Text('Enter the basic details about your institution', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               const Divider(height: 28, color: AppColors.border),
 
               _fieldLabel('Institution Type'),
@@ -571,7 +571,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_logoFileName!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                        Text(_logoFileName!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
                         Text('PNG, JPG, JPEG only', style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.5))),
                       ],
@@ -684,7 +684,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const Text('Affiliation Information', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                   ]),
                   const SizedBox(height: 6),
-                  const Text('Enter affiliation and recognition details', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const Text('Enter affiliation and recognition details', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   const Divider(height: 28, color: AppColors.border),
 
                   Row(children: [
@@ -734,7 +734,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Address', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 6),
-                const Text('Enter the institution address details', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Text('Enter the institution address details', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
                 _fieldLabel('Address Line 1 *'),
@@ -795,7 +795,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Academic Year', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 6),
-                const Text('Set up the academic year for your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Text('Set up the academic year for your institution', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
                 _fieldLabel('Year Label *'),
@@ -875,7 +875,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Text('Account Setup', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 6),
-                const Text('Create an admin account for your institution', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const Text('Create an admin account for your institution', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
                 Row(children: [
@@ -1038,7 +1038,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _fieldLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.black87)),
+      child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.black87)),
     );
   }
 

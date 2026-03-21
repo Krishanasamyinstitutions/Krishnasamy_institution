@@ -577,47 +577,160 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Header
-        Row(
-          children: [
-            Icon(Icons.request_page_rounded, color: AppColors.primary, size: 22),
-            const SizedBox(width: 10),
-            Text('Fee Demand', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: () => setState(() {
-                _showImport = !_showImport;
-                if (!_showImport) _resetImport();
-              }),
-              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
-              label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          // Card header with title, buttons, breadcrumb, and search
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: _loadFeeDemands,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Refresh'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
+            child: Row(
+              children: [
+                if (_drilldownClass == null && _drilldownStudent == null) ...[
+                  Icon(Icons.request_page_rounded, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 10),
+                  Text('Fee Demand', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+                if (!_showImport) ...[
+                  if (_drilldownClass != null || _drilldownStudent != null) ...[
+                    // Back button
+                    IconButton(
+                      onPressed: () => setState(() {
+                        if (_drilldownStudent != null) {
+                          _drilldownStudent = null;
+                          _drilldownStudentName = null;
+                        } else {
+                          _drilldownClass = null;
+                          _drilldownDemands = [];
+                        }
+                        _searchQuery = '';
+                        _searchController.clear();
+                      }),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                      splashRadius: 18,
+                    ),
+                    const SizedBox(width: 4),
+                    // Breadcrumb
+                    InkWell(
+                      onTap: () => setState(() {
+                        _drilldownClass = null;
+                        _drilldownDemands = [];
+                        _drilldownStudent = null;
+                        _drilldownStudentName = null;
+                        _searchQuery = '';
+                        _searchController.clear();
+                      }),
+                      child: Text('Fee Demand', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+                    ),
+                    if (_drilldownStudent != null) ...[
+                      InkWell(
+                        onTap: () => setState(() {
+                          _drilldownStudent = null;
+                          _drilldownStudentName = null;
+                          _searchQuery = '';
+                          _searchController.clear();
+                        }),
+                        child: Text('Class $_drilldownClass', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+                      ),
+                      Text(
+                        '${_drilldownStudentName ?? ''} (${_drilldownStudent})',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                    ] else
+                      Text(
+                        'Class $_drilldownClass',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                  ] else ...[
+                    const SizedBox(width: 16),
+                    Text(
+                      '${_classSummary.fold<int>(0, (sum, c) => sum + ((c['student_count'] as num?)?.toInt() ?? 0))} students',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+                const Spacer(),
+                if (!_showImport) ...[
+                  SizedBox(
+                    width: 220,
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search...',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 16),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                      onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    _showImport = !_showImport;
+                    if (!_showImport) _resetImport();
+                  }),
+                  icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 16),
+                  label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: _loadFeeDemands,
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Refresh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
+          ),
 
-        Expanded(
-          child: _showImport ? _buildImportSection() : _buildMainContent(),
-        ),
-      ],
+          // Content
+          Expanded(
+            child: _showImport ? _buildImportSection() : _buildMainContent(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -831,7 +944,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
       ),
     );
   }
@@ -859,105 +972,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   }
 
   Widget _buildDemandsList() {
-    return Column(
-      children: [
-        // Search field
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              if (_drilldownStudent != null)
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _drilldownStudent = null;
-                    _drilldownStudentName = null;
-                    _searchQuery = '';
-                    _searchController.clear();
-                  }),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: Text('Class $_drilldownClass', style: const TextStyle(fontSize: 12)),
-                )
-              else if (_drilldownClass != null)
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _drilldownClass = null;
-                    _drilldownDemands = [];
-                    _searchQuery = '';
-                    _searchController.clear();
-                  }),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text('All Classes', style: TextStyle(fontSize: 12)),
-                ),
-              if (_drilldownClass != null) const SizedBox(width: 8),
-              Text(
-                _drilldownStudent != null
-                    ? '${_drilldownStudentName ?? ''} (Adm No: $_drilldownStudent)'
-                    : _drilldownClass != null
-                        ? 'Class $_drilldownClass'
-                        : 'Fee Demands',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: 250,
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 16),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    isDense: true,
-                  ),
-                  style: const TextStyle(fontSize: 12),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                _drilldownStudent != null
-                    ? '${_filteredStudentDemands.length} records'
-                    : _drilldownClass != null
-                        ? '${_studentSummary.length} students'
-                        : '${_classSummary.fold<int>(0, (sum, c) => sum + ((c['student_count'] as num?)?.toInt() ?? 0))} students',
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Content
-        Expanded(
-          child: _loadingDemands
-              ? const Center(child: CircularProgressIndicator())
-              : _drilldownStudent != null
-                  ? _buildStudentFeeDetails()
-                  : _drilldownClass != null
-                      ? _buildDrilldownView()
-                      : _buildClassCards(),
-        ),
-      ],
-    );
+    return _loadingDemands
+        ? const Center(child: CircularProgressIndicator())
+        : _drilldownStudent != null
+            ? _buildStudentFeeDetails()
+            : _drilldownClass != null
+                ? _buildDrilldownView()
+                : _buildClassCards();
   }
 
   List<Map<String, dynamic>> get _filteredClassSummary {
@@ -1052,90 +1073,79 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          // Table header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6C8EEF),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+    return Column(
+          children: [
+            // Table header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFF6C8EEF),
+              child: const Row(
+                children: [
+                  SizedBox(width: 100, child: Text('CLASS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                  Expanded(child: Text('STUDENTS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
+                  Expanded(child: Text('TOTAL DEMAND', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  Expanded(child: Text('COLLECTED', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  Expanded(child: Text('PENDING', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  SizedBox(width: 32),
+                ],
+              ),
             ),
-            child: const Row(
-              children: [
-                SizedBox(width: 100, child: Text('CLASS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(child: Text('STUDENTS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
-                Expanded(child: Text('TOTAL DEMAND', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('COLLECTED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('PENDING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                SizedBox(width: 32),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // List rows
-          Expanded(
-            child: ListView.separated(
-              padding: EdgeInsets.zero,
-              itemCount: summaries.length,
-              separatorBuilder: (_, __) => const SizedBox.shrink(),
-              itemBuilder: (context, i) {
-                final s = summaries[i];
-                final className = s['stuclass']?.toString() ?? '-';
-                final studentCount = (s['student_count'] as num?)?.toInt() ?? 0;
-                final totalDemand = (s['total_demand'] as num?)?.toDouble() ?? 0;
-                final totalPaid = (s['total_paid'] as num?)?.toDouble() ?? 0;
-                final totalPending = (s['total_pending'] as num?)?.toDouble() ?? 0;
+            // List rows
+            Expanded(
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: summaries.length,
+                separatorBuilder: (_, __) => const SizedBox.shrink(),
+                itemBuilder: (context, i) {
+                  final s = summaries[i];
+                  final className = s['stuclass']?.toString() ?? '-';
+                  final studentCount = (s['student_count'] as num?)?.toInt() ?? 0;
+                  final totalDemand = (s['total_demand'] as num?)?.toDouble() ?? 0;
+                  final totalPaid = (s['total_paid'] as num?)?.toDouble() ?? 0;
+                  final totalPending = (s['total_pending'] as num?)?.toDouble() ?? 0;
 
-                return InkWell(
-                  onTap: () => _loadDrilldown(className),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    color: i.isEven ? Colors.white : const Color(0xFFF7FAFC),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 100,
-                          child: Text('Class $className', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        ),
-                        Expanded(child: Text('$studentCount', style: const TextStyle(fontSize: 12), textAlign: TextAlign.center)),
-                        Expanded(child: Text('₹${_formatAmount(totalDemand)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
-                        Expanded(child: Text('₹${_formatAmount(totalPaid)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right)),
-                        Expanded(child: Text('₹${_formatAmount(totalPending)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.warning), textAlign: TextAlign.right)),
-                        const SizedBox(width: 32, child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textSecondary)),
-                      ],
+                  return InkWell(
+                    onTap: () => _loadDrilldown(className),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      color: i.isEven ? Colors.white : const Color(0xFFF7FAFC),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 100,
+                            child: Text('Class $className', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          ),
+                          Expanded(child: Text('$studentCount', style: const TextStyle(fontSize: 13), textAlign: TextAlign.center)),
+                          Expanded(child: Text('₹${_formatAmount(totalDemand)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
+                          Expanded(child: Text('₹${_formatAmount(totalPaid)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right)),
+                          Expanded(child: Text('₹${_formatAmount(totalPending)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.warning), textAlign: TextAlign.right)),
+                          const SizedBox(width: 32, child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.textSecondary)),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          // Total footer row
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6C8EEF),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+            // Total footer row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF6C8EEF),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 100, child: Text('TOTAL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white))),
+                  Expanded(child: Text('${summaries.fold<int>(0, (sum, s) => sum + ((s['student_count'] as num?)?.toInt() ?? 0))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
+                  Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_demand'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_paid'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_pending'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                  const SizedBox(width: 32),
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                const SizedBox(width: 100, child: Text('TOTAL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(child: Text('${summaries.fold<int>(0, (sum, s) => sum + ((s['student_count'] as num?)?.toInt() ?? 0))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
-                Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_demand'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_paid'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_pending'] as num?)?.toDouble() ?? 0)))}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                const SizedBox(width: 32),
-              ],
-            ),
-          ),
-        ],
-      ),
+          ],
     );
   }
 
@@ -1186,107 +1196,96 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          // Table header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF6C8EEF),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: const Row(
-              children: [
-                SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 2, child: Text('NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(child: Text('DEMAND', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('PAID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                Expanded(child: Text('PENDING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
-                SizedBox(width: 70, child: Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
-                SizedBox(width: 28),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView.separated(
-              padding: EdgeInsets.zero,
-              itemCount: students.length,
-              separatorBuilder: (_, __) => const SizedBox.shrink(),
-              itemBuilder: (context, i) {
-                final s = students[i];
-                final admNo = s['stuadmno']?.toString() ?? '-';
-                final name = s['stuname']?.toString() ?? '';
-                final totalDemand = (s['total_demand'] as double?) ?? 0;
-                final totalPaid = (s['total_paid'] as double?) ?? 0;
-                final totalPending = (s['total_pending'] as double?) ?? 0;
-                final unpaidCount = (s['unpaid_count'] as int?) ?? 0;
-                final allPaid = unpaidCount == 0;
+    return Column(
+            children: [
+              // Table header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: const Color(0xFF6C8EEF),
+                child: const Row(
+                  children: [
+                    SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                    Expanded(flex: 2, child: Text('NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                    Expanded(child: Text('DEMAND', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                    Expanded(child: Text('PAID', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                    Expanded(child: Text('PENDING', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                    SizedBox(width: 70, child: Text('STATUS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
+                    SizedBox(width: 28),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: students.length,
+                  separatorBuilder: (_, __) => const SizedBox.shrink(),
+                  itemBuilder: (context, i) {
+                    final s = students[i];
+                    final admNo = s['stuadmno']?.toString() ?? '-';
+                    final name = s['stuname']?.toString() ?? '';
+                    final totalDemand = (s['total_demand'] as double?) ?? 0;
+                    final totalPaid = (s['total_paid'] as double?) ?? 0;
+                    final totalPending = (s['total_pending'] as double?) ?? 0;
+                    final unpaidCount = (s['unpaid_count'] as int?) ?? 0;
+                    final allPaid = unpaidCount == 0;
 
-                return InkWell(
-                  onTap: () => setState(() {
-                    _drilldownStudent = admNo;
-                    _drilldownStudentName = name;
-                    _searchQuery = '';
-                    _searchController.clear();
-                  }),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 80,
-                          child: Text(admNo, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            name.isNotEmpty ? name : '-',
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text('₹${_formatAmount(totalDemand)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), textAlign: TextAlign.right),
-                        ),
-                        Expanded(
-                          child: Text('₹${_formatAmount(totalPaid)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right),
-                        ),
-                        Expanded(
-                          child: Text('₹${_formatAmount(totalPending)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: totalPending > 0 ? AppColors.warning : AppColors.success), textAlign: TextAlign.right),
-                        ),
-                        SizedBox(
-                          width: 70,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: allPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                    return InkWell(
+                      onTap: () => setState(() {
+                        _drilldownStudent = admNo;
+                        _drilldownStudentName = name;
+                        _searchQuery = '';
+                        _searchController.clear();
+                      }),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 80,
+                              child: Text(admNo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                            ),
+                            Expanded(
+                              flex: 2,
                               child: Text(
-                                allPaid ? 'Paid' : 'Unpaid',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : AppColors.warning),
+                                name.isNotEmpty ? name : '-',
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
+                            Expanded(
+                              child: Text('₹${_formatAmount(totalDemand)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.right),
+                            ),
+                            Expanded(
+                              child: Text('₹${_formatAmount(totalPaid)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right),
+                            ),
+                            Expanded(
+                              child: Text('₹${_formatAmount(totalPending)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: totalPending > 0 ? AppColors.warning : AppColors.success), textAlign: TextAlign.right),
+                            ),
+                            SizedBox(
+                              width: 70,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: allPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    allPaid ? 'Paid' : 'Unpaid',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : AppColors.warning),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 28, child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.textSecondary)),
+                          ],
                         ),
-                        const SizedBox(width: 28, child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
     );
   }
 
@@ -1347,8 +1346,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20,
               horizontalMargin: 16,
               dataRowMinHeight: 36,
@@ -1384,7 +1383,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     DataCell(Text('₹${_formatAmount(amt)}')),
                     DataCell(Text('₹${_formatAmount(paid)}', style: TextStyle(color: paid > 0 ? AppColors.success : AppColors.textPrimary))),
                     DataCell(Text('₹${_formatAmount(bal)}', style: TextStyle(fontWeight: FontWeight.w500, color: bal > 0 ? AppColors.warning : AppColors.success))),
-                    DataCell(Text(formattedDueDate, style: const TextStyle(fontSize: 11))),
+                    DataCell(Text(formattedDueDate, style: const TextStyle(fontSize: 13))),
                     DataCell(Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -1441,7 +1440,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               const Text('Import Fee Demands', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (_fileName != null)
-                Text(_fileName!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text(_fileName!, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _pickFile,
@@ -1452,7 +1451,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1465,14 +1464,14 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           if (_errorMsg != null) ...[
             const SizedBox(height: 8),
-            Text(_errorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
+            Text(_errorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
           ],
           const SizedBox(height: 12),
 
@@ -1529,7 +1528,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                 const SizedBox(height: 8),
                                 const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                                 const SizedBox(height: 4),
-                                const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                               ],
                             ),
                           )
@@ -1571,17 +1570,17 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             children: [
               Text(
                 '${_rows.length} rows',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               ),
               const Spacer(),
-              OutlinedButton.icon(
+              TextButton.icon(
                 onPressed: _rows.isEmpty ? null : () => _validateImportData(),
                 icon: const Icon(Icons.check_circle_outline, size: 16),
                 label: const Text('Validate'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1594,7 +1593,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1603,7 +1602,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
               ),
@@ -1624,7 +1623,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final child = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -1640,7 +1639,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+      child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -1728,7 +1727,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             child: ListView(
               children: errors.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Text(e, style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
               )).toList(),
             ),
           ),
@@ -1760,7 +1759,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             const SizedBox(height: 12),
             LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
             const SizedBox(height: 8),
-            Text('$_imported imported, $_skipped skipped', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text('$_imported imported, $_skipped skipped', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -1797,7 +1796,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 child: ListView(
                   children: _importErrors.map((e) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(e, style: const TextStyle(fontSize: 11, color: AppColors.error)),
+                    child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
                   )).toList(),
                 ),
               ),

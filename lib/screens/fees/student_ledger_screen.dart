@@ -273,7 +273,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         ),
                         child: Text(
                           '${_classCounts.values.fold(0, (a, b) => a + b)}',
-                          style: const TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w700),
+                          style: const TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700),
                         ),
                       ),
                   ],
@@ -316,7 +316,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text('Class $cls',
-                                              style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? color : AppColors.textPrimary)),
+                                              style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? color : AppColors.textPrimary)),
                                           Text('$count students',
                                               style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                                         ],
@@ -328,7 +328,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                         color: color.withValues(alpha: isSelected ? 0.2 : 0.1),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
-                                      child: Text('$count', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                                      child: Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
                                     ),
                                     const SizedBox(width: 6),
                                     Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
@@ -402,7 +402,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text('${allStudents.length} students',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
               ),
               const Spacer(),
               SizedBox(
@@ -413,7 +413,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: 'Search...',
-                    hintStyle: const TextStyle(fontSize: 12, color: AppColors.textLight),
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textLight),
                     prefixIcon: const Icon(Icons.search_rounded, size: 16, color: AppColors.textLight),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -432,10 +432,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: const Row(
             children: [
-              SizedBox(width: 48, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 60, child: Text('GENDER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 48, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 80, child: Text('ADM NO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 60, child: Text('GENDER', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white))),
               SizedBox(width: 40),
             ],
           ),
@@ -541,7 +541,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   children: [
                     Text(s.stuname, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                     Text('Adm: ${s.stuadmno}  •  Class ${s.stuclass}  •  Father: $fatherName',
-                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -552,16 +552,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                 const SizedBox(width: 8),
                 _chip('Pending', '₹${_totalPending.toStringAsFixed(0)}', AppColors.error),
                 const SizedBox(width: 12),
-                IconButton(
+                TextButton.icon(
                   onPressed: _demands.isNotEmpty ? _exportToExcel : null,
-                  icon: const Icon(Icons.download_rounded, size: 20),
-                  color: AppColors.accent,
-                  tooltip: 'Export to Excel',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.accent.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Export'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -639,20 +637,20 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 100,
                             child: Text(_fmt(r['date'] as String),
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                           ),
                           SizedBox(
                             width: 110,
                             child: Text(r['docno'] as String,
                                 style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: isDemand ? AppColors.accent : Colors.green.shade700)),
                           ),
                           SizedBox(
                             width: 90,
                             child: Text(r['term'] as String,
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                           ),
                           Expanded(
                             child: Row(
@@ -667,7 +665,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                 ),
                                 Expanded(
                                   child: Text(r['feetype'] as String,
-                                      style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                                       overflow: TextOverflow.ellipsis),
                                 ),
                               ],
@@ -676,7 +674,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 110,
                             child: Text(r['reference'] as String,
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                 overflow: TextOverflow.ellipsis),
                           ),
                           SizedBox(
@@ -685,7 +683,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                               debit > 0 ? '₹${debit.toStringAsFixed(0)}' : '-',
                               textAlign: TextAlign.right,
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: debit > 0 ? AppColors.error : AppColors.textSecondary),
                             ),
@@ -696,7 +694,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                               credit > 0 ? '₹${credit.toStringAsFixed(0)}' : '-',
                               textAlign: TextAlign.right,
                               style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: credit > 0 ? Colors.green.shade700 : AppColors.textSecondary),
                             ),
@@ -833,17 +831,17 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     );
     final insStyle = xl.CellStyle(
       bold: true,
-      fontSize: 12,
+      fontSize: 13,
       horizontalAlign: xl.HorizontalAlign.Center,
     );
     final insDetailStyle = xl.CellStyle(
       fontSize: 10,
       horizontalAlign: xl.HorizontalAlign.Center,
     );
-    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 13);
     final colHeaderStyle = xl.CellStyle(
       bold: true,
-      fontSize: 11,
+      fontSize: 13,
       backgroundColorHex: xl.ExcelColor.fromHexString('#1E2532'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
@@ -857,7 +855,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     );
     final totalRowStyle = xl.CellStyle(
       bold: true,
-      fontSize: 11,
+      fontSize: 13,
       backgroundColorHex: xl.ExcelColor.fromHexString('#1E2532'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
@@ -1047,7 +1045,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.2))),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label, style: TextStyle(fontSize: 9, color: color.withValues(alpha: 0.7))),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
       ]),
     );
   }
@@ -1073,6 +1071,6 @@ class _TH extends StatelessWidget {
   const _TH(this.text, {this.align = TextAlign.left});
   @override
   Widget build(BuildContext context) =>
-      Text(text, textAlign: align, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white));
+      Text(text, textAlign: align, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white));
 }
 

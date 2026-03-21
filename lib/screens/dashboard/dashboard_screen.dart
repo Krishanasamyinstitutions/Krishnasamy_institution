@@ -188,11 +188,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(s.stuname, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                              Text('${s.stuadmno}  •  Class ${s.stuclass}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              Text('${s.stuadmno}  •  Class ${s.stuclass}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
-                        Text(s.stumobile, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                        Text(s.stumobile, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -433,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(
                 'Academic Year 2025-26',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 12,
+                      fontSize: 13,
                     ),
               ),
             ],

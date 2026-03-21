@@ -357,7 +357,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           children: [
             const Icon(Icons.calendar_today, size: 14, color: AppColors.accent),
             const SizedBox(width: 6),
-            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -374,7 +374,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ),
     );
   }
@@ -439,7 +439,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 children: [
                   const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.accent),
                   const SizedBox(width: 8),
-                  const Text('Date Range:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                  const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   _buildDateChip('From', _fromDate, () => _pickDate(true)),
                   const Padding(
@@ -481,9 +481,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _fetchData();
                   }),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20, color: AppColors.textSecondary),
+                  TextButton.icon(
                     onPressed: _fetchData,
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Refresh'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -642,7 +648,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(todayStr, style: const TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.w500)),
+                child: Text(todayStr, style: const TextStyle(fontSize: 13, color: Colors.blue, fontWeight: FontWeight.w500)),
               ),
             ],
             const Spacer(),
@@ -652,10 +658,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               height: 34,
               child: TextField(
                 onChanged: (v) => setState(() => _collectionSearchQuery = v),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search student / pay no...',
-                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   prefixIcon: const Icon(Icons.search, size: 16),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -675,8 +681,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _collectionMethodFilter,
-                  hint: const Text('All Methods', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Methods', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -699,8 +705,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _collectionClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -712,11 +718,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
+            TextButton.icon(
               onPressed: filtered.isNotEmpty ? () => _exportCollectionSummaryExcel(filtered) : null,
-              icon: const Icon(Icons.download_rounded, size: 20, color: AppColors.accent),
-              tooltip: 'Export Fee Collection Summary',
-              splashRadius: 18,
+              icon: const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Export'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
             ),
           ],
         ),
@@ -749,7 +759,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     const SizedBox(width: 8),
                     const Text('Method-wise Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    Text('${methodKeys.length} methods', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text('${methodKeys.length} methods', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -765,8 +775,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 44, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -828,7 +838,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     const SizedBox(width: 8),
                     const Text('Payment Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    Text('${filtered.length} records', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text('${filtered.length} records', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -844,8 +854,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -938,7 +948,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                child: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: iconColor),
+                child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: iconColor),
               ),
             ],
           ),
@@ -1049,10 +1059,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               height: 34,
               child: TextField(
                 onChanged: (v) => setState(() => _pendingSearchQuery = v),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search student / adm no...',
-                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   prefixIcon: const Icon(Icons.search, size: 16),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -1072,8 +1082,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingFeeTypeFilter,
-                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -1096,8 +1106,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -1109,21 +1119,19 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
+            TextButton.icon(
               onPressed: filtered.isNotEmpty ? () {
                 final pendingFiltered = filtered.where((d) => d['paidstatus']?.toString() == 'U').toList();
                 if (pendingFiltered.isNotEmpty) {
                   _exportPendingToExcel(pendingFiltered, totalDemand, totalPaid, totalBalance, totalStudents);
                 }
               } : null,
-              icon: const Icon(Icons.download_rounded, size: 20),
-              color: AppColors.accent,
-              tooltip: 'Export to Excel',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.accent.withValues(alpha: 0.1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              icon: const Icon(Icons.download_rounded, size: 16),
+              label: const Text('Export'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -1149,8 +1157,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1200,7 +1208,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                             child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                               SizedBox(width: 4),
                               Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                             ]),
@@ -1267,7 +1275,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               children: [
                 Text(stuName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text('Adm No: $admNo  |  Class: $stuClass', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                Text('Adm No: $admNo  |  Class: $stuClass', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
           ],
@@ -1291,8 +1299,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1435,10 +1443,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   _pendingStudentSearch = v;
                   _pendingPage = 0;
                 }),
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search student / adm no...',
-                  hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   prefixIcon: const Icon(Icons.search, size: 16),
                   suffixIcon: _pendingStudentSearch.isNotEmpty
                       ? IconButton(
@@ -1470,8 +1478,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingFeeTypeFilter,
-                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -1494,8 +1502,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 12)),
-                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                   icon: const Icon(Icons.arrow_drop_down, size: 18),
                   isDense: true,
                   items: [
@@ -1529,8 +1537,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1612,7 +1620,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           children: [
             Text(
               'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const Spacer(),
             IconButton(
@@ -1628,7 +1636,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-              child: Text('${_pendingPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+              child: Text('${_pendingPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
             ),
             IconButton(
               icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -1686,7 +1694,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 const SizedBox(width: 8),
                 const Text('Date-wise Collection Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 const Spacer(),
-                Text('${_dateGroups.length} days', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                Text('${_dateGroups.length} days', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -1728,8 +1736,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                       columnSpacing: 20,
                       horizontalMargin: 16,
                       dataRowMinHeight: 40,
@@ -1760,7 +1768,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                    Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                                     SizedBox(width: 4),
                                     Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                                   ]),
@@ -1793,7 +1801,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   children: [
                     Text(
                       'Showing ${totalItems == 0 ? 0 : startIdx + 1}\u2013$endIdx of $totalItems dates',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const Spacer(),
                     IconButton(
@@ -1809,7 +1817,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-                      child: Text('${_dateListPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                      child: Text('${_dateListPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -1908,7 +1916,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   ),
                   child: Text(
                     '${group.payments.length} payments',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent),
                   ),
                 ),
                 const Spacer(),
@@ -1919,7 +1927,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     onChanged: (v) => setState(() { _dateDrilldownSearch = v; _dateDrilldownPage = 0; }),
                     decoration: InputDecoration(
                       hintText: 'Search...',
-                      hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       prefixIcon: const Icon(Icons.search_rounded, size: 18),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -1940,8 +1948,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       ),
                       child: DropdownButton<String?>(
                         value: _dateDrilldownMethodFilter,
-                        hint: const Text('All Methods', style: TextStyle(fontSize: 12)),
-                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        hint: const Text('All Methods', style: TextStyle(fontSize: 13)),
+                        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                         items: [
                           const DropdownMenuItem(value: null, child: Text('All Methods')),
                           ...{for (final p in group.payments) p['paymethod']?.toString() ?? '-'}.map(
@@ -1984,8 +1992,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -2021,7 +2029,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                      Text('View', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                      Text('View', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                                       SizedBox(width: 4),
                                       Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                                     ]),
@@ -2056,7 +2064,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         IconButton(icon: const Icon(Icons.chevron_left_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage--) : null),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('${_dateDrilldownPage + 1} / ${ddTotalPages == 0 ? 1 : ddTotalPages}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                          child: Text('${_dateDrilldownPage + 1} / ${ddTotalPages == 0 ? 1 : ddTotalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                         ),
                         IconButton(icon: const Icon(Icons.chevron_right_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage++) : null),
                         IconButton(icon: const Icon(Icons.last_page_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage = ddTotalPages - 1) : null),
@@ -2264,7 +2272,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 pw.SizedBox(height: 12),
                 // To section (only on first page)
                 if (isFirstPage) ...[
-                  pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 12, color: textDark)),
+                  pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 13, color: textDark)),
                   pw.SizedBox(height: 8),
                   pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -2521,7 +2529,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
-                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -2634,8 +2642,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                       columns: const [
                         DataColumn(label: Text('S No.')), DataColumn(label: Text('TERM')), DataColumn(label: Text('FEE TYPE')),
@@ -2709,7 +2717,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -2810,7 +2818,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
       final headerStyle = xl.CellStyle(
         bold: true,
-        fontSize: 12,
+        fontSize: 13,
       );
       final boldStyle = xl.CellStyle(bold: true);
       final amountStyle = xl.CellStyle(
@@ -2822,7 +2830,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       );
       final totalRowStyle = xl.CellStyle(
         bold: true,
-        fontSize: 11,
+        fontSize: 13,
       );
 
       int row = 0;
@@ -2843,7 +2851,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       final fromDate = '${_fromDate.day.toString().padLeft(2, '0')}/${_fromDate.month.toString().padLeft(2, '0')}/${_fromDate.year}';
       final toDate = '${_toDate.day.toString().padLeft(2, '0')}/${_toDate.month.toString().padLeft(2, '0')}/${_toDate.year}';
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE COLLECTION SUMMARY');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = xl.CellStyle(bold: true, fontSize: 11);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = xl.CellStyle(bold: true, fontSize: 13);
       row++;
       row++;
 
@@ -3022,15 +3030,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     // Styles
     final insStyle = xl.CellStyle(bold: true, fontSize: 14, horizontalAlign: xl.HorizontalAlign.Center);
     final insDetailStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Center);
-    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 13);
     final colHeaderStyle = xl.CellStyle(
       bold: true, fontSize: 10,
       backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
-    final totalStyle = xl.CellStyle(bold: true, fontSize: 11, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
+    final totalStyle = xl.CellStyle(bold: true, fontSize: 13, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
     final grandTotalStyle = xl.CellStyle(
-      bold: true, fontSize: 11,
+      bold: true, fontSize: 13,
       backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
@@ -3462,10 +3470,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           height: 34,
                           child: TextField(
                             onChanged: (v) => setState(() => _classSearchQuery = v.trim().toLowerCase()),
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 13),
                             decoration: InputDecoration(
                               hintText: 'Search class...',
-                              hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                               prefixIcon: const Icon(Icons.search, size: 16),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -3486,18 +3494,18 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             child: DropdownButton<String>(
                               value: _classFilterFeeType,
                               isDense: true,
-                              hint: const Text('All Fee Types', style: TextStyle(fontSize: 12)),
-                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                              hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
+                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                               icon: const Icon(Icons.arrow_drop_down, size: 18),
                               items: [
-                                const DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 12))),
+                                const DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13))),
                                 ...() {
                                   final allFeeTypes = <String>{};
                                   for (final g in _classGroups) {
                                     allFeeTypes.addAll(g.feeTypes);
                                   }
                                   final sorted = allFeeTypes.toList()..sort();
-                                  return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: const TextStyle(fontSize: 12))));
+                                  return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: const TextStyle(fontSize: 13))));
                                 }(),
                               ],
                               onChanged: (v) => setState(() => _classFilterFeeType = v),
@@ -3529,8 +3537,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     child: SingleChildScrollView(scrollDirection: Axis.vertical, child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 48, headingRowHeight: 42,
                       columns: const [
                         DataColumn(label: Text('S No.')),
@@ -3616,7 +3624,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                     decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                      Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                                      Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                                       SizedBox(width: 4),
                                       Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                                     ]),
@@ -3741,8 +3749,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -3894,7 +3902,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       ),
                       child: Text(
                         '$totalStudents students',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent),
                       ),
                     ),
                     const Spacer(),
@@ -3908,7 +3916,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         }),
                         decoration: InputDecoration(
                           hintText: 'Search...',
-                          hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                           prefixIcon: const Icon(Icons.search_rounded, size: 18),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -3929,13 +3937,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           ),
                           child: DropdownButton<String?>(
                             value: _studentStatusFilter,
-                            hint: const Text('All Status', style: TextStyle(fontSize: 12)),
-                            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                            hint: const Text('All Status', style: TextStyle(fontSize: 13)),
+                            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                             items: const [
-                              DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 12))),
-                              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 12))),
+                              DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 13))),
+                              DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 13))),
+                              DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 13))),
+                              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 13))),
                             ],
                             onChanged: (v) => setState(() {
                               _studentStatusFilter = v;
@@ -3965,8 +3973,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -4029,7 +4037,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                           child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                            Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
                             SizedBox(width: 4),
                             Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
                           ]),
@@ -4061,7 +4069,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Text(
                   '$totalStudents students',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
               ),
             ],
@@ -4425,7 +4433,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           children: [
             const Icon(Icons.calendar_today, size: 14, color: AppColors.accent),
             const SizedBox(width: 6),
-            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -4442,7 +4450,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ),
     );
   }
@@ -4601,7 +4609,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                 children: [
                   const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.accent),
                   const SizedBox(width: 8),
-                  const Text('Date Range:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                  const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   const SizedBox(width: 8),
                   _buildDateChip('From', _fromDate, () => _pickDate(true)),
                   const Padding(
@@ -4651,9 +4659,15 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     _applyFilter();
                   }),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20, color: AppColors.textSecondary),
+                  TextButton.icon(
                     onPressed: _fetchData,
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Refresh'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -4697,19 +4711,17 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text('$totalDateCount dates  |  $totalStudentCount students',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
                         ),
                         const Spacer(),
-                        IconButton(
+                        TextButton.icon(
                           onPressed: flatRows.isNotEmpty ? () => _exportToExcel(flatRows, activeDisplayFeeTypes, grandFeeTypeTotals, grandTotal) : null,
-                          icon: const Icon(Icons.download_rounded, size: 20),
-                          color: AppColors.accent,
-                          tooltip: 'Export to Excel',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.accent.withValues(alpha: 0.1),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          icon: const Icon(Icons.download_rounded, size: 16),
+                          label: const Text('Export'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.accent,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -4720,7 +4732,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                             decoration: InputDecoration(
                               hintText: 'Search...',
-                              hintStyle: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                               prefixIcon: const Icon(Icons.search_rounded, size: 18),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
@@ -4741,8 +4753,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               ),
                               child: DropdownButton<String?>(
                                 value: _filterFeeType,
-                                hint: const Text('All Fee Types', style: TextStyle(fontSize: 12)),
-                                style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
+                                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                                 items: [
                                   const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
                                   ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft))),
@@ -4793,7 +4805,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                   color: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
                                   cells: [
                                     DataCell(Text(row['date'] as String,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.accent))),
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent))),
                                     ...List.generate(totalCols - 1, (_) => const DataCell(Text(''))),
                                   ],
                                 ));
@@ -4803,7 +4815,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 dataRows.add(DataRow(
                                   color: WidgetStateProperty.all(subTotalBg),
                                   cells: [
-                                    DataCell(Text('S.Total', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                                    DataCell(Text('S.Total', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
                                     const DataCell(Text('')),
                                     const DataCell(Text('')),
                                     const DataCell(Text('')),
@@ -4812,12 +4824,12 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       final amt = feeAmts[ft] ?? 0;
                                       return DataCell(Text(
                                         amt > 0 ? amt.toStringAsFixed(0) : '',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                                       ));
                                     }),
                                     DataCell(Text(
                                       total.toStringAsFixed(0),
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                                     )),
                                   ],
                                 ));
@@ -4826,8 +4838,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 final feeAmts = row['feeAmounts'] as Map<String, double>;
                                 dataRows.add(DataRow(
                                   cells: [
-                                    DataCell(Text('${row['sno']}', style: const TextStyle(fontSize: 12))),
-                                    DataCell(Text(row['payNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11))),
+                                    DataCell(Text('${row['sno']}', style: const TextStyle(fontSize: 13))),
+                                    DataCell(Text(row['payNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
                                     DataCell(Text(row['admNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500))),
                                     DataCell(ConstrainedBox(
                                       constraints: const BoxConstraints(maxWidth: 180),
@@ -4878,7 +4890,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               showCheckboxColumn: false,
                               headingRowColor: WidgetStateProperty.all(headerBg),
                               headingTextStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                              dataTextStyle: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
                               columnSpacing: 12,
                               horizontalMargin: 12,
                               dataRowMinHeight: 32,
@@ -4939,7 +4951,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_left, size: 14, color: Color(0xFF333333)),
+                                    child: const Icon(Icons.chevron_left, size: 16, color: Color(0xFF333333)),
                                   ),
                                 ),
                                 // Scrollbar track + thumb
@@ -5011,7 +5023,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF333333)),
+                                    child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF333333)),
                                   ),
                                 ),
                               ],
@@ -5056,16 +5068,16 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     // Styles
     final insStyle = xl.CellStyle(bold: true, fontSize: 14, horizontalAlign: xl.HorizontalAlign.Center);
     final insDetailStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Center);
-    final labelStyle = xl.CellStyle(bold: true, fontSize: 11);
+    final labelStyle = xl.CellStyle(bold: true, fontSize: 13);
     final colHeaderStyle = xl.CellStyle(
       bold: true, fontSize: 10,
       backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
-    final dateHeaderStyle = xl.CellStyle(bold: true, fontSize: 11, fontColorHex: xl.ExcelColor.fromHexString('#2563EB'));
-    final subTotalStyle = xl.CellStyle(bold: true, fontSize: 11, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
+    final dateHeaderStyle = xl.CellStyle(bold: true, fontSize: 13, fontColorHex: xl.ExcelColor.fromHexString('#2563EB'));
+    final subTotalStyle = xl.CellStyle(bold: true, fontSize: 13, backgroundColorHex: xl.ExcelColor.fromHexString('#E2E8F0'));
     final totalRowStyle = xl.CellStyle(
-      bold: true, fontSize: 11,
+      bold: true, fontSize: 13,
       backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
@@ -5368,12 +5380,12 @@ class _StudentAccordionState extends State<_StudentAccordion> {
             ),
             child: Row(
               children: [
-                SizedBox(width: 36, child: Text('${widget.index}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500))),
-                Expanded(flex: 1, child: Text(widget.admNo, style: const TextStyle(fontSize: 11))),
-                Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalFee), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.success))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalBalance), textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: totalBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
+                SizedBox(width: 36, child: Text('${widget.index}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                Expanded(flex: 1, child: Text(widget.admNo, style: const TextStyle(fontSize: 13))),
+                Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalFee), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.success))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalBalance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: totalBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
                 SizedBox(
                   width: 60,
                   child: Center(
@@ -5453,12 +5465,12 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(flex: 2, child: Text(d['demfeeterm']?.toString() ?? '-', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                        Expanded(flex: 3, child: Text(d['demfeetype']?.toString() ?? '-', style: const TextStyle(fontSize: 11))),
-                        Expanded(flex: 2, child: Text(_formatDueDate(d['duedate']), textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['feeamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['paidamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.success))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency(balance), textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
+                        Expanded(flex: 2, child: Text(d['demfeeterm']?.toString() ?? '-', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+                        Expanded(flex: 3, child: Text(d['demfeetype']?.toString() ?? '-', style: const TextStyle(fontSize: 13))),
+                        Expanded(flex: 2, child: Text(_formatDueDate(d['duedate']), textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['feeamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['paidamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.success))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency(balance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                         SizedBox(
                           width: 50,
                           child: Center(

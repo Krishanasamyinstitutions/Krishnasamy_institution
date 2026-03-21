@@ -230,11 +230,17 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                         const SizedBox(width: 8),
                         const Text('Designations', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         const Spacer(),
-                        Text('${_designations.length} records', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                        Text('${_designations.length} records', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         const SizedBox(width: 12),
-                        IconButton(
-                          icon: const Icon(Icons.refresh, size: 18, color: AppColors.textSecondary),
+                        TextButton.icon(
                           onPressed: _fetchDesignations,
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Refresh'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
                         ),
                       ],
                     ),
@@ -245,10 +251,10 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                     color: const Color(0xFF6C8EEF),
                     child: const Row(
                       children: [
-                        SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 3, child: Text('DESIGNATION NAME', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 3, child: Text('REPORTS TO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
-                        SizedBox(width: 80, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 3, child: Text('DESIGNATION NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 3, child: Text('REPORTS TO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 80, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
                       ],
                     ),
                   ),
