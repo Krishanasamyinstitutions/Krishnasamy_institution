@@ -103,7 +103,7 @@ class FeeModel {
   }
 
   bool get isPaid => paidstatus == 'P';
-  double get totalAmount => feeamount - conamount;
+  double get totalAmount => feeamount;
 }
 
 /// Fee summary for dashboard display

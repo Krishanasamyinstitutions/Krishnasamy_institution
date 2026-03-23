@@ -501,10 +501,13 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   List<String> _availableClasses = [];
   bool _isLoadingClasses = false;
   bool _isSending = false;
+  String? _pendingFeeTermFilter;
+  List<String> _availableFeeTerms = [];
+  bool _isLoadingFeeTerms = false;
 
   static const _priorities = ['Normal', 'Medium', 'High', 'Urgent'];
   static const _categories = ['General', 'Exam', 'Holiday', 'Event', 'Fee', 'Result'];
-  static const _targetTypes = ['All Students', 'Specific Classes', 'Staff'];
+  static const _targetTypes = ['All Students', 'Specific Classes', 'Pending Fees', 'Staff'];
 
   @override
   void initState() {
@@ -554,6 +557,34 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     }
   }
 
+  Future<void> _loadFeeTerms() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+
+    setState(() => _isLoadingFeeTerms = true);
+    try {
+      final demands = await SupabaseService.getFeeDemands(insId);
+      final terms = <String>{};
+      for (final d in demands) {
+        final term = d['demfeeterm']?.toString() ?? '';
+        if (term.isNotEmpty) terms.add(term);
+      }
+      final termOrder = {
+        'I TERM': 0, 'II TERM': 1, 'III TERM': 2,
+        'JUNE': 3, 'JULY': 4, 'AUGUST': 5, 'SEPTEMBER': 6,
+        'OCTOBER': 7, 'NOVEMBER': 8, 'DECEMBER': 9,
+        'JANUARY': 10, 'FEBRUARY': 11, 'MARCH': 12,
+        'APRIL': 13, 'MAY': 14,
+      };
+      final sorted = terms.toList()..sort((a, b) => (termOrder[a] ?? 99).compareTo(termOrder[b] ?? 99));
+      if (mounted) setState(() { _availableFeeTerms = sorted; _isLoadingFeeTerms = false; });
+    } catch (e) {
+      debugPrint('Error loading fee terms: $e');
+      if (mounted) setState(() => _isLoadingFeeTerms = false);
+    }
+  }
+
   Future<void> _submitNotice() async {
     final title = _titleController.text.trim();
     final desc = _descController.text.trim();
@@ -588,7 +619,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           ? 'All Students'
           : _targetType == 'Staff'
               ? 'Staff'
-              : _selectedClasses.join(', ');
+              : _targetType == 'Pending Fees'
+                  ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}'
+                  : _selectedClasses.join(', ');
 
       // Insert notice
       await SupabaseService.client.from('notice').insert({
@@ -623,6 +656,25 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
             'activestatus': 1,
           }).toList();
           await SupabaseService.client.from('notification').insert(staffNotifications);
+        }
+      } else if (_targetType == 'Pending Fees') {
+        // Get students with pending fee balance, optionally filtered by term
+        final demands = await SupabaseService.getFeeDemands(insId);
+        final pendingStuIds = <int>{};
+        for (final d in demands) {
+          final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
+          if (balance > 0) {
+            if (_pendingFeeTermFilter != null && d['demfeeterm']?.toString() != _pendingFeeTermFilter) continue;
+            final stuId = d['stu_id'] as int?;
+            if (stuId != null) pendingStuIds.add(stuId);
+          }
+        }
+        if (pendingStuIds.isNotEmpty) {
+          final allStudents = await SupabaseService.getStudents(insId);
+          targetStudents = allStudents
+              .where((s) => pendingStuIds.contains(s.stuId))
+              .map((s) => {'stu_id': s.stuId, 'stuname': s.stuname})
+              .toList();
         }
       } else if (_targetType == 'All Students') {
         final allStudents = await SupabaseService.getStudents(insId);
@@ -764,10 +816,14 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       return Padding(
                         padding: const EdgeInsets.only(right: 10),
                         child: GestureDetector(
-                          onTap: () => setState(() {
-                            _targetType = t;
-                            if (t != 'Specific Classes') _selectedClasses.clear();
-                          }),
+                          onTap: () {
+                            setState(() {
+                              _targetType = t;
+                              if (t != 'Specific Classes') _selectedClasses.clear();
+                              if (t != 'Pending Fees') _pendingFeeTermFilter = null;
+                            });
+                            if (t == 'Pending Fees' && _availableFeeTerms.isEmpty) _loadFeeTerms();
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
@@ -779,7 +835,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  t == 'All Students' ? Icons.groups_rounded : t == 'Staff' ? Icons.badge_rounded : Icons.class_rounded,
+                                  t == 'All Students' ? Icons.groups_rounded : t == 'Staff' ? Icons.badge_rounded : t == 'Pending Fees' ? Icons.pending_actions_rounded : Icons.class_rounded,
                                   size: 16,
                                   color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
@@ -869,6 +925,51 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             Text('${_selectedClasses.length} class${_selectedClasses.length > 1 ? 'es' : ''} selected',
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
                           ],
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // Fee term filter (shown when Pending Fees is selected)
+                  if (_targetType == 'Pending Fees') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Filter by Fee Term', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          _isLoadingFeeTerms
+                              ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String?>(
+                                      value: _pendingFeeTermFilter,
+                                      isExpanded: true,
+                                      hint: const Text('All Terms', style: TextStyle(fontSize: 13)),
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                      items: [
+                                        const DropdownMenuItem<String?>(value: null, child: Text('All Terms')),
+                                        ..._availableFeeTerms.map((term) => DropdownMenuItem<String?>(value: term, child: Text(term))),
+                                      ],
+                                      onChanged: (v) => setState(() => _pendingFeeTermFilter = v),
+                                    ),
+                                  ),
+                                ),
                         ],
                       ),
                     ),
@@ -1026,7 +1127,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             Icon(Icons.people_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                             const SizedBox(width: 4),
                             Text(
-                              _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : '${_selectedClasses.length} classes',
+                              _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : _targetType == 'Pending Fees' ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}' : '${_selectedClasses.length} classes',
                               style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7)),
                             ),
                           ],

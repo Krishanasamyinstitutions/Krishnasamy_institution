@@ -794,38 +794,21 @@ class SupabaseService {
 
     // Fallback: paginate through all rows to avoid 1000-row cap
     try {
-      double totalDemand = 0, totalPending = 0;
+      double totalDemand = 0, totalPaid = 0, totalPending = 0;
       const batchSize = 1000;
       int offset = 0;
       while (true) {
         final demandRes = await client
             .from('feedemand')
-            .select('feeamount, balancedue')
+            .select('feeamount, paidamount, balancedue')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
             .range(offset, offset + batchSize - 1);
         final rows = demandRes as List;
         for (final row in rows) {
           totalDemand += (row['feeamount'] as num?)?.toDouble() ?? 0;
+          totalPaid += (row['paidamount'] as num?)?.toDouble() ?? 0;
           totalPending += (row['balancedue'] as num?)?.toDouble() ?? 0;
-        }
-        if (rows.length < batchSize) break;
-        offset += batchSize;
-      }
-
-      double totalPaid = 0;
-      offset = 0;
-      while (true) {
-        final payRes = await client
-            .from('payment')
-            .select('transtotalamount')
-            .eq('ins_id', insId)
-            .eq('paystatus', 'C')
-            .eq('activestatus', 1)
-            .range(offset, offset + batchSize - 1);
-        final rows = payRes as List;
-        for (final row in rows) {
-          totalPaid += (row['transtotalamount'] as num?)?.toDouble() ?? 0;
         }
         if (rows.length < batchSize) break;
         offset += batchSize;

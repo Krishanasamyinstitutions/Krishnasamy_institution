@@ -30,6 +30,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   List<PaymentModel> _failedTransactions = [];
   Map<int, String> _stuIdToName = {};
   Map<int, StudentModel> _stuIdToStudent = {};
+  DateTime? _filterFromDate;
+  DateTime? _filterToDate;
   String? _insName;
   String? _insLogoUrl;
   String? _insAddress;
@@ -38,14 +40,28 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
 
   List<PaymentModel> _filterBySearch(List<PaymentModel> list) {
-    if (_searchQuery.isEmpty) return list;
-    return list.where((t) {
-      final name = _getStudentName(t).toLowerCase();
-      final payNo = (t.paynumber ?? '${t.payId}').toLowerCase();
-      final ref = (t.payreference ?? '').toLowerCase();
-      final method = (t.paymethod ?? '').toLowerCase();
-      return name.contains(_searchQuery) || payNo.contains(_searchQuery) || ref.contains(_searchQuery) || method.contains(_searchQuery);
-    }).toList();
+    var filtered = list;
+    // Date filter
+    if (_filterFromDate != null || _filterToDate != null) {
+      filtered = filtered.where((t) {
+        final date = t.paydate ?? t.createdat;
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        if (_filterFromDate != null && dateOnly.isBefore(_filterFromDate!)) return false;
+        if (_filterToDate != null && dateOnly.isAfter(_filterToDate!)) return false;
+        return true;
+      }).toList();
+    }
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((t) {
+        final name = _getStudentName(t).toLowerCase();
+        final payNo = (t.paynumber ?? '${t.payId}').toLowerCase();
+        final ref = (t.payreference ?? '').toLowerCase();
+        final method = (t.paymethod ?? '').toLowerCase();
+        return name.contains(_searchQuery) || payNo.contains(_searchQuery) || ref.contains(_searchQuery) || method.contains(_searchQuery);
+      }).toList();
+    }
+    return filtered;
   }
 
   List<PaymentModel> get _allTransactions {
@@ -658,10 +674,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             final tabBgColors = [AppColors.accent.withValues(alpha: 0.1), Colors.green.shade50, Colors.red.shade50];
             final tabIcons = [Icons.list_alt_rounded, Icons.check_circle_rounded, Icons.error_rounded];
             final tabLabels = ['All', 'Paid', 'Failed'];
+            final filteredPaid = _applyDateFilter(_paidTransactions);
+            final filteredFailed = _applyDateFilter(_failedTransactions);
             final tabCounts = [
-              _paidTransactions.length + _failedTransactions.length,
-              _paidTransactions.length,
-              _failedTransactions.length,
+              filteredPaid.length + filteredFailed.length,
+              filteredPaid.length,
+              filteredFailed.length,
             ];
 
             return Container(
@@ -728,6 +746,106 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             ),
             child: Column(
               children: [
+                // Date filter row
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.border)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterFromDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) setState(() => _filterFromDate = picked);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                _filterFromDate != null
+                                    ? '${_filterFromDate!.day.toString().padLeft(2, '0')}/${_filterFromDate!.month.toString().padLeft(2, '0')}/${_filterFromDate!.year}'
+                                    : 'From',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('—', style: TextStyle(color: AppColors.textSecondary))),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _filterToDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) setState(() => _filterToDate = picked);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                _filterToDate != null
+                                    ? '${_filterToDate!.day.toString().padLeft(2, '0')}/${_filterToDate!.month.toString().padLeft(2, '0')}/${_filterToDate!.year}'
+                                    : 'To',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ...[
+                        ('Today', () { final now = DateTime.now(); setState(() { _filterFromDate = DateTime(now.year, now.month, now.day); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
+                        ('7 Days', () { final now = DateTime.now(); setState(() { _filterFromDate = now.subtract(const Duration(days: 7)); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
+                        ('30 Days', () { final now = DateTime.now(); setState(() { _filterFromDate = now.subtract(const Duration(days: 30)); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
+                        ('All', () { setState(() { _filterFromDate = null; _filterToDate = null; }); }),
+                      ].map((e) => Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: InkWell(
+                          onTap: e.$2,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(e.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                          ),
+                        ),
+                      )),
+                    ],
+                  ),
+                ),
                 // Header
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -812,10 +930,23 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
+  List<PaymentModel> _applyDateFilter(List<PaymentModel> list) {
+    if (_filterFromDate == null && _filterToDate == null) return list;
+    return list.where((t) {
+      final date = t.paydate ?? t.createdat;
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      if (_filterFromDate != null && dateOnly.isBefore(_filterFromDate!)) return false;
+      if (_filterToDate != null && dateOnly.isAfter(_filterToDate!)) return false;
+      return true;
+    }).toList();
+  }
+
   Widget _buildSummaryCards() {
-    final paidTotal = _paidTransactions.fold<double>(
+    final filteredPaid = _applyDateFilter(_paidTransactions);
+    final filteredFailed = _applyDateFilter(_failedTransactions);
+    final paidTotal = filteredPaid.fold<double>(
         0, (sum, t) => sum + t.transtotalamount);
-    final failedTotal = _failedTransactions.fold<double>(
+    final failedTotal = filteredFailed.fold<double>(
         0, (sum, t) => sum + t.transtotalamount);
 
     return Row(
@@ -824,7 +955,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           child: _buildSummaryCard(
             'Total Paid',
             '\u20B9 ${paidTotal.toStringAsFixed(2)}',
-            '${_paidTransactions.length} transactions',
+            '${filteredPaid.length} transactions',
             Colors.green,
             Icons.check_circle_outline_rounded,
           ),
@@ -834,7 +965,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           child: _buildSummaryCard(
             'Total Failed',
             '\u20B9 ${failedTotal.toStringAsFixed(2)}',
-            '${_failedTransactions.length} transactions',
+            '${filteredFailed.length} transactions',
             Colors.red,
             Icons.error_outline_rounded,
           ),
@@ -843,7 +974,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         Expanded(
           child: _buildSummaryCard(
             'Total Transactions',
-            '${_paidTransactions.length + _failedTransactions.length}',
+            '${filteredPaid.length + filteredFailed.length}',
             'All records',
             AppColors.primary,
             Icons.receipt_long_rounded,
