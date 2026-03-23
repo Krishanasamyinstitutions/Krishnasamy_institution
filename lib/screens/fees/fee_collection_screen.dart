@@ -3952,127 +3952,125 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               ),
               const Divider(height: 1),
               // Student list table
-              Expanded(
-                child: LayoutBuilder(builder: (context, constraints) {
-                  // Compute totals for grand total row
-                  double gDemand = 0, gPaid = 0, gBalance = 0;
-                  for (final key in studentKeys) {
-                    for (final d in byStudent[key]!) {
-                      gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                      gPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-                      gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                    }
+              Expanded(child: LayoutBuilder(builder: (context, constraints) {
+                // Compute totals for grand total row
+                double gDemand = 0, gPaid = 0, gBalance = 0;
+                for (final key in studentKeys) {
+                  for (final d in byStudent[key]!) {
+                    gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                    gPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                            child: DataTable(
-                              dividerThickness: 0,
-                              showCheckboxColumn: false,
-                              headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
-                              columns: const [
-                                DataColumn(label: Text('S No.')),
-                                DataColumn(label: Text('ADM NO')),
-                                DataColumn(label: Text('STUDENT NAME')),
-                                DataColumn(label: Text('FEE AMOUNT'), numeric: true),
-                                DataColumn(label: Text('PAID'), numeric: true),
-                                DataColumn(label: Text('BALANCE'), numeric: true),
-                                DataColumn(label: Text('STATUS')),
-                                DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
-                              ],
-                              rows: studentKeys.isEmpty ? [
-                                const DataRow(cells: [
-                                  DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')),
-                                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                                ]),
-                              ] : [
-                                ...studentKeys.asMap().entries.map((entry) {
-                                  final idx = entry.key;
-                                  final admNo = entry.value;
-                                  final studentDemands = byStudent[admNo]!;
-                                  final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
-                                  double sDemand = 0, sPaid = 0, sBalance = 0;
-                                  for (final d in studentDemands) {
-                                    sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                                    sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-                                    sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                                  }
-                                  final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
-                                  final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
-                                  return DataRow(
-                                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                                    onSelectChanged: (_) => setState(() {
-                                      _drilldownAdmNo = admNo;
-                                      _drilldownDemands = studentDemands;
-                                    }),
-                                    cells: [
-                                      DataCell(Text('${idx + 1}')),
-                                      DataCell(Text(admNo)),
-                                      DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                      DataCell(Text(_formatCurrency(sDemand))),
-                                      DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
-                                      DataCell(Text(_formatCurrency(sBalance), style: TextStyle(fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
-                                      DataCell(Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
-                                      )),
-                                      DataCell(Align(
-                                        alignment: Alignment.centerRight,
-                                        child: InkWell(
-                                          onTap: () => setState(() {
-                                            _drilldownAdmNo = admNo;
-                                            _drilldownDemands = studentDemands;
-                                          }),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                                              SizedBox(width: 4),
-                                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
-                                            ]),
+                }
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                          child: DataTable(
+                            dividerThickness: 0,
+                            showCheckboxColumn: false,
+                            headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                            headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                            dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                            columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                            columns: const [
+                              DataColumn(label: Text('S No.')),
+                              DataColumn(label: Text('ADM NO')),
+                              DataColumn(label: Text('STUDENT NAME')),
+                              DataColumn(label: Text('FEE AMOUNT'), numeric: true),
+                              DataColumn(label: Text('PAID'), numeric: true),
+                              DataColumn(label: Text('BALANCE'), numeric: true),
+                              DataColumn(label: Text('STATUS')),
+                              DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
+                            ],
+                            rows: studentKeys.isEmpty
+                                ? [
+                                    const DataRow(cells: [
+                                      DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')),
+                                      DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
+                                    ]),
+                                  ]
+                                : studentKeys.asMap().entries.map((entry) {
+                                    final idx = entry.key;
+                                    final admNo = entry.value;
+                                    final studentDemands = byStudent[admNo]!;
+                                    final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
+                                    double sDemand = 0, sPaid = 0, sBalance = 0;
+                                    for (final d in studentDemands) {
+                                      sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                                      sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                                      sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+                                    }
+                                    final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
+                                    final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+                                    return DataRow(
+                                      color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
+                                      onSelectChanged: (_) => setState(() {
+                                        _drilldownAdmNo = admNo;
+                                        _drilldownDemands = studentDemands;
+                                      }),
+                                      cells: [
+                                        DataCell(Text('${idx + 1}')),
+                                        DataCell(Text(admNo)),
+                                        DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
+                                        DataCell(Text(_formatCurrency(sDemand))),
+                                        DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
+                                        DataCell(Text(_formatCurrency(sBalance), style: TextStyle(fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
+                                        DataCell(Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
                                           ),
-                                        ),
-                                      )),
-                                    ],
-                                  );
-                                }),
-                              ],
-                            ),
+                                          child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
+                                        )),
+                                        DataCell(Align(
+                                          alignment: Alignment.centerRight,
+                                          child: InkWell(
+                                            onTap: () => setState(() {
+                                              _drilldownAdmNo = admNo;
+                                              _drilldownDemands = studentDemands;
+                                            }),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
+                                              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                                Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                                                SizedBox(width: 4),
+                                                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+                                              ]),
+                                            ),
+                                          ),
+                                        )),
+                                      ],
+                                    );
+                                  }).toList(),
                           ),
                         ),
                       ),
-                      // Fixed footer
-                      Container(
-                        color: const Color(0xFF6C8EEF),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        child: Row(children: [
-                          const SizedBox(width: 50),
-                          const SizedBox(width: 100),
-                          Expanded(flex: 3, child: Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                          Expanded(flex: 2, child: Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                          Expanded(flex: 2, child: Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                          Expanded(flex: 2, child: Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                          const SizedBox(width: 16),
-                          const SizedBox(width: 80),
-                          const SizedBox(width: 120),
-                        ]),
-                      ),
-                    ],
-                  );
-                }),
-              ),
+                    ),
+                    // Fixed footer
+                    Container(
+                      color: const Color(0xFF6C8EEF),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(children: [
+                        const SizedBox(width: 50),
+                        const SizedBox(width: 100),
+                        Expanded(flex: 3, child: Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                        Expanded(flex: 2, child: Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                        Expanded(flex: 2, child: Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                        Expanded(flex: 2, child: Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
+                        const SizedBox(width: 16),
+                        const SizedBox(width: 80),
+                        const SizedBox(width: 120),
+                      ]),
+                    ),
+                  ],
+                );
+              })),
             ],
           ),
         )),

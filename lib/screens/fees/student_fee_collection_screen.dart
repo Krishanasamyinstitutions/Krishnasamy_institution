@@ -615,7 +615,6 @@ class _StudentFeeCollectionScreenState
       );
   }
 
-  // ── Payment Details ──
 
   // ── Demands Panel ──
   Widget _buildDemandsPanel() {
