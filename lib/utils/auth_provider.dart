@@ -9,6 +9,7 @@ const _kPassword = 'saved_password';
 class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isLoading = false;
+  bool _subscriptionActive = false;
   String? _userEmail;
   String? _userName;
   String? _userRole;
@@ -18,10 +19,12 @@ class AuthProvider extends ChangeNotifier {
   String? _insName;
   String? _insLogo;
   String? _insAddress;
+  String? _yearLabel;
   InstitutionUserModel? _currentUser;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  bool get subscriptionActive => _subscriptionActive;
   String? get userEmail => _userEmail;
   String? get userName => _userName;
   String? get userRole => _userRole;
@@ -31,6 +34,7 @@ class AuthProvider extends ChangeNotifier {
   String? get insName => _insName;
   String? get insLogo => _insLogo;
   String? get insAddress => _insAddress;
+  String? get yearLabel => _yearLabel;
   InstitutionUserModel? get currentUser => _currentUser;
 
   Future<bool> login(String email, String password) async {
@@ -55,12 +59,17 @@ class AuthProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
 
-        // Fetch institution name in background
+        // Fetch institution info and check subscription
         if (user.insId != null) {
           final insInfo = await SupabaseService.getInstitutionInfo(user.insId!);
           _insName = insInfo.name;
           _insLogo = insInfo.logo;
           _insAddress = insInfo.address;
+
+          // Check subscription status
+          final sub = await SupabaseService.checkSubscription(user.insId!);
+          _subscriptionActive = sub.isActive;
+          _yearLabel = sub.yearLabel;
           notifyListeners();
         }
 
@@ -136,6 +145,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await clearCredentials();
     _isAuthenticated = false;
+    _subscriptionActive = false;
     _currentUser = null;
     _userEmail = null;
     _userName = null;
@@ -145,6 +155,7 @@ class AuthProvider extends ChangeNotifier {
     _insName = null;
     _insLogo = null;
     _insAddress = null;
+    _yearLabel = null;
     _errorMessage = null;
     notifyListeners();
   }

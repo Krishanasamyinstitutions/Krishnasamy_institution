@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
+import '../auth/activation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,13 +38,30 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateToNextScreen() async {
     await Future.delayed(const Duration(seconds: 4));
     if (!mounted) return;
+
+    // Check if app is activated first
+    final activated = await ActivationScreen.isActivated();
+    if (!mounted) return;
+
+    if (!activated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.activation);
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final loggedIn = await auth.tryAutoLogin();
     if (!mounted) return;
-    Navigator.pushReplacementNamed(
-      context,
-      loggedIn ? AppRoutes.dashboard : AppRoutes.onboarding,
-    );
+
+    if (loggedIn) {
+      // Check subscription status after login
+      if (auth.subscriptionActive) {
+        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
+      }
+    } else {
+      Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+    }
   }
 
   @override

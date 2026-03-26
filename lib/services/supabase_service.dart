@@ -9,6 +9,22 @@ import '../models/fee_model.dart';
 class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
 
+  // ==================== LICENSE ====================
+
+  /// Verify a license key against the institutionyear table
+  static Future<Map<String, dynamic>> verifyLicenseKey(String licenseKey) async {
+    try {
+      final result = await client.rpc('verify_license_key', params: {
+        'p_license_key': licenseKey.trim(),
+      });
+      debugPrint('License verification result: $result');
+      return Map<String, dynamic>.from(result as Map);
+    } catch (e) {
+      debugPrint('License verification error: $e');
+      return {'valid': false, 'message': 'Connection error. Please try again.'};
+    }
+  }
+
   // ==================== AUTH ====================
 
   /// Login institution user by email, returns user if found
@@ -42,6 +58,46 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Login error: $e');
       return null;
+    }
+  }
+
+  // ==================== SUBSCRIPTION ====================
+
+  /// Check if institution has an active subscription year with valid license key
+  /// Returns (isActive, yearLabel, endDate) based on institutionyear table
+  static Future<({bool isActive, String? yearLabel, DateTime? endDate})> checkSubscription(int insId) async {
+    try {
+      final now = DateTime.now().toIso8601String().split('T').first;
+      final result = await client
+          .from('institutionyear')
+          .select('yrlabel, iyrstadate, iyrenddate, iyearsubstatus, iyearlicencekey')
+          .eq('ins_id', insId)
+          .lte('iyrstadate', now)
+          .gte('iyrenddate', now)
+          .eq('iyearsubstatus', 1)
+          .not('iyearlicencekey', 'is', null)
+          .maybeSingle();
+
+      if (result == null) {
+        return (isActive: false, yearLabel: null, endDate: null);
+      }
+
+      // Verify the license key is not empty
+      final licenseKey = result['iyearlicencekey'] as String?;
+      if (licenseKey == null || licenseKey.trim().isEmpty) {
+        return (isActive: false, yearLabel: null, endDate: null);
+      }
+
+      return (
+        isActive: true,
+        yearLabel: result['yrlabel'] as String?,
+        endDate: result['iyrenddate'] != null
+            ? DateTime.parse(result['iyrenddate'].toString())
+            : null,
+      );
+    } catch (e) {
+      debugPrint('Subscription check error: $e');
+      return (isActive: false, yearLabel: null, endDate: null);
     }
   }
 
