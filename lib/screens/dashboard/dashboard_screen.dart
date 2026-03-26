@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
@@ -31,6 +32,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Notification unread count
   int _unreadNotifCount = 0;
+  String _academicYear = '';
 
   // Global search
   final TextEditingController _searchController = TextEditingController();
@@ -75,6 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadStudentsForSearch();
     _loadUnreadNotifCount();
+    _loadAcademicYear();
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus) {
         // Delay removal so overlay tap events can fire first
@@ -83,6 +86,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     });
+  }
+
+  Future<void> _loadAcademicYear() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final years = await SupabaseService.getYears(insId);
+      if (years.isNotEmpty && mounted) {
+        setState(() => _academicYear = years.first['yrlabel']?.toString() ?? '');
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadStudentsForSearch() async {
@@ -148,23 +163,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSearchOverlay() {
     return Positioned(
-      width: 350,
+      width: 350.w,
       child: CompositedTransformFollower(
         link: _searchLayerLink,
         showWhenUnlinked: false,
-        offset: const Offset(0, 48),
+        offset: Offset(0, 48.h),
         child: Material(
           elevation: 8,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           child: Container(
-            constraints: const BoxConstraints(maxHeight: 400),
+            constraints: BoxConstraints(maxHeight: 400.h),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: AppColors.border),
             ),
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: EdgeInsets.symmetric(vertical: 4.h),
               shrinkWrap: true,
               itemCount: _searchResults.length,
               itemBuilder: (context, index) {
@@ -172,27 +187,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return InkWell(
                   onTap: () => _onStudentSelected(s),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                     child: Row(
                       children: [
                         CircleAvatar(
-                          radius: 18,
+                          radius: 18.r,
                           backgroundColor: AppColors.accent.withValues(alpha: 0.1),
                           child: s.stuphoto != null && s.stuphoto!.startsWith('http')
-                              ? ClipOval(child: Image.network(s.stuphoto!, width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(s.stuname[0].toUpperCase(), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14))))
-                              : Text(s.stuname[0].toUpperCase(), style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14)),
+                              ? ClipOval(child: Image.network(s.stuphoto!, width: 36.w, height: 36.h, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14.sp))))
+                              : Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 14.sp)),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.stuname, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                              Text('${s.stuadmno}  •  Class ${s.stuclass}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                              Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                              Text('${s.stuadmno}  •  Class ${s.stuclass}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
-                        Text(s.stumobile, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -276,26 +291,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Logo area
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 16 : 24,
-              vertical: 24,
+              horizontal: collapsed ? 16.w : 24.w,
+              vertical: 24.h,
             ),
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 42.w,
+                  height: 42.h,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.school_rounded,
                     color: AppColors.primary,
-                    size: 22,
+                    size: 22.sp,
                   ),
                 ),
                 if (!collapsed) ...[
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14.w),
                   Text(
                     'EduDesk',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -308,19 +323,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: 8.h),
 
           // Nav items
           Expanded(
             child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: collapsed ? 12 : 16),
+              padding: EdgeInsets.symmetric(horizontal: collapsed ? 12.w : 16.w),
               itemCount: _navItems.length,
               itemBuilder: (context, index) {
                 final item = _navItems[index];
                 final isSelected = _selectedNavIndex == index;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: EdgeInsets.only(bottom: 4.h),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -328,19 +343,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         setState(() => _selectedNavIndex = index);
                         _loadUnreadNotifCount();
                       },
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12.r),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.symmetric(
-                          horizontal: collapsed ? 12 : 16,
-                          vertical: 12,
+                          horizontal: collapsed ? 12.w : 16.w,
+                          vertical: 12.h,
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary.withValues(alpha: 0.12)
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12.r),
                         ),
                         child: Row(
                           children: [
@@ -349,10 +364,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               color: isSelected
                                   ? AppColors.primary
                                   : AppColors.textSecondary,
-                              size: MediaQuery.of(context).size.width <= 1366 ? 18 : 22,
+                              size: MediaQuery.of(context).size.width <= 1366 ? 18.sp : 22.sp,
                             ),
                             if (!collapsed) ...[
-                              const SizedBox(width: 14),
+                              SizedBox(width: 14.w),
                               Flexible(
                                 child: Text(
                                   item.label,
@@ -382,7 +397,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          SizedBox(height: 16.h),
         ],
       ),
     );
@@ -418,11 +433,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.surface,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
               ),
             ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16.w),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -431,9 +446,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               Text(
-                'Academic Year 2025-26',
+                _academicYear.isNotEmpty ? 'Academic Year $_academicYear' : '',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 13,
+                      fontSize: 13.sp,
                     ),
               ),
             ],
@@ -449,18 +464,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         if (auth.insLogo != null)
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                             child: Image.network(
                               auth.insLogo!,
-                              width: 44,
-                              height: 44,
+                              width: 44.w,
+                              height: 44.h,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, size: 36, color: AppColors.accent),
+                              errorBuilder: (_, __, ___) => Icon(Icons.school_rounded, size: 36.sp, color: AppColors.accent),
                             ),
                           )
                         else
-                          const Icon(Icons.school_rounded, size: 36, color: AppColors.accent),
-                        const SizedBox(width: 10),
+                          Icon(Icons.school_rounded, size: 36.sp, color: AppColors.accent),
+                        SizedBox(width: 10.w),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -468,12 +483,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             if (auth.insName != null)
                               Text(
                                 auth.insName!,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                               ),
                             if (auth.insAddress != null)
                               Text(
                                 auth.insAddress!,
-                                style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary),
                                 overflow: TextOverflow.ellipsis,
                               ),
                           ],
@@ -484,7 +499,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-          const SizedBox(width: 16),
+          SizedBox(width: 16.w),
 
           // Notification bell
           Stack(
@@ -494,21 +509,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() => _selectedNavIndex = _navItems.indexWhere((i) => i.label == 'Notifications'));
                   _loadUnreadNotifCount();
                 },
-                icon: const Icon(Icons.notifications_outlined, size: 22),
+                icon: Icon(Icons.notifications_outlined, size: 22.sp),
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.surface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10.r),
                   ),
                 ),
               ),
               if (_unreadNotifCount > 0)
                 Positioned(
-                  right: 8,
-                  top: 8,
+                  right: 8.w,
+                  top: 8.h,
                   child: Container(
-                    width: 8,
-                    height: 8,
+                    width: 8.w,
+                    height: 8.h,
                     decoration: const BoxDecoration(
                       color: AppColors.error,
                       shape: BoxShape.circle,
@@ -517,19 +532,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
             ],
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12.w),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
             decoration: BoxDecoration(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10.r),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
-                  radius: 17,
+                  radius: 17.r,
                   backgroundColor: AppColors.accent.withValues(alpha: 0.2),
                   child: Text(
                     (auth.userName ?? 'U')[0].toUpperCase(),
@@ -539,7 +554,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10.w),
                 ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: isDesktop ? 180 : 120,
@@ -570,15 +585,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 PopupMenuButton<String>(
                   tooltip: 'Profile options',
                   position: PopupMenuPosition.under,
-                  offset: const Offset(0, 8),
+                  offset: Offset(0, 8.h),
                   color: Colors.white,
                   elevation: 10,
                   surfaceTintColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                     side: BorderSide(color: AppColors.border),
                   ),
-                  menuPadding: const EdgeInsets.symmetric(vertical: 6),
+                  menuPadding: EdgeInsets.symmetric(vertical: 6.h),
                   padding: EdgeInsets.zero,
                   icon: const Icon(
                     Icons.keyboard_arrow_down_rounded,
@@ -592,14 +607,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       }
                     }
                   },
-                  itemBuilder: (context) => const [
+                  itemBuilder: (context) => [
                     PopupMenuItem<String>(
                       value: 'signout',
                       child: Row(
                         children: [
-                          Icon(Icons.logout_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text('Sign out'),
+                          Icon(Icons.logout_rounded, size: 18.sp),
+                          SizedBox(width: 8.w),
+                          const Text('Sign out'),
                         ],
                       ),
                     ),

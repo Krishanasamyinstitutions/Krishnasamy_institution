@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart' as xl;
@@ -82,6 +83,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   List<String> _importHeaders = [];
   List<List<dynamic>> _importRows = [];
   bool _importValidated = false;
+  Map<int, String> _rowErrors = {}; // rowIndex -> error message
   List<String?> _importMappings = [];
   int _importStep = 0; // 0=grid, 2=importing, 3=done
   int _importedCount = 0;
@@ -134,7 +136,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass', 'concession', 'payincharge', 'payinchargemob'};
 
-  static const TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Color(0xFF555555));
+  static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: const Color(0xFF555555));
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _genders = ['Male', 'Female', 'Other'];
@@ -221,16 +223,20 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
     final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
 
+    final allClasses = [...ordered, ...extra];
     setState(() {
       _years = years;
       _concessions = concessions;
-      _classes = [...ordered, ...extra];
+      _classes = allClasses;
       _classCounts = classCounts;
       _insName = insInfo.name;
       _insLogo = insInfo.logo;
       if (years.isNotEmpty) {
         _selectedYrId = years.first['yr_id'].toString();
         _selectedYrLabel = years.first['yrlabel'];
+      }
+      if (_selectedClassFilter == null && allClasses.isNotEmpty) {
+        _selectedClassFilter = allClasses.first;
       }
     });
 
@@ -507,7 +513,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Center(
       child: Text(
         name[0].toUpperCase(),
-        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.accent),
+        style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.w700, color: AppColors.accent),
       ),
     );
   }
@@ -578,7 +584,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         : classColor.withValues(alpha: 0.1);
     final letter = Text(
       s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
-      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 13),
+      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 13.sp),
     );
 
     if (s.stuphoto != null && s.stuphoto!.startsWith('http')) {
@@ -702,17 +708,17 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     height: 36,
                     decoration: BoxDecoration(
                       color: isSelected ? classColor.withValues(alpha: 0.2) : classColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
                     child: Center(child: Icon(Icons.class_rounded, size: 18, color: classColor)),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10.w),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Class $className', style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
-                        Text('$count students', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                        Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
+                        Text('$count students', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -720,11 +726,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
-                    child: Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: classColor)),
+                    child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8.w),
                   Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, size: 18, color: isSelected ? classColor : AppColors.textSecondary),
                 ],
               ),
@@ -772,16 +778,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
               Icon(Icons.class_rounded, size: 14, color: classColor.withValues(alpha: 0.7)),
-              const SizedBox(width: 6),
-              Text('Class $className', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: classColor)),
-              const SizedBox(width: 6),
+              SizedBox(width: 6.w),
+              Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
+              SizedBox(width: 6.w),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: classColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: Text('${allStudents.length}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
+                child: Text('${allStudents.length}', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
               ),
             ],
           ),
@@ -790,7 +796,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         // Student list
         Expanded(
           child: students.isEmpty
-              ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)))
+              ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   itemCount: students.length,
@@ -809,13 +815,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           child: Row(
                             children: [
                               _buildStudentAvatar(s, classColor, isSelected),
-                              const SizedBox(width: 10),
+                              SizedBox(width: 10.w),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 13, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
-                                    Text(s.stuadmno, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    Text(s.stuadmno, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                                   ],
                                 ),
                               ),
@@ -861,7 +867,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -890,16 +896,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   tooltip: 'Back to classes',
                 ),
                 Icon(Icons.class_rounded, size: 20, color: classColor),
-                const SizedBox(width: 8),
-                Text('Class $className', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: classColor)),
-                const SizedBox(width: 8),
+                SizedBox(width: 8.w),
+                Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
+                SizedBox(width: 8.w),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: classColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: classColor)),
+                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: classColor)),
                 ),
                 const Spacer(),
                 // Search
@@ -910,35 +916,35 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search...',
-                      hintStyle: const TextStyle(fontSize: 13),
+                      hintStyle: TextStyle(fontSize: 13.sp),
                       prefixIcon: const Icon(Icons.search_rounded, size: 16),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
                       isDense: true,
                     ),
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     onChanged: (_) => setState(() => _studentPage = 0),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12.w),
                 Tooltip(
                   message: 'Export $className',
                   child: InkWell(
                     onTap: () => _exportClassStudents(className, allStudents),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(6.r),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                       decoration: BoxDecoration(
                         color: AppColors.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(6.r),
                         border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.file_download_rounded, size: 14, color: AppColors.success),
-                          SizedBox(width: 4),
-                          Text('Export', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.success)),
+                          Icon(Icons.file_download_rounded, size: 14.sp, color: AppColors.success),
+                          SizedBox(width: 4.w),
+                          Text('Export', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
                         ],
                       ),
                     ),
@@ -955,21 +961,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       color: const Color(0xFF6C8EEF),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 100, child: Text('ADM NO', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 80, child: Text('GENDER', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 120, child: Text('MOBILE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 30),
+                          SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 30.w),
                         ],
                       ),
                     ),
                     // Student rows
                     Expanded(
                       child: pagedStudents.isEmpty
-                          ? const Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)))
+                          ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
                           : ListView.builder(
                               padding: EdgeInsets.zero,
                               itemCount: pagedStudents.length,
@@ -986,12 +992,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 40, child: Text('$serialNo', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                                        SizedBox(width: 100, child: Text(s.stuadmno, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                        Expanded(child: Text(s.stuname, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        SizedBox(width: 80, child: Text(s.stugender, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                                        SizedBox(width: 120, child: Text(s.stumobile, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                                        const SizedBox(width: 30, child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.accent)),
+                                        SizedBox(width: 40, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 100, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                                        SizedBox(width: 80, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 120, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
                                       ],
                                     ),
                                   ),
@@ -1014,7 +1020,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           children: [
                             Text(
                               'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-                              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                             ),
                             const Spacer(),
                             IconButton(
@@ -1029,8 +1035,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-                              child: Text('${_studentPage + 1}/$totalPages', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
+                              child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                             ),
                             IconButton(
                               icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -1063,7 +1069,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         Row(
           children: [
             Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22),
-            const SizedBox(width: 10),
+            SizedBox(width: 10.w),
             Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
             OutlinedButton.icon(
@@ -1073,26 +1079,17 @@ class _StudentsScreenState extends State<StudentsScreen> {
               }),
               icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
               label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-              style: OutlinedButton.styleFrom(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _showImport ? AppColors.error : AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(
-              onPressed: _loadDropdowns,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Refresh'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         Expanded(
           child: _showImport ? _buildStudentImportSection() : Form(
@@ -1106,7 +1103,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
@@ -1119,21 +1116,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         Row(
                           children: [
                             const Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text('Students', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.accent.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(10.r),
                               ),
-                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 0),
+                        SizedBox(height: 0),
                       ],
                     ),
                   ),
@@ -1147,7 +1144,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             ),
           ),
 
-          const SizedBox(width: 16),
+          SizedBox(width: 16.w),
 
           // RIGHT — Student Details or Class Table
           Expanded(
@@ -1162,36 +1159,36 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(10.r),
                             border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             children: [
                               InkWell(
                                 onTap: () => setState(() { _selectedStudent = null; _selectedClassFilter = null; }),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(6.r),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: AppColors.accent.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(6.r),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
-                                      SizedBox(width: 6),
-                                      Text('Back to Student List', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                      Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
+                                      SizedBox(width: 6.w),
+                                      Text('Back to Student List', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                                     ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8.w),
                               const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textSecondary),
-                              const SizedBox(width: 4),
-                              Text(_selectedStudent!.stuname, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                              const SizedBox(width: 6),
-                              Text('(${_selectedStudent!.stuadmno})', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                              SizedBox(width: 4.w),
+                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              SizedBox(width: 6.w),
+                              Text('(${_selectedStudent!.stuadmno})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -1205,7 +1202,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(12.r),
                                   border: Border.all(color: AppColors.border),
                                 ),
                                 child: Column(
@@ -1218,13 +1215,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                const Row(children: [
-                                                  Icon(Icons.person_rounded, color: AppColors.accent, size: 20),
-                                                  SizedBox(width: 8),
+                                                Row(children: [
+                                                  Icon(Icons.person_rounded, color: AppColors.accent, size: 20.sp),
+                                                  SizedBox(width: 8.w),
                                                   Text('Student Information',
-                                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                                                 ]),
-                                                const SizedBox(height: 6),
+                                                SizedBox(height: 6.h),
                                                 Row(children: [
                                                   if (_insLogo != null)
                                                     Image.network(
@@ -1234,11 +1231,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                     )
                                                   else
                                                     const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
-                                                  const SizedBox(width: 8),
+                                                  SizedBox(width: 8.w),
                                                   Flexible(
                                                     child: Text(
                                                       _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
-                                                      style: const TextStyle(fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+                                                      style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
@@ -1260,9 +1257,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                               TextButton.icon(
                                                 onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
                                                 icon: _isUploadingPhoto
-                                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                                    : const Icon(Icons.camera_alt_rounded, size: 14),
-                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: const TextStyle(fontSize: 13)),
+                                                    ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2))
+                                                    : Icon(Icons.camera_alt_rounded, size: 14.sp),
+                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 13.sp)),
                                               ),
                                             ],
                                           ),
@@ -1283,7 +1280,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                               ),
                             ),
 
-                            const SizedBox(width: 16),
+                            SizedBox(width: 16.w),
 
                             // Parent + Payment panels
                             Expanded(
@@ -1291,10 +1288,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 child: Column(
                                     children: [
                                       _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
-                                      const SizedBox(height: 16),
+                                      SizedBox(height: 16.h),
                                       _panel(title: 'Payment In Charge', icon: Icons.payments_rounded, child: _buildPaymentFields()),
                                       if (_selectedStudent == null) ...[
-                                        const SizedBox(height: 16),
+                                        SizedBox(height: 16.h),
                                         Row(
                                           children: [
                                             Expanded(
@@ -1308,19 +1305,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 12),
+                                            SizedBox(width: 12.w),
                                             Expanded(
                                               child: ElevatedButton.icon(
                                                 onPressed: _isSaving ? null : _saveNewStudent,
                                                 icon: _isSaving
-                                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                                    : const Icon(Icons.save_rounded, size: 18),
+                                                    ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                    : Icon(Icons.save_rounded, size: 18.sp),
                                                 label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontWeight: FontWeight.w600)),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: AppColors.accent,
                                                   foregroundColor: Colors.white,
                                                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                                                 ),
                                               ),
                                             ),
@@ -1328,7 +1325,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                         ),
                                       ] else if (_selectedStudent!.isActive) ...[
                                       ],
-                                      const SizedBox(height: 24),
+                                      SizedBox(height: 24.h),
                                     ],
                                   ),
                               ),
@@ -1375,7 +1372,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           )),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _fieldFull(label: 'Student Name *', child: TextFormField(
           controller: _nameController,
@@ -1383,7 +1380,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           style: _inputStyle,
           validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
         )),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(
@@ -1408,7 +1405,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       : 'Select admission date',
                   style: TextStyle(
                     color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                    fontSize: 13,
+                    fontSize: 13.sp,
                     fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
                   ),
                 ),
@@ -1425,7 +1422,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             validator: (v) => v == null ? 'Required' : null,
           )),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(label: 'Date of Birth *', child: InkWell(
@@ -1446,7 +1443,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     : 'DD/MM/YYYY',
                 style: TextStyle(
                   color: _dob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                  fontSize: 13,
+                  fontSize: 13.sp,
                   fontWeight: _dob != null ? FontWeight.w700 : FontWeight.normal,
                 ),
               ),
@@ -1460,7 +1457,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           )),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(label: 'Email', child: TextFormField(
@@ -1479,7 +1476,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             validator: (v) => v == null ? 'Required' : null,
           )),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
@@ -1505,7 +1502,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             }),
           )),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _fieldFull(label: 'Address *', child: TextFormField(
           controller: _addressController,
@@ -1514,13 +1511,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
           maxLines: 2,
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
         )),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(label: 'City', child: TextFormField(controller: _cityController, decoration: _dec('Enter city'), style: _inputStyle)),
           _fieldFull(label: 'State', child: TextFormField(controller: _stateController, decoration: _dec('Enter state'), style: _inputStyle)),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14.h),
 
         _row2(
           _fieldFull(label: 'Country', child: TextFormField(controller: _countryController, decoration: _dec('Enter country'), style: _inputStyle)),
@@ -1566,7 +1563,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         IgnorePointer(
           ignoring: !_isFormEnabled,
@@ -1578,7 +1575,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 decoration: _dec('Enter $prefix name'),
                 style: _inputStyle,
               )),
-              const SizedBox(height: 14),
+              SizedBox(height: 14.h),
               _row2(
                 _fieldFull(label: '$prefix Mobile', child: TextFormField(
                   controller: controllers.$2,
@@ -1735,6 +1732,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _totalCount = 0;
       _importErrors = [];
       _importErrorMsg = null;
+      _rowErrors = {};
     });
   }
 
@@ -1845,6 +1843,70 @@ class _StudentsScreenState extends State<StudentsScreen> {
     }
   }
 
+  Future<void> _exportSampleData() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Students'];
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Adm No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Mobile', 'Email', 'Concession',
+      'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
+      'Father Name', 'Father Mobile', 'Father Occupation',
+      'Mother Name', 'Mother Mobile', 'Mother Occupation',
+      'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
+      'Payment In Charge', 'Payment Mobile',
+    ];
+    final sampleRows = [
+      ['1001', 'RAHUL KUMAR', 'Male', '2015-06-15', '2025-04-01', 'I', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
+      ['1002', 'PRIYA S', 'Female', '2014-03-22', '2025-04-01', 'II', '9876543220', '', 'SC/ST', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220'],
+      ['1003', 'ARUN M', 'Male', '2013-11-08', '2025-04-01', 'III', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230'],
+      ['1004', 'DIVYA R', 'Female', '2012-08-30', '2025-04-01', 'IV', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240'],
+    ];
+
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, 18);
+    }
+    for (int r = 0; r < sampleRows.length; r++) {
+      for (int c = 0; c < sampleRows[r].length; c++) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+        cell.value = xl.TextCellValue(sampleRows[r][c]);
+      }
+    }
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Sample Data',
+        fileName: 'student_import_sample.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sample data exported successfully'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   String _importMappedCell(List<dynamic> row, String fieldKey) {
     final idx = _importMappings.indexOf(fieldKey);
     if (idx < 0 || idx >= row.length) return '';
@@ -1915,37 +1977,22 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   void _validateImportData() {
-    final errors = <String>[];
+    final errors = <int, String>{};
     for (int i = 0; i < _importRows.length; i++) {
       final err = _validateImportRow(i);
-      if (err != null) errors.add('Row ${i + 2}: $err');
+      if (err != null) errors[i] = err;
     }
+    setState(() {
+      _rowErrors = errors;
+      _importValidated = errors.isEmpty;
+    });
     if (errors.isEmpty) {
-      setState(() => _importValidated = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
       );
     } else {
-      setState(() => _importValidated = false);
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          title: Text('${errors.length} validation errors', style: const TextStyle(fontWeight: FontWeight.w700)),
-          content: SizedBox(
-            width: 400,
-            height: 250,
-            child: ListView(
-              children: errors.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
-              )).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-          ],
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${errors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -2082,7 +2129,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2092,12 +2139,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
           Row(
             children: [
               Icon(Icons.upload_file_rounded, size: 20, color: AppColors.accent),
-              const SizedBox(width: 8),
-              const Text('Import Students', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              SizedBox(width: 8.w),
+              Text('Import Students', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (_importFileName != null)
-                Text(_importFileName!, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(width: 12),
+                Text(_importFileName!, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickImportFile,
                 icon: const Icon(Icons.folder_open_rounded, size: 16),
@@ -2106,37 +2153,50 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportStudentTemplate,
                 icon: const Icon(Icons.table_chart_rounded, size: 16),
-                label: const Text('Move to Excel'),
+                label: const Text('Format to Excel'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _exportSampleData,
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('Sample Data'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           if (_importErrorMsg != null) ...[
-            const SizedBox(height: 8),
-            Text(_importErrorMsg!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+            SizedBox(height: 8.h),
+            Text(_importErrorMsg!, style: TextStyle(color: AppColors.error, fontSize: 13.sp)),
           ],
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
 
           // Data grid
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
               ),
               clipBehavior: Clip.hardEdge,
               child: Scrollbar(
@@ -2177,10 +2237,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(Icons.grid_on_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                                      const SizedBox(height: 8),
-                                      const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                                      const SizedBox(height: 4),
-                                      const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                                      SizedBox(height: 8.h),
+                                      Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                      SizedBox(height: 4.h),
+                                      Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                     ],
                                   ),
                                 )
@@ -2189,15 +2249,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                   itemBuilder: (context, index) {
                                     final row = _importRows[index];
                                     final isEven = index % 2 == 0;
-                                    return Container(
-                                      color: isEven ? Colors.white : AppColors.surface,
-                                      padding: const EdgeInsets.symmetric(vertical: 6),
-                                      child: Row(
-                                        children: [
-                                          _gridDataCell('${index + 1}', width: 50, center: true),
-                                          for (final key in _importGridKeys)
-                                            _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
-                                        ],
+                                    final hasError = _rowErrors.containsKey(index);
+                                    return Tooltip(
+                                      message: hasError ? _rowErrors[index]! : '',
+                                      child: Container(
+                                        color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
+                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        child: Row(
+                                          children: [
+                                            _gridDataCell('${index + 1}', width: 50, center: true),
+                                            for (final key in _importGridKeys)
+                                              _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
+                                            if (hasError)
+                                              Padding(
+                                                padding: const EdgeInsets.only(right: 8),
+                                                child: Tooltip(
+                                                  message: _rowErrors[index]!,
+                                                  child: const Icon(Icons.error_outline, color: AppColors.error, size: 16),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     );
                                   },
@@ -2211,14 +2283,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
             ),
           ),
 
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
 
           // Bottom bar
           Row(
             children: [
               Text(
                 '${_importRows.length} rows',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               ),
               const Spacer(),
               ElevatedButton.icon(
@@ -2229,11 +2301,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   backgroundColor: _importRows.isNotEmpty && !_importValidated ? Colors.orange : (_importValidated ? AppColors.success : Colors.grey),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _importValidated ? _startStudentImport : null,
                 icon: const Icon(Icons.save_rounded, size: 16),
@@ -2242,17 +2314,17 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               OutlinedButton(
                 onPressed: _resetImport,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
               ),
@@ -2271,19 +2343,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(10.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
-            const SizedBox(height: 20),
-            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            SizedBox(height: 20.h),
+            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+            SizedBox(height: 12.h),
             LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
-            const SizedBox(height: 8),
-            Text('$_importedCount imported, $_skippedCount skipped', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            SizedBox(height: 8.h),
+            Text('$_importedCount imported, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -2297,42 +2369,42 @@ class _StudentsScreenState extends State<StudentsScreen> {
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(10.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.check_circle_rounded, size: 64, color: AppColors.success),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             const Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            Text('$_importedCount imported successfully, $_skippedCount skipped', style: const TextStyle(fontSize: 13)),
+            SizedBox(height: 12.h),
+            Text('$_importedCount imported successfully, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp)),
             if (_importErrors.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               Container(
                 height: 150,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: ListView(
                   children: _importErrors.map((e) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
+                    child: Text(e, style: TextStyle(fontSize: 13.sp, color: AppColors.error)),
                   )).toList(),
                 ),
               ),
             ],
-            const SizedBox(height: 20),
+            SizedBox(height: 20.h),
             ElevatedButton(
               onPressed: _resetImport,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
               ),
               child: const Text('Done'),
             ),
@@ -2372,7 +2444,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final child = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -2388,7 +2460,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -2402,7 +2474,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2410,12 +2482,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
         children: [
           Row(children: [
             Icon(icon, color: AppColors.accent, size: 20),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            SizedBox(width: 8.w),
+            Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
-          const SizedBox(height: 4),
+          SizedBox(height: 4.h),
           const Divider(color: AppColors.border),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
           child,
         ],
       ),
@@ -2428,7 +2500,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(child: left),
-        const SizedBox(width: 14),
+        SizedBox(width: 14.w),
         Expanded(child: right),
       ],
     );
@@ -2439,8 +2511,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.black)),
-        const SizedBox(height: 6),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
+        SizedBox(height: 6.h),
         child,
       ],
     );
@@ -2448,11 +2520,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   InputDecoration _dec(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
     filled: true,
     fillColor: Colors.white,
   );

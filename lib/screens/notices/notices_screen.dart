@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -147,38 +148,38 @@ class _NoticesScreenState extends State<NoticesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
               Icon(Icons.campaign_rounded, color: AppColors.accent, size: 22),
-              const SizedBox(width: 10),
-              const Text('Notices & Announcements', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              SizedBox(width: 10.w),
+              Text('Notices & Announcements', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: Text('${_notices.length} notices', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                child: Text('${_notices.length} notices', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: () => setState(() => _showCreateForm = true),
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Create Notice', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                label: Text('Create Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   elevation: 0,
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               TextButton.icon(
                 onPressed: _fetchNotices,
                 icon: const Icon(Icons.refresh_rounded, size: 16),
@@ -186,13 +187,13 @@ class _NoticesScreenState extends State<NoticesScreen> {
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         // Content
         Expanded(
@@ -203,7 +204,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   : ListView.separated(
                       padding: EdgeInsets.zero,
                       itemCount: _notices.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => SizedBox(height: 10.h),
                       itemBuilder: (context, index) => _buildNoticeCard(_notices[index]),
                     ),
         ),
@@ -217,11 +218,11 @@ class _NoticesScreenState extends State<NoticesScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.notifications_off_rounded, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          const Text('No notices yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
-          const Text('Notices and announcements will appear here', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          const SizedBox(height: 20),
+          SizedBox(height: 16.h),
+          Text('No notices yet', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          SizedBox(height: 6.h),
+          Text('Notices and announcements will appear here', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+          SizedBox(height: 20.h),
           ElevatedButton.icon(
             onPressed: () => setState(() => _showCreateForm = true),
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -230,7 +231,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
               elevation: 0,
             ),
           ),
@@ -248,12 +249,12 @@ class _NoticesScreenState extends State<NoticesScreen> {
 
     return InkWell(
       onTap: () => setState(() => _selectedNotice = notice),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
@@ -265,11 +266,11 @@ class _NoticesScreenState extends State<NoticesScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: _priorityColor(priority).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(10.r),
               ),
               child: Icon(_categoryIcon(category), size: 20, color: _priorityColor(priority)),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             // Content
             Expanded(
               child: Column(
@@ -278,7 +279,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       if (priority != null)
                         Container(
@@ -286,33 +287,33 @@ class _NoticesScreenState extends State<NoticesScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: _priorityColor(priority).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(6.r),
                           ),
-                          child: Text(priority, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
+                          child: Text(priority, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
                         ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8.w),
                       const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
                     ],
                   ),
                   if (desc.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(desc, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    SizedBox(height: 4.h),
+                    Text(desc, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4.h),
                   Row(
                     children: [
                       Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
-                      Text(_formatDate(date), style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 4.w),
+                      Text(_formatDate(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      SizedBox(width: 10.w),
                       Icon(Icons.access_time_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
-                      Text(_timeAgo(date), style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      SizedBox(width: 4.w),
+                      Text(_timeAgo(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       if (category != null) ...[
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10.w),
                         Icon(Icons.label_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                        const SizedBox(width: 4),
-                        Text(category, style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                        SizedBox(width: 4.w),
+                        Text(category, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       ],
                     ],
                   ),
@@ -342,7 +343,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
@@ -352,22 +353,22 @@ class _NoticesScreenState extends State<NoticesScreen> {
                 onPressed: () => setState(() => _selectedNotice = null),
                 tooltip: 'Back to notices',
               ),
-              const SizedBox(width: 4),
-              const Text('Notice Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              SizedBox(width: 4.w),
+              Text('Notice Details', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (priority != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: _priorityColor(priority).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
-                  child: Text(priority, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
+                  child: Text(priority, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         // Detail card
         Expanded(
@@ -377,7 +378,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(10.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
@@ -391,17 +392,17 @@ class _NoticesScreenState extends State<NoticesScreen> {
                         height: 48,
                         decoration: BoxDecoration(
                           color: _priorityColor(priority).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Icon(_categoryIcon(category), size: 24, color: _priorityColor(priority)),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16.w),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
+                            Text(title, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
+                            SizedBox(height: 4.h),
                             Row(
                               children: [
                                 if (category != null) ...[
@@ -409,15 +410,15 @@ class _NoticesScreenState extends State<NoticesScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: AppColors.accent.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(6.r),
                                     ),
-                                    child: Text(category, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                    child: Text(category, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                                   ),
-                                  const SizedBox(width: 10),
+                                  SizedBox(width: 10.w),
                                 ],
-                                Text(_formatDate(date), style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                                const SizedBox(width: 8),
-                                Text(_timeAgo(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.6))),
+                                Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                SizedBox(width: 8.w),
+                                Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.6))),
                               ],
                             ),
                           ],
@@ -428,30 +429,30 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   const Divider(height: 32, color: AppColors.border),
 
                   // Description
-                  Text(desc, style: const TextStyle(fontSize: 14, height: 1.7, color: AppColors.textPrimary)),
+                  Text(desc, style: TextStyle(fontSize: 14.sp, height: 1.7, color: AppColors.textPrimary)),
 
                   if (target != null && target.isNotEmpty) ...[
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20.h),
                     Row(
                       children: [
                         const Icon(Icons.people_rounded, size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 6),
-                        const Text('Target: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                        Text(target, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 6.w),
+                        Text('Target: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text(target, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
 
                   if (createdBy != null && createdBy.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     const Divider(color: AppColors.border),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     Row(
                       children: [
                         const Icon(Icons.person_rounded, size: 16, color: AppColors.textSecondary),
-                        const SizedBox(width: 6),
-                        const Text('Posted by: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                        Text(createdBy, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 6.w),
+                        Text('Posted by: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text(createdBy, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ],
@@ -740,7 +741,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
@@ -750,31 +751,31 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                 onPressed: widget.onBack,
                 tooltip: 'Back to notices',
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: 4.w),
               const Icon(Icons.edit_notifications_rounded, size: 20, color: AppColors.accent),
-              const SizedBox(width: 8),
-              const Text('Create Notice', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              SizedBox(width: 8.w),
+              Text('Create Notice', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (_isSending)
-                const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(strokeWidth: 2))
               else
                 ElevatedButton.icon(
                   onPressed: _submitNotice,
                   icon: const Icon(Icons.send_rounded, size: 16),
-                  label: const Text('Send Notice', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  label: Text('Send Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                     elevation: 0,
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         // Form
         Expanded(
@@ -784,32 +785,32 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(10.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
-                  const Text('Notice Title', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  Text('Notice Title', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8.h),
                   TextField(
                     controller: _titleController,
                     decoration: InputDecoration(
                       hintText: 'Enter notice title...',
                       hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14.sp),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // Target Audience
-                  const Text('Target Audience', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  Text('Target Audience', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8.h),
                   Row(
                     children: _targetTypes.map((t) {
                       final isSelected = _targetType == t;
@@ -828,7 +829,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
                               color: isSelected ? AppColors.accent : Colors.white,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(8.r),
                               border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
                             ),
                             child: Row(
@@ -839,8 +840,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                   size: 16,
                                   color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textSecondary)),
+                                SizedBox(width: 6.w),
+                                Text(t, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppColors.textSecondary)),
                               ],
                             ),
                           ),
@@ -851,13 +852,13 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
 
                   // Class selection (shown when Specific Classes is selected)
                   if (_targetType == 'Specific Classes') ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10.r),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Column(
@@ -865,21 +866,21 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         children: [
                           Row(
                             children: [
-                              const Text('Select Classes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text('Select Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                               const Spacer(),
                               if (_selectedClasses.isNotEmpty)
                                 GestureDetector(
                                   onTap: () => setState(() => _selectedClasses.clear()),
-                                  child: const Text('Clear all', style: TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w500)),
+                                  child: Text('Clear all', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
                                 ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12.w),
                               GestureDetector(
                                 onTap: () => setState(() => _selectedClasses = List.from(_availableClasses)),
-                                child: const Text('Select all', style: TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w500)),
+                                child: Text('Select all', style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w500)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12.h),
                           _isLoadingClasses
                               ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                               : Wrap(
@@ -901,7 +902,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                         decoration: BoxDecoration(
                                           color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.white,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(8.r),
                                           border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
                                         ),
                                         child: Row(
@@ -912,8 +913,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                               size: 16,
                                               color: isSelected ? AppColors.accent : AppColors.textSecondary,
                                             ),
-                                            const SizedBox(width: 6),
-                                            Text(cls, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
+                                            SizedBox(width: 6.w),
+                                            Text(cls, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
                                           ],
                                         ),
                                       ),
@@ -921,9 +922,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                   }).toList(),
                                 ),
                           if (_selectedClasses.isNotEmpty) ...[
-                            const SizedBox(height: 10),
+                            SizedBox(height: 10.h),
                             Text('${_selectedClasses.length} class${_selectedClasses.length > 1 ? 'es' : ''} selected',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                           ],
                         ],
                       ),
@@ -932,35 +933,35 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
 
                   // Fee term filter (shown when Pending Fees is selected)
                   if (_targetType == 'Pending Fees') ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12.h),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10.r),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Filter by Fee Term', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
+                          Text('Filter by Fee Term', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 8.h),
                           _isLoadingFeeTerms
                               ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
                               : Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(8.r),
                                     border: Border.all(color: AppColors.border),
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String?>(
                                       value: _pendingFeeTermFilter,
                                       isExpanded: true,
-                                      hint: const Text('All Terms', style: TextStyle(fontSize: 13)),
-                                      style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                      hint: Text('All Terms', style: TextStyle(fontSize: 13.sp)),
+                                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                                       icon: const Icon(Icons.arrow_drop_down, size: 18),
                                       items: [
                                         const DropdownMenuItem<String?>(value: null, child: Text('All Terms')),
@@ -974,50 +975,50 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // Description
-                  const Text('Description', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  Text('Description', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8.h),
                   TextField(
                     controller: _descController,
                     maxLines: 5,
                     decoration: InputDecoration(
                       hintText: 'Enter notice description...',
                       hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14.sp),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // Priority & Category row
                   Row(
                     children: [
                       Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v!))),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16.w),
                       Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v!))),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // From Date & To Date row
                   Row(
                     children: [
                       Expanded(child: _buildDatePicker('From Date', _fromDate, (d) => setState(() => _fromDate = d))),
-                      const SizedBox(width: 16),
+                      SizedBox(width: 16.w),
                       Expanded(child: _buildDatePicker('To Date', _toDate, (d) => setState(() => _toDate = d))),
                     ],
                   ),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // From / To Date
-                  const Text('Notice Period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  Text('Notice Period', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 8.h),
                   Row(
                     children: [
                       Expanded(
@@ -1027,18 +1028,18 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               border: Border.all(color: _fromDate != null ? AppColors.accent : AppColors.border),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10.r),
                               color: AppColors.surface,
                             ),
                             child: Row(
                               children: [
                                 Icon(Icons.calendar_today_rounded, size: 15, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8.w),
                                 Text(
                                   _fromDate != null
                                       ? '${_fromDate!.day.toString().padLeft(2,'0')}/${_fromDate!.month.toString().padLeft(2,'0')}/${_fromDate!.year}'
                                       : 'From Date',
-                                  style: TextStyle(fontSize: 13, color: _fromDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                  style: TextStyle(fontSize: 13.sp, color: _fromDate != null ? AppColors.textPrimary : AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -1056,18 +1057,18 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               border: Border.all(color: _toDate != null ? AppColors.error : AppColors.border),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10.r),
                               color: AppColors.surface,
                             ),
                             child: Row(
                               children: [
                                 Icon(Icons.event_busy_rounded, size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8.w),
                                 Text(
                                   _toDate != null
                                       ? '${_toDate!.day.toString().padLeft(2,'0')}/${_toDate!.month.toString().padLeft(2,'0')}/${_toDate!.year}'
                                       : 'To Date (Auto-expire)',
-                                  style: TextStyle(fontSize: 13, color: _toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                  style: TextStyle(fontSize: 13.sp, color: _toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -1076,13 +1077,13 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
+                  SizedBox(height: 6.h),
+                  Text(
                     'Notice will be automatically removed after the To Date.',
-                    style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                   ),
 
-                  const SizedBox(height: 28),
+                  SizedBox(height: 28.h),
 
                   // Preview section
                   Container(
@@ -1090,7 +1091,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(10.r),
                       border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
                     ),
                     child: Column(
@@ -1099,8 +1100,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         Row(
                           children: [
                             const Icon(Icons.preview_rounded, size: 16, color: AppColors.accent),
-                            const SizedBox(width: 6),
-                            const Text('Preview', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                            SizedBox(width: 6.w),
+                            Text('Preview', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                           ],
                         ),
                         const Divider(height: 20, color: AppColors.border),
@@ -1110,42 +1111,42 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: _priorityColorForPreview.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(6.r),
                               ),
-                              child: Text(_priority, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _priorityColorForPreview)),
+                              child: Text(_priority, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColorForPreview)),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8.w),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(6.r),
                               ),
-                              child: Text(_category, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                              child: Text(_category, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8.w),
                             Icon(Icons.people_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4.w),
                             Text(
                               _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : _targetType == 'Pending Fees' ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}' : '${_selectedClasses.length} classes',
-                              style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7)),
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        SizedBox(height: 10.h),
                         Text(
                           _titleController.text.isEmpty ? 'Notice title...' : _titleController.text,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 14.sp,
                             fontWeight: FontWeight.w700,
                             color: _titleController.text.isEmpty ? AppColors.textSecondary.withValues(alpha: 0.4) : AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6.h),
                         Text(
                           _descController.text.isEmpty ? 'Notice description...' : _descController.text,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 13.sp,
                             height: 1.4,
                             color: _descController.text.isEmpty ? AppColors.textSecondary.withValues(alpha: 0.4) : AppColors.textSecondary,
                           ),
@@ -1184,8 +1185,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+        SizedBox(height: 8.h),
         GestureDetector(
           onTap: () async {
             final picked = await showDatePicker(
@@ -1200,7 +1201,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10.r),
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
@@ -1209,7 +1210,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   child: Text(
                     selectedDate != null ? _formatDateDisplay(selectedDate) : 'Select date...',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 13.sp,
                       color: selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.5),
                     ),
                   ),
@@ -1227,19 +1228,19 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+        SizedBox(height: 8.h),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
               onChanged: onChanged,
             ),

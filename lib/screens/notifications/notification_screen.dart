@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -188,26 +189,26 @@ class _NotificationScreenState extends State<NotificationScreen> {
       children: [
         // Header
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
-              const Icon(Icons.notifications_rounded, color: AppColors.accent, size: 22),
-              const SizedBox(width: 10),
-              const Text('Notifications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Icon(Icons.notifications_rounded, color: AppColors.accent, size: 22.sp),
+              SizedBox(width: 10.w),
+              Text('Notifications', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
               if (_unreadCount > 0) ...[
-                const SizedBox(width: 10),
+                SizedBox(width: 10.w),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                   decoration: BoxDecoration(
                     color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: Text('$_unreadCount new', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.error)),
+                  child: Text('$_unreadCount new', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.error)),
                 ),
               ],
               const Spacer(),
@@ -215,43 +216,43 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ...['All', 'Unread', 'Read'].map((f) {
                 final isActive = _filter == f;
                 return Padding(
-                  padding: const EdgeInsets.only(left: 6),
+                  padding: EdgeInsets.only(left: 6.w),
                   child: GestureDetector(
                     onTap: () => setState(() => _filter = f),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                       decoration: BoxDecoration(
                         color: isActive ? AppColors.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                         border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
                       ),
-                      child: Text(f, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textSecondary)),
+                      child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textSecondary)),
                     ),
                   ),
                 );
               }),
-              const SizedBox(width: 10),
+              SizedBox(width: 10.w),
               if (_unreadCount > 0)
                 TextButton.icon(
                   onPressed: _markAllAsRead,
-                  icon: const Icon(Icons.done_all_rounded, size: 16),
-                  label: const Text('Mark all read', style: TextStyle(fontSize: 13)),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20)),
+                  icon: Icon(Icons.done_all_rounded, size: 16.sp),
+                  label: Text('Mark all read', style: TextStyle(fontSize: 13.sp)),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
                 ),
               TextButton.icon(
                 onPressed: _fetchNotifications,
-                icon: const Icon(Icons.refresh_rounded, size: 16),
+                icon: Icon(Icons.refresh_rounded, size: 16.sp),
                 label: const Text('Refresh'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         // Content
         Expanded(
@@ -264,7 +265,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       : ListView.separated(
                           padding: EdgeInsets.zero,
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 6),
+                          separatorBuilder: (_, __) => SizedBox(height: 6.h),
                           itemBuilder: (context, index) => _buildNotificationTile(filtered[index]),
                         ),
         ),
@@ -277,14 +278,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off_rounded, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-          const SizedBox(height: 14),
+          Icon(Icons.notifications_off_rounded, size: 56.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+          SizedBox(height: 14.h),
           Text(
             _filter == 'Unread' ? 'No unread notifications' : _filter == 'Read' ? 'No read notifications' : 'No notifications yet',
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 6),
-          const Text('You\'re all caught up!', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          SizedBox(height: 6.h),
+          Text('You\'re all caught up!', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
         ],
       ),
     );
@@ -302,12 +303,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
         if (!isRead) _markAsRead(notif);
         setState(() => _selectedNotification = notif);
       },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18.w),
         decoration: BoxDecoration(
           color: isRead ? Colors.white : AppColors.accent.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(color: isRead ? AppColors.border : AppColors.accent.withValues(alpha: 0.2)),
         ),
         child: Row(
@@ -315,15 +316,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
           children: [
             // Icon
             Container(
-              width: 44,
-              height: 44,
+              width: 44.w,
+              height: 44.h,
               decoration: BoxDecoration(
                 color: _typeColor(type).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Icon(_typeIcon(type), size: 22, color: _typeColor(type)),
+              child: Icon(_typeIcon(type), size: 22.sp, color: _typeColor(type)),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14.w),
             // Content
             Expanded(
               child: Column(
@@ -333,46 +334,46 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     children: [
                       if (!isRead)
                         Container(
-                          width: 7,
-                          height: 7,
-                          margin: const EdgeInsets.only(right: 6),
+                          width: 7.w,
+                          height: 7.h,
+                          margin: EdgeInsets.only(right: 6.w),
                           decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
                         ),
                       Expanded(
-                        child: Text(title, style: TextStyle(fontSize: 14, fontWeight: isRead ? FontWeight.w500 : FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(title, style: TextStyle(fontSize: 14.sp, fontWeight: isRead ? FontWeight.w500 : FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
                       if (type != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                           decoration: BoxDecoration(
                             color: _typeColor(type).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(6.r),
                           ),
-                          child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _typeColor(type))),
+                          child: Text(type, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _typeColor(type))),
                         ),
                     ],
                   ),
                   if (body.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(body, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    SizedBox(height: 6.h),
+                    Text(body, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8.h),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
-                      Text(_formatDate(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      const SizedBox(width: 12),
-                      Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      const SizedBox(width: 4),
-                      Text(_timeAgo(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      Icon(Icons.calendar_today_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      SizedBox(width: 4.w),
+                      Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                      SizedBox(width: 12.w),
+                      Icon(Icons.access_time_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      SizedBox(width: 4.w),
+                      Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textSecondary),
+            SizedBox(width: 8.w),
+            Icon(Icons.chevron_right_rounded, size: 20.sp, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -388,7 +389,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -396,22 +397,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
         children: [
           // Back button
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
             child: InkWell(
               onTap: () => setState(() => _selectedNotification = null),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(6.r),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(6.r),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
-                    SizedBox(width: 6),
-                    Text('Back to Notifications', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                    Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
+                    SizedBox(width: 6.w),
+                    Text('Back to Notifications', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                   ],
                 ),
               ),
@@ -420,48 +421,48 @@ class _NotificationScreenState extends State<NotificationScreen> {
           const Divider(color: AppColors.border),
           // Detail content
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24.w),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 48.w,
+                      height: 48.h,
                       decoration: BoxDecoration(
                         color: _typeColor(type).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12.r),
                       ),
-                      child: Icon(_typeIcon(type), size: 24, color: _typeColor(type)),
+                      child: Icon(_typeIcon(type), size: 24.sp, color: _typeColor(type)),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16.w),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
+                          Text(title, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
+                          SizedBox(height: 4.h),
                           Row(
                             children: [
                               if (type != null) ...[
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                                   decoration: BoxDecoration(
                                     color: _typeColor(type).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(6.r),
                                   ),
-                                  child: Text(type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _typeColor(type))),
+                                  child: Text(type, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _typeColor(type))),
                                 ),
-                                const SizedBox(width: 10),
+                                SizedBox(width: 10.w),
                               ],
-                              Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                              const SizedBox(width: 4),
-                              Text(_formatDate(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                              const SizedBox(width: 10),
-                              Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                              const SizedBox(width: 4),
-                              Text(_timeAgo(date), style: TextStyle(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                              Icon(Icons.calendar_today_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              SizedBox(width: 4.w),
+                              Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
+                              SizedBox(width: 10.w),
+                              Icon(Icons.access_time_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              SizedBox(width: 4.w),
+                              Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                             ],
                           ),
                         ],
@@ -470,10 +471,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ],
                 ),
                 if (body.isNotEmpty) ...[
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
                   const Divider(color: AppColors.border),
-                  const SizedBox(height: 16),
-                  Text(body, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, height: 1.6)),
+                  SizedBox(height: 16.h),
+                  Text(body, style: TextStyle(fontSize: 14.sp, color: AppColors.textPrimary, height: 1.6)),
                 ],
               ],
             ),

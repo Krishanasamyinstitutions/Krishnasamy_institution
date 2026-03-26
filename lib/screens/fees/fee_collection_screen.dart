@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -53,22 +54,22 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: AppColors.border),
           ),
           child: TabBar(
             controller: _tabController,
             labelColor: Colors.white,
             unselectedLabelColor: AppColors.textSecondary,
-            labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            labelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
             indicator: BoxDecoration(
               color: AppColors.accent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10.r),
             ),
             indicatorSize: TabBarIndicatorSize.tab,
             dividerColor: Colors.transparent,
-            padding: const EdgeInsets.all(4),
+            padding: EdgeInsets.all(4.w),
             tabs: const [
               Tab(text: 'Fee Collection'),
               Tab(text: 'Class-wise Demand'),
@@ -76,7 +77,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
         // Tab content
         Expanded(
           child: TabBarView(
@@ -153,6 +154,19 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   String? _insMobile;
   String? _insEmail;
 
+  // Scroll controllers for horizontal scrollbar on each DataTable
+  final ScrollController _methodSummaryScrollCtrl = ScrollController();
+  final ScrollController _paymentDetailsScrollCtrl = ScrollController();
+  final ScrollController _feeGroupScrollCtrl = ScrollController();
+  final ScrollController _studentFeeScrollCtrl = ScrollController();
+  final ScrollController _studentListScrollCtrl = ScrollController();
+  final ScrollController _dateListScrollCtrl = ScrollController();
+  final ScrollController _dateDrilldownScrollCtrl = ScrollController();
+  final ScrollController _feeDetailScrollCtrl = ScrollController();
+
+  bool _canScrollDateList = false;
+  bool _canScrollDateDrilldown = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -161,6 +175,48 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     super.initState();
     _fetchData();
     _loadInsInfo();
+    _dateListScrollCtrl.addListener(_onDateListScrollChanged);
+    _dateDrilldownScrollCtrl.addListener(_onDateDrilldownScrollChanged);
+  }
+
+  void _onDateListScrollChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onDateDrilldownScrollChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _updateCanScrollDateList() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_dateListScrollCtrl.hasClients &&
+          _dateListScrollCtrl.positions.isNotEmpty &&
+          _dateListScrollCtrl.position.hasContentDimensions) {
+        final canScroll = _dateListScrollCtrl.position.maxScrollExtent > 5;
+        if (_canScrollDateList != canScroll) {
+          setState(() => _canScrollDateList = canScroll);
+        }
+      } else {
+        if (_canScrollDateList) setState(() => _canScrollDateList = false);
+      }
+    });
+  }
+
+  void _updateCanScrollDateDrilldown() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_dateDrilldownScrollCtrl.hasClients &&
+          _dateDrilldownScrollCtrl.positions.isNotEmpty &&
+          _dateDrilldownScrollCtrl.position.hasContentDimensions) {
+        final canScroll = _dateDrilldownScrollCtrl.position.maxScrollExtent > 5;
+        if (_canScrollDateDrilldown != canScroll) {
+          setState(() => _canScrollDateDrilldown = canScroll);
+        }
+      } else {
+        if (_canScrollDateDrilldown) setState(() => _canScrollDateDrilldown = false);
+      }
+    });
   }
 
   Future<void> _loadInsInfo() async {
@@ -182,7 +238,119 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   @override
   void dispose() {
     _pendingStudentSearchController.dispose();
+    _methodSummaryScrollCtrl.dispose();
+    _paymentDetailsScrollCtrl.dispose();
+    _feeGroupScrollCtrl.dispose();
+    _studentFeeScrollCtrl.dispose();
+    _studentListScrollCtrl.dispose();
+    _dateListScrollCtrl.removeListener(_onDateListScrollChanged);
+    _dateListScrollCtrl.dispose();
+    _dateDrilldownScrollCtrl.removeListener(_onDateDrilldownScrollChanged);
+    _dateDrilldownScrollCtrl.dispose();
+    _feeDetailScrollCtrl.dispose();
     super.dispose();
+  }
+
+  Widget _buildDateScrollbar(ScrollController ctrl) {
+    return ListenableBuilder(
+      listenable: ctrl,
+      builder: (context, _) {
+        if (!ctrl.hasClients ||
+            ctrl.positions.isEmpty ||
+            !ctrl.position.hasContentDimensions) {
+          return const SizedBox.shrink();
+        }
+        final maxExtent = ctrl.position.maxScrollExtent;
+        if (maxExtent <= 5) return const SizedBox.shrink();
+        final viewportWidth = ctrl.position.viewportDimension;
+        final totalContentWidth = maxExtent + viewportWidth;
+        final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
+
+        return LayoutBuilder(builder: (context, constraints) {
+          final trackWidth = constraints.maxWidth - 40; // 20px per arrow button
+          final thumbWidth = (trackWidth * thumbRatio).clamp(30.0, trackWidth);
+          final trackSpace = trackWidth - thumbWidth;
+          final scrollRatio = maxExtent > 0 ? (ctrl.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+          final thumbOffset = trackSpace * scrollRatio;
+
+          return Container(
+            height: 20,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0F0F0),
+              border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+            ),
+            child: Row(
+              children: [
+                // Left arrow
+                InkWell(
+                  onTap: () => ctrl.animateTo(
+                    (ctrl.offset - 100).clamp(0.0, maxExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  ),
+                  child: Container(
+                    width: 20, height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0E0E0),
+                      border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                    ),
+                    child: const Icon(Icons.chevron_left, size: 16, color: Color(0xFF333333)),
+                  ),
+                ),
+                // Track + thumb
+                Expanded(
+                  child: GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      if (trackSpace > 0) {
+                        final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                        ctrl.jumpTo(newRatio * maxExtent);
+                      }
+                    },
+                    child: Container(
+                      color: const Color(0xFFF0F0F0),
+                      height: 20,
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: thumbOffset,
+                            top: 2,
+                            child: Container(
+                              width: thumbWidth,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFC0C0C0),
+                                borderRadius: BorderRadius.circular(2),
+                                border: Border.all(color: const Color(0xFFB0B0B0)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Right arrow
+                InkWell(
+                  onTap: () => ctrl.animateTo(
+                    (ctrl.offset + 100).clamp(0.0, maxExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  ),
+                  child: Container(
+                    width: 20, height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0E0E0),
+                      border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                    ),
+                    child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF333333)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   Future<void> _fetchData() async {
@@ -192,14 +360,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     setState(() => _isLoading = true);
 
-    // Stage 1: Fast — payments + fee group map (no pagination loops)
+    // Stage 1: Fast — payments + fee group map + fee totals (single RPCs)
     final fastResults = await Future.wait([
       SupabaseService.getPaymentsByDateRange(insId, fromDate: _fromDate, toDate: _toDate),
       SupabaseService.getFeeGroupMap(insId),
+      SupabaseService.getFeeTotals(insId),
     ]);
 
     final payments = fastResults[0] as List<Map<String, dynamic>>;
     final feeGroupMap = fastResults[1] as Map<int, String>;
+    final feeTotals = fastResults[2] as Map<String, double>;
 
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -233,6 +403,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         _dateGroups = dateGroups;
         _todayCollection = todayCollection;
         _feeGroupMap = feeGroupMap;
+        _totalCollection = feeTotals['totalPaid'] ?? 0;
+        _pendingFees = feeTotals['totalPending'] ?? 0;
         _isLoading = false;
       });
     }
@@ -338,26 +510,25 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
   double _pendingFees = 0;
   double _todayCollection = 0;
-
-  double get _totalCollection => _demands.fold(0.0, (sum, d) => sum + ((d['paidamount'] as num?)?.toDouble() ?? 0));
+  double _totalCollection = 0;
 
   Widget _buildDateChip(String label, DateTime date, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(8.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.calendar_today, size: 14, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
+            SizedBox(width: 6.w),
+            Text(_formatFilterDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -367,14 +538,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   Widget _buildQuickFilter(String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(16.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16.r),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+        child: Text(label, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
       ),
     );
   }
@@ -382,29 +553,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   Widget _buildSummaryCard(IconData icon, Color iconColor, String value, String label) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: EdgeInsets.all(6.w),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(icon, color: iconColor, size: 18),
+              child: Icon(icon, color: iconColor, size: 18.sp),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                  Text(value, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -429,25 +600,25 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           children: [
             // Date filter bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.accent),
-                  const SizedBox(width: 8),
-                  const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  const SizedBox(width: 8),
+                  Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
+                  SizedBox(width: 8.w),
+                  Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+                  SizedBox(width: 8.w),
                   _buildDateChip('From', _fromDate, () => _pickDate(true)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
                   ),
                   _buildDateChip('To', _toDate, () => _pickDate(false)),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12.w),
                   _buildQuickFilter('Today', () {
                     setState(() {
                       _fromDate = DateTime.now();
@@ -455,7 +626,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     });
                     _fetchData();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('7 Days', () {
                     setState(() {
                       _toDate = DateTime.now();
@@ -463,7 +634,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     });
                     _fetchData();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('30 Days', () {
                     setState(() {
                       _toDate = DateTime.now();
@@ -471,7 +642,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     });
                     _fetchData();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('This Month', () {
                     final now = DateTime.now();
                     setState(() {
@@ -483,18 +654,18 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   const Spacer(),
                   TextButton.icon(
                     onPressed: _fetchData,
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    icon: Icon(Icons.refresh_rounded, size: 16.sp),
                     label: const Text('Refresh'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             // Summary cards
             Row(
               children: [
@@ -507,7 +678,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _selectedPayId = null;
                   });
                 }),
-                const SizedBox(width: 16),
+                SizedBox(width: 16.w),
                 _buildClickableSummaryCard(Icons.today_rounded, Colors.blue, _formatCurrency(_todayCollection), 'Today Collection', () {
                   setState(() {
                     _showTodayCollection = true;
@@ -517,7 +688,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _selectedPayId = null;
                   });
                 }),
-                const SizedBox(width: 16),
+                SizedBox(width: 16.w),
                 _buildClickableSummaryCard(Icons.pending_actions_rounded, Colors.orange, _isLoadingDemands ? 'Loading...' : _formatCurrency(_pendingFees), 'Pending Fees', () {
                   setState(() {
                     _showPendingFees = true;
@@ -531,7 +702,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 }),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             // Show drilldown or date list based on selection
             if (_showTotalCollection)
               _buildCollectionDrilldown(false)
@@ -623,7 +794,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              icon: Icon(Icons.arrow_back_rounded, size: 20.sp),
               onPressed: () => setState(() {
                 _showTotalCollection = false;
                 _showTodayCollection = false;
@@ -633,22 +804,22 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               }),
               tooltip: 'Back',
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.account_balance_wallet_rounded, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
+            SizedBox(width: 4.w),
+            Icon(Icons.account_balance_wallet_rounded, size: 18.sp, color: AppColors.accent),
+            SizedBox(width: 8.w),
             Text(
               todayOnly ? 'Today Collection' : 'Total Collection',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
             ),
             if (todayOnly) ...[
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: Colors.blue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
-                child: Text(todayStr, style: const TextStyle(fontSize: 13, color: Colors.blue, fontWeight: FontWeight.w500)),
+                child: Text(todayStr, style: TextStyle(fontSize: 13.sp, color: Colors.blue, fontWeight: FontWeight.w500)),
               ),
             ],
             const Spacer(),
@@ -658,32 +829,32 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               height: 34,
               child: TextField(
                 onChanged: (v) => setState(() => _collectionSearchQuery = v),
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(fontSize: 13.sp),
                 decoration: InputDecoration(
                   hintText: 'Search student / pay no...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.search, size: 16),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, size: 16.sp),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Payment Method dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _collectionMethodFilter,
-                  hint: const Text('All Methods', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Methods', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
@@ -693,21 +864,21 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Class dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _collectionClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Classes', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
@@ -717,49 +888,49 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             TextButton.icon(
               onPressed: filtered.isNotEmpty ? () => _exportCollectionSummaryExcel(filtered) : null,
-              icon: const Icon(Icons.download_rounded, size: 16),
+              icon: Icon(Icons.download_rounded, size: 16.sp),
               label: const Text('Export'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Summary row
         Row(
           children: [
             _buildSummaryCard(Icons.receipt_long, AppColors.accent, '$totalCount', 'Transactions'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, '${allStuIds.length}', 'Students'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.currency_rupee, AppColors.success, _formatCurrency(total), 'Total Amount'),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Payment method-wise table
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                 child: Row(
                   children: [
-                    Icon(Icons.payment_rounded, size: 18, color: AppColors.accent),
-                    const SizedBox(width: 8),
-                    const Text('Method-wise Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Icon(Icons.payment_rounded, size: 18.sp, color: AppColors.accent),
+                    SizedBox(width: 8.w),
+                    Text('Method-wise Summary', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    Text('${methodKeys.length} methods', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    Text('${methodKeys.length} methods', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -768,15 +939,20 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('No collections found', style: TextStyle(color: AppColors.textSecondary))))
               else
                 LayoutBuilder(builder: (context, constraints) {
-                  return SingleChildScrollView(
+                  return Scrollbar(
+                    controller: _methodSummaryScrollCtrl,
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    child: SingleChildScrollView(
+                    controller: _methodSummaryScrollCtrl,
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 44, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -807,38 +983,39 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           }),
                           DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('$totalCount', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('${allStuIds.length}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(total), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text('$totalCount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text('${allStuIds.length}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                           ]),
                         ],
                       ),
                     ),
+                  ),
                   );
                 }),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
         // Individual payment list
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                 child: Row(
                   children: [
-                    Icon(Icons.receipt_long, size: 18, color: AppColors.accent),
-                    const SizedBox(width: 8),
-                    const Text('Payment Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Icon(Icons.receipt_long, size: 18.sp, color: AppColors.accent),
+                    SizedBox(width: 8.w),
+                    Text('Payment Details', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    Text('${filtered.length} records', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    Text('${filtered.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -847,15 +1024,20 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('No payments found', style: TextStyle(color: AppColors.textSecondary))))
               else
                 LayoutBuilder(builder: (context, constraints) {
-                  return SingleChildScrollView(
+                  return Scrollbar(
+                    controller: _paymentDetailsScrollCtrl,
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    child: SingleChildScrollView(
+                    controller: _paymentDetailsScrollCtrl,
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -885,15 +1067,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           }),
                           DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
-                            DataCell(Text(_formatCurrency(total), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                           ]),
                         ],
                       ),
                     ),
+                  ),
                   );
                 }),
             ],
@@ -917,38 +1100,38 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(20.w),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: iconColor.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: EdgeInsets.all(6.w),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: Icon(icon, color: iconColor, size: 18),
+                child: Icon(icon, color: iconColor, size: 18.sp),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                    Text(value, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                child: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: iconColor),
+                padding: EdgeInsets.all(4.w),
+                decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(6.r)),
+                child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: iconColor),
               ),
             ],
           ),
@@ -1026,7 +1209,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              icon: Icon(Icons.arrow_back_rounded, size: 20.sp),
               onPressed: () => setState(() {
                 _showPendingFees = false;
                 _pendingSearchQuery = '';
@@ -1038,10 +1221,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               }),
               tooltip: 'Back',
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.pending_actions_rounded, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
-            const Text('Pending Fees', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            SizedBox(width: 4.w),
+            Icon(Icons.pending_actions_rounded, size: 18.sp, color: AppColors.accent),
+            SizedBox(width: 8.w),
+            Text('Pending Fees', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
             const Spacer(),
             // Search field
             SizedBox(
@@ -1049,32 +1232,32 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               height: 34,
               child: TextField(
                 onChanged: (v) => setState(() => _pendingSearchQuery = v),
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(fontSize: 13.sp),
                 decoration: InputDecoration(
                   hintText: 'Search student / adm no...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.search, size: 16),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, size: 16.sp),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Fee Type dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingFeeTypeFilter,
-                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
@@ -1084,21 +1267,21 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Class dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Classes', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
@@ -1108,7 +1291,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             TextButton.icon(
               onPressed: filtered.isNotEmpty ? () {
                 final pendingFiltered = filtered.where((d) => d['paidstatus']?.toString() == 'U').toList();
@@ -1116,39 +1299,39 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   _exportPendingToExcel(pendingFiltered, totalDemand, totalPaid, totalBalance, totalStudents);
                 }
               } : null,
-              icon: const Icon(Icons.download_rounded, size: 16),
+              icon: Icon(Icons.download_rounded, size: 16.sp),
               label: const Text('Export'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Summary row
         Row(
           children: [
             _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, totalStudents.toString(), 'Students'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(totalDemand), 'Total Demand'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(totalPaid), 'Total Paid'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.pending_outlined, Colors.orange, _formatCurrency(totalBalance), 'Balance Due'),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Fee group-wise table
         LayoutBuilder(builder: (context, constraints) {
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Scrollbar(controller: _feeGroupScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeGroupScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1195,12 +1378,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         child: InkWell(
                           onTap: () => setState(() => _selectedPendingFeeGroup = groupName),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                              SizedBox(width: 4.w),
+                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12.sp),
                             ]),
                           ),
                         ),
@@ -1213,17 +1396,17 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                   cells: [
                     const DataCell(Text('')),
-                    const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text('$totalStudents', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text('$totalStudents', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
                   ],
                 ),
               ],
             ),
-          ));
+          )));
         }),
       ],
     );
@@ -1250,47 +1433,47 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              icon: Icon(Icons.arrow_back_rounded, size: 20.sp),
               onPressed: () => setState(() {
                 _selectedStudentKey = null;
                 _selectedStudentDemands = null;
               }),
               tooltip: 'Back',
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.person_rounded, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
+            SizedBox(width: 4.w),
+            Icon(Icons.person_rounded, size: 18.sp, color: AppColors.accent),
+            SizedBox(width: 8.w),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(stuName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text('Adm No: $admNo  |  Class: $stuClass', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text(stuName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                SizedBox(height: 2.h),
+                Text('Adm No: $admNo  |  Class: $stuClass', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Summary cards
         Row(
           children: [
             _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(totalDemand), 'Total Demand'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(totalPaid), 'Total Paid'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.pending_outlined, Colors.orange, _formatCurrency(totalBalance), 'Balance Due'),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Fee details table
         LayoutBuilder(builder: (context, constraints) {
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Scrollbar(controller: _studentFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1319,12 +1502,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     DataCell(Text(_formatCurrency(paid), style: const TextStyle(color: AppColors.success))),
                     DataCell(Text(_formatCurrency(balance), style: TextStyle(fontWeight: FontWeight.w600, color: balance > 0 ? Colors.orange : AppColors.textSecondary))),
                     DataCell(Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
-                      child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
+                      child: Text(statusLabel, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: statusColor)),
                     )),
                   ]);
                 }),
@@ -1334,16 +1517,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
-                    const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
                   ],
                 ),
               ],
             ),
-          ));
+          )));
         }),
       ],
     );
@@ -1407,7 +1590,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              icon: Icon(Icons.arrow_back_rounded, size: 20.sp),
               onPressed: () => setState(() {
                 _selectedPendingFeeGroup = null;
                 _pendingStudentSearch = '';
@@ -1415,14 +1598,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               }),
               tooltip: 'Back to Fee Groups',
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.folder_rounded, size: 18, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Text('Pending Fees', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, size: 16, color: AppColors.textSecondary),
-            const SizedBox(width: 4),
-            Text(feeGroupName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            SizedBox(width: 4.w),
+            Icon(Icons.folder_rounded, size: 18.sp, color: AppColors.accent),
+            SizedBox(width: 8.w),
+            Text('Pending Fees', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            SizedBox(width: 4.w),
+            Icon(Icons.chevron_right, size: 16.sp, color: AppColors.textSecondary),
+            SizedBox(width: 4.w),
+            Text(feeGroupName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
             const Spacer(),
             // Search field
             SizedBox(
@@ -1434,14 +1617,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   _pendingStudentSearch = v;
                   _pendingPage = 0;
                 }),
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(fontSize: 13.sp),
                 decoration: InputDecoration(
                   hintText: 'Search student / adm no...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.search, size: 16),
+                  hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search, size: 16.sp),
                   suffixIcon: _pendingStudentSearch.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.close, size: 16),
+                          icon: Icon(Icons.close, size: 16.sp),
                           onPressed: () => setState(() {
                             _pendingStudentSearchController.clear();
                             _pendingStudentSearch = '';
@@ -1451,27 +1634,27 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           padding: EdgeInsets.zero,
                         )
                       : null,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Fee Type dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingFeeTypeFilter,
-                  hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
@@ -1481,21 +1664,21 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             // Class dropdown
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: _pendingClassFilter,
-                  hint: const Text('All Classes', style: TextStyle(fontSize: 13)),
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                  icon: const Icon(Icons.arrow_drop_down, size: 18),
+                  hint: Text('All Classes', style: TextStyle(fontSize: 13.sp)),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                   isDense: true,
                   items: [
                     const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
@@ -1507,29 +1690,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Summary row
         Row(
           children: [
             _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, '$totalStudents', 'Students'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(totalDemand), 'Total Demand'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(totalPaid), 'Total Paid'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.pending_outlined, Colors.orange, _formatCurrency(totalBalance), 'Balance Due'),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
         // Student table
         LayoutBuilder(builder: (context, constraints) {
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Scrollbar(controller: _studentListScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentListScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -1578,12 +1761,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(color: AppColors.success))),
                       DataCell(Text(_formatCurrency(sBalance), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
                       DataCell(Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
+                        child: Text(statusLabel, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: statusColor)),
                       )),
                     ],
                   );
@@ -1594,49 +1777,49 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
-                    const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
-                    DataCell(Text(_formatCurrency(totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrency(totalBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrency(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
                   ],
                 ),
               ],
             ),
-          ));
+          )));
         }),
-        const SizedBox(height: 8),
+        SizedBox(height: 8.h),
         // Pagination footer
         Row(
           children: [
             Text(
               'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
             ),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.first_page_rounded, size: 20),
+              icon: Icon(Icons.first_page_rounded, size: 20.sp),
               onPressed: _pendingPage > 0 ? () => setState(() => _pendingPage = 0) : null,
               tooltip: 'First page', splashRadius: 18,
             ),
             IconButton(
-              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+              icon: Icon(Icons.chevron_left_rounded, size: 20.sp),
               onPressed: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
               tooltip: 'Previous page', splashRadius: 18,
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-              child: Text('${_pendingPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
+              child: Text('${_pendingPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
             ),
             IconButton(
-              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+              icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
               onPressed: _pendingPage < totalPages - 1 ? () => setState(() => _pendingPage++) : null,
               tooltip: 'Next page', splashRadius: 18,
             ),
             IconButton(
-              icon: const Icon(Icons.last_page_rounded, size: 20),
+              icon: Icon(Icons.last_page_rounded, size: 20.sp),
               onPressed: _pendingPage < totalPages - 1 ? () => setState(() => _pendingPage = totalPages - 1) : null,
               tooltip: 'Last page', splashRadius: 18,
             ),
@@ -1673,20 +1856,20 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
             child: Row(
               children: [
-                Icon(Icons.description_outlined, size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                const Text('Date-wise Collection Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                Icon(Icons.description_outlined, size: 18.sp, color: AppColors.accent),
+                SizedBox(width: 8.w),
+                Text('Date-wise Collection Summary', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                 const Spacer(),
-                Text('${_dateGroups.length} days', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('${_dateGroups.length} days', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               ],
             ),
           ),
@@ -1698,12 +1881,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             )
           else if (_dateGroups.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(48),
+              padding: EdgeInsets.all(48.w),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.search_off, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                    const SizedBox(height: 8),
+                    Icon(Icons.search_off, size: 40.sp, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                    SizedBox(height: 8.h),
                     const Text('No collections found for selected date range', style: TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
@@ -1721,103 +1904,111 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               return Column(children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: DataTable(dividerThickness: 0,
-                      showCheckboxColumn: false,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                      columnSpacing: 20,
-                      horizontalMargin: 16,
-                      dataRowMinHeight: 40,
-                      dataRowMaxHeight: 44,
-                      headingRowHeight: 42,
-                      columns: const [
-                        DataColumn(label: Text('S No.')),
-                        DataColumn(label: Text('DATE')),
-                        DataColumn(label: Text('TRANSACTIONS'), numeric: true),
-                        DataColumn(label: Text('AMOUNT'), numeric: true),
-                        DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
-                      ],
-                      rows: [
-                        ...pagedGroups.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final group = entry.value;
-                          return DataRow(
-                            color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                            onSelectChanged: (_) => setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; }),
-                            cells: [
-                              DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
-                              DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600))),
-                              DataCell(Text('${group.payments.length}', textAlign: TextAlign.right)),
-                              DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
-                              DataCell(Align(
-                                alignment: Alignment.centerRight,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                                    SizedBox(width: 4),
-                                    Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
-                                  ]),
-                                ),
-                              )),
-                            ],
-                          );
-                        }),
-                        // Grand total row
-                        DataRow(
-                          color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                          cells: [
-                            const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('$grandTransactions', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(grandTotal), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            const DataCell(Text('')),
+                _updateCanScrollDateList();
+                return Column(
+                  children: [
+                    SingleChildScrollView(
+                      controller: _dateListScrollCtrl,
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                        child: DataTable(dividerThickness: 0,
+                          showCheckboxColumn: false,
+                          headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                          headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                          columnSpacing: 20,
+                          horizontalMargin: 16,
+                          dataRowMinHeight: 40,
+                          dataRowMaxHeight: 44,
+                          headingRowHeight: 42,
+                          columns: const [
+                            DataColumn(label: Text('S No.')),
+                            DataColumn(label: Text('DATE')),
+                            DataColumn(label: Text('TRANSACTIONS'), numeric: true),
+                            DataColumn(label: Text('AMOUNT'), numeric: true),
+                            DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
+                          ],
+                          rows: [
+                            ...pagedGroups.asMap().entries.map((entry) {
+                              final i = entry.key;
+                              final group = entry.value;
+                              return DataRow(
+                                color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
+                                onSelectChanged: (_) => setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; }),
+                                cells: [
+                                  DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                                  DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600))),
+                                  DataCell(Text('${group.payments.length}', textAlign: TextAlign.right)),
+                                  DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
+                                  DataCell(Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                        SizedBox(width: 4.w),
+                                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12.sp),
+                                      ]),
+                                    ),
+                                  )),
+                                ],
+                              );
+                            }),
+                            // Grand total row
+                            DataRow(
+                              color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                              cells: [
+                                const DataCell(Text('')),
+                                DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                                DataCell(Text('$grandTransactions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                                DataCell(Text(_formatCurrency(grandTotal), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                                const DataCell(Text('')),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    if (_canScrollDateList)
+                      _buildDateScrollbar(_dateListScrollCtrl),
+                  ],
                 );
               },
             ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8.h),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                 child: Row(
                   children: [
                     Text(
                       'Showing ${totalItems == 0 ? 0 : startIdx + 1}\u2013$endIdx of $totalItems dates',
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.first_page_rounded, size: 20),
+                      icon: Icon(Icons.first_page_rounded, size: 20.sp),
                       onPressed: _dateListPage > 0 ? () => setState(() => _dateListPage = 0) : null,
                       tooltip: 'First page', splashRadius: 18,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                      icon: Icon(Icons.chevron_left_rounded, size: 20.sp),
                       onPressed: _dateListPage > 0 ? () => setState(() => _dateListPage--) : null,
                       tooltip: 'Previous page', splashRadius: 18,
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6)),
-                      child: Text('${_dateListPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
+                      child: Text('${_dateListPage + 1} / ${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                      icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
                       onPressed: _dateListPage < totalPages - 1 ? () => setState(() => _dateListPage++) : null,
                       tooltip: 'Next page', splashRadius: 18,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.last_page_rounded, size: 20),
+                      icon: Icon(Icons.last_page_rounded, size: 20.sp),
                       onPressed: _dateListPage < totalPages - 1 ? () => setState(() => _dateListPage = totalPages - 1) : null,
                       tooltip: 'Last page', splashRadius: 18,
                     ),
@@ -1856,14 +2047,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
             child: Row(
               children: [
                 InkWell(
@@ -1875,17 +2066,17 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _dateDrilldownSearch = '';
                     _dateDrilldownMethodFilter = null;
                   }),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
-                    child: const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
+                    child: Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12.w),
                 InkWell(
                   onTap: () => setState(() {
                     _selectedDate = null;
@@ -1895,20 +2086,20 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _dateDrilldownSearch = '';
                     _dateDrilldownMethodFilter = null;
                   }),
-                  child: const Text('Date-wise Collection', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                  child: Text('Date-wise Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                 ),
-                const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text(_formatDisplayDate(group.date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 12),
+                Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                Text(_formatDisplayDate(group.date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                SizedBox(width: 12.w),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(
                     '${group.payments.length} payments',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
                   ),
                 ),
                 const Spacer(),
@@ -1919,29 +2110,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     onChanged: (v) => setState(() { _dateDrilldownSearch = v; _dateDrilldownPage = 0; }),
                     decoration: InputDecoration(
                       hintText: 'Search...',
-                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),
+                      hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                      prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8.w),
                 SizedBox(
                   height: 34,
                   child: DropdownButtonHideUnderline(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: EdgeInsets.symmetric(horizontal: 10.w),
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
                       child: DropdownButton<String?>(
                         value: _dateDrilldownMethodFilter,
-                        hint: const Text('All Methods', style: TextStyle(fontSize: 13)),
-                        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                        hint: Text('All Methods', style: TextStyle(fontSize: 13.sp)),
+                        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         items: [
                           const DropdownMenuItem(value: null, child: Text('All Methods')),
                           ...{for (final p in group.payments) p['paymethod']?.toString() ?? '-'}.map(
@@ -1977,15 +2168,17 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final ddStart = _dateDrilldownPage * _dateDrilldownPageSize;
                   final ddEnd = (ddStart + _dateDrilldownPageSize).clamp(0, ddTotalItems);
                   final filtered = allFiltered.sublist(ddStart, ddEnd);
+                  _updateCanScrollDateDrilldown();
                   return Column(children: [SingleChildScrollView(
+                    controller: _dateDrilldownScrollCtrl,
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(dividerThickness: 0,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                         columns: const [
                           DataColumn(label: Text('S No.')),
@@ -2018,12 +2211,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 DataCell(Align(
                                   alignment: Alignment.centerRight,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                      Text('View', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                                      SizedBox(width: 4),
-                                      Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Text('View', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                      SizedBox(width: 4.w),
+                                      Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12.sp),
                                     ]),
                                   ),
                                 )),
@@ -2032,34 +2225,36 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           }),
                           DataRow(color: WidgetStateProperty.all(const Color(0xFF6C8EEF)), cells: [
                             const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
-                            DataCell(Text(_formatCurrency(grandTotal), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(grandTotal), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                           ]),
                         ],
                       ),
                     ),
                   ),
+                  if (_canScrollDateDrilldown)
+                    _buildDateScrollbar(_dateDrilldownScrollCtrl),
                   // Pagination controls
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                     decoration: const BoxDecoration(color: Color(0xFF6C8EEF)),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        IconButton(icon: const Icon(Icons.first_page_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage = 0) : null),
-                        IconButton(icon: const Icon(Icons.chevron_left_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage--) : null),
+                        IconButton(icon: Icon(Icons.first_page_rounded, size: 20.sp), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage = 0) : null),
+                        IconButton(icon: Icon(Icons.chevron_left_rounded, size: 20.sp), color: Colors.white, onPressed: _dateDrilldownPage > 0 ? () => setState(() => _dateDrilldownPage--) : null),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('${_dateDrilldownPage + 1} / ${ddTotalPages == 0 ? 1 : ddTotalPages}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                          padding: EdgeInsets.symmetric(horizontal: 12.w),
+                          child: Text('${_dateDrilldownPage + 1} / ${ddTotalPages == 0 ? 1 : ddTotalPages}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                         ),
-                        IconButton(icon: const Icon(Icons.chevron_right_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage++) : null),
-                        IconButton(icon: const Icon(Icons.last_page_rounded, size: 20), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage = ddTotalPages - 1) : null),
+                        IconButton(icon: Icon(Icons.chevron_right_rounded, size: 20.sp), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage++) : null),
+                        IconButton(icon: Icon(Icons.last_page_rounded, size: 20.sp), color: Colors.white, onPressed: _dateDrilldownPage < ddTotalPages - 1 ? () => setState(() => _dateDrilldownPage = ddTotalPages - 1) : null),
                       ],
                     ),
                   ),
@@ -2405,7 +2600,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
                               decoration: pw.BoxDecoration(
                                 color: const PdfColor.fromInt(0x66c2eecd),
-                                borderRadius: pw.BorderRadius.circular(10),
+                                borderRadius: pw.BorderRadius.circular(10.r),
                                 border: pw.Border.all(color: paidGreen, width: 2.5),
                               ),
                               child: pw.Text('PAID', style: pw.TextStyle(font: fontSemiBold, fontSize: 20, color: paidGreen)),
@@ -2463,7 +2658,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
         child: SizedBox(
           width: 620,
           height: 920,
@@ -2496,10 +2691,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
                         }
                       },
-                      icon: const Icon(Icons.download_rounded, size: 18),
+                      icon: Icon(Icons.download_rounded, size: 18.sp),
                       label: const Text('Download'),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     ElevatedButton.icon(
                       onPressed: () async {
                         Navigator.pop(ctx);
@@ -2513,21 +2708,21 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
                         }
                       },
-                      icon: const Icon(Icons.print_rounded, size: 18),
+                      icon: Icon(Icons.print_rounded, size: 18.sp),
                       label: const Text('Print'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                         elevation: 0,
-                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     IconButton(
                       onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close, size: 20),
+                      icon: Icon(Icons.close, size: 20.sp),
                     ),
                   ],
                 ),
@@ -2535,7 +2730,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               const Divider(height: 1),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12.w),
                   child: Center(
                     child: Container(
                       decoration: BoxDecoration(
@@ -2563,14 +2758,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
             child: Row(
               children: [
                 InkWell(
@@ -2579,17 +2774,17 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _selectedPayment = null;
                     _feeDetails = null;
                   }),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
-                    child: const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
+                    child: Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12.w),
                 Expanded(
                   child: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -2603,19 +2798,19 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           _dateDrilldownSearch = '';
                           _dateDrilldownMethodFilter = null;
                         }),
-                        child: const Text('Date-wise Collection', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                        child: Text('Date-wise Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                       ),
-                      const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                       InkWell(
                         onTap: () => setState(() {
                           _selectedPayId = null;
                           _selectedPayment = null;
                           _feeDetails = null;
                         }),
-                        child: Text(_selectedDate != null ? _formatDisplayDate(_selectedDate!) : '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                        child: Text(_selectedDate != null ? _formatDisplayDate(_selectedDate!) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                       ),
-                      const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                      Text('$payNo - $stuName ($admNo)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                      Text('$payNo - $stuName ($admNo)', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -2629,13 +2824,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('No fee details found', style: TextStyle(color: AppColors.textSecondary))))
               else
                 LayoutBuilder(builder: (context, constraints) {
-                  return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+                  return Scrollbar(controller: _feeDetailScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeDetailScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(dividerThickness: 0,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                      headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                      dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                       columns: const [
                         DataColumn(label: Text('S No.')), DataColumn(label: Text('TERM')), DataColumn(label: Text('FEE TYPE')),
@@ -2671,12 +2866,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DataCell(Text(_formatCurrency((fd['paidamount'] as num?)?.toDouble() ?? 0), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
                             DataCell(Text(_formatCurrency(balance), style: TextStyle(fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                             DataCell(Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8.r),
                               ),
-                              child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
+                              child: Text(statusLabel, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: statusColor)),
                             )),
                           ]);
                         }),
@@ -2685,33 +2880,33 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
                           cells: [
                             const DataCell(Text('')),
-                            const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('${_feeDetails!.length} items', style: const TextStyle(fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0))), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0))), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0))), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                            DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text('${_feeDetails!.length} items', style: TextStyle(fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                           ],
                         ),
                       ],
                     ),
-                  ));
+                  )));
                 }),
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, 12, 20, 16),
+            padding: EdgeInsets.fromLTRB(0, 12.h, 20.w, 16.h),
             child: Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton.icon(
                 onPressed: () => _showReceiptDialog(p, _feeDetails),
-                icon: const Icon(Icons.download_rounded, size: 16),
+                icon: Icon(Icons.download_rounded, size: 16.sp),
                 label: const Text('Download PDF'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   elevation: 0,
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -3336,6 +3531,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   String? _studentStatusFilter;
 
   final ScrollController _classTableScrollController = ScrollController();
+  final ScrollController _studentTableScrollController = ScrollController();
+  final ScrollController _drilldownFeeScrollCtrl = ScrollController();
+  bool _canScrollClass = false;
+  bool _canScrollStudent = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -3344,11 +3543,57 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   void initState() {
     super.initState();
     _fetchData();
+    _classTableScrollController.addListener(_onClassScrollChanged);
+    _studentTableScrollController.addListener(_onStudentScrollChanged);
+  }
+
+  void _onClassScrollChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onStudentScrollChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _updateCanScrollClass() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_classTableScrollController.hasClients &&
+          _classTableScrollController.positions.isNotEmpty &&
+          _classTableScrollController.position.hasContentDimensions) {
+        final canScroll = _classTableScrollController.position.maxScrollExtent > 5;
+        if (_canScrollClass != canScroll) {
+          setState(() => _canScrollClass = canScroll);
+        }
+      } else {
+        if (_canScrollClass) setState(() => _canScrollClass = false);
+      }
+    });
+  }
+
+  void _updateCanScrollStudent() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_studentTableScrollController.hasClients &&
+          _studentTableScrollController.positions.isNotEmpty &&
+          _studentTableScrollController.position.hasContentDimensions) {
+        final canScroll = _studentTableScrollController.position.maxScrollExtent > 5;
+        if (_canScrollStudent != canScroll) {
+          setState(() => _canScrollStudent = canScroll);
+        }
+      } else {
+        if (_canScrollStudent) setState(() => _canScrollStudent = false);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _classTableScrollController.removeListener(_onClassScrollChanged);
+    _studentTableScrollController.removeListener(_onStudentScrollChanged);
     _classTableScrollController.dispose();
+    _studentTableScrollController.dispose();
+    _drilldownFeeScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -3430,21 +3675,21 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         Row(
           children: [
             _buildSummaryCard(Icons.people_alt_outlined, Colors.blue, _totalStudents.toString(), 'Total Students'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_totalDemand), 'Total Demand'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_totalPaid), 'Total Collected'),
-            const SizedBox(width: 12),
+            SizedBox(width: 12.w),
             _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_totalPending), 'Total Pending'),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
         // Class-wise table card — Expanded so height is bounded
         Expanded(
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(
@@ -3454,9 +3699,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                     child: Row(
                       children: [
-                        Icon(Icons.class_rounded, size: 18, color: AppColors.accent),
-                        const SizedBox(width: 8),
-                        const Text('Class-Wise Fee Details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        Icon(Icons.class_rounded, size: 18.sp, color: AppColors.accent),
+                        SizedBox(width: 8.w),
+                        Text('Class-Wise Fee Details', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                         const Spacer(),
                         // Search field
                         SizedBox(
@@ -3464,42 +3709,42 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           height: 34,
                           child: TextField(
                             onChanged: (v) => setState(() => _classSearchQuery = v.trim().toLowerCase()),
-                            style: const TextStyle(fontSize: 13),
+                            style: TextStyle(fontSize: 13.sp),
                             decoration: InputDecoration(
                               hintText: 'Search class...',
-                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                              prefixIcon: const Icon(Icons.search, size: 16),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                              hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                              prefixIcon: Icon(Icons.search, size: 16.sp),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8.w),
                         // Fee type filter dropdown
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: EdgeInsets.symmetric(horizontal: 10.w),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(color: AppColors.border),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               value: _classFilterFeeType,
                               isDense: true,
-                              hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
-                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              icon: const Icon(Icons.arrow_drop_down, size: 18),
+                              hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp)),
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                              icon: Icon(Icons.arrow_drop_down, size: 18.sp),
                               items: [
-                                const DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13))),
+                                DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
                                 ...() {
                                   final allFeeTypes = <String>{};
                                   for (final g in _classGroups) {
                                     allFeeTypes.addAll(g.feeTypes);
                                   }
                                   final sorted = allFeeTypes.toList()..sort();
-                                  return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: const TextStyle(fontSize: 13))));
+                                  return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: TextStyle(fontSize: 13.sp))));
                                 }(),
                               ],
                               onChanged: (v) => setState(() => _classFilterFeeType = v),
@@ -3524,133 +3769,327 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   const contentW = 1000.0;
                   final effectiveW = contentW > viewportW ? contentW : viewportW;
                   const scrollbarH = 18.0;
-                  return Stack(
-                    children: [
-                  SingleChildScrollView(controller: _classTableScrollController, scrollDirection: Axis.horizontal, child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: effectiveW),
-                    child: SingleChildScrollView(scrollDirection: Axis.vertical, child: DataTable(dividerThickness: 0,
-                      showCheckboxColumn: false,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                      dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                      columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 48, headingRowHeight: 42,
-                      columns: const [
-                        DataColumn(label: Text('S No.')),
-                        DataColumn(label: Text('CLASS')),
-                        DataColumn(label: Text('STUDENTS'), numeric: true),
-                        DataColumn(label: Text('FEE TYPES')),
-                        DataColumn(label: Text('TOTAL DEMAND'), numeric: true),
-                        DataColumn(label: Text('PAID'), numeric: true),
-                        DataColumn(label: Text('% COLLECTED')),
-                        DataColumn(label: Text('PENDING'), numeric: true),
-                        DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
+
+                  // Column widths for class list table
+                  const double cHMargin = 16;
+                  const double cColSpacing = 20;
+                  const double cSnoW = 50;
+                  const double cClassW = 80;
+                  const double cStudentsW = 80;
+                  const double cFeeTypesW = 280;
+                  const double cTotalDemandW = 110;
+                  const double cPaidW = 110;
+                  const double cCollectedW = 90;
+                  const double cPendingW = 110;
+                  const double cActionW = 130;
+                  final List<double> cColWidths = [cSnoW, cClassW, cStudentsW, cFeeTypesW, cTotalDemandW, cPaidW, cCollectedW, cPendingW, cActionW];
+                  final cTotalFixedWidth = cColWidths.reduce((a, b) => a + b) + (cColWidths.length - 1) * cColSpacing + 2 * cHMargin;
+                  final cTableWidth = cTotalFixedWidth > effectiveW ? cTotalFixedWidth : effectiveW;
+                  final cExtraSpace = cTableWidth - cTotalFixedWidth;
+                  final cSum = cColWidths.reduce((a, b) => a + b);
+                  final List<double> cAdj = cColWidths.map((w) => w + (cExtraSpace * w / cSum)).toList();
+
+                  Widget cBuildCell(String text, int colIndex, {FontWeight? fontWeight, double? fontSize, Color? color, Widget? child}) {
+                    return SizedBox(
+                      width: cAdj[colIndex],
+                      child: child ?? Align(
+                        alignment: colIndex >= 4 && colIndex <= 5 || colIndex == 7 ? Alignment.centerRight : colIndex == 8 ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Text(text, style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color)),
+                      ),
+                    );
+                  }
+
+                  Widget cBuildRow(List<Widget> cells, {Color? bgColor, double height = 44}) {
+                    return Container(
+                      height: height,
+                      color: bgColor,
+                      padding: EdgeInsets.symmetric(horizontal: cHMargin),
+                      child: Row(
+                        children: [
+                          for (int ci = 0; ci < cells.length; ci++) ...[
+                            if (ci > 0) const SizedBox(width: cColSpacing),
+                            cells[ci],
+                          ],
+                        ],
+                      ),
+                    );
+                  }
+
+                  // --- HEADER ---
+                  final classHeaderRow = cBuildRow(
+                    [
+                      cBuildCell('S No.', 0, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('CLASS', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('STUDENTS', 2, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('FEE TYPES', 3, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('TOTAL DEMAND', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('PAID', 5, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('% COLLECTED', 6, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('PENDING', 7, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('ACTION', 8, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    ],
+                    bgColor: const Color(0xFF6C8EEF),
+                    height: 42,
+                  );
+
+                  // --- BODY ROWS ---
+                  final classBodyChildren = <Widget>[];
+                  if (filteredGroups.isEmpty) {
+                    classBodyChildren.add(cBuildRow(
+                      [
+                        cBuildCell('', 0),
+                        cBuildCell('No fee demands found', 1),
+                        for (int ci = 2; ci < 9; ci++) cBuildCell('', ci),
                       ],
-                      rows: filteredGroups.isEmpty ? [
-                        const DataRow(cells: [
-                          DataCell(Text('')), DataCell(Text('No fee demands found')), DataCell(Text('')), DataCell(Text('')),
-                          DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                        ]),
-                      ] : [
-                        ...filteredGroups.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final g = entry.value;
-                          final pct = g.totalDemand > 0 ? (g.totalPaid / g.totalDemand * 100) : 0.0;
-                          onClassTap() async {
-                            setState(() {
-                              _selectedClass = g.className;
-                              _drilldownLoading = true;
-                              _drilldownDemands = [];
-                              _studentSearchQuery = '';
-                              _studentStatusFilter = null;
-                              _studentPage = 0;
-                            });
-                            final auth = context.read<AuthProvider>();
-                            final insId = auth.insId;
-                            if (insId != null) {
-                              final demands = await SupabaseService.getFeeDemandsByClass(insId, g.className);
-                              for (final d in demands) {
-                                d['_stuname'] = d['stuname']?.toString() ?? '';
-                              }
-                              if (mounted) {
-                                setState(() {
-                                  _drilldownDemands = demands;
-                                  _drilldownLoading = false;
-                                });
-                              }
-                            }
+                      height: 44,
+                    ));
+                  } else {
+                    for (int i = 0; i < filteredGroups.length; i++) {
+                      final g = filteredGroups[i];
+                      final pct = g.totalDemand > 0 ? (g.totalPaid / g.totalDemand * 100) : 0.0;
+                      onClassTap() async {
+                        setState(() {
+                          _selectedClass = g.className;
+                          _drilldownLoading = true;
+                          _drilldownDemands = [];
+                          _studentSearchQuery = '';
+                          _studentStatusFilter = null;
+                          _studentPage = 0;
+                        });
+                        final auth = context.read<AuthProvider>();
+                        final insId = auth.insId;
+                        if (insId != null) {
+                          final demands = await SupabaseService.getFeeDemandsByClass(insId, g.className);
+                          for (final d in demands) {
+                            d['_stuname'] = d['stuname']?.toString() ?? '';
                           }
-                          return DataRow(
-                            color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                            onSelectChanged: (_) => onClassTap(),
-                            cells: [
-                              DataCell(Text('${i + 1}')),
-                              DataCell(Text(g.className, style: const TextStyle(fontWeight: FontWeight.w600))),
-                              DataCell(Text('${g.studentCount}')),
-                              DataCell(SizedBox(
-                                width: 280,
+                          if (mounted) {
+                            setState(() {
+                              _drilldownDemands = demands;
+                              _drilldownLoading = false;
+                            });
+                          }
+                        }
+                      }
+                      classBodyChildren.add(InkWell(
+                        onTap: () => onClassTap(),
+                        child: Container(
+                          color: i.isEven ? Colors.white : const Color(0xFFF7FAFC),
+                          padding: EdgeInsets.symmetric(horizontal: cHMargin),
+                          constraints: BoxConstraints(minHeight: 44),
+                          child: Row(
+                            children: [
+                              SizedBox(width: cAdj[0], child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[1], child: Text(g.className, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[2], child: Text('${g.studentCount}', style: TextStyle(fontSize: 13.sp))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(
+                                width: cAdj[3],
                                 child: Wrap(
                                   spacing: 4, runSpacing: 4,
                                   children: [
                                     ...g.feeTypes.map((ft) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6)),
-                                      child: Text(ft, style: const TextStyle(fontSize: 9, color: AppColors.accent)),
+                                      decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6.r)),
+                                      child: Text(ft, style: TextStyle(fontSize: 9.sp, color: AppColors.accent)),
                                     )),
                                   ],
                                 ),
-                              )),
-                              DataCell(Text(_formatCurrency(g.totalDemand))),
-                              DataCell(Text(_formatCurrency(g.totalPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
-                              DataCell(Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              ),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[4], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalDemand), style: TextStyle(fontSize: 13.sp)))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[5], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPaid), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success)))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[6], child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                                 decoration: BoxDecoration(
                                   color: pct >= 100 ? AppColors.success.withValues(alpha: 0.1) : pct >= 50 ? Colors.orange.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(8.r),
                                 ),
-                                child: Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: pct >= 100 ? AppColors.success : pct >= 50 ? Colors.orange : AppColors.warning)),
+                                child: Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: pct >= 100 ? AppColors.success : pct >= 50 ? Colors.orange : AppColors.warning)),
                               )),
-                              DataCell(Text(_formatCurrency(g.totalPending), style: TextStyle(fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary))),
-                              DataCell(Align(
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[7], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPending), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary)))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[8], child: Align(
                                 alignment: Alignment.centerRight,
                                 child: InkWell(
                                   onTap: () => onClassTap(),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                      Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                                      SizedBox(width: 4),
-                                      Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
+                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                      SizedBox(width: 4.w),
+                                      Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12.sp),
                                     ]),
                                   ),
                                 ),
                               )),
                             ],
-                          );
-                        }),
-                        // Grand total row
-                        DataRow(
-                          color: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                          cells: [
-                            const DataCell(Text('')),
-                            const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('$_totalStudents', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text('${_classGroups.length} classes', style: const TextStyle(fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_totalDemand > 0 ? '${(_totalPaid / _totalDemand * 100).toStringAsFixed(0)}%' : '0%', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_totalPending), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                            const DataCell(Text('')),
-                          ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ))),
-                  Positioned(
-                    left: 0, right: 0, bottom: 0,
-                    child: _buildWinScrollbar(viewportW, effectiveW, scrollbarH),
-                  ),
-                  ],
+                      ));
+                      classBodyChildren.add(const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)));
+                    }
+                  }
+
+                  // --- FOOTER (GRAND TOTAL) ---
+                  final classFooterRow = cBuildRow(
+                    [
+                      cBuildCell('', 0, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell('Total', 1, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell('$_totalStudents', 2, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell('${_classGroups.length} classes', 3, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell(_formatCurrency(_totalDemand), 4, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell(_formatCurrency(_totalPaid), 5, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell(_totalDemand > 0 ? '${(_totalPaid / _totalDemand * 100).toStringAsFixed(0)}%' : '0%', 6, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell(_formatCurrency(_totalPending), 7, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                      cBuildCell('', 8),
+                    ],
+                    bgColor: const Color(0xFF6C8EEF),
+                    height: 42,
+                  );
+
+                  _updateCanScrollClass();
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: _classTableScrollController,
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: cTableWidth,
+                            height: constraints.maxHeight,
+                            child: Column(
+                              children: [
+                                // Fixed header
+                                classHeaderRow,
+                                // Scrollable body
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.vertical,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: classBodyChildren,
+                                    ),
+                                  ),
+                                ),
+                                // Fixed footer
+                                classFooterRow,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Classic horizontal scrollbar with arrow buttons
+                      if (_canScrollClass)
+                        Container(
+                          height: 20,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF0F0F0),
+                            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                          ),
+                          child: Row(
+                            children: [
+                              // Left arrow button
+                              InkWell(
+                                onTap: () {
+                                  _classTableScrollController.animateTo(
+                                    (_classTableScrollController.offset - 100).clamp(0.0, _classTableScrollController.position.maxScrollExtent),
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOut,
+                                  );
+                                },
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE0E0E0),
+                                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                                  ),
+                                  child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
+                                ),
+                              ),
+                              // Scrollbar track + thumb
+                              Expanded(
+                                child: LayoutBuilder(
+                                  builder: (context, scrollbarConstraints) {
+                                    final maxExtent = _classTableScrollController.hasClients &&
+                                            _classTableScrollController.positions.isNotEmpty &&
+                                            _classTableScrollController.position.hasContentDimensions
+                                        ? _classTableScrollController.position.maxScrollExtent
+                                        : 1.0;
+                                    final viewportWidth = _classTableScrollController.hasClients &&
+                                            _classTableScrollController.positions.isNotEmpty &&
+                                            _classTableScrollController.position.hasContentDimensions
+                                        ? _classTableScrollController.position.viewportDimension
+                                        : scrollbarConstraints.maxWidth;
+                                    final totalContentWidth = maxExtent + viewportWidth;
+                                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
+                                    final thumbWidth = (scrollbarConstraints.maxWidth * thumbRatio).clamp(30.0, scrollbarConstraints.maxWidth);
+                                    final trackSpace = scrollbarConstraints.maxWidth - thumbWidth;
+                                    final scrollRatio = maxExtent > 0 ? (_classTableScrollController.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+                                    final thumbOffset = trackSpace * scrollRatio;
+
+                                    return GestureDetector(
+                                      onHorizontalDragUpdate: (details) {
+                                        if (trackSpace > 0) {
+                                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                                          _classTableScrollController.jumpTo(newRatio * maxExtent);
+                                        }
+                                      },
+                                      child: Container(
+                                        color: const Color(0xFFF0F0F0),
+                                        height: 20,
+                                        child: Stack(
+                                          children: [
+                                            Positioned(
+                                              left: thumbOffset,
+                                              top: 2,
+                                              child: Container(
+                                                width: thumbWidth,
+                                                height: 16,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFC0C0C0),
+                                                  borderRadius: BorderRadius.circular(2),
+                                                  border: Border.all(color: const Color(0xFFB0B0B0)),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              // Right arrow button
+                              InkWell(
+                                onTap: () {
+                                  _classTableScrollController.animateTo(
+                                    (_classTableScrollController.offset + 100).clamp(0.0, _classTableScrollController.position.maxScrollExtent),
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOut,
+                                  );
+                                },
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE0E0E0),
+                                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                                  ),
+                                  child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   );
                 });
               })),
@@ -3681,14 +4120,14 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
             child: Row(
               children: [
                 InkWell(
@@ -3697,35 +4136,35 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     _drilldownAdmNo = null;
                     _drilldownDemands = [];
                   }),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                     ),
-                    child: const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
+                    child: Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12.w),
                 InkWell(
                   onTap: () => setState(() {
                     _selectedClass = null;
                     _drilldownAdmNo = null;
                     _drilldownDemands = [];
                   }),
-                  child: const Text('Class-wise Demand', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                  child: Text('Class-wise Demand', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                 ),
-                const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 InkWell(
                   onTap: () => setState(() {
                     _drilldownAdmNo = null;
                     _drilldownDemands = [];
                   }),
-                  child: Text('Class $stuClass', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                  child: Text('Class $stuClass', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                 ),
-                const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                Text('$stuName ($admNo)', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                Text('$stuName ($admNo)', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -3738,13 +4177,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
             totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
           }
-          return SingleChildScrollView(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return SingleChildScrollView(child: Scrollbar(controller: _drilldownFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _drilldownFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 0,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white),
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
@@ -3774,12 +4213,12 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     DataCell(Text(_formatCurrencyLocal(paid), style: const TextStyle(color: AppColors.success))),
                     DataCell(Text(_formatCurrencyLocal(balance), style: TextStyle(fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                     DataCell(Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
-                      child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor)),
+                      child: Text(statusLabel, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: statusColor)),
                     )),
                   ]);
                 }),
@@ -3789,16 +4228,16 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   cells: [
                     const DataCell(Text('')),
                     const DataCell(Text('')),
-                    const DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrencyLocal(totalDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrencyLocal(totalPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                    DataCell(Text(_formatCurrencyLocal(totalBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
+                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrencyLocal(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrencyLocal(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text(_formatCurrencyLocal(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
                   ],
                 ),
               ],
             ),
-          )));
+          ))));
         })),
         ],
       ),
@@ -3848,14 +4287,14 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         Expanded(child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                 child: Row(
                   children: [
                     InkWell(
@@ -3865,17 +4304,17 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         _studentSearchQuery = '';
                         _studentStatusFilter = null;
                       }),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(8.r),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                         decoration: BoxDecoration(
                           color: AppColors.accent.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.accent),
+                        child: Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12.w),
                     InkWell(
                       onTap: () => setState(() {
                         _selectedClass = null;
@@ -3883,20 +4322,20 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         _studentSearchQuery = '';
                         _studentStatusFilter = null;
                       }),
-                      child: const Text('Class-wise Demand', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                      child: Text('Class-wise Demand', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                     ),
-                    const Text('  >  ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                    Text('Class ${group.className}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 12),
+                    Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                    Text('Class ${group.className}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                    SizedBox(width: 12.w),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
                       child: Text(
                         '$totalStudents students',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent),
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
                       ),
                     ),
                     const Spacer(),
@@ -3910,34 +4349,34 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         }),
                         decoration: InputDecoration(
                           hintText: 'Search...',
-                          hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),
+                          hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                          prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12.w),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     SizedBox(
                       height: 34,
                       child: DropdownButtonHideUnderline(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: EdgeInsets.symmetric(horizontal: 10.w),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
                           child: DropdownButton<String?>(
                             value: _studentStatusFilter,
-                            hint: const Text('All Status', style: TextStyle(fontSize: 13)),
-                            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                            items: const [
-                              DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 13))),
-                              DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 13))),
-                              DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 13))),
-                              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 13))),
+                            hint: Text('All Status', style: TextStyle(fontSize: 13.sp)),
+                            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                            items: [
+                              DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 13.sp))),
+                              DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 13.sp))),
+                              DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 13.sp))),
+                              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 13.sp))),
                             ],
                             onChanged: (v) => setState(() {
                               _studentStatusFilter = v;
@@ -3962,112 +4401,299 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
                 }
+                // Column widths for student drilldown table
+                const double sHMargin = 16;
+                const double sColSpacing = 12;
+                const double sSnoW = 45;
+                const double sAdmNoW = 80;
+                const double sNameW = 160;
+                const double sFeeAmtW = 100;
+                const double sPaidW = 100;
+                const double sBalanceW = 100;
+                const double sStatusW = 70;
+                const double sActionW = 80;
+                final List<double> sColWidths = [sSnoW, sAdmNoW, sNameW, sFeeAmtW, sPaidW, sBalanceW, sStatusW, sActionW];
+                final sTotalFixedWidth = sColWidths.reduce((a, b) => a + b) + (sColWidths.length - 1) * sColSpacing + 2 * sHMargin;
+                final sTableWidth = sTotalFixedWidth > constraints.maxWidth ? sTotalFixedWidth : constraints.maxWidth;
+                final sExtraSpace = sTableWidth - sTotalFixedWidth;
+                final sSum = sColWidths.reduce((a, b) => a + b);
+                final List<double> sAdj = sColWidths.map((w) => w + (sExtraSpace * w / sSum)).toList();
+
+                Widget sBuildCell(String text, int colIndex, {FontWeight? fontWeight, double? fontSize, Color? color, Widget? child}) {
+                  return SizedBox(
+                    width: sAdj[colIndex],
+                    child: child ?? Align(
+                      alignment: colIndex >= 3 && colIndex <= 5 ? Alignment.centerRight : colIndex == 7 ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Text(text, style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color)),
+                    ),
+                  );
+                }
+
+                Widget sBuildRow(List<Widget> cells, {Color? bgColor, double height = 40}) {
+                  return Container(
+                    height: height,
+                    color: bgColor,
+                    padding: EdgeInsets.symmetric(horizontal: sHMargin),
+                    child: Row(
+                      children: [
+                        for (int ci = 0; ci < cells.length; ci++) ...[
+                          if (ci > 0) const SizedBox(width: sColSpacing),
+                          cells[ci],
+                        ],
+                      ],
+                    ),
+                  );
+                }
+
+                // --- HEADER ---
+                final stuHeaderRow = sBuildRow(
+                  [
+                    sBuildCell('S No.', 0, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('ADM NO', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('STUDENT NAME', 2, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('FEE AMOUNT', 3, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('PAID', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('BALANCE', 5, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('STATUS', 6, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('ACTION', 7, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                  ],
+                  bgColor: const Color(0xFF6C8EEF),
+                  height: 42,
+                );
+
+                // --- BODY ROWS ---
+                final stuBodyChildren = <Widget>[];
+                if (studentKeys.isEmpty) {
+                  stuBodyChildren.add(sBuildRow(
+                    [
+                      sBuildCell('', 0),
+                      sBuildCell('No students found', 1),
+                      for (int ci = 2; ci < 8; ci++) sBuildCell('', ci),
+                    ],
+                    height: 40,
+                  ));
+                } else {
+                  for (int idx = 0; idx < studentKeys.length; idx++) {
+                    final admNo = studentKeys[idx];
+                    final studentDemands = byStudent[admNo]!;
+                    final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
+                    double sDemand = 0, sPaid = 0, sBalance = 0;
+                    for (final d in studentDemands) {
+                      sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                      sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                      sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+                    }
+                    final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
+                    final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+                    stuBodyChildren.add(InkWell(
+                      onTap: () => setState(() {
+                        _drilldownAdmNo = admNo;
+                        _drilldownDemands = studentDemands;
+                      }),
+                      child: Container(
+                        color: idx.isEven ? Colors.white : const Color(0xFFF7FAFC),
+                        padding: EdgeInsets.symmetric(horizontal: sHMargin),
+                        constraints: BoxConstraints(minHeight: 40),
+                        child: Row(
+                          children: [
+                            SizedBox(width: sAdj[0], child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[1], child: Text(admNo, style: TextStyle(fontSize: 13.sp))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[2], child: Text(stuName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[3], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sDemand), style: TextStyle(fontSize: 13.sp)))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[4], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sPaid), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success)))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[5], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sBalance), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary)))),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[6], child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
+                            )),
+                            const SizedBox(width: sColSpacing),
+                            SizedBox(width: sAdj[7], child: Align(
+                              alignment: Alignment.centerRight,
+                              child: InkWell(
+                                onTap: () => setState(() {
+                                  _drilldownAdmNo = admNo;
+                                  _drilldownDemands = studentDemands;
+                                }),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                    SizedBox(width: 4.w),
+                                    Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12.sp),
+                                  ]),
+                                ),
+                              ),
+                            )),
+                          ],
+                        ),
+                      ),
+                    ));
+                    stuBodyChildren.add(const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)));
+                  }
+                }
+
+                // --- FOOTER (GRAND TOTAL) ---
+                final stuFooterRow = sBuildRow(
+                  [
+                    sBuildCell('', 0, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell('', 1, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell('Total ($totalStudents students)', 2, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell(_formatCurrency(gDemand), 3, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell(_formatCurrency(gPaid), 4, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell(_formatCurrency(gBalance), 5, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                    sBuildCell('', 6),
+                    sBuildCell('', 7),
+                  ],
+                  bgColor: const Color(0xFF6C8EEF),
+                  height: 42,
+                );
+
+                _updateCanScrollStudent();
                 return Column(
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
+                        controller: _studentTableScrollController,
                         scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                          child: DataTable(
-                            dividerThickness: 0,
-                            showCheckboxColumn: false,
-                            headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                            headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                            dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                            columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
-                            columns: const [
-                              DataColumn(label: Text('S No.')),
-                              DataColumn(label: Text('ADM NO')),
-                              DataColumn(label: Text('STUDENT NAME')),
-                              DataColumn(label: Text('FEE AMOUNT'), numeric: true),
-                              DataColumn(label: Text('PAID'), numeric: true),
-                              DataColumn(label: Text('BALANCE'), numeric: true),
-                              DataColumn(label: Text('STATUS')),
-                              DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
+                        child: SizedBox(
+                          width: sTableWidth,
+                          height: constraints.maxHeight,
+                          child: Column(
+                            children: [
+                              // Fixed header
+                              stuHeaderRow,
+                              // Scrollable body
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.vertical,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: stuBodyChildren,
+                                  ),
+                                ),
+                              ),
+                              // Fixed footer
+                              stuFooterRow,
                             ],
-                            rows: studentKeys.isEmpty
-                                ? [
-                                    const DataRow(cells: [
-                                      DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')),
-                                      DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                                    ]),
-                                  ]
-                                : studentKeys.asMap().entries.map((entry) {
-                                    final idx = entry.key;
-                                    final admNo = entry.value;
-                                    final studentDemands = byStudent[admNo]!;
-                                    final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
-                                    double sDemand = 0, sPaid = 0, sBalance = 0;
-                                    for (final d in studentDemands) {
-                                      sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                                      sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
-                                      sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                                    }
-                                    final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
-                                    final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
-                                    return DataRow(
-                                      color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                                      onSelectChanged: (_) => setState(() {
-                                        _drilldownAdmNo = admNo;
-                                        _drilldownDemands = studentDemands;
-                                      }),
-                                      cells: [
-                                        DataCell(Text('${idx + 1}')),
-                                        DataCell(Text(admNo)),
-                                        DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                        DataCell(Text(_formatCurrency(sDemand))),
-                                        DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
-                                        DataCell(Text(_formatCurrency(sBalance), style: TextStyle(fontWeight: FontWeight.w500, color: sBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
-                                        DataCell(Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
-                                        )),
-                                        DataCell(Align(
-                                          alignment: Alignment.centerRight,
-                                          child: InkWell(
-                                            onTap: () => setState(() {
-                                              _drilldownAdmNo = admNo;
-                                              _drilldownDemands = studentDemands;
-                                            }),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                                              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                                                Text('View Details', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                                                SizedBox(width: 4),
-                                                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 12),
-                                              ]),
-                                            ),
-                                          ),
-                                        )),
-                                      ],
-                                    );
-                                  }).toList(),
                           ),
                         ),
                       ),
                     ),
-                    // Fixed footer
-                    Container(
-                      color: const Color(0xFF6C8EEF),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      child: Row(children: [
-                        const SizedBox(width: 50),
-                        const SizedBox(width: 100),
-                        Expanded(flex: 3, child: Text('Total ($totalStudents students)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                        Expanded(flex: 2, child: Text(_formatCurrency(gDemand), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                        Expanded(flex: 2, child: Text(_formatCurrency(gPaid), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                        Expanded(flex: 2, child: Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white), textAlign: TextAlign.right)),
-                        const SizedBox(width: 16),
-                        const SizedBox(width: 80),
-                        const SizedBox(width: 120),
-                      ]),
-                    ),
+                    // Classic horizontal scrollbar with arrow buttons
+                    if (_canScrollStudent)
+                      Container(
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF0F0F0),
+                          border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                        ),
+                        child: Row(
+                          children: [
+                            // Left arrow button
+                            InkWell(
+                              onTap: () {
+                                _studentTableScrollController.animateTo(
+                                  (_studentTableScrollController.offset - 100).clamp(0.0, _studentTableScrollController.position.maxScrollExtent),
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                );
+                              },
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE0E0E0),
+                                  border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                                ),
+                                child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
+                              ),
+                            ),
+                            // Scrollbar track + thumb
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (context, scrollbarConstraints) {
+                                  final maxExtent = _studentTableScrollController.hasClients &&
+                                          _studentTableScrollController.positions.isNotEmpty &&
+                                          _studentTableScrollController.position.hasContentDimensions
+                                      ? _studentTableScrollController.position.maxScrollExtent
+                                      : 1.0;
+                                  final viewportWidth = _studentTableScrollController.hasClients &&
+                                          _studentTableScrollController.positions.isNotEmpty &&
+                                          _studentTableScrollController.position.hasContentDimensions
+                                      ? _studentTableScrollController.position.viewportDimension
+                                      : scrollbarConstraints.maxWidth;
+                                  final totalContentWidth = maxExtent + viewportWidth;
+                                  final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
+                                  final thumbWidth = (scrollbarConstraints.maxWidth * thumbRatio).clamp(30.0, scrollbarConstraints.maxWidth);
+                                  final trackSpace = scrollbarConstraints.maxWidth - thumbWidth;
+                                  final scrollRatio = maxExtent > 0 ? (_studentTableScrollController.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+                                  final thumbOffset = trackSpace * scrollRatio;
+
+                                  return GestureDetector(
+                                    onHorizontalDragUpdate: (details) {
+                                      if (trackSpace > 0) {
+                                        final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                                        _studentTableScrollController.jumpTo(newRatio * maxExtent);
+                                      }
+                                    },
+                                    child: Container(
+                                      color: const Color(0xFFF0F0F0),
+                                      height: 20,
+                                      child: Stack(
+                                        children: [
+                                          Positioned(
+                                            left: thumbOffset,
+                                            top: 2,
+                                            child: Container(
+                                              width: thumbWidth,
+                                              height: 16,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFC0C0C0),
+                                                borderRadius: BorderRadius.circular(2),
+                                                border: Border.all(color: const Color(0xFFB0B0B0)),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            // Right arrow button
+                            InkWell(
+                              onTap: () {
+                                _studentTableScrollController.animateTo(
+                                  (_studentTableScrollController.offset + 100).clamp(0.0, _studentTableScrollController.position.maxScrollExtent),
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                );
+                              },
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE0E0E0),
+                                  border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                                ),
+                                child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 );
               })),
@@ -4081,29 +4707,29 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   Widget _buildSummaryCard(IconData icon, Color iconColor, String value, String label) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: EdgeInsets.all(6.w),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(icon, color: iconColor, size: 18),
+              child: Icon(icon, color: iconColor, size: 18.sp),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                  Text(value, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -4201,7 +4827,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           border: Border(right: BorderSide(color: const Color(0xFF555555), width: arrow == '◄' ? 1 : 0),
                         left: BorderSide(color: const Color(0xFF555555), width: arrow == '►' ? 1 : 0)),
         ),
-        child: Text(arrow, style: TextStyle(fontSize: 8, color: onTap != null ? const Color(0xFF333333) : const Color(0xFFAAAAAA))),
+        child: Text(arrow, style: TextStyle(fontSize: 8.sp, color: onTap != null ? const Color(0xFF333333) : const Color(0xFFAAAAAA))),
       ),
     );
   }
@@ -4302,6 +4928,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     setState(() => _isLoading = true);
 
     try {
+      // Stage 1: fetch demands, fee types, and totals in parallel
       final results = await Future.wait([
         SupabaseService.getPaidFeeDemands(insId),
         SupabaseService.getFeeTypes(insId),
@@ -4311,7 +4938,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       final feeTypes = results[1] as List<String>;
       final feeTotals = results[2] as Map<String, double>;
 
-      // Fetch paynumber and amount maps from payment table
+      // Stage 2: fetch pay numbers (needs pay_ids from demands)
       final payIds = demands
           .map((d) => d['pay_id'] as int?)
           .where((id) => id != null)
@@ -4415,20 +5042,20 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   Widget _buildDateChip(String label, DateTime date, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(8.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.calendar_today, size: 14, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(_formatFilterDate(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
+            SizedBox(width: 6.w),
+            Text(_formatFilterDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -4438,14 +5065,14 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   Widget _buildQuickFilter(String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(16.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(16.r),
           border: Border.all(color: AppColors.border),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+        child: Text(label, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
       ),
     );
   }
@@ -4518,7 +5145,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     int globalSno = 0;
     final Map<String, double> grandFeeTypeTotals = {};
     double grandTotal = 0;
-    int totalStudentCount = 0;
+    final uniqueStudentIds = <String>{};
     int totalDateCount = 0;
 
     // Use all fee types from feetype table so all columns show
@@ -4571,7 +5198,10 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         dateTotal += total;
         grandTotal += total;
       }
-      totalStudentCount += filteredStudentRows.length;
+      for (final row in filteredStudentRows) {
+        final admNo = row['admNo']?.toString() ?? '';
+        if (admNo.isNotEmpty) uniqueStudentIds.add(admNo);
+      }
 
       // S.Total row
       flatRows.add({'_type': 'subTotal', 'feeAmounts': dateTotals, 'total': dateTotal});
@@ -4582,34 +5212,29 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
     _updateCanScroll();
 
-    return RefreshIndicator(
-      onRefresh: _fetchData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        child: Column(
+    return Column(
           children: [
             // Date filter bar
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.filter_alt_rounded, size: 18, color: AppColors.accent),
-                  const SizedBox(width: 8),
-                  const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  const SizedBox(width: 8),
+                  Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
+                  SizedBox(width: 8.w),
+                  Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+                  SizedBox(width: 8.w),
                   _buildDateChip('From', _fromDate, () => _pickDate(true)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Text('\u2014', style: TextStyle(color: AppColors.textSecondary)),
                   ),
                   _buildDateChip('To', _toDate, () => _pickDate(false)),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12.w),
                   _buildQuickFilter('Today', () {
                     setState(() {
                       _fromDate = DateTime.now();
@@ -4617,7 +5242,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     });
                     _applyFilter();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('7 Days', () {
                     setState(() {
                       _toDate = DateTime.now();
@@ -4625,7 +5250,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     });
                     _applyFilter();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('30 Days', () {
                     setState(() {
                       _toDate = DateTime.now();
@@ -4633,7 +5258,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     });
                     _applyFilter();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('This Month', () {
                     final now = DateTime.now();
                     setState(() {
@@ -4642,7 +5267,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     });
                     _applyFilter();
                   }),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6.w),
                   _buildQuickFilter('All Time', () {
                     setState(() {
                       _fromDate = DateTime(2020);
@@ -4653,70 +5278,70 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                   const Spacer(),
                   TextButton.icon(
                     onPressed: _fetchData,
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    icon: Icon(Icons.refresh_rounded, size: 16.sp),
                     label: const Text('Refresh'),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             // Summary cards
             Row(
               children: [
-                _buildSummaryCard(Icons.people_outline, Colors.blue, '$totalStudentCount', 'Total Students'),
-                const SizedBox(width: 16),
+                _buildSummaryCard(Icons.people_outline, Colors.blue, '${uniqueStudentIds.length}', 'Total Students'),
+                SizedBox(width: 16.w),
                 _buildSummaryCard(Icons.account_balance_wallet, AppColors.accent, _formatCurrency(_summaryTotalDemand), 'Total Demand'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16.w),
                 _buildSummaryCard(Icons.check_circle_outline, AppColors.success, _formatCurrency(_summaryTotalPaid), 'Total Collected'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16.w),
                 _buildSummaryCard(Icons.pending_outlined, AppColors.warning, _formatCurrency(_summaryTotalPending), 'Total Pending'),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             // Spreadsheet-like table
-            Container(
+            Expanded(child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 children: [
                   // Title bar with search & filter
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     child: Row(
                       children: [
-                        Icon(Icons.table_chart_rounded, size: 18, color: AppColors.accent),
-                        const SizedBox(width: 8),
-                        const Text('Date-wise Paid Collection Register', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 12),
+                        Icon(Icons.table_chart_rounded, size: 18.sp, color: AppColors.accent),
+                        SizedBox(width: 8.w),
+                        Text('Date-wise Paid Collection Register', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 12.w),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                           decoration: BoxDecoration(
                             color: AppColors.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(8.r),
                           ),
-                          child: Text('$totalDateCount dates  |  $totalStudentCount students',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                          child: Text('$totalDateCount dates  |  ${uniqueStudentIds.length} students',
+                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                         ),
                         const Spacer(),
                         TextButton.icon(
                           onPressed: flatRows.isNotEmpty ? () => _exportToExcel(flatRows, activeDisplayFeeTypes, grandFeeTypeTotals, grandTotal) : null,
-                          icon: const Icon(Icons.download_rounded, size: 16),
+                          icon: Icon(Icons.download_rounded, size: 16.sp),
                           label: const Text('Export'),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.accent,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8.w),
                         SizedBox(
                           width: 200,
                           height: 34,
@@ -4724,29 +5349,29 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                             decoration: InputDecoration(
                               hintText: 'Search...',
-                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                              prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent)),
+                              hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                              prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12.w),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8.w),
                         SizedBox(
                           height: 34,
                           child: DropdownButtonHideUnderline(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              padding: EdgeInsets.symmetric(horizontal: 10.w),
                               decoration: BoxDecoration(
                                 border: Border.all(color: AppColors.border),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: DropdownButton<String?>(
                                 value: _filterFeeType,
-                                hint: const Text('All Fee Types', style: TextStyle(fontSize: 13)),
-                                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                                hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp)),
+                                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                                 items: [
                                   const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
                                   ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft))),
@@ -4767,156 +5392,217 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     )
                   else if (_dateGroups.isEmpty)
                     Padding(
-                      padding: const EdgeInsets.all(48),
+                      padding: EdgeInsets.all(48.w),
                       child: Center(
                         child: Column(
                           children: [
-                            Icon(Icons.search_off, size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                            const SizedBox(height: 8),
+                            Icon(Icons.search_off, size: 40.sp, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                            SizedBox(height: 8.h),
                             const Text('No paid collections found', style: TextStyle(color: AppColors.textSecondary)),
                           ],
                         ),
                       ),
                     )
                   else
-                    Column(
+                    Expanded(child: Column(
                       children: [
-                        LayoutBuilder(
+                        Expanded(child: LayoutBuilder(
                           builder: (context, constraints) {
                             const headerBg = Color(0xFF6C8EEF);
                             const subTotalBg = Color(0xFFE2E8F0);
 
-                            final dataRows = <DataRow>[];
-                            for (final row in flatRows) {
-                              final type = row['_type'] as String;
-
-                              if (type == 'dateHeader') {
-                                // Date header row (5 fixed + feeTypes + 1 total)
-                                final totalCols = 5 + activeDisplayFeeTypes.length + 1;
-                                dataRows.add(DataRow(
-                                  color: WidgetStateProperty.all(const Color(0xFFF1F5F9)),
-                                  cells: [
-                                    DataCell(Text(row['date'] as String,
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent))),
-                                    ...List.generate(totalCols - 1, (_) => const DataCell(Text(''))),
-                                  ],
-                                ));
-                              } else if (type == 'subTotal') {
-                                final feeAmts = row['feeAmounts'] as Map<String, double>;
-                                final total = row['total'] as double;
-                                dataRows.add(DataRow(
-                                  color: WidgetStateProperty.all(subTotalBg),
-                                  cells: [
-                                    DataCell(Text('S.Total', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
-                                    const DataCell(Text('')),
-                                    const DataCell(Text('')),
-                                    const DataCell(Text('')),
-                                    const DataCell(Text('')),
-                                    ...activeDisplayFeeTypes.map((ft) {
-                                      final amt = feeAmts[ft] ?? 0;
-                                      return DataCell(Text(
-                                        amt > 0 ? amt.toStringAsFixed(0) : '',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                      ));
-                                    }),
-                                    DataCell(Text(
-                                      total.toStringAsFixed(0),
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                                    )),
-                                  ],
-                                ));
-                              } else {
-                                // Data row
-                                final feeAmts = row['feeAmounts'] as Map<String, double>;
-                                dataRows.add(DataRow(
-                                  cells: [
-                                    DataCell(Text('${row['sno']}', style: const TextStyle(fontSize: 13))),
-                                    DataCell(Text(row['payNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
-                                    DataCell(Text(row['admNo'] as String, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                    DataCell(ConstrainedBox(
-                                      constraints: const BoxConstraints(maxWidth: 180),
-                                      child: Text(row['stuName'] as String, overflow: TextOverflow.ellipsis),
-                                    )),
-                                    DataCell(Text(row['stuClass'] as String)),
-                                    ...activeDisplayFeeTypes.map((ft) {
-                                      final amt = feeAmts[ft] ?? 0;
-                                      return DataCell(Text(
-                                        amt > 0 ? amt.toStringAsFixed(0) : '',
-                                        textAlign: TextAlign.right,
-                                      ));
-                                    }),
-                                    DataCell(Text(
-                                      (row['total'] as double).toStringAsFixed(0),
-                                      style: const TextStyle(fontWeight: FontWeight.w600),
-                                    )),
-                                  ],
-                                ));
-                              }
-                            }
-
-                            // Grand total row
-                            dataRows.add(DataRow(
-                              color: WidgetStateProperty.all(headerBg),
-                              cells: [
-                                const DataCell(Text('')),
-                                const DataCell(Text('')),
-                                const DataCell(Text('')),
-                                DataCell(Text('GRAND TOTAL', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white))),
-                                const DataCell(Text('')),
-                                ...activeDisplayFeeTypes.map((ft) {
-                                  final amt = grandFeeTypeTotals[ft] ?? 0;
-                                  return DataCell(Text(
-                                    amt > 0 ? amt.toStringAsFixed(0) : '',
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white),
-                                  ));
-                                }),
-                                DataCell(Text(
-                                  grandTotal.toStringAsFixed(0),
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white),
-                                )),
-                              ],
-                            ));
-
-                            final tableWidget = DataTable(
-                              dividerThickness: 0,
-                              showCheckboxColumn: false,
-                              headingRowColor: WidgetStateProperty.all(headerBg),
-                              headingTextStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                              dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
-                              columnSpacing: 12,
-                              horizontalMargin: 12,
-                              dataRowMinHeight: 32,
-                              dataRowMaxHeight: 38,
-                              headingRowHeight: 40,
-                              columns: [
-                                const DataColumn(label: Text('SNO')),
-                                const DataColumn(label: Text('RECPT.NO')),
-                                const DataColumn(label: Text('ADMN.NO')),
-                                const DataColumn(label: Text('NAME')),
-                                const DataColumn(label: Text('CLASS')),
-                                ...activeDisplayFeeTypes.map((ft) => DataColumn(label: Text(ft.toUpperCase()), numeric: true)),
-                                const DataColumn(label: Text('TOTAL'), numeric: true),
-                              ],
-                              rows: dataRows,
-                            );
+                            // Column widths: SNO, RECPT.NO, ADMN.NO, NAME, CLASS, ...feeTypes, TOTAL
+                            const double colSpacing = 12;
+                            const double hMargin = 12;
+                            const double snoW = 50;
+                            const double recptW = 80;
+                            const double admnW = 80;
+                            const double nameW = 180;
+                            const double classW = 70;
+                            const double feeColW = 80;
+                            const double totalColW = 80;
+                            final int feeCount = activeDisplayFeeTypes.length;
 
                             // Minimum width to keep columns readable
-                            final totalColumns = 6 + activeDisplayFeeTypes.length;
+                            final totalColumns = 6 + feeCount;
                             final minTableWidth = totalColumns * 80.0;
                             final effectiveMin = minTableWidth > constraints.maxWidth
                                 ? minTableWidth
                                 : constraints.maxWidth;
 
+                            // Build column widths list
+                            final List<double> colWidths = [
+                              snoW, recptW, admnW, nameW, classW,
+                              ...List.filled(feeCount, feeColW),
+                              totalColW,
+                            ];
+                            final totalFixedWidth = colWidths.reduce((a, b) => a + b) + (colWidths.length - 1) * colSpacing + 2 * hMargin;
+                            final tableWidth = totalFixedWidth > effectiveMin ? totalFixedWidth : effectiveMin;
+
+                            // Distribute extra space proportionally
+                            final extraSpace = tableWidth - totalFixedWidth;
+                            final List<double> adjustedWidths = colWidths.map((w) => w + (extraSpace * w / colWidths.reduce((a, b) => a + b))).toList();
+
+                            Widget buildCell(String text, int colIndex, {FontWeight? fontWeight, double? fontSize, Color? color, TextAlign? textAlign, bool truncate = false}) {
+                              final child = truncate
+                                  ? Text(text, overflow: TextOverflow.ellipsis, maxLines: 1,
+                                      style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color))
+                                  : Text(text, textAlign: textAlign,
+                                      style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color));
+                              return SizedBox(
+                                width: adjustedWidths[colIndex],
+                                child: truncate ? child : Align(
+                                  alignment: (colIndex >= 5) ? Alignment.centerRight : Alignment.centerLeft,
+                                  child: child,
+                                ),
+                              );
+                            }
+
+                            Widget buildRowContainer(List<Widget> cells, {Color? bgColor, double height = 36}) {
+                              return Container(
+                                height: height,
+                                color: bgColor,
+                                padding: EdgeInsets.symmetric(horizontal: hMargin.toDouble()),
+                                child: Row(
+                                  children: [
+                                    for (int i = 0; i < cells.length; i++) ...[
+                                      if (i > 0) const SizedBox(width: colSpacing),
+                                      cells[i],
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }
+
+                            // --- HEADER ---
+                            final headerRow = buildRowContainer(
+                              [
+                                buildCell('SNO', 0, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('RECPT.NO', 1, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('ADMN.NO', 2, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('NAME', 3, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('CLASS', 4, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                for (int i = 0; i < feeCount; i++)
+                                  buildCell(activeDisplayFeeTypes[i].toUpperCase(), 5 + i, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('TOTAL', 5 + feeCount, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                              ],
+                              bgColor: headerBg,
+                              height: 40,
+                            );
+
+                            // --- BODY ROWS ---
+                            final bodyChildren = <Widget>[];
+                            for (final row in flatRows) {
+                              final type = row['_type'] as String;
+                              if (type == 'grandTotal') continue;
+
+                              if (type == 'dateHeader') {
+                                bodyChildren.add(buildRowContainer(
+                                  [
+                                    buildCell(row['date'] as String, 0, fontWeight: FontWeight.w700, color: AppColors.accent),
+                                    for (int i = 1; i < totalColumns; i++)
+                                      buildCell('', i),
+                                  ],
+                                  bgColor: const Color(0xFFF1F5F9),
+                                  height: 36,
+                                ));
+                              } else if (type == 'subTotal') {
+                                final feeAmts = row['feeAmounts'] as Map<String, double>;
+                                final total = row['total'] as double;
+                                bodyChildren.add(buildRowContainer(
+                                  [
+                                    buildCell('S.Total', 0, fontWeight: FontWeight.w700),
+                                    buildCell('', 1),
+                                    buildCell('', 2),
+                                    buildCell('', 3),
+                                    buildCell('', 4),
+                                    for (int i = 0; i < feeCount; i++)
+                                      buildCell(
+                                        (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
+                                            ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                        5 + i, fontWeight: FontWeight.w700,
+                                      ),
+                                    buildCell(total.toStringAsFixed(0), 5 + feeCount, fontWeight: FontWeight.w700),
+                                  ],
+                                  bgColor: subTotalBg,
+                                  height: 36,
+                                ));
+                              } else {
+                                // Data row
+                                final feeAmts = row['feeAmounts'] as Map<String, double>;
+                                bodyChildren.add(buildRowContainer(
+                                  [
+                                    buildCell('${row['sno']}', 0),
+                                    buildCell(row['payNo'] as String, 1, fontWeight: FontWeight.w500),
+                                    buildCell(row['admNo'] as String, 2, fontWeight: FontWeight.w500),
+                                    buildCell(row['stuName'] as String, 3, truncate: true),
+                                    buildCell(row['stuClass'] as String, 4),
+                                    for (int i = 0; i < feeCount; i++)
+                                      buildCell(
+                                        (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
+                                            ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                        5 + i,
+                                      ),
+                                    buildCell(
+                                      (row['total'] as double).toStringAsFixed(0),
+                                      5 + feeCount, fontWeight: FontWeight.w600,
+                                    ),
+                                  ],
+                                  height: 36,
+                                ));
+                                // Thin divider between data rows
+                                bodyChildren.add(const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)));
+                              }
+                            }
+
+                            // --- FOOTER (GRAND TOTAL) ---
+                            final footerRow = buildRowContainer(
+                              [
+                                buildCell('', 0),
+                                buildCell('', 1),
+                                buildCell('', 2),
+                                buildCell('GRAND TOTAL', 3, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                                buildCell('', 4),
+                                for (int i = 0; i < feeCount; i++)
+                                  buildCell(
+                                    (grandFeeTypeTotals[activeDisplayFeeTypes[i]] ?? 0) > 0
+                                        ? (grandFeeTypeTotals[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                    5 + i, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white,
+                                  ),
+                                buildCell(grandTotal.toStringAsFixed(0), 5 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                              ],
+                              bgColor: headerBg,
+                              height: 40,
+                            );
+
                             return SingleChildScrollView(
                               controller: _tableScrollController,
                               scrollDirection: Axis.horizontal,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(minWidth: effectiveMin),
-                                child: tableWidget,
+                              child: SizedBox(
+                                width: tableWidth,
+                                height: constraints.maxHeight,
+                                child: Column(
+                                  children: [
+                                    // Fixed header
+                                    headerRow,
+                                    // Scrollable body
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.vertical,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: bodyChildren,
+                                        ),
+                                      ),
+                                    ),
+                                    // Fixed footer
+                                    footerRow,
+                                  ],
+                                ),
                               ),
                             );
                           },
-                        ),
+                        )),
                         // Classic horizontal scrollbar with arrow buttons
                         if (_canScroll)
                           Container(
@@ -4943,7 +5629,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_left, size: 16, color: Color(0xFF333333)),
+                                    child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
                                   ),
                                 ),
                                 // Scrollbar track + thumb
@@ -5015,20 +5701,18 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       color: Color(0xFFE0E0E0),
                                       border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
                                     ),
-                                    child: const Icon(Icons.chevron_right, size: 16, color: Color(0xFF333333)),
+                                    child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
                                   ),
                                 ),
                               ],
                             ),
                           ),
                       ],
-                    ),
+                    )),
                 ],
               ),
-            ),
+            )),
           ],
-        ),
-      ),
     );
   }
 
@@ -5231,29 +5915,29 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   Widget _buildSummaryCard(IconData icon, Color iconColor, String value, String label) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: EdgeInsets.all(6.w),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(icon, color: iconColor, size: 18),
+              child: Icon(icon, color: iconColor, size: 18.sp),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                  Text(value, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                 ],
               ),
             ),
@@ -5372,12 +6056,12 @@ class _StudentAccordionState extends State<_StudentAccordion> {
             ),
             child: Row(
               children: [
-                SizedBox(width: 36, child: Text('${widget.index}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                Expanded(flex: 1, child: Text(widget.admNo, style: const TextStyle(fontSize: 13))),
-                Expanded(flex: 3, child: Text(stuName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalFee), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalPaid), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.success))),
-                Expanded(flex: 2, child: Text(widget.formatCurrency(totalBalance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: totalBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
+                SizedBox(width: 36, child: Text('${widget.index}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                Expanded(flex: 1, child: Text(widget.admNo, style: TextStyle(fontSize: 13.sp))),
+                Expanded(flex: 3, child: Text(stuName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalFee), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalPaid), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success))),
+                Expanded(flex: 2, child: Text(widget.formatCurrency(totalBalance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: totalBalance > 0 ? AppColors.warning : AppColors.textSecondary))),
                 SizedBox(
                   width: 60,
                   child: Center(
@@ -5389,12 +6073,12 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                             : anyPaid
                                 ? AppColors.warning.withValues(alpha: 0.1)
                                 : AppColors.error.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
                       child: Text(
                         allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid',
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 9.sp,
                           fontWeight: FontWeight.w600,
                           color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error,
                         ),
@@ -5415,7 +6099,7 @@ class _StudentAccordionState extends State<_StudentAccordion> {
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8.r),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(
@@ -5426,15 +6110,15 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Expanded(flex: 2, child: Text('Term', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      Expanded(flex: 3, child: Text('Fee Type', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      Expanded(flex: 2, child: Text('Due Date', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      Expanded(flex: 2, child: Text('Paid', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      Expanded(flex: 2, child: Text('Balance', textAlign: TextAlign.right, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                      SizedBox(width: 50, child: Center(child: Text('Status', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
+                      Expanded(flex: 2, child: Text('Term', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 3, child: Text('Fee Type', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Due Date', textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Paid', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Balance', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      SizedBox(width: 50.w, child: Center(child: Text('Status', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                     ],
                   ),
                 ),
@@ -5459,11 +6143,11 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(flex: 2, child: Text(d['demfeeterm']?.toString() ?? '-', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        Expanded(flex: 3, child: Text(d['demfeetype']?.toString() ?? '-', style: const TextStyle(fontSize: 13))),
-                        Expanded(flex: 2, child: Text(_formatDueDate(d['duedate']), textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['feeamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['paidamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.success))),
+                        Expanded(flex: 2, child: Text(d['demfeeterm']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                        Expanded(flex: 3, child: Text(d['demfeetype']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
+                        Expanded(flex: 2, child: Text(_formatDueDate(d['duedate']), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['feeamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['paidamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success))),
                         Expanded(flex: 2, child: Text(widget.formatCurrency(balance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                         SizedBox(
                           width: 50,
@@ -5472,11 +6156,11 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8.r),
                               ),
                               child: Text(
                                 statusLabel,
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: statusColor),
+                                style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: statusColor),
                               ),
                             ),
                           ),

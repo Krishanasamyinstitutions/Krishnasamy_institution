@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -148,10 +149,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   Widget _buildDownloadButton(PaymentModel t) {
     return TextButton.icon(
       onPressed: () => _showReceiptOptions(t),
-      icon: const Icon(Icons.download_rounded, size: 18, color: AppColors.accent),
-      label: const Text('Download', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.accent)),
+      icon: Icon(Icons.download_rounded, size: 18.sp, color: AppColors.accent),
+      label: Text('Download', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
       style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       ),
     );
   }
@@ -233,7 +234,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
         child: SizedBox(
           width: 620,
           height: 920,
@@ -241,7 +242,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             children: [
               // Action bar
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -253,27 +254,27 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       icon: const Icon(Icons.download_rounded, size: 18),
                       label: const Text('Download'),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(ctx);
                         _printReceipt(t);
                       },
-                      icon: const Icon(Icons.print_rounded, size: 18),
+                      icon: Icon(Icons.print_rounded, size: 18.sp),
                       label: const Text('Print'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                         elevation: 0,
-                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8.w),
                     IconButton(
                       onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close, size: 20),
+                      icon: Icon(Icons.close, size: 20.sp),
                     ),
                   ],
                 ),
@@ -282,7 +283,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               // Receipt preview
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12.w),
                   child: Center(
                     child: Container(
                       decoration: BoxDecoration(
@@ -557,7 +558,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                             padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
                             decoration: pw.BoxDecoration(
                               color: PdfColor.fromInt(data.status == 'paid' ? 0x66c2eecd : 0x66FFD6D6),
-                              borderRadius: pw.BorderRadius.circular(10),
+                              borderRadius: pw.BorderRadius.circular(10.r),
                               border: pw.Border.all(
                                 color: data.status == 'paid' ? paidGreen : const PdfColor.fromInt(0xFFFF3B30),
                                 width: 2.5,
@@ -685,7 +686,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               padding: const EdgeInsets.all(4),
@@ -700,24 +701,24 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
                           color: isActive ? tabColors[i] : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(tabIcons[i], size: 16, color: isActive ? Colors.white : tabColors[i]),
-                            const SizedBox(width: 8),
-                            Text(tabLabels[i], style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textPrimary)),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8.w),
+                            Text(tabLabels[i], style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textPrimary)),
+                            SizedBox(width: 8.w),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: isActive ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(10.r),
                               ),
                               child: Text(
                                 '${tabCounts[i]}',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isActive ? Colors.white : tabColors[i]),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: isActive ? Colors.white : tabColors[i]),
                               ),
                             ),
                           ],
@@ -730,34 +731,34 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             );
           },
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10.h),
 
         // 2. Summary cards
         _buildSummaryCards(),
-        const SizedBox(height: 10),
+        SizedBox(height: 10.h),
 
         // 3. Combined header + table card
         Expanded(
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
                 // Date filter row
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: AppColors.border)),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
-                      const SizedBox(width: 8),
-                      const Text('Date Range:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8.w),
+                      Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                      SizedBox(width: 8.w),
                       InkWell(
                         onTap: () async {
                           final picked = await showDatePicker(
@@ -772,18 +773,18 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6.w),
                               Text(
                                 _filterFromDate != null
                                     ? '${_filterFromDate!.day.toString().padLeft(2, '0')}/${_filterFromDate!.month.toString().padLeft(2, '0')}/${_filterFromDate!.year}'
                                     : 'From',
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(fontSize: 13.sp),
                               ),
                             ],
                           ),
@@ -804,24 +805,24 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(6.r),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6.w),
                               Text(
                                 _filterToDate != null
                                     ? '${_filterToDate!.day.toString().padLeft(2, '0')}/${_filterToDate!.month.toString().padLeft(2, '0')}/${_filterToDate!.year}'
                                     : 'To',
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(fontSize: 13.sp),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8.w),
                       ...[
                         ('Today', () { final now = DateTime.now(); setState(() { _filterFromDate = DateTime(now.year, now.month, now.day); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
                         ('7 Days', () { final now = DateTime.now(); setState(() { _filterFromDate = now.subtract(const Duration(days: 7)); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
@@ -831,15 +832,15 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         padding: const EdgeInsets.only(left: 4),
                         child: InkWell(
                           onTap: e.$2,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(6.r),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(6.r),
                               border: Border.all(color: AppColors.border),
                             ),
-                            child: Text(e.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                            child: Text(e.$1, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500)),
                           ),
                         ),
                       )),
@@ -856,7 +857,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                     children: [
                       Icon(Icons.receipt_long_rounded,
                           color: AppColors.primary, size: 20),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8.w),
                       Text(
                         'Transactions',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -872,7 +873,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                           onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                           decoration: InputDecoration(
                             hintText: 'Search by name, pay no, reference...',
-                            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                            hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
                             prefixIcon: const Icon(Icons.search_rounded, size: 18),
                             suffixIcon: _searchQuery.isNotEmpty
                                 ? IconButton(
@@ -884,26 +885,26 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                                     splashRadius: 14,
                                   )
                                 : null,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                             filled: true,
                             fillColor: AppColors.surface,
                             isDense: true,
                           ),
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: 13.sp),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8.w),
                       TextButton.icon(
                         onPressed: _fetchData,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Refresh'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.textSecondary,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                          textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                         ),
                       ),
                     ],
@@ -960,7 +961,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             Icons.check_circle_outline_rounded,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16.w),
         Expanded(
           child: _buildSummaryCard(
             'Total Failed',
@@ -970,7 +971,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             Icons.error_outline_rounded,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16.w),
         Expanded(
           child: _buildSummaryCard(
             'Total Transactions',
@@ -990,7 +991,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
@@ -999,11 +1000,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10.r),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14.w),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1011,26 +1012,26 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.sp,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4.h),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 18.sp,
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2.h),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.sp,
                     color: AppColors.textSecondary.withValues(alpha: 0.7),
                   ),
                 ),
@@ -1051,7 +1052,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           children: [
             Icon(Icons.receipt_long_rounded,
                 size: 64, color: AppColors.accent.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             Text(
               'No Transactions',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1070,8 +1071,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       child: DataTable(
         dividerThickness: 0,
         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-        headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
-        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+        headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
         columnSpacing: 20,
         horizontalMargin: 16,
         headingRowHeight: 42,
@@ -1107,8 +1108,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               DataCell(Text('${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}')),
               DataCell(Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8)),
-                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13)),
+                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8.r)),
+                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13.sp)),
               )),
               DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
             ],
@@ -1132,7 +1133,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               size: 64,
               color: AppColors.accent.withValues(alpha: 0.5),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             Text(
               isPaid ? 'No Paid Transactions' : 'No Failed Transactions',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -1140,7 +1141,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                     color: AppColors.textSecondary,
                   ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
             Text(
               isPaid
                   ? 'No completed payments found.'
@@ -1160,8 +1161,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       child: DataTable(
         dividerThickness: 0,
         headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-        headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
-        dataTextStyle: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+        headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
         columnSpacing: 20,
         horizontalMargin: 16,
         headingRowHeight: 42,
@@ -1196,8 +1197,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               DataCell(Text(date != null ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}' : '-')),
               DataCell(Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8)),
-                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13)),
+                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8.r)),
+                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13.sp)),
               )),
               DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
             ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
@@ -109,8 +110,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             top: -100,
             right: -100,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 300.w,
+              height: 300.h,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.accent.withValues(alpha: 0.05),
@@ -121,8 +122,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             bottom: -50,
             left: -50,
             child: Container(
-              width: 200,
-              height: 200,
+              width: 200.w,
+              height: 200.h,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.secondary.withValues(alpha: 0.05),
@@ -136,26 +137,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               // Top bar
               Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                    EdgeInsets.symmetric(horizontal: 32.w, vertical: 24.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
                         Container(
-                          width: 40,
-                          height: 40,
+                          width: 40.w,
+                          height: 40.h,
                           decoration: BoxDecoration(
                             color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(12.r),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.school_rounded,
                             color: AppColors.accent,
-                            size: 22,
+                            size: 22.sp,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12.w),
                         Text(
                           'EduDesk',
                           style: Theme.of(context)
@@ -176,11 +177,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       color: AppColors.textSecondary,
                                     ),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(
+                          SizedBox(width: 4.w),
+                          Icon(
                             Icons.arrow_forward_rounded,
                             color: AppColors.textSecondary,
-                            size: 18,
+                            size: 18.sp,
                           ),
                         ],
                       ),
@@ -209,7 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               // Bottom navigation
               Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                    EdgeInsets.symmetric(horizontal: 32.w, vertical: 32.h),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -219,14 +220,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         _pages.length,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.only(right: 8),
-                          height: 6,
-                          width: _currentPage == index ? 32 : 6,
+                          margin: EdgeInsets.only(right: 8.w),
+                          height: 6.h,
+                          width: _currentPage == index ? 32.w : 6.w,
                           decoration: BoxDecoration(
                             color: _currentPage == index
                                 ? AppColors.accent
                                 : AppColors.border,
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(3.r),
                           ),
                         ),
                       ),
@@ -241,12 +242,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           duration: const Duration(milliseconds: 300),
                           padding: EdgeInsets.symmetric(
                             horizontal:
-                                _currentPage == _pages.length - 1 ? 32 : 24,
-                            vertical: 16,
+                                _currentPage == _pages.length - 1 ? 32.w : 24.w,
+                            vertical: 16.h,
                           ),
                           decoration: BoxDecoration(
                             gradient: AppColors.accentGradient,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(10.r),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.accent.withValues(alpha: 0.3),
@@ -270,11 +271,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       fontWeight: FontWeight.w600,
                                     ),
                               ),
-                              const SizedBox(width: 8),
-                              const Icon(
+                              SizedBox(width: 8.w),
+                              Icon(
                                 Icons.arrow_forward_rounded,
                                 color: Colors.white,
-                                size: 20,
+                                size: 20.sp,
                               ),
                             ],
                           ),
@@ -302,7 +303,7 @@ class _OnboardingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isDesktop) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 64),
+        padding: EdgeInsets.symmetric(horizontal: 64.w),
         child: Row(
           children: [
             // Left: illustration
@@ -313,7 +314,7 @@ class _OnboardingPage extends StatelessWidget {
                 child: _buildIllustration(context),
               ),
             ),
-            const SizedBox(width: 64),
+            SizedBox(width: 64.w),
             // Right: content
             Expanded(
               flex: 5,
@@ -328,15 +329,15 @@ class _OnboardingPage extends StatelessWidget {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: 32.w),
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          SizedBox(height: 24.h),
           FadeInDown(
             duration: const Duration(milliseconds: 600),
             child: _buildIllustration(context),
           ),
-          const SizedBox(height: 40),
+          SizedBox(height: 40.h),
           FadeInUp(
             duration: const Duration(milliseconds: 600),
             child: _buildContent(context),
@@ -349,11 +350,11 @@ class _OnboardingPage extends StatelessWidget {
   Widget _buildIllustration(BuildContext context) {
     return Center(
       child: Container(
-        width: 280,
-        height: 280,
+        width: 280.w,
+        height: 280.h,
         decoration: BoxDecoration(
           color: data.iconColor.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(40),
+          borderRadius: BorderRadius.circular(40.r),
           border: Border.all(
             color: data.iconColor.withValues(alpha: 0.15),
             width: 2,
@@ -367,8 +368,8 @@ class _OnboardingPage extends StatelessWidget {
               top: 30,
               right: 30,
               child: Container(
-                width: 40,
-                height: 40,
+                width: 40.w,
+                height: 40.h,
                 decoration: BoxDecoration(
                   color: data.iconColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
@@ -379,8 +380,8 @@ class _OnboardingPage extends StatelessWidget {
               bottom: 40,
               left: 30,
               child: Container(
-                width: 24,
-                height: 24,
+                width: 24.w,
+                height: 24.h,
                 decoration: BoxDecoration(
                   color: data.iconColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
@@ -389,7 +390,7 @@ class _OnboardingPage extends StatelessWidget {
             ),
             Icon(
               data.icon,
-              size: 100,
+              size: 100.sp,
               color: data.iconColor,
             ),
           ],
@@ -405,22 +406,22 @@ class _OnboardingPage extends StatelessWidget {
       children: [
         // Subtitle chip
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
           decoration: BoxDecoration(
             color: data.iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(20.r),
           ),
           child: Text(
             data.subtitle,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: data.iconColor,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 13.sp,
                 ),
           ),
         ),
 
-        const SizedBox(height: 20),
+        SizedBox(height: 20.h),
 
         // Title
         Text(
@@ -430,7 +431,7 @@ class _OnboardingPage extends StatelessWidget {
               ),
         ),
 
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
 
         // Description
         Text(
@@ -441,28 +442,28 @@ class _OnboardingPage extends StatelessWidget {
               ),
         ),
 
-        const SizedBox(height: 32),
+        SizedBox(height: 32.h),
 
         // Feature list
         ...data.features.map(
           (feature) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: 12.h),
             child: Row(
               children: [
                 Container(
-                  width: 28,
-                  height: 28,
+                  width: 28.w,
+                  height: 28.h,
                   decoration: BoxDecoration(
                     color: data.iconColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Icon(
                     Icons.check_rounded,
                     color: data.iconColor,
-                    size: 16,
+                    size: 16.sp,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12.w),
                 Text(
                   feature,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(

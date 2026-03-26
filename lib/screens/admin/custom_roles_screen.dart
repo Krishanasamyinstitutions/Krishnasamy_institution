@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -130,27 +131,27 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 13),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      labelStyle: TextStyle(fontSize: 13.sp),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r)),
+      contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Form panel
           SizedBox(
-            width: 360,
+            width: 360.w,
             child: Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20.w),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Form(
@@ -161,38 +162,38 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.security_rounded, color: AppColors.accent, size: 22),
-                        const SizedBox(width: 8),
+                        Icon(Icons.security_rounded, color: AppColors.accent, size: 22.sp),
+                        SizedBox(width: 8.w),
                         Text(
                           _editingUrId != null ? 'Edit Role' : 'Add Role',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20.h),
                     TextFormField(
                       controller: _nameController,
                       decoration: _inputDecoration('Role Name'),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24.h),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _isLoading ? null : _saveRole,
-                            icon: Icon(_editingUrId != null ? Icons.save : Icons.add, size: 18),
+                            icon: Icon(_editingUrId != null ? Icons.save : Icons.add, size: 18.sp),
                             label: Text(_editingUrId != null ? 'Update' : 'Add'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                             ),
                           ),
                         ),
                         if (_editingUrId != null) ...[
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8.w),
                           TextButton(
                             onPressed: () => setState(() => _resetForm()),
                             child: const Text('Cancel'),
@@ -205,13 +206,13 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          SizedBox(width: 24.w),
           // Table panel
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
@@ -219,27 +220,27 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.05),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.admin_panel_settings_rounded, size: 18, color: AppColors.accent),
-                        const SizedBox(width: 8),
-                        const Text('Custom Roles', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        Icon(Icons.admin_panel_settings_rounded, size: 18.sp, color: AppColors.accent),
+                        SizedBox(width: 8.w),
+                        Text('Custom Roles', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                         const Spacer(),
-                        Text('${_roles.length} records', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                        const SizedBox(width: 12),
+                        Text('${_roles.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        SizedBox(width: 12.w),
                         TextButton.icon(
                           onPressed: _fetchRoles,
-                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          icon: Icon(Icons.refresh_rounded, size: 16.sp),
                           label: const Text('Refresh'),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.textSecondary,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -247,26 +248,26 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                   ),
                   // Table header
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     color: const Color(0xFF6C8EEF),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        SizedBox(width: 40, child: Text('S NO.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
-                        SizedBox(width: 80, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                        SizedBox(width: 80.w, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                       ],
                     ),
                   ),
                   // Data rows
                   if (_isLoading)
-                    const Padding(
-                      padding: EdgeInsets.all(40),
+                    Padding(
+                      padding: EdgeInsets.all(40.w),
                       child: Center(child: CircularProgressIndicator()),
                     )
                   else if (_roles.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(40),
+                    Padding(
+                      padding: EdgeInsets.all(40.w),
                       child: Center(child: Text('No roles found', style: TextStyle(color: AppColors.textSecondary))),
                     )
                   else
@@ -274,33 +275,33 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                       final idx = entry.key;
                       final role = entry.value;
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                         color: idx.isEven ? Colors.white : AppColors.surface,
                         child: Row(
                           children: [
-                            SizedBox(width: 40, child: Text('${idx + 1}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                            Expanded(flex: 3, child: Text(role['urname']?.toString() ?? '-', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                            Expanded(flex: 2, child: Text(role['inscode']?.toString() ?? '-', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+                            SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                            Expanded(flex: 3, child: Text(role['urname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                            Expanded(flex: 2, child: Text(role['inscode']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                             SizedBox(
-                              width: 80,
+                              width: 80.w,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   InkWell(
                                     onTap: () => _editRole(role),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.edit_rounded, size: 16, color: AppColors.accent),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(4.w),
+                                      child: Icon(Icons.edit_rounded, size: 16.sp, color: AppColors.accent),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  SizedBox(width: 8.w),
                                   InkWell(
                                     onTap: () => _deleteRole(role['ur_id'] as int),
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.delete_rounded, size: 16, color: Colors.red),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(4.w),
+                                      child: Icon(Icons.delete_rounded, size: 16.sp, color: Colors.red),
                                     ),
                                   ),
                                 ],

@@ -698,45 +698,57 @@ class SupabaseService {
       }
       if (demandList.isEmpty) return [];
 
-      // Collect unique pay_ids and fetch paydate
+      // Collect unique pay_ids and stu_ids
       final payIds = demandList
           .map((d) => d['pay_id'])
           .where((id) => id != null)
           .toSet()
           .toList();
-      final Map<int, String> payDateMap = {};
-      for (var i = 0; i < payIds.length; i += 500) {
-        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
-        final payRows = await client
-            .from('payment')
-            .select('pay_id, paydate')
-            .inFilter('pay_id', chunk);
-        for (final row in (payRows as List)) {
-          final id = row['pay_id'] as int?;
-          final date = row['paydate']?.toString();
-          if (id != null && date != null) payDateMap[id] = date;
-        }
-      }
-
-      // Collect unique stu_ids and fetch student names
       final stuIds = demandList
           .map((d) => d['stu_id'])
           .where((id) => id != null)
           .toSet()
           .toList();
+
+      // Fetch payment dates and student names in parallel
+      final Map<int, String> payDateMap = {};
       final Map<int, String> stuNameMap = {};
+
+      final enrichFutures = <Future>[];
+
+      // Payment date futures
+      for (var i = 0; i < payIds.length; i += 500) {
+        final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+        enrichFutures.add(client
+            .from('payment')
+            .select('pay_id, paydate')
+            .inFilter('pay_id', chunk)
+            .then((payRows) {
+          for (final row in (payRows as List)) {
+            final id = row['pay_id'] as int?;
+            final date = row['paydate']?.toString();
+            if (id != null && date != null) payDateMap[id] = date;
+          }
+        }));
+      }
+
+      // Student name futures
       for (var i = 0; i < stuIds.length; i += 500) {
         final chunk = stuIds.sublist(i, (i + 500).clamp(0, stuIds.length));
-        final stuRows = await client
+        enrichFutures.add(client
             .from('students')
             .select('stu_id, stuname')
-            .inFilter('stu_id', chunk);
-        for (final row in (stuRows as List)) {
-          final id = row['stu_id'] as int?;
-          final name = row['stuname']?.toString();
-          if (id != null && name != null) stuNameMap[id] = name;
-        }
+            .inFilter('stu_id', chunk)
+            .then((stuRows) {
+          for (final row in (stuRows as List)) {
+            final id = row['stu_id'] as int?;
+            final name = row['stuname']?.toString();
+            if (id != null && name != null) stuNameMap[id] = name;
+          }
+        }));
       }
+
+      await Future.wait(enrichFutures);
 
       // Enrich demand rows with paydate and stuname
       for (final d in demandList) {

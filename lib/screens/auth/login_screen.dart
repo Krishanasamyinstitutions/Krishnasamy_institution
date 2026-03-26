@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
@@ -84,8 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
               top: 60.0 + (row * 80),
               left: 40.0 + (col * 80),
               child: Container(
-                width: 3,
-                height: 3,
+                width: 3.w,
+                height: 3.h,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.06),
@@ -96,26 +97,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
           Center(
             child: Padding(
-              padding: const EdgeInsets.all(64),
+              padding: EdgeInsets.all(64.w),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInLeft(
                     child: Container(
-                      width: 80,
-                      height: 80,
+                      width: 80.w,
+                      height: 80.h,
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(22.r),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.school_rounded,
-                        size: 40,
+                        size: 40.sp,
                         color: AppColors.accent,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32.h),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
@@ -128,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 400),
                     child: Text(
@@ -140,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                     ),
                   ),
-                  const SizedBox(height: 48),
+                  SizedBox(height: 48.h),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 600),
                     child: _buildFeatureList(context),
@@ -164,24 +165,24 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       children: features.map((f) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.only(bottom: 16.h),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 36.w,
+                height: 36.h,
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
                 child: Icon(
                   f['icon'] as IconData,
                   color: AppColors.accent,
-                  size: 18,
+                  size: 18.sp,
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14.w),
               Text(
                 f['text'] as String,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -200,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
       color: AppColors.surface,
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(40),
+          padding: EdgeInsets.all(40.w),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Form(
@@ -219,14 +220,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: Colors.white,
                           side: const BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(12.r),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32.h),
 
                   FadeInDown(
                     delay: const Duration(milliseconds: 100),
@@ -235,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: Theme.of(context).textTheme.displayMedium,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8.h),
                   FadeInDown(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
@@ -244,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 36),
+                  SizedBox(height: 36.h),
 
                   // Error message
                   Consumer<AuthProvider>(
@@ -252,20 +253,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (auth.errorMessage != null) {
                         return FadeInDown(
                           child: Container(
-                            padding: const EdgeInsets.all(14),
-                            margin: const EdgeInsets.only(bottom: 20),
+                            padding: EdgeInsets.all(14.w),
+                            margin: EdgeInsets.only(bottom: 20.h),
                             decoration: BoxDecoration(
                               color: AppColors.error.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(12.r),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline_rounded,
-                                    color: AppColors.error, size: 20),
-                                const SizedBox(width: 10),
+                                Icon(Icons.error_outline_rounded,
+                                    color: AppColors.error, size: 20.sp),
+                                SizedBox(width: 10.w),
                                 Expanded(
                                   child: Text(
                                     auth.errorMessage!,
@@ -295,18 +296,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(fontSize: 13),
+                              ?.copyWith(fontSize: 13.sp),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8.h),
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
                             hintText: 'admin@edudesk.com',
-                            prefixIcon: const Icon(Icons.email_outlined,
-                                size: 20, color: AppColors.textLight),
-                            prefixIconConstraints: const BoxConstraints(
-                                minWidth: 52, minHeight: 0),
+                            prefixIcon: Icon(Icons.email_outlined,
+                                size: 20.sp, color: AppColors.textLight),
+                            prefixIconConstraints: BoxConstraints(
+                                minWidth: 52.w, minHeight: 0),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -322,7 +323,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20.h),
 
                   // Password field
                   FadeInDown(
@@ -335,24 +336,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(fontSize: 13),
+                              ?.copyWith(fontSize: 13.sp),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8.h),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: '••••••••',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded,
-                                size: 20, color: AppColors.textLight),
-                            prefixIconConstraints: const BoxConstraints(
-                                minWidth: 52, minHeight: 0),
+                            prefixIcon: Icon(Icons.lock_outline_rounded,
+                                size: 20.sp, color: AppColors.textLight),
+                            prefixIconConstraints: BoxConstraints(
+                                minWidth: 52.w, minHeight: 0),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                size: 20,
+                                size: 20.sp,
                                 color: AppColors.textLight,
                               ),
                               onPressed: () {
@@ -376,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
 
                   // Remember me & Forgot password
                   FadeInDown(
@@ -387,25 +388,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           children: [
                             SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: 20.w,
+                              height: 20.h,
                               child: Checkbox(
                                 value: _rememberMe,
                                 onChanged: (v) =>
                                     setState(() => _rememberMe = v ?? false),
                                 activeColor: AppColors.accent,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(4.r),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8.w),
                             Text(
                               'Remember me',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(fontSize: 13),
+                                  ?.copyWith(fontSize: 13.sp),
                             ),
                           ],
                         ),
@@ -420,7 +421,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ?.copyWith(
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 13,
+                                  fontSize: 13.sp,
                                 ),
                           ),
                         ),
@@ -428,7 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  SizedBox(height: 28.h),
 
                   // Sign in button
                   FadeInDown(
@@ -436,29 +437,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         return SizedBox(
-                          height: 54,
+                          height: 54.h,
                           child: ElevatedButton(
                             onPressed: auth.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
-                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(10.r),
                               ),
                             ),
                             child: auth.isLoading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
+                                ? SizedBox(
+                                    width: 22.w,
+                                    height: 22.h,
+                                    child: const CircularProgressIndicator(
                                       strokeWidth: 2.5,
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
+                                : Text(
                                     'Sign In',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 16.sp,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -468,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  SizedBox(height: 28.h),
 
                   // Sign up link
                   FadeInDown(
@@ -503,16 +504,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24.h),
 
                   // Demo hint
                   FadeInDown(
                     delay: const Duration(milliseconds: 800),
                     child: Container(
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsets.all(14.w),
                       decoration: BoxDecoration(
                         color: AppColors.info.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12.r),
                         border: Border.all(
                           color: AppColors.info.withValues(alpha: 0.15),
                         ),
@@ -521,8 +522,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           Icon(Icons.info_outline_rounded,
                               color: AppColors.info.withValues(alpha: 0.7),
-                              size: 18),
-                          const SizedBox(width: 10),
+                              size: 18.sp),
+                          SizedBox(width: 10.w),
                           Expanded(
                             child: Text(
                               'Demo: admin@edudesk.com / admin123',
@@ -531,7 +532,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   .bodyMedium
                                   ?.copyWith(
                                     color: AppColors.info,
-                                    fontSize: 13,
+                                    fontSize: 13.sp,
                                   ),
                             ),
                           ),

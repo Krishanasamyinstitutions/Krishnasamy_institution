@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_windows/webview_windows.dart';
 import '../../utils/app_theme.dart';
@@ -296,7 +297,17 @@ class _StudentFeeCollectionScreenState
   double _netAmt(Map<String, dynamic> d) {
     final key = _demKey(d);
     final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-    return bal + _fine(key) - _con(key);
+    final fine = _fine(key);
+    return bal + fine;
+  }
+
+  double _payableAmt(Map<String, dynamic> d) {
+    final key = _demKey(d);
+    final col = _con(key);
+    final fine = _fine(key);
+    if (col > 0) return col + fine;
+    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+    return bal + fine;
   }
 
   double get _totalNetSelected {
@@ -305,7 +316,7 @@ class _StudentFeeCollectionScreenState
           (x) => _demKey(x) == key,
           orElse: () => {});
       if (d.isEmpty) return sum;
-      return sum + _netAmt(d);
+      return sum + _payableAmt(d);
     });
   }
 
@@ -316,16 +327,16 @@ class _StudentFeeCollectionScreenState
       children: [
         // Header card
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
-              const Icon(Icons.payments_rounded, color: AppColors.accent, size: 22),
-              const SizedBox(width: 10),
+              Icon(Icons.payments_rounded, color: AppColors.accent, size: 22.sp),
+              SizedBox(width: 10.w),
               Text('Fee Collection',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -333,19 +344,19 @@ class _StudentFeeCollectionScreenState
               const Spacer(),
               TextButton.icon(
                 onPressed: _clear,
-                icon: const Icon(Icons.refresh_rounded, size: 16),
+                icon: Icon(Icons.refresh_rounded, size: 16.sp),
                 label: const Text('Clear'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w500),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  textStyle: TextStyle(
+                      fontSize: 13.sp, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10.h),
 
         // Body
         Expanded(
@@ -354,11 +365,11 @@ class _StudentFeeCollectionScreenState
             children: [
               // ── Left Panel (Single Card) ──
               SizedBox(
-                width: 240,
+                width: 240.w,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: SingleChildScrollView(
@@ -367,14 +378,14 @@ class _StudentFeeCollectionScreenState
                       children: [
                         // Student Lookup section
                         Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(12.w),
                           child: _buildStudentLookupContent(),
                         ),
                         if (_student != null) ...[
                           const Divider(height: 1),
                           // Student Info section
                           Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: EdgeInsets.all(12.w),
                             child: _buildStudentCardContent(),
                           ),
                         ],
@@ -384,7 +395,7 @@ class _StudentFeeCollectionScreenState
                 ),
               ),
 
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
 
               // ── Right Panel ──
               Expanded(child: _buildDemandsPanel()),
@@ -405,7 +416,7 @@ class _StudentFeeCollectionScreenState
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   )),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
           Row(
             children: [
               Expanded(
@@ -413,48 +424,48 @@ class _StudentFeeCollectionScreenState
                   controller: _admNoController,
                   onSubmitted: (_) => _search(),
                   decoration: _inputDec('Admission No'),
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(fontSize: 13.sp),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8.w),
               SizedBox(
-                height: 42,
-                width: 42,
+                height: 42.h,
+                width: 42.w,
                 child: ElevatedButton(
                   onPressed: _searching ? null : _search,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10.r)),
                     padding: EdgeInsets.zero,
                   ),
                   child: _searching
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
+                      ? SizedBox(
+                          width: 18.w,
+                          height: 18.h,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Icon(Icons.search_rounded, size: 20),
+                      : Icon(Icons.search_rounded, size: 20.sp),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10.h),
           TextField(
             controller: _nameController,
             decoration: _inputDec('Student Name'),
-            style: const TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 13.sp),
             onChanged: _searchByName,
           ),
           if (_studentSuggestions.isNotEmpty)
             Container(
-              margin: const EdgeInsets.only(top: 4),
+              margin: EdgeInsets.only(top: 4.h),
               constraints: const BoxConstraints(maxHeight: 180),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
               ),
@@ -466,20 +477,20 @@ class _StudentFeeCollectionScreenState
                   final s = _studentSuggestions[i];
                   return ListTile(
                     dense: true,
-                    title: Text(s['stuname']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: const TextStyle(fontSize: 13)),
+                    title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
                     onTap: () => _selectSuggestion(s),
                   );
                 },
               ),
             ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10.h),
           DropdownButtonFormField<String>(
             value: _selectedClass,
             decoration: _inputDec('Class'),
-            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
             isExpanded: true,
-            items: _classList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+            items: _classList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
             onChanged: (val) {
               setState(() {
                 _selectedClass = val;
@@ -491,11 +502,11 @@ class _StudentFeeCollectionScreenState
           ),
           if (_classSuggestions.isNotEmpty)
             Container(
-              margin: const EdgeInsets.only(top: 4),
+              margin: EdgeInsets.only(top: 4.h),
               constraints: const BoxConstraints(maxHeight: 220),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
               ),
@@ -507,26 +518,26 @@ class _StudentFeeCollectionScreenState
                   final s = _classSuggestions[i];
                   return ListTile(
                     dense: true,
-                    title: Text(s['stuname']?.toString() ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: const TextStyle(fontSize: 13)),
+                    title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
                     onTap: () => _selectSuggestion(s),
                   );
                 },
               ),
             ),
           if (_errorMsg != null) ...[
-            const SizedBox(height: 10),
+            SizedBox(height: 10.h),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(10.w),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(
                     color: AppColors.error.withValues(alpha: 0.3)),
               ),
               child: Text(_errorMsg!,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.error)),
+                  style: TextStyle(
+                      fontSize: 13.sp, color: AppColors.error)),
             ),
           ],
         ],
@@ -549,38 +560,38 @@ class _StudentFeeCollectionScreenState
                 backgroundColor: AppColors.accent.withValues(alpha: 0.12),
                 child: Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.accent,
                             fontWeight: FontWeight.w700,
-                            fontSize: 18),
+                            fontSize: 18.sp),
                       ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name,
-                        style: const TextStyle(
-                            fontSize: 14,
+                        style: TextStyle(
+                            fontSize: 14.sp,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary),
                         overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2.h),
                     Text('Adm No: $admNo',
-                        style: const TextStyle(
-                            fontSize: 13,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             color: AppColors.textSecondary)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14.h),
           const Divider(height: 1),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
           _detailRow(Icons.person_outline_rounded, 'Father', fatherName),
-          const SizedBox(height: 8),
+          SizedBox(height: 8.h),
           _detailRow(Icons.school_outlined, 'Class', className),
         ],
       );
@@ -596,18 +607,18 @@ class _StudentFeeCollectionScreenState
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   )),
-          const SizedBox(height: 10),
+          SizedBox(height: 10.h),
           DropdownButtonFormField<String?>(
             value: _selectedTerm,
             isExpanded: true,
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
             ),
             items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13))),
-              ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
+              DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp))),
+              ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp)))),
             ],
             onChanged: (v) => setState(() => _selectedTerm = v),
           ),
@@ -621,7 +632,7 @@ class _StudentFeeCollectionScreenState
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -629,7 +640,7 @@ class _StudentFeeCollectionScreenState
           // Panel header
           Container(
             padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
             decoration: BoxDecoration(
               border:
                   Border(bottom: BorderSide(color: AppColors.border)),
@@ -643,18 +654,18 @@ class _StudentFeeCollectionScreenState
                           color: AppColors.textPrimary,
                         )),
                 if (_allDemands.isNotEmpty) ...[
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8.w),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 8.w, vertical: 2.h),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
                     child: Text(
                       '${_filteredDemands.length} of ${_allDemands.length} items',
-                      style: const TextStyle(
-                          fontSize: 13,
+                      style: TextStyle(
+                          fontSize: 13.sp,
                           color: AppColors.accent,
                           fontWeight: FontWeight.w600),
                     ),
@@ -662,23 +673,23 @@ class _StudentFeeCollectionScreenState
                 ],
                 const Spacer(),
                 if (_student != null && _terms.isNotEmpty) ...[
-                  const Text('Term:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                  const SizedBox(width: 8),
+                  Text('Term:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                  SizedBox(width: 8.w),
                   SizedBox(
-                    width: 140,
-                    height: 38,
+                    width: 140.w,
+                    height: 38.h,
                     child: DropdownButtonFormField<String?>(
                       value: _selectedTerm,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border)),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
                         isDense: true,
                       ),
                       items: [
-                        const DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13))),
-                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
+                        DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp))),
+                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp)))),
                       ],
                       onChanged: (v) => setState(() => _selectedTerm = v),
                     ),
@@ -707,11 +718,11 @@ class _StudentFeeCollectionScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.search_rounded,
-                size: 52, color: Colors.grey.shade300),
-            const SizedBox(height: 12),
+                size: 52.sp, color: Colors.grey.shade300),
+            SizedBox(height: 12.h),
             Text('Search a student to view pending fees',
                 style: TextStyle(
-                    fontSize: 13, color: Colors.grey.shade400)),
+                    fontSize: 13.sp, color: Colors.grey.shade400)),
           ],
         ),
       );
@@ -723,11 +734,11 @@ class _StudentFeeCollectionScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.check_circle_outline_rounded,
-                size: 52, color: Colors.green.shade300),
-            const SizedBox(height: 12),
+                size: 52.sp, color: Colors.green.shade300),
+            SizedBox(height: 12.h),
             Text('No pending fee demands',
                 style:
-                    TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                    TextStyle(fontSize: 13.sp, color: Colors.grey.shade500)),
           ],
         ),
       );
@@ -742,11 +753,11 @@ class _StudentFeeCollectionScreenState
         // Table header (dark)
         Container(
           color: const Color(0xFF6C8EEF),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
           child: Row(
             children: [
               SizedBox(
-                width: 32,
+                width: 32.w,
                 child: Checkbox(
                   value: allSelected,
                   onChanged: (v) {
@@ -773,12 +784,12 @@ class _StudentFeeCollectionScreenState
               ),
               const _THCell('Term', flex: 2),
               const _THCell('Fee Type', flex: 3),
-              const _THCell('Due Date', flex: 2),
-              const _THCell('Fee Amt', flex: 2),
-              const _THCell('Bal. Amt', flex: 2),
-              const _THCell('Fine', flex: 2),
-              const _THCell('Con/Refund', flex: 2),
-              const _THCell('Net Amt', flex: 2),
+              const _THCell('Due Date', flex: 3),
+              const _THCell('Fee Amt', flex: 2, textAlign: TextAlign.right),
+              const _THCell('Bal. Amt', flex: 2, textAlign: TextAlign.right),
+              const _THCell('Col Amount', flex: 2, textAlign: TextAlign.center),
+              const _THCell('Fine', flex: 2, textAlign: TextAlign.center),
+              const _THCell('Net Amt', flex: 1, textAlign: TextAlign.right),
             ],
           ),
         ),
@@ -807,12 +818,12 @@ class _StudentFeeCollectionScreenState
                 color: isSelected
                     ? AppColors.accent.withValues(alpha: 0.04)
                     : null,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                    horizontal: 12.w, vertical: 10.h),
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 32,
+                      width: 32.w,
                       child: Checkbox(
                         value: isSelected,
                         onChanged: (v) {
@@ -834,49 +845,58 @@ class _StudentFeeCollectionScreenState
                     ),
                     _TDCell(d['demfeeterm']?.toString() ?? '-',
                         flex: 2,
-                        style: const TextStyle(
-                            fontSize: 13,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary)),
                     _TDCell(d['demfeetype']?.toString() ?? '-',
                         flex: 3,
-                        style: const TextStyle(
-                            fontSize: 13,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             color: AppColors.textSecondary)),
                     _TDCell(shortDate,
-                        flex: 2,
-                        style: const TextStyle(
-                            fontSize: 13,
+                        flex: 3,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             color: AppColors.textSecondary)),
                     _TDCell(feeAmt.toStringAsFixed(2),
                         flex: 2,
-                        style: const TextStyle(
-                            fontSize: 13,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             color: AppColors.textPrimary)),
                     _TDCell(bal.toStringAsFixed(2),
                         flex: 2,
-                        style: const TextStyle(
-                            fontSize: 13,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFE87722))),
+                            color: const Color(0xFFE87722))),
+                    // Col Amount editable
+                    Expanded(
+                      flex: 2,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        child:
+                            _numField(_conCtrl[key], () => setState(() {})),
+                      ),
+                    ),
                     // Fine editable
                     Expanded(
                       flex: 2,
-                      child: _numField(_fineCtrl[key], () => setState(() {})),
-                    ),
-                    // Con/Refund editable
-                    Expanded(
-                      flex: 2,
-                      child:
-                          _numField(_conCtrl[key], () => setState(() {})),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        child: _numField(_fineCtrl[key], () => setState(() {})),
+                      ),
                     ),
                     // Net Amt
                     Expanded(
-                      flex: 2,
+                      flex: 1,
                       child: Text(
                         netAmt.toStringAsFixed(2),
+                        textAlign: TextAlign.right,
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
                             color: netAmt > 0
                                 ? AppColors.error
@@ -892,54 +912,54 @@ class _StudentFeeCollectionScreenState
 
         // Footer
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
           decoration: BoxDecoration(
             color: Colors.white,
             border: Border(top: BorderSide(color: AppColors.border)),
-            borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12)),
+            borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(12.r),
+                bottomRight: Radius.circular(12.r)),
           ),
           child: Row(
             children: [
-              Icon(Icons.check_circle_outline_rounded, size: 16, color: AppColors.accent),
-              const SizedBox(width: 6),
+              Icon(Icons.check_circle_outline_rounded, size: 16.sp, color: AppColors.accent),
+              SizedBox(width: 6.w),
               Text(
                 '${_selected.length} of ${demands.length} selected',
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                    horizontal: 14.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                   border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
                 ),
                 child: Row(
                   children: [
-                    const Text('Net Amount: ',
+                    Text('Net Amount: ',
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary)),
                     Text(
                       'Rs.${_totalNetSelected.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 13,
+                      style: TextStyle(
+                          fontSize: 13.sp,
                           fontWeight: FontWeight.w700,
                           color: AppColors.accent),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed:
                     _selected.isEmpty ? null : _onCollectAndReceipt,
-                icon: const Icon(Icons.payment_rounded, size: 16),
+                icon: Icon(Icons.payment_rounded, size: 16.sp),
                 label: const Text('Proceed to Pay'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
@@ -947,11 +967,11 @@ class _StudentFeeCollectionScreenState
                   disabledBackgroundColor: Colors.grey.shade200,
                   disabledForegroundColor: AppColors.textSecondary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 16),
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
+                      borderRadius: BorderRadius.circular(10.r)),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 24.w, vertical: 16.h),
+                  textStyle: TextStyle(
+                      fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -975,24 +995,24 @@ class _StudentFeeCollectionScreenState
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: const Text('Proceed to Pay', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          title: Text('Proceed to Pay', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
           content: SizedBox(
-            width: 400,
+            width: 400.w,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Student: ${_student!['stuname']} (${_student!['stuadmno']})', style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 4),
-                Text('Demands selected: ${_selected.length}', style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 8),
-                Text('Total: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.accent)),
-                const SizedBox(height: 16),
+                Text('Student: ${_student!['stuname']} (${_student!['stuadmno']})', style: TextStyle(fontSize: 14.sp)),
+                SizedBox(height: 4.h),
+                Text('Demands selected: ${_selected.length}', style: TextStyle(fontSize: 14.sp)),
+                SizedBox(height: 8.h),
+                Text('Total: Rs.${totalNet.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18.sp, color: AppColors.accent)),
+                SizedBox(height: 16.h),
                 const Divider(),
-                const SizedBox(height: 8),
-                const Text('Payment Mode *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
+                SizedBox(height: 8.h),
+                Text('Payment Mode *', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                SizedBox(height: 10.h),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1002,47 +1022,47 @@ class _StudentFeeCollectionScreenState
                       onTap: () => setDialogState(() => setState(() => _paymentMode = mode)),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
                         decoration: BoxDecoration(
                           color: sel ? AppColors.accent : AppColors.surface,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(20.r),
                           border: Border.all(color: sel ? AppColors.accent : AppColors.border),
                         ),
-                        child: Text(mode, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
+                        child: Text(mode, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
                       ),
                     );
                   }).toList(),
                 ),
                 if (_paymentMode == 'Cheque') ...[
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
                   Row(
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Cheque No *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            const SizedBox(height: 6),
+                            Text('Cheque No *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                            SizedBox(height: 6.h),
                             TextField(
                               controller: _chequeNoController,
                               decoration: InputDecoration(
                                 hintText: 'Enter cheque number',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
                                 isDense: true,
                               ),
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(fontSize: 13.sp),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10.w),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Cheque Date *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            const SizedBox(height: 6),
+                            Text('Cheque Date *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                            SizedBox(height: 6.h),
                             TextField(
                               controller: _chequeDateController,
                               readOnly: true,
@@ -1061,30 +1081,30 @@ class _StudentFeeCollectionScreenState
                               },
                               decoration: InputDecoration(
                                 hintText: 'DD/MM/YYYY',
-                                suffixIcon: const Icon(Icons.calendar_today, size: 16),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                suffixIcon: Icon(Icons.calendar_today, size: 16.sp),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
                                 isDense: true,
                               ),
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(fontSize: 13.sp),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  const Text('Bank Name *', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 10.h),
+                  Text('Bank Name *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                  SizedBox(height: 6.h),
                   TextField(
                     controller: _bankNameController,
                     decoration: InputDecoration(
                       hintText: 'Enter bank name',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
                       isDense: true,
                     ),
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                   ),
                 ],
               ],
@@ -1093,7 +1113,7 @@ class _StudentFeeCollectionScreenState
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel', style: TextStyle(fontSize: 14)),
+              child: Text('Cancel', style: TextStyle(fontSize: 14.sp)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -1113,10 +1133,10 @@ class _StudentFeeCollectionScreenState
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 14.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
               ),
-              child: const Text('Confirm Payment', style: TextStyle(fontSize: 14)),
+              child: Text('Confirm Payment', style: TextStyle(fontSize: 14.sp)),
             ),
           ],
         ),
@@ -1140,30 +1160,30 @@ class _StudentFeeCollectionScreenState
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
-            const SizedBox(height: 12),
-            const Text('Payment Successful', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text('Receipt No: $payNumber', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.accent)),
-            Text('Mode: $_paymentMode', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 16),
+            Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56.sp),
+            SizedBox(height: 12.h),
+            Text('Payment Successful', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+            SizedBox(height: 8.h),
+            Text('Receipt No: $payNumber', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            Text('Amount: Rs.${totalNet.toStringAsFixed(2)}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            Text('Mode: $_paymentMode', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            SizedBox(height: 16.h),
             OutlinedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 _clear();
                 if (payId != null) _downloadReceipt(payId, payNumber);
               },
-              icon: const Icon(Icons.download_rounded, size: 16),
+              icon: Icon(Icons.download_rounded, size: 16.sp),
               label: const Text('Download Receipt'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.accent,
                 side: const BorderSide(color: AppColors.accent),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
               ),
             ),
           ],
@@ -1177,8 +1197,8 @@ class _StudentFeeCollectionScreenState
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
             ),
             child: const Text('Done'),
           ),
@@ -1216,8 +1236,9 @@ class _StudentFeeCollectionScreenState
         if (d.isEmpty) continue;
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
-        final con = _con(key);
-        final net = bal + fine - con;
+        final col = _con(key);
+        // If col amount entered, pay that amount (partial); otherwise pay full balance
+        final net = (col > 0 ? col : bal) + fine;
         items.add({
           'dem_id': d['dem_id'] as int,
           'yr_id': d['yr_id'],
@@ -1319,8 +1340,9 @@ class _StudentFeeCollectionScreenState
         if (d.isEmpty) continue;
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
-        final con = _con(key);
-        final net = bal + fine - con;
+        final col = _con(key);
+        // If col amount entered, pay that amount (partial); otherwise pay full balance
+        final net = (col > 0 ? col : bal) + fine;
         items.add({
           'dem_id': d['dem_id'] as int,
           'yr_id': d['yr_id'],
@@ -1508,27 +1530,27 @@ class _StudentFeeCollectionScreenState
         context: context,
         barrierDismissible: false,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
           child: SizedBox(
-            width: 500,
-            height: 620,
+            width: 500.w,
+            height: 620.h,
             child: Column(
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  decoration: BoxDecoration(
                     color: AppColors.accent,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(14.r)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.payment, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
+                      Icon(Icons.payment, color: Colors.white, size: 20.sp),
+                      SizedBox(width: 8.w),
                       Expanded(
                         child: Text(
                           'Razorpay Payment  -  Rs.${totalNet.toStringAsFixed(2)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15.sp),
                         ),
                       ),
                       InkWell(
@@ -1538,7 +1560,7 @@ class _StudentFeeCollectionScreenState
                           Navigator.pop(ctx);
                           if (!completer.isCompleted) completer.complete(null);
                         },
-                        child: const Icon(Icons.close, color: Colors.white, size: 20),
+                        child: Icon(Icons.close, color: Colors.white, size: 20.sp),
                       ),
                     ],
                   ),
@@ -1623,10 +1645,10 @@ class _StudentFeeCollectionScreenState
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12.r),
         border: Border.all(color: AppColors.border),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12.w),
       child: child,
     );
   }
@@ -1635,17 +1657,17 @@ class _StudentFeeCollectionScreenState
     return InputDecoration(
       hintText: hint,
       hintStyle:
-          const TextStyle(fontSize: 13, color: AppColors.textLight),
+          TextStyle(fontSize: 13.sp, color: AppColors.textLight),
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
           borderSide: BorderSide(color: AppColors.border)),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
           borderSide: BorderSide(color: AppColors.border)),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(8.r),
           borderSide:
               const BorderSide(color: AppColors.accent, width: 1.5)),
     );
@@ -1655,15 +1677,15 @@ class _StudentFeeCollectionScreenState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: AppColors.textSecondary),
-        const SizedBox(width: 8),
+        Icon(icon, size: 15.sp, color: AppColors.textSecondary),
+        SizedBox(width: 8.w),
         Text('$label  ',
-            style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary)),
+            style: TextStyle(
+                fontSize: 13.sp, color: AppColors.textSecondary)),
         Expanded(
           child: Text(value,
-              style: const TextStyle(
-                  fontSize: 13,
+              style: TextStyle(
+                  fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary),
               overflow: TextOverflow.ellipsis),
@@ -1678,16 +1700,16 @@ class _StudentFeeCollectionScreenState
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
         decoration: BoxDecoration(
           color: selected ? AppColors.accent : AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(20.r),
           border:
               Border.all(color: selected ? AppColors.accent : AppColors.border),
         ),
         child: Text(label,
             style: TextStyle(
-                fontSize: 13,
+                fontSize: 13.sp,
                 fontWeight: FontWeight.w500,
                 color: selected ? Colors.white : AppColors.textSecondary)),
       ),
@@ -1697,7 +1719,7 @@ class _StudentFeeCollectionScreenState
   Widget _numField(TextEditingController? ctrl, VoidCallback onChange) {
     if (ctrl == null) return const SizedBox();
     return SizedBox(
-      height: 28,
+      height: 28.h,
       child: TextField(
         controller: ctrl,
         onChanged: (_) => onChange(),
@@ -1707,21 +1729,21 @@ class _StudentFeeCollectionScreenState
           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
         ],
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 13),
+        style: TextStyle(fontSize: 13.sp),
         decoration: InputDecoration(
           hintText: '0',
-          hintStyle: const TextStyle(
-              fontSize: 13, color: AppColors.textLight),
+          hintStyle: TextStyle(
+              fontSize: 13.sp, color: AppColors.textLight),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(6.r),
               borderSide: BorderSide(color: AppColors.border)),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(6.r),
               borderSide: BorderSide(color: AppColors.border)),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(6.r),
               borderSide: const BorderSide(
                   color: AppColors.accent, width: 1.2)),
         ),
@@ -1740,15 +1762,17 @@ class _StudentFeeCollectionScreenState
 class _THCell extends StatelessWidget {
   final String text;
   final int flex;
-  const _THCell(this.text, {this.flex = 1});
+  final TextAlign textAlign;
+  const _THCell(this.text, {this.flex = 1, this.textAlign = TextAlign.left});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       flex: flex,
       child: Text(text.toUpperCase(),
-          style: const TextStyle(
-              fontSize: 13,
+          textAlign: textAlign,
+          style: TextStyle(
+              fontSize: 13.sp,
               fontWeight: FontWeight.w700,
               color: Colors.white)),
     );
@@ -1759,15 +1783,17 @@ class _TDCell extends StatelessWidget {
   final String text;
   final int flex;
   final TextStyle? style;
-  const _TDCell(this.text, {this.flex = 1, this.style});
+  final TextAlign textAlign;
+  const _TDCell(this.text, {this.flex = 1, this.style, this.textAlign = TextAlign.left});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       flex: flex,
       child: Text(text,
+          textAlign: textAlign,
           style: style ??
-              const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
           overflow: TextOverflow.ellipsis),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
@@ -13,48 +14,48 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
     barrierDismissible: false,
     builder: (ctx) => Center(
       child: Container(
-        width: 420,
-        padding: const EdgeInsets.all(32),
+        width: 420.w,
+        padding: EdgeInsets.all(32.w),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(10.r),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(errors.isEmpty ? Icons.check_circle_rounded : Icons.warning_rounded, size: 64, color: errors.isEmpty ? AppColors.success : AppColors.error),
-            const SizedBox(height: 16),
-            Text(errors.isEmpty ? 'Import Complete' : 'Import Completed with Errors', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            Text('$imported imported successfully, $skipped skipped', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Icon(errors.isEmpty ? Icons.check_circle_rounded : Icons.warning_rounded, size: 64.sp, color: errors.isEmpty ? AppColors.success : AppColors.error),
+            SizedBox(height: 16.h),
+            Text(errors.isEmpty ? 'Import Complete' : 'Import Completed with Errors', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
+            SizedBox(height: 12.h),
+            Text('$imported imported successfully, $skipped skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
             if (errors.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: 16.h),
               Container(
-                height: 150,
-                padding: const EdgeInsets.all(12),
+                height: 150.h,
+                padding: EdgeInsets.all(12.w),
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: ListView(
                   children: errors.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(e, style: const TextStyle(fontSize: 13, color: AppColors.error)),
+                    padding: EdgeInsets.only(bottom: 4.h),
+                    child: Text(e, style: TextStyle(fontSize: 13.sp, color: AppColors.error)),
                   )).toList(),
                 ),
               ),
             ],
-            const SizedBox(height: 20),
+            SizedBox(height: 20.h),
             ElevatedButton(
               onPressed: () { Navigator.pop(ctx); onDone?.call(); },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
               ),
-              child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: Text('Done', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -96,10 +97,10 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
-              padding: const EdgeInsets.all(4),
+              padding: EdgeInsets.all(4.w),
               child: Row(
                 children: List.generate(tabLabels.length, (i) {
                   final isActive = selected == i;
@@ -107,17 +108,17 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
                     child: GestureDetector(
                       onTap: () => _tabCtrl.animateTo(i),
                       child: Container(
-                        margin: EdgeInsets.only(right: i < tabLabels.length - 1 ? 4 : 0),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        margin: EdgeInsets.only(right: i < tabLabels.length - 1 ? 4.w : 0),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
                         decoration: BoxDecoration(
                           color: isActive ? AppColors.accent : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Center(
                           child: Text(
                             tabLabels[i],
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 13.sp,
                               fontWeight: FontWeight.w600,
                               color: isActive ? Colors.white : AppColors.textPrimary,
                             ),
@@ -131,7 +132,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
             );
           },
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10.h),
         Expanded(
           child: TabBarView(
             controller: _tabCtrl,
@@ -227,6 +228,38 @@ List<List<dynamic>> _parseExcel(String path) {
   return sheet.rows.map((r) => r.map((c) => c?.value?.toString().trim() ?? '').toList()).toList();
 }
 
+Future<void> _exportSampleData(String sheetName, List<String> headers, List<List<String>> sampleRows) async {
+  final savePath = await FilePicker.platform.saveFile(
+    dialogTitle: 'Save Sample Data',
+    fileName: '${sheetName.toLowerCase().replaceAll(' ', '_')}_sample.xlsx',
+    type: FileType.custom,
+    allowedExtensions: ['xlsx'],
+  );
+  if (savePath == null) return;
+  final workbook = xl.Excel.createExcel();
+  final sheet = workbook[sheetName];
+  final headerStyle = xl.CellStyle(
+    bold: true,
+    backgroundColorHex: xl.ExcelColor.fromHexString('#1B2A4A'),
+    fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+  );
+  for (int i = 0; i < headers.length; i++) {
+    final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+    cell.value = xl.TextCellValue(headers[i]);
+    cell.cellStyle = headerStyle;
+    sheet.setColumnWidth(i, 20);
+  }
+  for (int r = 0; r < sampleRows.length; r++) {
+    for (int c = 0; c < sampleRows[r].length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+      cell.value = xl.TextCellValue(sampleRows[r][c]);
+    }
+  }
+  workbook.delete('Sheet1');
+  final bytes = workbook.encode();
+  if (bytes != null) File(savePath).writeAsBytesSync(bytes);
+}
+
 Future<void> _exportTemplate(String sheetName, List<String> headers) async {
   final savePath = await FilePicker.platform.saveFile(
     dialogTitle: 'Save Template',
@@ -255,25 +288,25 @@ Future<void> _exportTemplate(String sheetName, List<String> headers) async {
 
 Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
   final child = Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
     alignment: center ? Alignment.center : Alignment.centerLeft,
-    child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+    child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
 
 Widget _gridHeaderDivider() {
-  return Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.15));
+  return Container(width: 1, height: 36.h, color: Colors.white.withValues(alpha: 0.15));
 }
 
 Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
   final child = Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
     alignment: center ? Alignment.center : Alignment.centerLeft,
     decoration: BoxDecoration(
       border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
     ),
-    child: Text(text, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    child: Text(text, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -295,12 +328,20 @@ Widget _buildImportCard({
   VoidCallback? onValidate,
   VoidCallback? onClose,
   bool isValidated = false,
+  List<List<dynamic>> existingRows = const [],
+  List<String> existingHeaders = const [],
+  bool isLoadingExisting = false,
+  VoidCallback? onSampleDownload,
+  Map<int, String> rowErrors = const {},
 }) {
+  final bool showExisting = rows.isEmpty && existingRows.isNotEmpty;
+  final displayHeaders = showExisting ? existingHeaders : headers;
+  final displayRows = showExisting ? existingRows : rows;
   return Container(
-    padding: const EdgeInsets.all(16),
+    padding: EdgeInsets.all(16.w),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(10.r),
       border: Border.all(color: AppColors.border),
     ),
     child: Column(
@@ -309,180 +350,214 @@ Widget _buildImportCard({
         // Title bar
         Row(
           children: [
-            Icon(Icons.upload_file_rounded, size: 20, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
+            SizedBox(width: 8.w),
+            Text(title, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
             const Spacer(),
             if (fileName != null)
-              Text(fileName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(width: 12),
+              Text(fileName, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            SizedBox(width: 12.w),
             ElevatedButton.icon(
               onPressed: onBrowse,
-              icon: const Icon(Icons.folder_open_rounded, size: 16),
+              icon: Icon(Icons.folder_open_rounded, size: 16.sp),
               label: const Text('Browse'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             ElevatedButton.icon(
               onPressed: onTemplate,
-              icon: const Icon(Icons.table_chart_rounded, size: 16),
-              label: const Text('Move to Excel'),
+              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+              label: const Text('Format to Excel'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF217346),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
+            if (onSampleDownload != null) ...[
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: onSampleDownload,
+                icon: Icon(Icons.download_rounded, size: 16.sp),
+                label: const Text('Sample Data'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ],
         ),
         if (showResult) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8.h),
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(10.w),
             decoration: BoxDecoration(
               color: errors.isEmpty ? const Color(0xFFE6F4EA) : const Color(0xFFFCE4E4),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8.r),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(errors.isEmpty ? Icons.check_circle : Icons.warning_rounded, color: errors.isEmpty ? AppColors.success : AppColors.error, size: 18),
-                    const SizedBox(width: 8),
-                    Text('$imported imported, $skipped skipped', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    Icon(errors.isEmpty ? Icons.check_circle : Icons.warning_rounded, color: errors.isEmpty ? AppColors.success : AppColors.error, size: 18.sp),
+                    SizedBox(width: 8.w),
+                    Text('$imported imported, $skipped skipped', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp)),
                     const Spacer(),
-                    IconButton(icon: const Icon(Icons.close, size: 16), onPressed: onDismissResult, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                    IconButton(icon: Icon(Icons.close, size: 16.sp), onPressed: onDismissResult, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                   ],
                 ),
                 if (errors.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4.h),
                   ...errors.take(5).map((e) => Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(e, style: const TextStyle(fontSize: 13, color: Colors.red)),
+                    padding: EdgeInsets.only(top: 2.h),
+                    child: Text(e, style: TextStyle(fontSize: 13.sp, color: Colors.red)),
                   )),
-                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 ],
               ],
             ),
           ),
         ],
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
 
         // Data grid
         Expanded(
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8.r),
             ),
             child: Column(
               children: [
                 // Header row
                 Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF6C8EEF),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C8EEF),
                     borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(7),
-                      topRight: Radius.circular(7),
+                      topLeft: Radius.circular(7.r),
+                      topRight: Radius.circular(7.r),
                     ),
                   ),
                   child: Row(
                     children: [
-                      _gridHeaderCell('S.No', width: 60, center: true),
-                      ...headers.expand((h) => [
+                      _gridHeaderCell('S.No', width: 60.w, center: true),
+                      ...displayHeaders.expand((h) => [
                         _gridHeaderDivider(),
                         _gridHeaderCell(h),
                       ]),
                     ],
                   ),
                 ),
+                // Existing records label
+                if (showExisting)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    color: AppColors.accent.withValues(alpha: 0.06),
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 14.sp, color: AppColors.accent),
+                        SizedBox(width: 6.w),
+                        Text('Existing Records (${existingRows.length})', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                      ],
+                    ),
+                  ),
                 // Data rows
                 Expanded(
-                  child: rows.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.grid_on_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                              const SizedBox(height: 8),
-                              const Text('No data loaded', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                              const SizedBox(height: 4),
-                              const Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: rows.length,
-                          itemBuilder: (_, i) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                              color: i.isEven ? Colors.white : AppColors.surface,
-                              child: Row(
+                  child: isLoadingExisting && rows.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : displayRows.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _gridDataCell('${i + 1}', width: 60, center: true),
-                                  ...List.generate(headers.length, (j) =>
-                                    _gridDataCell(j < rows[i].length ? rows[i][j].toString() : ''),
-                                  ),
+                                  Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                  SizedBox(height: 8.h),
+                                  Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                  SizedBox(height: 4.h),
+                                  Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                 ],
                               ),
-                            );
-                          },
-                        ),
+                            )
+                          : ListView.builder(
+                              itemCount: displayRows.length,
+                              itemBuilder: (_, i) {
+                                final hasError = !showExisting && rowErrors.containsKey(i);
+                                return Tooltip(
+                                  message: hasError ? rowErrors[i]! : '',
+                                  child: Container(
+                                    padding: EdgeInsets.zero,
+                                    color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
+                                    child: Row(
+                                      children: [
+                                        _gridDataCell('${i + 1}', width: 60.w, center: true),
+                                        ...List.generate(displayHeaders.length, (j) =>
+                                          _gridDataCell(j < displayRows[i].length ? displayRows[i][j].toString() : ''),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                 ),
               ],
             ),
           ),
         ),
 
-        const SizedBox(height: 12),
+        SizedBox(height: 12.h),
 
         // Bottom bar
         Row(
           children: [
-            Text('${rows.length} rows', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            Text('${displayRows.length} rows${showExisting ? ' (existing)' : ''}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             const Spacer(),
             OutlinedButton.icon(
               onPressed: rows.isNotEmpty && !saving ? onValidate : null,
-              icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+              icon: Icon(Icons.check_circle_outline_rounded, size: 16.sp),
               label: const Text('Validate'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: rows.isNotEmpty && !saving ? AppColors.accent : AppColors.textSecondary,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             ElevatedButton.icon(
               onPressed: saving ? null : (isValidated ? onSave : null),
               icon: saving
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save_rounded, size: 16),
+                  ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Icon(Icons.save_rounded, size: 16.sp),
               label: Text(saving ? 'Saving...' : 'Save'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isValidated ? AppColors.accent : Colors.grey.shade300,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8.w),
             OutlinedButton(
               onPressed: onClose,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
               ),
               child: const Text('Close'),
             ),
@@ -510,10 +585,35 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
   static const _headers = ['Group Name *', 'Year *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final groups = await SupabaseService.getFeeGroups(insId);
+      if (mounted) setState(() {
+        _existingRows = groups.map((g) => [g['fgdesc'] ?? '', g['yrlabel'] ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
 
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
@@ -524,7 +624,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   }
 
   void _validate() {
-    final errors = <String>[];
+    final rowErrs = <int, String>{};
     final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
@@ -532,19 +632,18 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    if (errors.isNotEmpty) {
-      setState(() { _isValidated = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
-      setState(() { _isValidated = true; });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
   }
 
   void _close() {
-    setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; });
+    setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; });
   }
 
   Future<void> _save() async {
@@ -561,7 +660,9 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
-    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
   }
 
   @override
@@ -574,11 +675,21 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       onBrowse: _browse,
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Group', _headers),
+      onSampleDownload: () => _exportSampleData('Fee Group', _headers, [
+        ['SCHOOL FEES', '2025-2026'],
+        ['VAN FEES', '2025-2026'],
+        ['HOSTEL FEES', '2025-2026'],
+        ['EXAM FEES', '2025-2026'],
+      ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
       onValidate: _rows.isNotEmpty ? _validate : null,
       onClose: _close,
       isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Group Name', 'Year'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
     );
   }
 }
@@ -601,10 +712,41 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
   static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final feeGroups = await SupabaseService.getFeeGroups(insId);
+      if (feeGroups.isEmpty) { if (mounted) setState(() => _isLoadingExisting = false); return; }
+      final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
+      final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
+      final types = await SupabaseService.client.from('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id');
+      if (mounted) setState(() {
+        _existingRows = (types as List).map((t) {
+          return [t['feedesc'] ?? '', t['feeshort'] ?? '', fgNameMap[t['fg_id']] ?? '', t['yrlabel'] ?? '', t['feeoptional'] ?? '', t['feecategory'] ?? ''];
+        }).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
 
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
@@ -615,7 +757,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   }
 
   void _validate() {
-    final errors = <String>[];
+    final rowErrs = <int, String>{};
     final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
@@ -623,18 +765,17 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    if (errors.isNotEmpty) {
-      setState(() { _isValidated = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
-      setState(() { _isValidated = true; });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -650,7 +791,9 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
-    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
   }
 
   @override
@@ -663,11 +806,21 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onBrowse: _browse,
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Type', _headers),
+      onSampleDownload: () => _exportSampleData('Fee Type', _headers, [
+        ['SCHOOL FEES', 'SCH', 'SCHOOL FEES', '2025-2026', '0', '1'],
+        ['VAN FEES', 'VAN', 'VAN FEES', '2025-2026', '1', '1'],
+        ['TUITION FEES', 'TUI', 'SCHOOL FEES', '2025-2026', '0', '1'],
+        ['BOOK FEES', 'BK', 'SCHOOL FEES', '2025-2026', '0', '1'],
+      ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
       onValidate: _rows.isNotEmpty ? _validate : null,
       onClose: _close,
       isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Optional', 'Category'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
     );
   }
 }
@@ -690,10 +843,35 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
   static const _headers = ['Concession Name *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final concessions = await SupabaseService.getConcessions(insId);
+      if (mounted) setState(() {
+        _existingRows = concessions.map((c) => [c['condesc'] ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
 
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
@@ -704,7 +882,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   }
 
   void _validate() {
-    final errors = <String>[];
+    final rowErrs = <int, String>{};
     final labels = _headers.map((h) => h.replaceAll(' *', '').replaceAll('*', '')).toList();
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
@@ -712,18 +890,17 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    if (errors.isNotEmpty) {
-      setState(() { _isValidated = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
-      setState(() { _isValidated = true; });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -739,7 +916,9 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
-    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
   }
 
   @override
@@ -752,11 +931,21 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       onBrowse: _browse,
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Concession', _headers),
+      onSampleDownload: () => _exportSampleData('Concession', _headers, [
+        ['SC/ST'],
+        ['Staff Children'],
+        ['Merit Scholarship'],
+        ['Sibling Discount'],
+      ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
       onValidate: _rows.isNotEmpty ? _validate : null,
       onClose: _close,
       isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Concession Name'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
     );
   }
 }
@@ -779,10 +968,55 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   bool _isValidated = false;
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
   static const _headers = ['Class *', 'Term *', 'Fee Type *', 'Amount *', 'Due Date *', 'New/Old *', 'Boys/Girls *', 'Dayscholar/Hostel *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final rows = await SupabaseService.client.from('classfeedemand').select('*');
+      if (mounted) setState(() {
+        const classOrder = {'PKG': 0, 'LKG': 1, 'UKG': 2, 'I': 3, 'II': 4, 'III': 5, 'IV': 6, 'V': 7, 'VI': 8, 'VII': 9, 'VIII': 10, 'IX': 11, 'X': 12, 'XI': 13, 'XII': 14};
+        final sorted = List<Map<String, dynamic>>.from(rows as List);
+        sorted.sort((a, b) {
+          final ca = classOrder[a['cfclass']?.toString() ?? ''] ?? 99;
+          final cb = classOrder[b['cfclass']?.toString() ?? ''] ?? 99;
+          if (ca != cb) return ca.compareTo(cb);
+          return (a['cfterm']?.toString() ?? '').compareTo(b['cfterm']?.toString() ?? '');
+        });
+        const nobLabels = {'1': 'New', '2': 'Old', '3': 'Both'};
+        const bgbLabels = {'1': 'Boys', '2': 'Girls', '3': 'Both'};
+        const dhbLabels = {'1': 'Dayscholar', '2': 'Hostel', '3': 'Both'};
+        _existingRows = sorted.map((r) => [
+          r['cfclass'] ?? '',
+          r['cfterm'] ?? '',
+          r['cffeetype'] ?? '',
+          r['cfamount'] ?? '',
+          r['cfdduedate'] ?? '',
+          nobLabels['${r['cfnob'] ?? ''}'] ?? '${r['cfnob'] ?? ''}',
+          bgbLabels['${r['cfbgb'] ?? ''}'] ?? '${r['cfbgb'] ?? ''}',
+          dhbLabels['${r['cfdhb'] ?? ''}'] ?? '${r['cfdhb'] ?? ''}',
+        ]).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
 
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
@@ -793,7 +1027,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   }
 
   void _validate() {
-    final errors = <String>[];
+    final rowErrs = <int, String>{};
     final labels = ['Class', 'Term', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
@@ -801,18 +1035,17 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) errors.add('Row ${i + 1}: Missing: ${missing.join(', ')}');
+      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    if (errors.isNotEmpty) {
-      setState(() { _isValidated = false; });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${errors.length} error(s) found: ${errors.first}'), backgroundColor: Colors.red));
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
-      setState(() { _isValidated = true; });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -842,7 +1075,9 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
-    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors);
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
   }
 
   @override
@@ -855,11 +1090,21 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onBrowse: _browse,
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Class Fee Demand', _headers),
+      onSampleDownload: () => _exportSampleData('Class Fee Demand', _headers, [
+        ['I', 'I TERM', 'SCHOOL FEES', '10080', '2025-05-31', 'Both', 'Both', 'Both'],
+        ['I', 'JUNE', 'TUITION FEES', '700', '2025-06-30', 'Both', 'Both', 'Both'],
+        ['XII', 'I TERM', 'SCHOOL FEES', '15410', '2025-05-31', 'Both', 'Both', 'Both'],
+        ['XII', 'JUNE', 'VAN FEES', '810', '2025-06-30', 'Both', 'Both', 'Both'],
+      ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
       onValidate: _rows.isNotEmpty ? _validate : null,
       onClose: _close,
       isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Class', 'Term', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -173,12 +174,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: const Text('Confirm Approval',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+        title: Text('Confirm Approval',
+            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
         content: Text(
           'Approve ${_selected.length} fee demand${_selected.length == 1 ? '' : 's'}?',
-          style: const TextStyle(fontSize: 14),
+          style: TextStyle(fontSize: 14.sp),
         ),
         actions: [
           TextButton(
@@ -190,9 +191,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10.r)),
             ),
             child: const Text('Approve'),
           ),
@@ -248,7 +249,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildActionBar(),
-        const SizedBox(height: 16),
+        SizedBox(height: 16.h),
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
@@ -279,28 +280,28 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               onChanged: (_) => _toggleSelectAll(!allSelected),
               activeColor: AppColors.accent,
             ),
-            const Text(
+            Text(
               'Select All',
               style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary),
             ),
           ],
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16.w),
 
         // Approve button
         ElevatedButton.icon(
           onPressed: _selected.isEmpty || _approving ? null : _approve,
           icon: _approving
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
+              ? SizedBox(
+                  width: 14.w,
+                  height: 14.h,
+                  child: const CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white),
                 )
-              : const Icon(Icons.check_circle_outline_rounded, size: 18),
+              : Icon(Icons.check_circle_outline_rounded, size: 18.sp),
           label: Text(_approving
               ? 'Approving...'
               : 'Approve (${_selected.length})'),
@@ -309,47 +310,47 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             foregroundColor: Colors.white,
             disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.4),
             disabledForegroundColor: Colors.white70,
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+            padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
             textStyle:
-                const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16.w),
 
         // Count
         TextButton.icon(
           onPressed: _loading ? null : _loadDemands,
-          icon: const Icon(Icons.refresh_rounded, size: 16),
+          icon: Icon(Icons.refresh_rounded, size: 16.sp),
           label: const Text('Refresh'),
           style: TextButton.styleFrom(
             foregroundColor: AppColors.textSecondary,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
           ),
         ),
-        const SizedBox(width: 4),
+        SizedBox(width: 4.w),
         Text(
           '${_filteredDemands.length} record${_filteredDemands.length == 1 ? '' : 's'}',
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
         ),
 
         const Spacer(),
 
         // Search
         SizedBox(
-          width: 260,
+          width: 260.w,
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search by student name or ad...',
               hintStyle:
-                  TextStyle(fontSize: 13, color: Colors.grey.shade400),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                  TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
+              prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 16),
+                      icon: Icon(Icons.close_rounded, size: 16.sp),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -357,22 +358,22 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                     )
                   : null,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                   borderSide: const BorderSide(color: AppColors.border)),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                   borderSide: const BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(10.r),
                   borderSide:
                       const BorderSide(color: AppColors.accent, width: 1.5)),
               filled: true,
               fillColor: AppColors.surface,
               isDense: true,
             ),
-            style: const TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 13.sp),
             onChanged: (v) {
               setState(() {
                 _searchQuery = v.trim().toLowerCase();
@@ -381,26 +382,26 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             },
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12.w),
 
         // Class filter dropdown
         Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 36.h,
+          padding: EdgeInsets.symmetric(horizontal: 12.w),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: Border.all(color: AppColors.border),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               value: _selectedClass,
-              hint: const Text('All Classes',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textPrimary),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 18, color: AppColors.textSecondary),
+              hint: Text('All Classes',
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              style: TextStyle(
+                  fontSize: 13.sp, color: AppColors.textPrimary),
+              icon: Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 18.sp, color: AppColors.textSecondary),
               isDense: true,
               onChanged: (v) => setState(() {
                 _selectedClass = v;
@@ -408,15 +409,15 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 _currentPage = 1;
               }),
               items: [
-                const DropdownMenuItem<String?>(
+                DropdownMenuItem<String?>(
                   value: null,
                   child: Text('All Classes',
-                      style: TextStyle(fontSize: 13)),
+                      style: TextStyle(fontSize: 13.sp)),
                 ),
                 ..._classList.map((cls) => DropdownMenuItem<String?>(
                       value: cls,
                       child: Text('Class $cls',
-                          style: const TextStyle(fontSize: 13)),
+                          style: TextStyle(fontSize: 13.sp)),
                     )),
               ],
             ),
@@ -431,12 +432,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 48, color: AppColors.error),
-          const SizedBox(height: 8),
+          Icon(Icons.error_outline_rounded,
+              size: 48.sp, color: AppColors.error),
+          SizedBox(height: 8.h),
           Text(_errorMsg!,
               style: const TextStyle(color: AppColors.textSecondary)),
-          const SizedBox(height: 12),
+          SizedBox(height: 12.h),
           OutlinedButton(onPressed: _loadDemands, child: const Text('Retry')),
         ],
       ),
@@ -484,9 +485,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.inbox_rounded,
-                size: 48,
+                size: 48.sp,
                 color: AppColors.textSecondary.withValues(alpha: 0.4)),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
             Text(
               _searchQuery.isNotEmpty
                   ? 'No matching records'
@@ -501,7 +502,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: LayoutBuilder(
@@ -525,16 +526,16 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                       children: [
                         // Header
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 11),
-                          decoration: const BoxDecoration(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8.w, vertical: 11.h),
+                          decoration: BoxDecoration(
                             color: AppColors.primaryDark,
                             borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(14)),
+                                top: Radius.circular(14.r)),
                           ),
                           child: Row(
                             children: [
-                              const SizedBox(width: 40),
+                              SizedBox(width: 40.w),
                               _headerCell('Adm No', 3),
                               _headerCell('Student Name', 5),
                               _headerCell('Class', 2, center: true),
@@ -544,7 +545,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                               _headerCell('Fee Amount', 3, right: true),
                               _headerCell('Concession', 4),
                               _headerCell('Balance Due', 3, right: true),
-                              const SizedBox(width: 32),
+                              SizedBox(width: 32.w),
                               _headerCell('Created By', 3),
                               _headerCell('Status', 3, center: true),
                             ],
@@ -610,10 +611,10 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
 
         return Container(
           height: barH,
-          decoration: const BoxDecoration(
-            color: Color(0xFFB0B0B0),
-            border: Border(top: BorderSide(color: Color(0xFF555555))),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(13)),
+          decoration: BoxDecoration(
+            color: const Color(0xFFB0B0B0),
+            border: const Border(top: BorderSide(color: Color(0xFF555555))),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(13.r)),
           ),
           child: Row(
             children: [
@@ -684,7 +685,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         child: Text(
           label,
           style: TextStyle(
-              fontSize: 9,
+              fontSize: 9.sp,
               color: onTap != null ? Colors.black87 : Colors.grey),
         ),
       ),
@@ -705,7 +706,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             (_) => Container(
               width: 1,
               height: 8,
-              margin: const EdgeInsets.symmetric(horizontal: 2),
+              margin: EdgeInsets.symmetric(horizontal: 2.w),
               decoration: const BoxDecoration(
                 border: Border(
                   left: BorderSide(color: Colors.white, width: 1),
@@ -725,8 +726,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       flex: flex,
       child: Text(
         label.toUpperCase(),
-        style: const TextStyle(
-            fontSize: 13,
+        style: TextStyle(
+            fontSize: 13.sp,
             fontWeight: FontWeight.w700,
             color: Colors.white),
         textAlign: right
@@ -778,11 +779,11 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 : index.isOdd
                     ? const Color(0xFFF8F9FA)
                     : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
         child: Row(
             children: [
               SizedBox(
-                width: 40,
+                width: 40.w,
                 child: Checkbox(
                   value: isApproved ? false : isSelected,
                   onChanged: (key.isNotEmpty && !isApproved) ? (v) => _toggleOne(key, v) : null,
@@ -793,8 +794,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(admNo,
-                    style: const TextStyle(
-                        fontSize: 13,
+                    style: TextStyle(
+                        fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primary)),
               ),
@@ -802,22 +803,22 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 5,
                 child: Text(name.isNotEmpty ? name : '-',
-                    style: const TextStyle(
-                        fontSize: 13, color: AppColors.textPrimary),
+                    style: TextStyle(
+                        fontSize: 13.sp, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis),
               ),
               // Class
               Expanded(
                 flex: 2,
                 child: Text(cls,
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     textAlign: TextAlign.center),
               ),
               // Year
               Expanded(
                 flex: 3,
                 child: Text(year,
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis),
               ),
@@ -825,7 +826,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(term,
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis),
               ),
@@ -833,23 +834,23 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(type,
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     overflow: TextOverflow.ellipsis),
               ),
               // Fee Amount
               Expanded(
                 flex: 3,
                 child: Text('₹${_fmt(feeAmt)}',
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     textAlign: TextAlign.right),
               ),
               // Concession
               Expanded(
                 flex: 4,
                 child: Padding(
-                  padding: const EdgeInsets.only(left: 12),
+                  padding: EdgeInsets.only(left: 12.w),
                   child: Text(concessionName,
-                      style: const TextStyle(fontSize: 13),
+                      style: TextStyle(fontSize: 13.sp),
                       overflow: TextOverflow.ellipsis),
                 ),
               ),
@@ -857,16 +858,16 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text('₹${_fmt(balance)}',
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontSize: 13.sp, fontWeight: FontWeight.w600),
                     textAlign: TextAlign.right),
               ),
-              const SizedBox(width: 32),
+              SizedBox(width: 32.w),
               // Created By
               Expanded(
                 flex: 3,
                 child: Text(createdBy,
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: 13.sp),
                     overflow: TextOverflow.ellipsis),
               ),
               // Status
@@ -903,13 +904,13 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
       child: Row(
         children: [
           Text(
             'Showing $start–$end of $total records',
-            style: const TextStyle(
-                fontSize: 13, color: AppColors.textSecondary),
+            style: TextStyle(
+                fontSize: 13.sp, color: AppColors.textSecondary),
           ),
           const Spacer(),
           // Prev button
@@ -917,20 +918,20 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             label: '‹',
             onTap: _currentPage > 1 ? () => _goToPage(_currentPage - 1) : null,
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4.w),
           // Page number buttons
           ...pages.map((p) {
             if (p == null) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
+              return Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.w),
                 child: Text('…',
                     style: TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary)),
+                        fontSize: 13.sp, color: AppColors.textSecondary)),
               );
             }
             final isActive = p == _currentPage;
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: EdgeInsets.symmetric(horizontal: 2.w),
               child: _pageBtn(
                 label: '$p',
                 onTap: isActive ? null : () => _goToPage(p),
@@ -938,7 +939,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               ),
             );
           }),
-          const SizedBox(width: 4),
+          SizedBox(width: 4.w),
           // Next button
           _pageBtn(
             label: '›',
@@ -957,12 +958,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        width: 30,
-        height: 30,
+        width: 30.w,
+        height: 30.h,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: active ? AppColors.primaryDark : AppColors.surface,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(6.r),
           border: Border.all(
             color: active ? AppColors.primaryDark : AppColors.border,
           ),
@@ -970,7 +971,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 13.sp,
             fontWeight: active ? FontWeight.w700 : FontWeight.w400,
             color: active
                 ? Colors.white
@@ -990,14 +991,14 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       'P' || _ => ('Pending', const Color(0xFFFFF8E1), const Color(0xFFE65100)),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(6.r),
       ),
       child: Text(label,
           style: TextStyle(
-              fontSize: 10, fontWeight: FontWeight.w600, color: fg),
+              fontSize: 10.sp, fontWeight: FontWeight.w600, color: fg),
           textAlign: TextAlign.center),
     );
   }

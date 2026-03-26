@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
@@ -38,8 +39,8 @@ class WelcomeScreen extends StatelessWidget {
                   top: -80,
                   left: -80,
                   child: Container(
-                    width: 300,
-                    height: 300,
+                    width: 300.w,
+                    height: 300.h,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.accent.withValues(alpha: 0.05),
@@ -50,8 +51,8 @@ class WelcomeScreen extends StatelessWidget {
                   bottom: -40,
                   right: -40,
                   child: Container(
-                    width: 200,
-                    height: 200,
+                    width: 200.w,
+                    height: 200.h,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: AppColors.secondary.withValues(alpha: 0.05),
@@ -66,8 +67,8 @@ class WelcomeScreen extends StatelessWidget {
                     top: 80.0 + (row * 100),
                     left: 60.0 + (col * 100),
                     child: Container(
-                      width: 4,
-                      height: 4,
+                      width: 4.w,
+                      height: 4.h,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withValues(alpha: 0.08),
@@ -79,31 +80,31 @@ class WelcomeScreen extends StatelessWidget {
                 // Center content
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(64),
+                    padding: EdgeInsets.all(64.w),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         FadeInDown(
                           duration: const Duration(milliseconds: 600),
                           child: Container(
-                            width: 100,
-                            height: 100,
+                            width: 100.w,
+                            height: 100.h,
                             decoration: BoxDecoration(
                               color: AppColors.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(28),
+                              borderRadius: BorderRadius.circular(28.r),
                               border: Border.all(
                                 color: AppColors.accent.withValues(alpha: 0.3),
                                 width: 2,
                               ),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.school_rounded,
-                              size: 50,
+                              size: 50.sp,
                               color: AppColors.accent,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32.h),
                         FadeInUp(
                           delay: const Duration(milliseconds: 200),
                           child: Text(
@@ -113,11 +114,11 @@ class WelcomeScreen extends StatelessWidget {
                                 .displayLarge
                                 ?.copyWith(
                                   color: Colors.white,
-                                  fontSize: 40,
+                                  fontSize: 40.sp,
                                 ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12.h),
                         FadeInUp(
                           delay: const Duration(milliseconds: 400),
                           child: Text(
@@ -130,7 +131,7 @@ class WelcomeScreen extends StatelessWidget {
                                     ),
                           ),
                         ),
-                        const SizedBox(height: 48),
+                        SizedBox(height: 48.h),
                         FadeInUp(
                           delay: const Duration(milliseconds: 600),
                           child: _buildStatsRow(context),
@@ -157,17 +158,17 @@ class WelcomeScreen extends StatelessWidget {
     return SafeArea(
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(32.w),
           child: Column(
             children: [
-              const SizedBox(height: 40),
+              SizedBox(height: 40.h),
               FadeInDown(
                 child: Container(
-                  width: 90,
-                  height: 90,
+                  width: 90.w,
+                  height: 90.h,
                   decoration: BoxDecoration(
                     gradient: AppColors.splashGradient,
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(24.r),
                     boxShadow: [
                       BoxShadow(
                         color: AppColors.primary.withValues(alpha: 0.3),
@@ -176,14 +177,14 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.school_rounded,
-                    size: 44,
+                    size: 44.sp,
                     color: AppColors.accent,
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24.h),
               FadeInUp(
                 delay: const Duration(milliseconds: 200),
                 child: Text(
@@ -191,7 +192,7 @@ class WelcomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.displayMedium,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8.h),
               FadeInUp(
                 delay: const Duration(milliseconds: 300),
                 child: Text(
@@ -199,7 +200,7 @@ class WelcomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
-              const SizedBox(height: 48),
+              SizedBox(height: 48.h),
               _buildActionPanel(context),
             ],
           ),
@@ -214,16 +215,16 @@ class WelcomeScreen extends StatelessWidget {
       children: [
         _buildStatItem(context, '500+', 'Schools'),
         Container(
-          width: 1,
-          height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 28),
+          width: 1.w,
+          height: 40.h,
+          margin: EdgeInsets.symmetric(horizontal: 28.w),
           color: Colors.white.withValues(alpha: 0.15),
         ),
         _buildStatItem(context, '50K+', 'Students'),
         Container(
-          width: 1,
-          height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 28),
+          width: 1.w,
+          height: 40.h,
+          margin: EdgeInsets.symmetric(horizontal: 28.w),
           color: Colors.white.withValues(alpha: 0.15),
         ),
         _buildStatItem(context, '99.9%', 'Uptime'),
@@ -241,7 +242,7 @@ class WelcomeScreen extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: 4.h),
         Text(
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -256,7 +257,7 @@ class WelcomeScreen extends StatelessWidget {
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 420),
-        padding: const EdgeInsets.all(40),
+        padding: EdgeInsets.all(40.w),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -269,10 +270,10 @@ class WelcomeScreen extends StatelessWidget {
                   Text(
                     'Welcome Back!',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          fontSize: 32,
+                          fontSize: 32.sp,
                         ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8.h),
                   Text(
                     'Sign in to continue managing your school, or create a new account to get started.',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -283,7 +284,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 40),
+            SizedBox(height: 40.h),
 
             // Sign In button
             FadeInRight(
@@ -297,7 +298,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
 
             // Create Account button
             FadeInRight(
@@ -311,7 +312,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: 32.h),
 
             // Divider
             FadeInRight(
@@ -319,27 +320,27 @@ class WelcomeScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(height: 1, color: AppColors.border),
+                    child: Container(height: 1.h, color: AppColors.border),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
                     child: Text(
                       'OR',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppColors.textLight,
-                            fontSize: 13,
+                            fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
                   ),
                   Expanded(
-                    child: Container(height: 1, color: AppColors.border),
+                    child: Container(height: 1.h, color: AppColors.border),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24.h),
 
             // Demo button
             FadeInRight(
@@ -350,10 +351,10 @@ class WelcomeScreen extends StatelessWidget {
                   onTap: () =>
                       Navigator.pushNamed(context, AppRoutes.dashboard),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(10.r),
                       border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.1),
                       ),
@@ -364,9 +365,9 @@ class WelcomeScreen extends StatelessWidget {
                         Icon(
                           Icons.play_circle_outline_rounded,
                           color: AppColors.primary.withValues(alpha: 0.7),
-                          size: 20,
+                          size: 20.sp,
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8.w),
                         Text(
                           'Explore Demo',
                           style:
@@ -417,11 +418,11 @@ class _WelcomeButtonState extends State<_WelcomeButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: EdgeInsets.symmetric(vertical: 18.h),
           decoration: BoxDecoration(
             gradient: widget.isPrimary ? AppColors.accentGradient : null,
             color: widget.isPrimary ? null : Colors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10.r),
             border: widget.isPrimary
                 ? null
                 : Border.all(color: AppColors.border, width: 1.5),
@@ -442,16 +443,16 @@ class _WelcomeButtonState extends State<_WelcomeButton> {
                 widget.icon,
                 color:
                     widget.isPrimary ? Colors.white : AppColors.textPrimary,
-                size: 20,
+                size: 20.sp,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10.w),
               Text(
                 widget.label,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: widget.isPrimary
                           ? Colors.white
                           : AppColors.textPrimary,
-                      fontSize: 16,
+                      fontSize: 16.sp,
                     ),
               ),
             ],
