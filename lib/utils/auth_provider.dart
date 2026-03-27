@@ -5,6 +5,7 @@ import '../models/institution_user_model.dart';
 
 const _kEmail = 'saved_email';
 const _kPassword = 'saved_password';
+const _kInsId = 'saved_ins_id';
 
 class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
@@ -37,7 +38,7 @@ class AuthProvider extends ChangeNotifier {
   String? get yearLabel => _yearLabel;
   InstitutionUserModel? get currentUser => _currentUser;
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {int? insId}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -46,6 +47,7 @@ class AuthProvider extends ChangeNotifier {
       final user = await SupabaseService.loginUser(
         email: email,
         password: password,
+        insId: insId,
       );
 
       if (user != null) {
@@ -59,17 +61,12 @@ class AuthProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
 
-        // Fetch institution info and check subscription
+        // Fetch institution info
         if (user.insId != null) {
           final insInfo = await SupabaseService.getInstitutionInfo(user.insId!);
           _insName = insInfo.name;
           _insLogo = insInfo.logo;
           _insAddress = insInfo.address;
-
-          // Check subscription status
-          final sub = await SupabaseService.checkSubscription(user.insId!);
-          _subscriptionActive = sub.isActive;
-          _yearLabel = sub.yearLabel;
           notifyListeners();
         }
 
@@ -124,15 +121,19 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString(_kEmail);
     final password = prefs.getString(_kPassword);
+    final insId = prefs.getInt(_kInsId);
     if (email == null || password == null) return false;
-    return login(email, password);
+    return login(email, password, insId: insId);
   }
 
   /// Save credentials for auto-login on next launch
-  Future<void> saveCredentials(String email, String password) async {
+  Future<void> saveCredentials(String email, String password, {int? insId}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kEmail, email);
     await prefs.setString(_kPassword, password);
+    if (insId != null) {
+      await prefs.setInt(_kInsId, insId);
+    }
   }
 
   /// Clear saved credentials (call on logout)
@@ -140,6 +141,7 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kEmail);
     await prefs.remove(_kPassword);
+    await prefs.remove(_kInsId);
   }
 
   Future<void> logout() async {

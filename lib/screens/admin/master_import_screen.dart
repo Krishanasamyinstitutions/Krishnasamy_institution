@@ -988,7 +988,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.client.from('classfeedemand').select('*');
+      final rows = await SupabaseService.client.from('classfeedemand').select('*').eq('ins_id', insId);
       if (mounted) setState(() {
         const classOrder = {'PKG': 0, 'LKG': 1, 'UKG': 2, 'I': 3, 'II': 4, 'III': 5, 'IV': 6, 'V': 7, 'VI': 8, 'VII': 9, 'VIII': 10, 'IX': 11, 'X': 12, 'XI': 13, 'XII': 14};
         final sorted = List<Map<String, dynamic>>.from(rows as List);

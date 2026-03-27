@@ -57,7 +57,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           if (readStatus[key] == true && !isRead) {
             final id = n['noti_id'];
             if (id != null) {
-              SupabaseService.client.from('notification').update({'isread': 1}).eq('noti_id', id).then((_) {});
+              SupabaseService.client.from('notification').update({'isread': 1}).eq('noti_id', id).eq('ins_id', insId).then((_) {});
             }
           }
         }

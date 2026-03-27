@@ -121,7 +121,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   String? _selectedPendingFeeGroup; // null = group list, non-null = student drilldown
   List<Map<String, dynamic>> _demands = [];
   bool _isLoadingDemands = false;
-  Map<int, String> _feeGroupMap = {};
+  Map<int, String> _feeGroupById = {};
+  Map<String, String> _feeGroupByName = {};
   Map<int, String> _stuIdToName = {};
   Map<String, String> _admNoToName = {};
   String? _pendingFeeTypeFilter;
@@ -363,12 +364,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     // Stage 1: Fast — payments + fee group map + fee totals (single RPCs)
     final fastResults = await Future.wait([
       SupabaseService.getPaymentsByDateRange(insId, fromDate: _fromDate, toDate: _toDate),
-      SupabaseService.getFeeGroupMap(insId),
+      SupabaseService.getFeeGroupMaps(insId),
       SupabaseService.getFeeTotals(insId),
     ]);
 
     final payments = fastResults[0] as List<Map<String, dynamic>>;
-    final feeGroupMap = fastResults[1] as Map<int, String>;
+    final feeGroupMaps = fastResults[1] as Map<String, Map>;
     final feeTotals = fastResults[2] as Map<String, double>;
 
     final today = DateTime.now();
@@ -402,7 +403,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         _payments = payments;
         _dateGroups = dateGroups;
         _todayCollection = todayCollection;
-        _feeGroupMap = feeGroupMap;
+        _feeGroupById = Map<int, String>.from(feeGroupMaps['byId'] ?? {});
+        _feeGroupByName = Map<String, String>.from(feeGroupMaps['byName'] ?? {});
         _totalCollection = feeTotals['totalPaid'] ?? 0;
         _pendingFees = feeTotals['totalPending'] ?? 0;
         _isLoading = false;
@@ -1172,9 +1174,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final Map<String, List<Map<String, dynamic>>> groupedByFeeGroup = {};
     for (final d in filtered) {
       final feeId = d['fee_id'] as int?;
-      final groupName = (feeId != null && _feeGroupMap.containsKey(feeId))
-          ? _feeGroupMap[feeId]!
-          : 'Uncategorized';
+      final feeTypeName = d['demfeetype']?.toString() ?? '';
+      String groupName;
+      if (feeId != null && _feeGroupById.containsKey(feeId)) {
+        groupName = _feeGroupById[feeId]!;
+      } else if (feeTypeName.isNotEmpty && _feeGroupByName.containsKey(feeTypeName)) {
+        groupName = _feeGroupByName[feeTypeName]!;
+      } else {
+        groupName = 'Uncategorized';
+      }
       groupedByFeeGroup.putIfAbsent(groupName, () => []).add(d);
     }
 
@@ -1488,7 +1496,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ...List.generate(demands.length, (i) {
                   final d = demands[i];
                   final term = d['demfeeterm']?.toString() ?? '-';
-                  final feeGroupName = _feeGroupMap[d['fee_id'] as int?] ?? (d['demfeetype']?.toString() ?? '-');
+                  final dFeeId = d['fee_id'] as int?;
+                  final dFeeType = d['demfeetype']?.toString() ?? '-';
+                  final feeGroupName = (dFeeId != null && _feeGroupById.containsKey(dFeeId))
+                      ? _feeGroupById[dFeeId]!
+                      : (_feeGroupByName[dFeeType] ?? dFeeType);
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
                   final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
@@ -2963,9 +2975,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       if (allDemIds.isNotEmpty) {
         for (int i = 0; i < allDemIds.length; i += 50) {
           final chunk = allDemIds.toList().sublist(i, (i + 50).clamp(0, allDemIds.length));
+          final auth = context.read<AuthProvider>();
           final demands = await SupabaseService.client
               .from('feedemand')
               .select('dem_id, demfeetype')
+              .eq('ins_id', auth.insId!)
               .inFilter('dem_id', chunk);
           for (final d in demands) {
             demFeeTypeMap[d['dem_id'] as int] = d['demfeetype']?.toString() ?? '';
@@ -3086,11 +3100,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         grandTotal += total;
 
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(feeType.toUpperCase());
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.DoubleCellValue(cash);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.IntCellValue(cash.toInt());
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = amountStyle;
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(bank);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.IntCellValue(bank.toInt());
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = amountStyle;
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(total);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.IntCellValue(total.toInt());
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = amountStyle;
         row++;
       }
@@ -3098,11 +3112,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       // Grand total
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('GRAND TOTAL');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = totalRowStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.DoubleCellValue(grandCash);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.IntCellValue(grandCash.toInt());
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldAmountStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(grandBank);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.IntCellValue(grandBank.toInt());
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = boldAmountStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(grandTotal);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.IntCellValue(grandTotal.toInt());
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = boldAmountStyle;
 
       // Set column widths
@@ -3394,12 +3408,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       for (var t = 0; t < termCols.length; t++) {
         final amt = termAmounts[termCols[t]] ?? 0;
         if (amt > 0) {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row)).value = xl.DoubleCellValue(amt);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row)).value = xl.IntCellValue(amt.toInt());
         }
       }
 
       final totalColIdx = 4 + termCols.length;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: row)).value = xl.DoubleCellValue(total);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: row)).value = xl.IntCellValue(total.toInt());
 
       final remarksStr = sr['remarks'] as String;
       if (remarksStr.isNotEmpty) {
@@ -3428,11 +3442,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     for (var t = 0; t < termCols.length; t++) {
       final amt = grandTermTotals[termCols[t]] ?? 0;
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row));
-      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
       cell.cellStyle = grandTotalStyle;
     }
     final gtTotalCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length, rowIndex: row));
-    gtTotalCell.value = xl.DoubleCellValue(appTotalBalance);
+    gtTotalCell.value = xl.IntCellValue(appTotalBalance.toInt());
     gtTotalCell.cellStyle = grandTotalStyle;
     sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length + 1, rowIndex: row)).cellStyle = grandTotalStyle;
 
@@ -3442,9 +3456,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     sheet.setColumnWidth(2, 12);
     sheet.setColumnWidth(3, 22);
     for (var t = 0; t < termCols.length; t++) {
-      sheet.setColumnWidth(4 + t, 10);
+      sheet.setColumnWidth(4 + t, 14);
     }
-    sheet.setColumnWidth(4 + termCols.length, 10);
+    sheet.setColumnWidth(4 + termCols.length, 14);
     sheet.setColumnWidth(4 + termCols.length + 1, 25);
 
     // Save
@@ -3494,11 +3508,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     for (var t = 0; t < termCols.length; t++) {
       final amt = classTotals[termCols[t]] ?? 0;
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + t, rowIndex: row));
-      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
       cell.cellStyle = style;
     }
     final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length, rowIndex: row));
-    tCell.value = xl.DoubleCellValue(classTotal);
+    tCell.value = xl.IntCellValue(classTotal.toInt());
     tCell.cellStyle = style;
     sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + termCols.length + 1, rowIndex: row)).cellStyle = style;
   }
@@ -4849,7 +4863,6 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   List<Map<String, dynamic>> _allDemands = [];
   List<_DateDemandGroup> _dateGroups = [];
 
-  List<String> _allFeeTypes = [];
   List<String> _feeTypes = [];
   Map<int, String> _payNumberMap = {};
   double _summaryTotalDemand = 0;
@@ -4928,15 +4941,13 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     setState(() => _isLoading = true);
 
     try {
-      // Stage 1: fetch demands, fee types, and totals in parallel
+      // Stage 1: fetch demands and totals in parallel
       final results = await Future.wait([
         SupabaseService.getPaidFeeDemands(insId),
-        SupabaseService.getFeeTypes(insId),
         SupabaseService.getFeeTotals(insId),
       ]);
       final demands = results[0] as List<Map<String, dynamic>>;
-      final feeTypes = results[1] as List<String>;
-      final feeTotals = results[2] as Map<String, double>;
+      final feeTotals = results[1] as Map<String, double>;
 
       // Stage 2: fetch pay numbers (needs pay_ids from demands)
       final payIds = demands
@@ -4945,12 +4956,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           .cast<int>()
           .toSet()
           .toList();
-      final payNumberMap = await SupabaseService.getPayNumberMap(payIds);
+      final payNumberMap = await SupabaseService.getPayNumberMap(payIds, insId: insId);
 
       if (mounted) {
         setState(() {
           _allDemands = demands;
-          _allFeeTypes = feeTypes;
           _payNumberMap = payNumberMap;
           _summaryTotalDemand = feeTotals['totalDemand'] ?? 0;
           _summaryTotalPaid = feeTotals['totalPaid'] ?? 0;
@@ -5148,8 +5158,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     final uniqueStudentIds = <String>{};
     int totalDateCount = 0;
 
-    // Use all fee types from feetype table so all columns show
-    final displayFeeTypes = _filterFeeType != null ? [_filterFeeType!] : _allFeeTypes;
+    // Use fee types from actual paid demands so columns match data
+    final displayFeeTypes = _filterFeeType != null ? [_filterFeeType!] : _feeTypes;
 
     for (final group in _dateGroups) {
       final filteredDemands = _filterFeeType != null
@@ -5834,11 +5844,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         for (var i = 0; i < activeFeeTypes.length; i++) {
           final amt = feeAmts[activeFeeTypes[i]] ?? 0;
           final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
-          if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+          if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
           cell.cellStyle = subTotalStyle;
         }
         final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
-        tCell.value = xl.DoubleCellValue(total);
+        tCell.value = xl.IntCellValue(total.toInt());
         tCell.cellStyle = subTotalStyle;
         row++;
       } else {
@@ -5853,11 +5863,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         for (var i = 0; i < activeFeeTypes.length; i++) {
           final amt = feeAmts[activeFeeTypes[i]] ?? 0;
           if (amt > 0) {
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row)).value = xl.DoubleCellValue(amt);
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row)).value = xl.IntCellValue(amt.toInt());
           }
         }
         final total = r['total'] as double;
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row)).value = xl.DoubleCellValue(total);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row)).value = xl.IntCellValue(total.toInt());
         row++;
       }
     }
@@ -5872,11 +5882,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     for (var i = 0; i < activeFeeTypes.length; i++) {
       final amt = grandFeeTypeTotals[activeFeeTypes[i]] ?? 0;
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
-      if (amt > 0) cell.value = xl.DoubleCellValue(amt);
+      if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
       cell.cellStyle = totalRowStyle;
     }
     final gtCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
-    gtCell.value = xl.DoubleCellValue(grandTotal);
+    gtCell.value = xl.IntCellValue(grandTotal.toInt());
     gtCell.cellStyle = totalRowStyle;
 
     // Column widths

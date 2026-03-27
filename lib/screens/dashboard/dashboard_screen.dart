@@ -17,6 +17,7 @@ import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
 import '../fees/fee_demand_approval_screen.dart';
 import '../admin/master_import_screen.dart';
+import '../admin/settings_screen.dart';
 
 
 
@@ -54,6 +55,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
+    _NavItem(Icons.settings_rounded, 'Settings', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
@@ -632,7 +634,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Settings';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -673,6 +675,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Master Data') {
       return const MasterImportScreen();
+    }
+    if (selectedMenu == 'Settings') {
+      return const SettingsScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();

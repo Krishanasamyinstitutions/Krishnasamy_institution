@@ -159,6 +159,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         final payments = await SupabaseService.client
             .from('payment')
             .select('pay_id, paynumber, paydate, paymethod')
+            .eq('ins_id', insId)
             .inFilter('pay_id', payIds);
         for (final p in (payments as List)) {
           paymentMap[p['pay_id'] as int] = Map<String, dynamic>.from(p);

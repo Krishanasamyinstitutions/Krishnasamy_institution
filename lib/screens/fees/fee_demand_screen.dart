@@ -210,6 +210,23 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final inscode = auth.inscode;
     if (insId == null) return;
 
+    final masterData = await SupabaseService.checkMasterData(insId);
+    if (!masterData.hasFeeTypes || !masterData.hasClassFeeDemand) {
+      if (mounted) {
+        final missing = <String>[];
+        if (!masterData.hasFeeTypes) missing.add('Fee Types');
+        if (!masterData.hasClassFeeDemand) missing.add('Class Fee Demand');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please import master data first: ${missing.join(', ')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
       // Look up the year label for the selected yr_id
@@ -416,6 +433,23 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
     final now = DateTime.now().toIso8601String();
+
+    final masterData = await SupabaseService.checkMasterData(insId);
+    if (!masterData.hasFeeTypes || !masterData.hasClassFeeDemand) {
+      if (mounted) {
+        final missing = <String>[];
+        if (!masterData.hasFeeTypes) missing.add('Fee Types');
+        if (!masterData.hasClassFeeDemand) missing.add('Class Fee Demand');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please import master data first: ${missing.join(', ')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _importStep = 2;

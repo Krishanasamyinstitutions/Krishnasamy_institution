@@ -212,9 +212,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
           .toList();
 
       if (tempIds.isNotEmpty) {
+        final auth = context.read<AuthProvider>();
         await SupabaseService.client
             .from('tempfeedemand')
-            .update({'isapproved': true}).inFilter('temp_id', tempIds);
+            .update({'isapproved': true})
+            .eq('ins_id', auth.insId!)
+            .inFilter('temp_id', tempIds);
       }
 
       if (mounted) {

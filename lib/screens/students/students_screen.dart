@@ -450,6 +450,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       final payMob = _payMobileController.text.trim().isNotEmpty ? _payMobileController.text.trim() : null;
 
       final existingParId = await SupabaseService.findParentByMobile(
+        insId: insId,
         fatherMobile: fatherMob,
         motherMobile: motherMob,
         payMobile: payMob,
@@ -2000,6 +2001,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
   Future<void> _startStudentImport() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
+
+    // Check master data exists before allowing import
+    final masterData = await SupabaseService.checkMasterData(insId);
+    if (!masterData.hasFeeGroups || !masterData.hasFeeTypes || !masterData.hasConcessions || !masterData.hasClassFeeDemand) {
+      if (mounted) {
+        final missing = <String>[];
+        if (!masterData.hasFeeGroups) missing.add('Fee Groups');
+        if (!masterData.hasFeeTypes) missing.add('Fee Types');
+        if (!masterData.hasConcessions) missing.add('Concessions');
+        if (!masterData.hasClassFeeDemand) missing.add('Class Fee Demand');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please import master data first: ${missing.join(', ')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
     final inscode = auth.inscode ?? '';
     final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
     final yrLabel = _selectedYrLabel ?? '';

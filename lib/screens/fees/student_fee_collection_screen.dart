@@ -1281,7 +1281,7 @@ class _StudentFeeCollectionScreenState
               ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
               : null,
           'paybankname': bankName,
-        }).eq('pay_id', payId);
+        }).eq('pay_id', payId).eq('ins_id', insId!);
       }
 
       final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
@@ -1289,6 +1289,7 @@ class _StudentFeeCollectionScreenState
         'p_pay_method': payMethod,
         'p_pay_reference': payReference,
         'p_items': completeItems,
+        'p_ins_id': insId,
       }) as String;
 
       _showSuccessDialog(payNumber, totalNet, payId: payId);
@@ -1452,7 +1453,7 @@ class _StudentFeeCollectionScreenState
           await SupabaseService.client.from('payment').update({
             'paystatus': 'F',
             'paydate': DateTime.now().toIso8601String(),
-          }).eq('pay_id', payId);
+          }).eq('pay_id', payId).eq('ins_id', insId!);
         } catch (_) {}
       }
 
@@ -1511,13 +1512,13 @@ class _StudentFeeCollectionScreenState
             timer.cancel();
             await SupabaseService.client.from('payment').update({
               'payreference': rpPaymentId,
-            }).eq('pay_id', payId);
+            }).eq('pay_id', payId).eq('ins_id', insId!);
             if (!completer.isCompleted) completer.complete('C');
           } else if (rpStatus == 'failed') {
             timer.cancel();
             await SupabaseService.client.from('payment').update({
               'payreference': rpPaymentId,
-            }).eq('pay_id', payId);
+            }).eq('pay_id', payId).eq('ins_id', insId!);
             if (!completer.isCompleted) completer.complete('F');
           }
         }
@@ -1603,6 +1604,7 @@ class _StudentFeeCollectionScreenState
           .from('payment')
           .select('payreference')
           .eq('pay_id', payId)
+          .eq('ins_id', insId!)
           .single();
 
       final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
@@ -1610,6 +1612,7 @@ class _StudentFeeCollectionScreenState
         'p_pay_method': 'razorpay',
         'p_pay_reference': payRecord['payreference']?.toString() ?? '',
         'p_items': completeItems,
+        'p_ins_id': insId,
       }) as String;
 
       _showSuccessDialog(payNumber, totalNet, payId: payId);
@@ -1617,7 +1620,7 @@ class _StudentFeeCollectionScreenState
       await SupabaseService.client.from('payment').update({
         'paystatus': 'F',
         'paydate': DateTime.now().toIso8601String(),
-      }).eq('pay_id', payId);
+      }).eq('pay_id', payId).eq('ins_id', insId!);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Online payment failed'), backgroundColor: Colors.red),
@@ -1628,7 +1631,7 @@ class _StudentFeeCollectionScreenState
         await SupabaseService.client.from('payment').update({
           'paystatus': 'F',
           'paydate': DateTime.now().toIso8601String(),
-        }).eq('pay_id', payId);
+        }).eq('pay_id', payId).eq('ins_id', insId!);
       } catch (_) {}
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

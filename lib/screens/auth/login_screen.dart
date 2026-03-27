@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../services/supabase_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
@@ -20,6 +21,25 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
+  List<Map<String, dynamic>> _institutions = [];
+  int? _selectedInsId;
+  bool _loadingInstitutions = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstitutions();
+  }
+
+  Future<void> _loadInstitutions() async {
+    final institutions = await SupabaseService.getInstitutionNames();
+    if (!mounted) return;
+    setState(() {
+      _institutions = institutions;
+      _loadingInstitutions = false;
+    });
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -30,16 +50,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedInsId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an institution')),
+      );
+      return;
+    }
+
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
+      insId: _selectedInsId,
     );
 
     if (success && mounted) {
       await authProvider.saveCredentials(
         _emailController.text.trim(),
         _passwordController.text,
+        insId: _selectedInsId,
       );
       if (mounted) {
         Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
@@ -284,6 +313,53 @@ class _LoginScreenState extends State<LoginScreen> {
                       return const SizedBox.shrink();
                     },
                   ),
+
+                  // Institution dropdown
+                  FadeInDown(
+                    delay: const Duration(milliseconds: 250),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Institution',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(fontSize: 13.sp),
+                        ),
+                        SizedBox(height: 8.h),
+                        _loadingInstitutions
+                            ? const LinearProgressIndicator()
+                            : DropdownButtonFormField<int>(
+                                value: _selectedInsId,
+                                decoration: InputDecoration(
+                                  hintText: 'Select your institution',
+                                  prefixIcon: Icon(Icons.school_outlined,
+                                      size: 20.sp, color: AppColors.textLight),
+                                  prefixIconConstraints: BoxConstraints(
+                                      minWidth: 52.w, minHeight: 0),
+                                ),
+                                items: _institutions.map((ins) {
+                                  return DropdownMenuItem<int>(
+                                    value: ins['ins_id'] as int,
+                                    child: Text(ins['insname'] ?? ''),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() => _selectedInsId = value);
+                                },
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Please select an institution';
+                                  }
+                                  return null;
+                                },
+                              ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 20.h),
 
                   // Email field
                   FadeInDown(

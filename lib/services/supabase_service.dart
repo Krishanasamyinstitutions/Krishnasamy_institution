@@ -31,6 +31,7 @@ class SupabaseService {
   static Future<InstitutionUserModel?> loginUser({
     required String email,
     required String password,
+    int? insId,
   }) async {
     try {
       final List<dynamic> result = await client.rpc('verify_user_login', params: {
@@ -46,12 +47,17 @@ class SupabaseService {
       if (row['is_valid'] != true) return null;
 
       final useId = row['use_id'];
-      final response = await client
+      var query = client
           .from('institutionusers')
           .select()
           .eq('use_id', useId)
-          .eq('activestatus', 1)
-          .maybeSingle();
+          .eq('activestatus', 1);
+
+      if (insId != null) {
+        query = query.eq('ins_id', insId);
+      }
+
+      final response = await query.maybeSingle();
 
       if (response == null) return null;
       return InstitutionUserModel.fromJson(response);
@@ -101,7 +107,44 @@ class SupabaseService {
     }
   }
 
+  // ==================== MASTER DATA CHECK ====================
+
+  /// Check if essential master data exists for an institution
+  static Future<({bool hasFeeGroups, bool hasFeeTypes, bool hasConcessions, bool hasClassFeeDemand})> checkMasterData(int insId) async {
+    try {
+      final results = await Future.wait([
+        client.from('feegroup').select('fg_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        client.from('feetype').select('fee_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        client.from('concessioncategory').select('con_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        client.from('classfeedemand').select('cfd_id').eq('ins_id', insId).limit(1),
+      ]);
+      return (
+        hasFeeGroups: (results[0] as List).isNotEmpty,
+        hasFeeTypes: (results[1] as List).isNotEmpty,
+        hasConcessions: (results[2] as List).isNotEmpty,
+        hasClassFeeDemand: (results[3] as List).isNotEmpty,
+      );
+    } catch (e) {
+      debugPrint('Master data check error: $e');
+      return (hasFeeGroups: false, hasFeeTypes: false, hasConcessions: false, hasClassFeeDemand: false);
+    }
+  }
+
   // ==================== INSTITUTION ====================
+
+  /// Get all institution names for the login dropdown
+  static Future<List<Map<String, dynamic>>> getInstitutionNames() async {
+    try {
+      final result = await client
+          .from('institution')
+          .select('ins_id, insname')
+          .order('insname');
+      return List<Map<String, dynamic>>.from(result);
+    } catch (e) {
+      debugPrint('Get institution names error: $e');
+      return [];
+    }
+  }
 
   /// Get institution name, logo, and address from the institution table
   static Future<({String? name, String? logo, String? address, String? mobile, String? email})> getInstitutionInfo(int insId) async {
@@ -291,6 +334,7 @@ class SupabaseService {
       final response = await client
           .from('feetype')
           .select('feedesc')
+          .eq('ins_id', insId)
           .eq('activestatus', 1)
           .order('fee_id', ascending: true);
       return (response as List).map((e) => e['feedesc']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
@@ -410,6 +454,7 @@ class SupabaseService {
   /// Find an existing parent record — checks fathermobile, then mothermobile,
   /// then payinchargemob in order. Returns par_id of first match, or null.
   static Future<int?> findParentByMobile({
+    required int insId,
     String? fatherMobile,
     String? motherMobile,
     String? payMobile,
@@ -418,6 +463,7 @@ class SupabaseService {
       final result = await client
           .from('parents')
           .select('par_id')
+          .eq('ins_id', insId)
           .eq('fathermobile', fatherMobile)
           .eq('activestatus', 1)
           .maybeSingle();
@@ -427,6 +473,7 @@ class SupabaseService {
       final result = await client
           .from('parents')
           .select('par_id')
+          .eq('ins_id', insId)
           .eq('mothermobile', motherMobile)
           .eq('activestatus', 1)
           .maybeSingle();
@@ -436,6 +483,7 @@ class SupabaseService {
       final result = await client
           .from('parents')
           .select('par_id')
+          .eq('ins_id', insId)
           .eq('payinchargemob', payMobile)
           .eq('activestatus', 1)
           .maybeSingle();
@@ -822,7 +870,7 @@ class SupabaseService {
   }
 
   /// Fetch paynumber lookup map: pay_id → paynumber
-  static Future<Map<int, String>> getPayNumberMap(List<int> payIds) async {
+  static Future<Map<int, String>> getPayNumberMap(List<int> payIds, {required int insId}) async {
     if (payIds.isEmpty) return {};
     try {
       final Map<int, String> result = {};
@@ -832,6 +880,7 @@ class SupabaseService {
         final response = await client
             .from('payment')
             .select('pay_id, paynumber')
+            .eq('ins_id', insId)
             .inFilter('pay_id', chunk);
         for (final row in (response as List)) {
           final id = row['pay_id'] as int?;
@@ -890,7 +939,7 @@ class SupabaseService {
   }
 
   /// Fetch payment amounts (transtotalamount) for given pay_ids
-  static Future<Map<int, double>> getPayAmountMap(List<int> payIds) async {
+  static Future<Map<int, double>> getPayAmountMap(List<int> payIds, {required int insId}) async {
     if (payIds.isEmpty) return {};
     try {
       final Map<int, double> result = {};
@@ -899,6 +948,7 @@ class SupabaseService {
         final response = await client
             .from('payment')
             .select('pay_id, transtotalamount')
+            .eq('ins_id', insId)
             .inFilter('pay_id', chunk);
         for (final row in (response as List)) {
           final id = row['pay_id'] as int?;
@@ -1135,35 +1185,62 @@ class SupabaseService {
   }
 
   /// Get fee group names mapped by fee_id
-  static Future<Map<int, String>> getFeeGroupMap(int insId) async {
+  /// Returns two maps:
+  /// - 'byId': fee_id -> fee group name
+  /// - 'byName': fee type name (feedesc) -> fee group name
+  static Future<Map<String, Map>> getFeeGroupMaps(int insId) async {
     try {
       final feeTypes = await client
           .from('feetype')
-          .select('fee_id, fg_id')
+          .select('fee_id, feedesc, fg_id')
+          .eq('ins_id', insId)
           .eq('activestatus', 1);
       final feeIdToFgId = <int, int>{};
+      final feeDescToFgId = <String, int>{};
       final fgIds = <int>{};
       for (final ft in (feeTypes as List)) {
-        feeIdToFgId[ft['fee_id'] as int] = ft['fg_id'] as int;
-        fgIds.add(ft['fg_id'] as int);
+        final feeId = ft['fee_id'] as int?;
+        final fgId = ft['fg_id'] as int?;
+        final feedesc = ft['feedesc']?.toString() ?? '';
+        if (fgId != null && fgId > 0) {
+          if (feeId != null) {
+            feeIdToFgId[feeId] = fgId;
+          }
+          if (feedesc.isNotEmpty) {
+            feeDescToFgId[feedesc] = fgId;
+          }
+          fgIds.add(fgId);
+        }
       }
-      if (fgIds.isEmpty) return {};
+      if (fgIds.isEmpty) return {'byId': {}, 'byName': {}};
       final feeGroups = await client
           .from('feegroup')
           .select('fg_id, fgdesc')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
           .inFilter('fg_id', fgIds.toList());
       final fgMap = <int, String>{};
       for (final fg in (feeGroups as List)) {
         fgMap[fg['fg_id'] as int] = fg['fgdesc']?.toString() ?? '';
       }
-      final result = <int, String>{};
+      final byId = <int, String>{};
       for (final entry in feeIdToFgId.entries) {
-        result[entry.key] = fgMap[entry.value] ?? '';
+        final name = fgMap[entry.value] ?? '';
+        if (name.isNotEmpty) {
+          byId[entry.key] = name;
+        }
       }
-      return result;
+      final byName = <String, String>{};
+      for (final entry in feeDescToFgId.entries) {
+        final name = fgMap[entry.value] ?? '';
+        if (name.isNotEmpty) {
+          byName[entry.key] = name;
+        }
+      }
+      return {'byId': byId, 'byName': byName};
     } catch (e) {
       debugPrint('Error fetching fee group map: $e');
-      return {};
+      return {'byId': {}, 'byName': {}};
     }
   }
 
