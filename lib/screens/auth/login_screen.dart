@@ -42,11 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
       if (mounted) {
-        if (authProvider.subscriptionActive) {
-          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
-        }
+        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
       }
     }
   }

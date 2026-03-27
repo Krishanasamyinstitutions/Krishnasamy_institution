@@ -5,7 +5,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
-import '../auth/activation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -40,26 +39,12 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(seconds: 4));
     if (!mounted) return;
 
-    // Check if app is activated first
-    final activated = await ActivationScreen.isActivated();
-    if (!mounted) return;
-
-    if (!activated) {
-      Navigator.pushReplacementNamed(context, AppRoutes.activation);
-      return;
-    }
-
     final auth = context.read<AuthProvider>();
     final loggedIn = await auth.tryAutoLogin();
     if (!mounted) return;
 
     if (loggedIn) {
-      // Check subscription status after login
-      if (auth.subscriptionActive) {
-        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-      } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
-      }
+      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
     } else {
       Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
     }
