@@ -2092,7 +2092,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       // 2. Bulk insert into staging table (batches of 200)
       for (int i = 0; i < stagingRows.length; i += 200) {
         final batch = stagingRows.sublist(i, (i + 200).clamp(0, stagingRows.length));
-        await SupabaseService.client.from('student_import').insert(batch);
+        await SupabaseService.fromSchema('student_import').insert(batch);
         setState(() {
           _importedCount = i + batch.length;
         });
@@ -2111,8 +2111,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
 
       // 4. Fetch errors from staging table
-      final errors = await SupabaseService.client
-          .from('student_import')
+      final errors = await SupabaseService.fromSchema('student_import')
           .select('imp_id, stuadmno, error_msg, status')
           .eq('ins_id', insId)
           .inFilter('status', ['ERROR', 'NO_PARENT']);
@@ -2127,8 +2126,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
 
       // 5. Clean up processed staging rows
-      await SupabaseService.client
-          .from('student_import')
+      await SupabaseService.fromSchema('student_import')
           .delete()
           .eq('ins_id', insId)
           .inFilter('status', ['DONE', 'ERROR', 'NO_PARENT']);
