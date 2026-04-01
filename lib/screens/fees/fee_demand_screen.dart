@@ -246,8 +246,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       final admNo = _admNoController.text.trim();
       int? stuId;
       if (admNo.isNotEmpty) {
-        final stuResult = await SupabaseService.client
-            .from('students')
+        final stuResult = await SupabaseService.fromSchema('students')
             .select('stu_id')
             .eq('ins_id', insId)
             .eq('stuadmno', admNo)
@@ -277,7 +276,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         'isapproved': false,
       };
 
-      await SupabaseService.client.from('tempfeedemand').insert(data);
+      await SupabaseService.fromSchema('tempfeedemand').insert(data);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -304,8 +303,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      final result = await SupabaseService.client
-          .from('students')
+      final result = await SupabaseService.fromSchema('students')
           .select('stuclass')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
@@ -460,8 +458,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     });
 
     // 1. Pre-fetch all student admno -> stu_id mappings
-    final stuList = await SupabaseService.client
-        .from('students')
+    final stuList = await SupabaseService.fromSchema('students')
         .select('stu_id, stuadmno')
         .eq('ins_id', insId)
         .eq('activestatus', 1);
@@ -572,13 +569,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     for (int i = 0; i < batch.length; i += 500) {
       final chunk = batch.sublist(i, (i + 500).clamp(0, batch.length));
       try {
-        await SupabaseService.client.from('tempfeedemand').insert(chunk);
+        await SupabaseService.fromSchema('tempfeedemand').insert(chunk);
         _imported += chunk.length;
       } catch (e) {
         // If batch fails, try one by one
         for (final row in chunk) {
           try {
-            await SupabaseService.client.from('tempfeedemand').insert(row);
+            await SupabaseService.fromSchema('tempfeedemand').insert(row);
             _imported++;
           } catch (e2) {
             _skipped++;

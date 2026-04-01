@@ -51,7 +51,7 @@ class InstitutionUserModel {
       inscode: json['inscode'] ?? '',
       usename: json['usename'] ?? '',
       usemail: json['usemail'] ?? '',
-      usephone: json['usephone'] ?? '',
+      usephone: json['usephone']?.toString() ?? '',
       usepassword: json['usepassword'],
       usestadate: json['usestadate'] != null
           ? DateTime.parse(json['usestadate'])
@@ -61,17 +61,17 @@ class InstitutionUserModel {
           ? DateTime.parse(json['usedob'])
           : DateTime.now(),
       usecategory: json['usecategory'],
-      urId: json['ur_id'] is int
-          ? json['ur_id']
-          : int.parse(json['ur_id'].toString()),
+      urId: json['ur_id'] != null
+          ? (json['ur_id'] is int ? json['ur_id'] : int.parse(json['ur_id'].toString()))
+          : 0,
       urname: json['urname'] ?? '',
-      desId: json['des_id'] is int
-          ? json['des_id']
-          : int.parse(json['des_id'].toString()),
+      desId: json['des_id'] != null
+          ? (json['des_id'] is int ? json['des_id'] : int.parse(json['des_id'].toString()))
+          : 0,
       desname: json['desname'] ?? '',
-      userepto: json['userepto'] is int
-          ? json['userepto']
-          : int.parse(json['userepto'].toString()),
+      userepto: json['userepto'] != null
+          ? (json['userepto'] is int ? json['userepto'] : int.parse(json['userepto'].toString()))
+          : 0,
       activestatus: json['activestatus'] ?? 1,
     );
   }

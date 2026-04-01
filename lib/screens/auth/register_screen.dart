@@ -1,12 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:animate_do/animate_do.dart';
-import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/app_routes.dart';
-import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -27,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   DateTime? _institutionStartDate;
   File? _logoFile;
   final _institutionNameController = TextEditingController();
+  final _institutionShortNameController = TextEditingController();
   final _institutionCodeController = TextEditingController();
   final _authorizedUsernameController = TextEditingController();
   final _designationController = TextEditingController();
@@ -79,6 +76,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _pageController.dispose();
     _institutionNameController.dispose();
+    _institutionShortNameController.dispose();
     _institutionCodeController.dispose();
     _authorizedUsernameController.dispose();
     _designationController.dispose();
@@ -203,6 +201,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
+      // Save short name and create institution schema
+      final shortName = _institutionShortNameController.text.trim().toLowerCase();
+      final schemaName = '$shortName${yrLabel.replaceAll('-', '')}';
+
+      debugPrint('Schema creation: ins_id=${regResult['ins_id']}, shortName="$shortName", schemaName="$schemaName"');
+
+      if (regResult['ins_id'] != null && shortName.isNotEmpty) {
+        // Update short name on institution table
+        await SupabaseService.client.from('institution')
+            .update({'inshortname': _institutionShortNameController.text.trim()})
+            .eq('ins_id', regResult['ins_id']);
+        debugPrint('Short name updated');
+
+        // Create institution schema (shortname+year)
+        await SupabaseService.client.rpc('create_institution_schema', params: {
+          'p_schema_name': schemaName,
+        });
+        debugPrint('Schema "$schemaName" created successfully');
+
+        // Insert year into institution schema
+        try {
+          SupabaseService.setSchema(schemaName);
+          await SupabaseService.fromSchema('year').insert({
+            'ins_id': regResult['ins_id'],
+            'yrlabel': yrLabel,
+            'yrstadate': yrStaDate.toIso8601String().split('T').first,
+            'yrenddate': yrEndDate.toIso8601String().split('T').first,
+            'activestatus': 1,
+          });
+          SupabaseService.setSchema(null);
+          debugPrint('Year inserted into schema');
+        } catch (e) {
+          SupabaseService.setSchema(null);
+          debugPrint('Year insert failed: $e');
+        }
+
+        // Expose schema to API (try, but don't fail if permission denied)
+        try {
+          await SupabaseService.client.rpc('expose_schema', params: {
+            'p_schema': schemaName,
+          });
+          debugPrint('Schema "$schemaName" exposed to API');
+        } catch (e) {
+          debugPrint('expose_schema skipped (run manually in SQL Editor): $e');
+        }
+      } else {
+        debugPrint('Schema NOT created: ins_id=${regResult['ins_id']}, shortName="$shortName"');
+      }
+
       // Upload logo if selected
       if (_logoFile != null && regResult['inscode'] != null) {
         try {
@@ -217,24 +264,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
 
-      // Auto-login with the new admin user
+      // Show success and stay on super admin dashboard
       if (mounted) {
-        final authProvider = context.read<AuthProvider>();
-        final loginSuccess = await authProvider.login(
-          _adminEmailController.text.trim(),
-          _passwordController.text,
-        );
-
         setState(() => _isCreating = false);
-
-        if (loginSuccess && mounted) {
-          Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account created! Please login with your credentials.'), backgroundColor: Colors.green),
-          );
-          Navigator.pop(context);
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Institution created successfully!'), backgroundColor: Colors.green),
+        );
       }
     } catch (e) {
       debugPrint('Registration error: $e');
@@ -274,169 +309,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isDesktop = size.width > 800;
-
-    return Scaffold(
-      body: Row(
-        children: [
-          if (isDesktop)
-            Expanded(
-              flex: 4,
-              child: _buildLeftPanel(context),
-            ),
-          Expanded(
-            flex: isDesktop ? 7 : 1,
-            child: _buildRightPanel(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeftPanel(BuildContext context) {
-    final stepLabels = ['Institution Info', 'Affiliation & Address', 'Account Setup'];
-    final stepDescs = ['Basic institution details', 'Affiliation and address', 'Set up your password'];
-
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.splashGradient),
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.all(48.w),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FadeInLeft(
-                child: Container(
-                  width: 72.w,
-                  height: 72.h,
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20.r),
-                  ),
-                  child: Icon(Icons.school_rounded, size: 36.sp, color: AppColors.secondary),
-                ),
-              ),
-              SizedBox(height: 28.h),
-              FadeInLeft(
-                delay: const Duration(milliseconds: 200),
-                child: Text(
-                  'Join EduDesk',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white),
-                ),
-              ),
-              SizedBox(height: 12.h),
-              FadeInLeft(
-                delay: const Duration(milliseconds: 400),
-                child: Text(
-                  'Set up your institution and start\nmanaging efficiently.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white.withValues(alpha: 0.6), height: 1.6),
-                ),
-              ),
-              SizedBox(height: 48.h),
-              FadeInLeft(
-                delay: const Duration(milliseconds: 600),
-                child: Container(
-                  padding: EdgeInsets.all(24.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16.r),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                  ),
-                  child: Column(
-                    children: List.generate(3, (i) {
-                      final isActive = i == _currentStep;
-                      final isDone = i < _currentStep;
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: i < 2 ? 16.h : 0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36.w,
-                              height: 36.h,
-                              decoration: BoxDecoration(
-                                color: isDone
-                                    ? AppColors.accent.withValues(alpha: 0.3)
-                                    : isActive
-                                        ? AppColors.accent.withValues(alpha: 0.2)
-                                        : Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(10.r),
-                              ),
-                              child: Center(
-                                child: isDone
-                                    ? Icon(Icons.check_rounded, size: 18.sp, color: AppColors.accent)
-                                    : Text('${i + 1}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: isActive ? AppColors.accent : Colors.white.withValues(alpha: 0.3))),
-                              ),
-                            ),
-                            SizedBox(width: 14.w),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(stepLabels[i], style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.4))),
-                                Text(stepDescs[i], style: TextStyle(fontSize: 13.sp, color: isActive ? Colors.white.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.2))),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRightPanel(BuildContext context) {
     return Container(
       color: AppColors.surface,
       child: Column(
         children: [
-          // Top bar with back button and stepper dots
-          Padding(
-            padding: EdgeInsets.fromLTRB(24.w, 24.h, 24.w, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: _currentStep > 0 ? () => _goToStep(_currentStep - 1) : () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                  ),
-                ),
-                const Spacer(),
-                // Step indicator dots
-                Row(
-                  children: List.generate(3, (i) {
-                    final isActive = i == _currentStep;
-                    final isDone = i < _currentStep;
-                    return GestureDetector(
-                      onTap: () => _goToStep(i),
-                      child: Container(
-                        width: isActive ? 32.w : 10.w,
-                        height: 10.h,
-                        margin: EdgeInsets.symmetric(horizontal: 4.w),
-                        decoration: BoxDecoration(
-                          color: isDone ? AppColors.accent : isActive ? AppColors.accent : AppColors.border,
-                          borderRadius: BorderRadius.circular(5.r),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                const Spacer(),
-                Text('Step ${_currentStep + 1} of 3', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-          SizedBox(height: 16.h),
+          // Milestone progress bar
+          _buildMilestoneProgress(context),
 
           // Page slider
           Expanded(
@@ -454,7 +332,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Bottom navigation
           Padding(
-            padding: EdgeInsets.fromLTRB(32.w, 0, 32.w, 24.h),
+            padding: EdgeInsets.fromLTRB(32.w, 0, 32.w, 16.h),
             child: Row(
               children: [
                 if (_currentStep > 0)
@@ -463,25 +341,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
                     label: const Text('Previous'),
                     style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 16.h),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                       side: const BorderSide(color: AppColors.border),
                     ),
                   ),
                 const Spacer(),
-                // Sign in link
-                if (_currentStep == 0)
-                  Row(
-                    children: [
-                      Text('Already have an account? ', style: Theme.of(context).textTheme.bodyMedium),
-                      TextButton(
-                        onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.login),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: Text('Sign In', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600)),
-                      ),
-                      SizedBox(width: 20.w),
-                    ],
-                  ),
                 if (_currentStep < 2)
                   ElevatedButton.icon(
                     onPressed: () => _goToStep(_currentStep + 1),
@@ -490,7 +355,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 16.h),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                     ),
                   ),
@@ -498,6 +363,103 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMilestoneProgress(BuildContext context) {
+    final steps = [
+      {'icon': Icons.domain_add_rounded, 'label': 'Institution Info'},
+      {'icon': Icons.location_on_rounded, 'label': 'Affiliation & Address'},
+      {'icon': Icons.lock_rounded, 'label': 'Account Setup'},
+    ];
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: List.generate(steps.length * 2 - 1, (index) {
+          if (index.isOdd) {
+            // Connector line
+            final stepBefore = index ~/ 2;
+            final isDone = stepBefore < _currentStep;
+            return Expanded(
+              child: Container(
+                height: 3,
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                decoration: BoxDecoration(
+                  color: isDone ? AppColors.accent : AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }
+
+          final stepIndex = index ~/ 2;
+          final step = steps[stepIndex];
+          final isActive = stepIndex == _currentStep;
+          final isDone = stepIndex < _currentStep;
+
+          return GestureDetector(
+            onTap: () => _goToStep(stepIndex),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: isDone
+                        ? AppColors.accent
+                        : isActive
+                            ? AppColors.accent.withValues(alpha: 0.15)
+                            : AppColors.surface,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: isDone || isActive ? AppColors.accent : AppColors.border,
+                      width: isActive ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: isDone
+                        ? Icon(Icons.check_rounded, size: 20.sp, color: Colors.white)
+                        : Icon(
+                            step['icon'] as IconData,
+                            size: 20.sp,
+                            color: isActive ? AppColors.accent : AppColors.textSecondary,
+                          ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Step ${stepIndex + 1}',
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        color: isActive || isDone ? AppColors.accent : AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      step['label'] as String,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
@@ -584,14 +546,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(children: [
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             _fieldLabel('Institution Name *'),
                             TextFormField(controller: _institutionNameController, decoration: _inputDec('Enter institution name'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
                           ])),
                           SizedBox(width: 14.w),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            _fieldLabel('Short Name *'),
+                            TextFormField(controller: _institutionShortNameController, decoration: _inputDec('e.g. KCET'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                          ])),
+                          SizedBox(width: 14.w),
+                          Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             _fieldLabel('Institution Code *'),
-                            TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter institution code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                            TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
                           ])),
                         ]),
                       ],

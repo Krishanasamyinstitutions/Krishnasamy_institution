@@ -19,6 +19,7 @@ class PaymentModel {
 
   /// Student name returned by the RPC function (not stored in model permanently)
   final String? stuname;
+  final String? reconStatus;
 
   PaymentModel({
     required this.payId,
@@ -38,6 +39,7 @@ class PaymentModel {
     required this.createdat,
     this.activestatus = 1,
     this.stuname,
+    this.reconStatus,
   });
 
   factory PaymentModel.fromJson(Map<String, dynamic> json) {
@@ -74,6 +76,7 @@ class PaymentModel {
           : DateTime.now(),
       activestatus: json['activestatus'] ?? 1,
       stuname: json['stuname'],
+      reconStatus: json['recon_status']?.toString(),
     );
   }
 
