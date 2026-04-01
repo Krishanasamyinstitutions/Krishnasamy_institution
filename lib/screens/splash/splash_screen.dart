@@ -44,7 +44,10 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (loggedIn) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      Navigator.pushReplacementNamed(
+        context,
+        auth.isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
+      );
     } else {
       Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
     }

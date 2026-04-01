@@ -6,6 +6,7 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/superadmin/super_admin_dashboard.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -15,6 +16,7 @@ class AppRoutes {
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
   static const String dashboard = '/dashboard';
+  static const String superAdminDashboard = '/super-admin-dashboard';
 
   static Map<String, WidgetBuilder> get routes => {
         splash: (context) => const SplashScreen(),
@@ -24,5 +26,6 @@ class AppRoutes {
         register: (context) => const RegisterScreen(),
         forgotPassword: (context) => const ForgotPasswordScreen(),
         dashboard: (context) => const DashboardScreen(),
+        superAdminDashboard: (context) => const SuperAdminDashboard(),
       };
 }

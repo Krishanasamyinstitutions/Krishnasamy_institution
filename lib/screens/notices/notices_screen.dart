@@ -31,8 +31,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final data = await SupabaseService.client
-          .from('notice')
+      final data = await SupabaseService.fromSchema('notice')
           .select()
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -54,8 +53,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
 
       if (expiredIds.isNotEmpty) {
         try {
-          await SupabaseService.client
-              .from('notice')
+          await SupabaseService.fromSchema('notice')
               .update({'activestatus': 9})
               .inFilter('notice_id', expiredIds);
         } catch (_) {}
@@ -625,7 +623,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   : _selectedClasses.join(', ');
 
       // Insert notice
-      await SupabaseService.client.from('notice').insert({
+      await SupabaseService.fromSchema('notice').insert({
         'ins_id': insId,
         'noticetitle': title,
         'noticedesc': desc,
@@ -656,7 +654,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
             'isread': 0,
             'activestatus': 1,
           }).toList();
-          await SupabaseService.client.from('notification').insert(staffNotifications);
+          await SupabaseService.fromSchema('notification').insert(staffNotifications);
         }
       } else if (_targetType == 'Pending Fees') {
         // Get students with pending fee balance, optionally filtered by term
@@ -705,7 +703,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         for (var i = 0; i < notifications.length; i += 500) {
           final batch = notifications.sublist(i, i + 500 > notifications.length ? notifications.length : i + 500);
           try {
-            await SupabaseService.client.from('notification').insert(batch);
+            await SupabaseService.fromSchema('notification').insert(batch);
           } catch (e) {
             debugPrint('Error inserting notification batch: $e');
           }

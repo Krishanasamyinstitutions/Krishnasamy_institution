@@ -43,6 +43,7 @@ class _StudentFeeCollectionScreenState
   final _classController = TextEditingController();
   final _remarksController = TextEditingController();
   final _chequeNoController = TextEditingController();
+  final _upiRefController = TextEditingController();
   final _chequeDateController = TextEditingController();
   final _bankNameController = TextEditingController();
   DateTime? _chequeDate;
@@ -89,8 +90,7 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      final rows = await SupabaseService.client
-          .from('students')
+      final rows = await SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -134,6 +134,7 @@ class _StudentFeeCollectionScreenState
       _chequeNoController.clear();
       _chequeDateController.clear();
       _bankNameController.clear();
+      _upiRefController.clear();
       _chequeDate = null;
     });
   }
@@ -147,8 +148,7 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      final rows = await SupabaseService.client
-          .from('students')
+      final rows = await SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -194,8 +194,7 @@ class _StudentFeeCollectionScreenState
     });
 
     try {
-      final studentRows = await SupabaseService.client
-          .from('students')
+      final studentRows = await SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass, stugender, stumobile, stuphoto')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
@@ -229,8 +228,7 @@ class _StudentFeeCollectionScreenState
 
       // Fetch parent and demands in parallel
       final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: admNo);
-      final demandsFuture = SupabaseService.client
-          .from('feedemand')
+      final demandsFuture = SupabaseService.fromSchema('feedemand')
           .select(
               'dem_id, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, duedate, paidstatus, stuclass')
           .eq('ins_id', insId)
@@ -983,12 +981,51 @@ class _StudentFeeCollectionScreenState
 
   bool _processing = false;
 
-  void _onCollectAndReceipt() {
+  Future<void> _onCollectAndReceipt() async {
+    // Check if sequences exist for all fee groups in selected demands
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId != null) {
+      try {
+        final sequences = await SupabaseService.fromSchema('sequence')
+            .select('fg_id')
+            .eq('ins_id', insId);
+        final seqFgIds = (sequences as List).map((s) => s['fg_id']).toSet();
+
+        // Get fee groups for selected demands
+        for (final key in _selected) {
+          final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+          if (d.isEmpty) continue;
+          final demfeetype = d['demfeetype']?.toString() ?? '';
+          final ftResult = await SupabaseService.fromSchema('feetype')
+              .select('fg_id')
+              .eq('feedesc', demfeetype)
+              .eq('activestatus', 1)
+              .limit(1)
+              .maybeSingle();
+          final fgId = ftResult?['fg_id'];
+          if (fgId != null && !seqFgIds.contains(fgId)) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Please create payment sequence for all fee groups first (Settings > Sequence Creation)'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
     final totalNet = _totalNetSelected;
     _paymentMode = 'Cash';
     _chequeNoController.clear();
     _chequeDateController.clear();
     _bankNameController.clear();
+    _upiRefController.clear();
     _chequeDate = null;
 
     showDialog(
@@ -1016,7 +1053,7 @@ class _StudentFeeCollectionScreenState
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: ['Cash', 'Online', 'Cheque'].map((mode) {
+                  children: ['Cash', 'QR/UPI', 'Online', 'Cheque'].map((mode) {
                     final sel = _paymentMode == mode;
                     return GestureDetector(
                       onTap: () => setDialogState(() => setState(() => _paymentMode = mode)),
@@ -1033,6 +1070,38 @@ class _StudentFeeCollectionScreenState
                     );
                   }).toList(),
                 ),
+                if (_paymentMode == 'QR/UPI') ...[
+                  SizedBox(height: 16.h),
+                  Container(
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: AppColors.info.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 16.sp, color: AppColors.info),
+                        SizedBox(width: 8.w),
+                        Expanded(child: Text('Enter the UPI Transaction ID shared by the student', style: TextStyle(fontSize: 11.sp, color: AppColors.info))),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  Text('UPI Transaction ID *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                  SizedBox(height: 6.h),
+                  TextField(
+                    controller: _upiRefController,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 412345678901',
+                      prefixIcon: Icon(Icons.receipt_long_rounded, size: 18.sp),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      isDense: true,
+                    ),
+                    style: TextStyle(fontSize: 13.sp),
+                  ),
+                ],
                 if (_paymentMode == 'Cheque') ...[
                   SizedBox(height: 16.h),
                   Row(
@@ -1117,6 +1186,14 @@ class _StudentFeeCollectionScreenState
             ),
             ElevatedButton(
               onPressed: () {
+                if (_paymentMode == 'QR/UPI') {
+                  if (_upiRefController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Please enter UPI Transaction ID'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+                }
                 if (_paymentMode == 'Cheque') {
                   if (_chequeNoController.text.trim().isEmpty ||
                       _chequeDateController.text.trim().isEmpty ||
@@ -1222,14 +1299,12 @@ class _StudentFeeCollectionScreenState
     final stuId = _student!['stu_id'] as int;
     final totalNet = _totalNetSelected;
 
-    int? payId;
-
     try {
       final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
       final yrId = firstDemand['yr_id'] as int?;
       final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
 
-      // Build items list for atomic RPC
+      // Build items list with fee type info
       final items = <Map<String, dynamic>>[];
       for (final key in _selected) {
         final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
@@ -1237,7 +1312,6 @@ class _StudentFeeCollectionScreenState
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
         final col = _con(key);
-        // If col amount entered, pay that amount (partial); otherwise pay full balance
         final net = (col > 0 ? col : bal) + fine;
         items.add({
           'dem_id': d['dem_id'] as int,
@@ -1245,12 +1319,27 @@ class _StudentFeeCollectionScreenState
           'yrlabel': d['demfeeyear']?.toString() ?? '',
           'ins_id': insId,
           'amount': net,
+          'demfeetype': d['demfeetype']?.toString() ?? '',
         });
       }
 
-      // Step 1: Initiate payment atomically (creates payment + paymentdetails, validates fees)
-      payId = await SupabaseService.client.rpc('initiate_payment_atomic', params: {
-        'p_car_id': 0, // No cart for desktop direct payment
+      // Build payment reference
+      String payReference = '$_paymentMode collection by $createdBy';
+      String payMethod = _paymentMode.toLowerCase();
+
+      if (_paymentMode == 'QR/UPI') {
+        final upiRef = _upiRefController.text.trim();
+        payReference = 'UPI Txn: $upiRef by $createdBy';
+        payMethod = 'qr_upi';
+      } else if (_paymentMode == 'Cheque') {
+        final chequeNo = _chequeNoController.text.trim();
+        final bankName = _bankNameController.text.trim();
+        payReference = 'Cheque $chequeNo ($bankName) by $createdBy';
+        payMethod = 'cheque';
+      }
+
+      // Call grouped payment RPC — creates one payment per fee group
+      final result = await SupabaseService.client.rpc('process_grouped_payment', params: {
         'p_ins_id': insId,
         'p_inscode': inscode,
         'p_stu_id': stuId,
@@ -1258,41 +1347,32 @@ class _StudentFeeCollectionScreenState
         'p_yrlabel': yrlabel,
         'p_total_amount': totalNet,
         'p_created_by': createdBy,
-        'p_items': items,
-      }) as int;
-
-      // Step 2: Complete payment atomically (updates feedemand, generates pay number)
-      final completeItems = items.map((i) => {
-        'dem_id': i['dem_id'],
-        'amount': i['amount'],
-      }).toList();
-
-      String payReference = '$_paymentMode collection by $createdBy';
-      String payMethod = _paymentMode.toLowerCase();
-
-      if (_paymentMode == 'Cheque') {
-        final chequeNo = _chequeNoController.text.trim();
-        final bankName = _bankNameController.text.trim();
-        payReference = 'Cheque $chequeNo ($bankName) by $createdBy';
-        // Update cheque details on payment record
-        await SupabaseService.client.from('payment').update({
-          'paychequeno': chequeNo,
-          'paychequedate': _chequeDate != null
-              ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
-              : null,
-          'paybankname': bankName,
-        }).eq('pay_id', payId).eq('ins_id', insId!);
-      }
-
-      final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
-        'p_pay_id': payId,
         'p_pay_method': payMethod,
         'p_pay_reference': payReference,
-        'p_items': completeItems,
-        'p_ins_id': insId,
-      }) as String;
+        'p_items': items,
+      });
 
-      _showSuccessDialog(payNumber, totalNet, payId: payId);
+      // Result is JSON array of receipt numbers
+      final receipts = result is List ? result : (result is String ? [result] : []);
+      final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+
+      // Update cheque details if applicable
+      if (_paymentMode == 'Cheque' && receipts.isNotEmpty) {
+        for (final r in receipts) {
+          final payId = r is Map ? r['pay_id'] : null;
+          if (payId != null) {
+            await SupabaseService.fromSchema('payment').update({
+              'paychequeno': _chequeNoController.text.trim(),
+              'paychequedate': _chequeDate != null
+                  ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
+                  : null,
+              'paybankname': _bankNameController.text.trim(),
+            }).eq('pay_id', payId).eq('ins_id', insId!);
+          }
+        }
+      }
+
+      _showSuccessDialog(receiptStr, totalNet);
     } catch (e) {
       String errorMsg = e.toString();
       if (errorMsg.contains('already fully paid')) {
@@ -1365,7 +1445,7 @@ class _StudentFeeCollectionScreenState
         'p_items': items,
       }) as int;
 
-      // 2. Create Razorpay order via edge function
+      // 2. Create Razorpay order via edge function (old project)
       final orderResponse = await SupabaseService.client.functions.invoke(
         'create-razorpay-order',
         body: {
@@ -1376,7 +1456,9 @@ class _StudentFeeCollectionScreenState
         },
       );
 
-      final orderData = orderResponse.data as Map<String, dynamic>;
+      final orderData = orderResponse.data is Map<String, dynamic>
+          ? orderResponse.data as Map<String, dynamic>
+          : <String, dynamic>{};
       final orderId = orderData['order_id'] as String;
 
       // 3. Build checkout HTML and open in browser
@@ -1450,7 +1532,7 @@ class _StudentFeeCollectionScreenState
     } catch (e) {
       if (payId != null) {
         try {
-          await SupabaseService.client.from('payment').update({
+          await SupabaseService.fromSchema('payment').update({
             'paystatus': 'F',
             'paydate': DateTime.now().toIso8601String(),
           }).eq('pay_id', payId).eq('ins_id', insId!);
@@ -1489,8 +1571,7 @@ class _StudentFeeCollectionScreenState
     // Start polling for payment status
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       try {
-        final payRecord = await SupabaseService.client
-            .from('payment')
+        final payRecord = await SupabaseService.fromSchema('payment')
             .select('payorderid')
             .eq('pay_id', payId)
             .single();
@@ -1510,13 +1591,13 @@ class _StudentFeeCollectionScreenState
         if (rpPaymentId != null && rpPaymentId.isNotEmpty) {
           if (rpStatus == 'captured' || rpStatus == 'authorized') {
             timer.cancel();
-            await SupabaseService.client.from('payment').update({
+            await SupabaseService.fromSchema('payment').update({
               'payreference': rpPaymentId,
             }).eq('pay_id', payId).eq('ins_id', insId!);
             if (!completer.isCompleted) completer.complete('C');
           } else if (rpStatus == 'failed') {
             timer.cancel();
-            await SupabaseService.client.from('payment').update({
+            await SupabaseService.fromSchema('payment').update({
               'payreference': rpPaymentId,
             }).eq('pay_id', payId).eq('ins_id', insId!);
             if (!completer.isCompleted) completer.complete('F');
@@ -1586,38 +1667,61 @@ class _StudentFeeCollectionScreenState
     webviewController.dispose();
 
     if (result == 'C') {
-      // Complete payment atomically
-      final completeItems = <Map<String, dynamic>>[];
+      // Get Razorpay reference before deleting
+      final payRecord = await SupabaseService.fromSchema('payment')
+          .select('payreference')
+          .eq('pay_id', payId)
+          .eq('ins_id', insId!)
+          .maybeSingle();
+      final rpRef = payRecord?['payreference']?.toString() ?? '';
+
+      // Delete the initiated payment (process_grouped_payment will create new ones per group)
+      try {
+        await SupabaseService.fromSchema('paymentdetails').delete().eq('pay_id', payId);
+        await SupabaseService.fromSchema('payment').delete().eq('pay_id', payId);
+      } catch (_) {}
+
+      // Re-read auth values
+      final auth2 = context.read<AuthProvider>();
+      final firstDem = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)), orElse: () => {});
+
+      // Build items with demfeetype for grouping
+      final items = <Map<String, dynamic>>[];
       for (final key in _selected) {
         final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
         if (d.isEmpty) continue;
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
-        final con = _con(key);
-        completeItems.add({
+        final col = _con(key);
+        final net = (col > 0 ? col : bal) + fine;
+        items.add({
           'dem_id': d['dem_id'] as int,
-          'amount': bal + fine - con,
+          'yr_id': d['yr_id'],
+          'yrlabel': d['demfeeyear']?.toString() ?? '',
+          'ins_id': insId,
+          'amount': net,
+          'demfeetype': d['demfeetype']?.toString() ?? '',
         });
       }
 
-      final payRecord = await SupabaseService.client
-          .from('payment')
-          .select('payreference')
-          .eq('pay_id', payId)
-          .eq('ins_id', insId!)
-          .single();
-
-      final payNumber = await SupabaseService.client.rpc('complete_payment_atomic', params: {
-        'p_pay_id': payId,
-        'p_pay_method': 'razorpay',
-        'p_pay_reference': payRecord['payreference']?.toString() ?? '',
-        'p_items': completeItems,
+      final rpResult = await SupabaseService.client.rpc('process_grouped_payment', params: {
         'p_ins_id': insId,
-      }) as String;
+        'p_inscode': auth2.currentUser?.inscode ?? '',
+        'p_stu_id': _student!['stu_id'] as int,
+        'p_yr_id': firstDem['yr_id'] ?? 0,
+        'p_yrlabel': firstDem['demfeeyear']?.toString() ?? '',
+        'p_total_amount': totalNet,
+        'p_created_by': auth2.currentUser?.usename ?? '',
+        'p_pay_method': 'razorpay',
+        'p_pay_reference': 'Razorpay: $rpRef',
+        'p_items': items,
+      });
 
-      _showSuccessDialog(payNumber, totalNet, payId: payId);
+      final receipts = rpResult is List ? rpResult : [rpResult];
+      final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+      _showSuccessDialog(receiptStr, totalNet);
     } else if (result == 'F') {
-      await SupabaseService.client.from('payment').update({
+      await SupabaseService.fromSchema('payment').update({
         'paystatus': 'F',
         'paydate': DateTime.now().toIso8601String(),
       }).eq('pay_id', payId).eq('ins_id', insId!);
@@ -1628,7 +1732,7 @@ class _StudentFeeCollectionScreenState
       }
     } else {
       try {
-        await SupabaseService.client.from('payment').update({
+        await SupabaseService.fromSchema('payment').update({
           'paystatus': 'F',
           'paydate': DateTime.now().toIso8601String(),
         }).eq('pay_id', payId).eq('ins_id', insId!);
