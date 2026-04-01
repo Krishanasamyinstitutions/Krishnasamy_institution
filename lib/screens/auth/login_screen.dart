@@ -24,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   List<Map<String, dynamic>> _institutions = [];
   int? _selectedInsId;
   bool _loadingInstitutions = true;
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
@@ -31,7 +32,18 @@ class _LoginScreenState extends State<LoginScreen> {
     _loadInstitutions();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments as String?;
+    _isSuperAdmin = args == 'super_admin';
+  }
+
   Future<void> _loadInstitutions() async {
+    if (_isSuperAdmin) {
+      setState(() => _loadingInstitutions = false);
+      return;
+    }
     final institutions = await SupabaseService.getInstitutionNames();
     if (!mounted) return;
     setState(() {
@@ -50,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedInsId == null) {
+    if (!_isSuperAdmin && _selectedInsId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an institution')),
       );
@@ -61,17 +73,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final success = await authProvider.login(
       _emailController.text.trim(),
       _passwordController.text,
-      insId: _selectedInsId,
+      insId: _isSuperAdmin ? null : _selectedInsId,
+      isSuperAdmin: _isSuperAdmin,
     );
 
     if (success && mounted) {
       await authProvider.saveCredentials(
         _emailController.text.trim(),
         _passwordController.text,
-        insId: _selectedInsId,
+        insId: _isSuperAdmin ? null : _selectedInsId,
+        isSuperAdmin: _isSuperAdmin,
       );
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+        Navigator.pushReplacementNamed(
+          context,
+          _isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
+        );
       }
     }
   }
@@ -261,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   FadeInDown(
                     delay: const Duration(milliseconds: 100),
                     child: Text(
-                      'Sign In',
+                      _isSuperAdmin ? 'Super Admin' : 'Sign In',
                       style: Theme.of(context).textTheme.displayMedium,
                     ),
                   ),
@@ -269,7 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   FadeInDown(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
-                      'Enter your credentials to access the dashboard',
+                      _isSuperAdmin
+                          ? 'Enter your super admin credentials'
+                          : 'Enter your credentials to access the dashboard',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ),
@@ -314,52 +333,53 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
 
-                  // Institution dropdown
-                  FadeInDown(
-                    delay: const Duration(milliseconds: 250),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Institution',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(fontSize: 13.sp),
-                        ),
-                        SizedBox(height: 8.h),
-                        _loadingInstitutions
-                            ? const LinearProgressIndicator()
-                            : DropdownButtonFormField<int>(
-                                value: _selectedInsId,
-                                decoration: InputDecoration(
-                                  hintText: 'Select your institution',
-                                  prefixIcon: Icon(Icons.school_outlined,
-                                      size: 20.sp, color: AppColors.textLight),
-                                  prefixIconConstraints: BoxConstraints(
-                                      minWidth: 52.w, minHeight: 0),
+                  // Institution dropdown (only for institution login)
+                  if (!_isSuperAdmin) ...[
+                    FadeInDown(
+                      delay: const Duration(milliseconds: 250),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Institution',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(fontSize: 13.sp),
+                          ),
+                          SizedBox(height: 8.h),
+                          _loadingInstitutions
+                              ? const LinearProgressIndicator()
+                              : DropdownButtonFormField<int>(
+                                  value: _selectedInsId,
+                                  decoration: InputDecoration(
+                                    hintText: 'Select your institution',
+                                    prefixIcon: Icon(Icons.school_outlined,
+                                        size: 20.sp, color: AppColors.textLight),
+                                    prefixIconConstraints: BoxConstraints(
+                                        minWidth: 52.w, minHeight: 0),
+                                  ),
+                                  items: _institutions.map((ins) {
+                                    return DropdownMenuItem<int>(
+                                      value: ins['ins_id'] as int,
+                                      child: Text(ins['insname'] ?? ''),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() => _selectedInsId = value);
+                                  },
+                                  validator: (value) {
+                                    if (value == null) {
+                                      return 'Please select an institution';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                items: _institutions.map((ins) {
-                                  return DropdownMenuItem<int>(
-                                    value: ins['ins_id'] as int,
-                                    child: Text(ins['insname'] ?? ''),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  setState(() => _selectedInsId = value);
-                                },
-                                validator: (value) {
-                                  if (value == null) {
-                                    return 'Please select an institution';
-                                  }
-                                  return null;
-                                },
-                              ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-
-                  SizedBox(height: 20.h),
+                    SizedBox(height: 20.h),
+                  ],
 
                   // Email field
                   FadeInDown(
@@ -546,39 +566,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   SizedBox(height: 28.h),
-
-                  // Sign up link
-                  FadeInDown(
-                    delay: const Duration(milliseconds: 700),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pushReplacementNamed(
-                              context, AppRoutes.register),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'Create Account',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AppColors.accent,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
 
                   SizedBox(height: 24.h),
 

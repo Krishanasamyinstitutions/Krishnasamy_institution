@@ -147,6 +147,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   Widget _buildDownloadButton(PaymentModel t) {
+    final isReconciled = t.reconStatus == 'R';
+    if (!isReconciled) {
+      return Text('Pending Approval', style: TextStyle(fontSize: 12.sp, color: AppColors.textLight, fontStyle: FontStyle.italic));
+    }
     return TextButton.icon(
       onPressed: () => _showReceiptOptions(t),
       icon: Icon(Icons.download_rounded, size: 18.sp, color: AppColors.accent),
@@ -224,6 +228,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       paymentMethod: t.paymethod ?? '-',
       paymentDate: dateStr,
       status: t.isSuccess ? 'paid' : (t.paystatus == 'F' ? 'failed' : 'pending'),
+      reconStatus: t.reconStatus ?? 'P',
       total: t.transtotalamount,
     );
   }

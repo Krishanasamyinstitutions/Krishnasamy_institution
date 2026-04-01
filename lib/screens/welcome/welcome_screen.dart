@@ -286,29 +286,29 @@ class WelcomeScreen extends StatelessWidget {
 
             SizedBox(height: 40.h),
 
-            // Sign In button
+            // Super Admin Sign In
             FadeInRight(
               delay: const Duration(milliseconds: 500),
               child: _WelcomeButton(
-                label: 'Sign In',
-                icon: Icons.login_rounded,
+                label: 'Super Admin Login',
+                icon: Icons.admin_panel_settings_rounded,
                 isPrimary: true,
                 onTap: () =>
-                    Navigator.pushNamed(context, AppRoutes.login),
+                    Navigator.pushNamed(context, AppRoutes.login, arguments: 'super_admin'),
               ),
             ),
 
             SizedBox(height: 16.h),
 
-            // Create Account button
+            // Institution User Sign In
             FadeInRight(
               delay: const Duration(milliseconds: 600),
               child: _WelcomeButton(
-                label: 'Create Account',
-                icon: Icons.person_add_alt_rounded,
+                label: 'Institution Login',
+                icon: Icons.school_rounded,
                 isPrimary: false,
                 onTap: () =>
-                    Navigator.pushNamed(context, AppRoutes.register),
+                    Navigator.pushNamed(context, AppRoutes.login, arguments: 'institution'),
               ),
             ),
 
@@ -316,7 +316,7 @@ class WelcomeScreen extends StatelessWidget {
 
             // Divider
             FadeInRight(
-              delay: const Duration(milliseconds: 700),
+              delay: const Duration(milliseconds: 800),
               child: Row(
                 children: [
                   Expanded(
@@ -344,7 +344,7 @@ class WelcomeScreen extends StatelessWidget {
 
             // Demo button
             FadeInRight(
-              delay: const Duration(milliseconds: 800),
+              delay: const Duration(milliseconds: 900),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
