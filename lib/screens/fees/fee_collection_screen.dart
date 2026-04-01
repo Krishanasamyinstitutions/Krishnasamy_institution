@@ -2345,6 +2345,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       paymentMethod: payMethod,
       paymentDate: dateStr,
       status: 'paid',
+      reconStatus: payment['recon_status']?.toString() ?? 'P',
       total: totalAmount,
     );
   }
@@ -2937,8 +2938,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       // Fetch sequence info
       Map<String, dynamic>? seqInfo;
       try {
-        seqInfo = await SupabaseService.client
-            .from('sequence')
+        seqInfo = await SupabaseService.fromSchema('sequence')
             .select('seqprefix, sequid, seqstart, seqcurno, seqwidth')
             .eq('ins_id', insId)
             .maybeSingle();
@@ -2951,8 +2951,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       if (payIds.isNotEmpty) {
         for (int i = 0; i < payIds.length; i += 50) {
           final chunk = payIds.sublist(i, (i + 50).clamp(0, payIds.length));
-          final details = await SupabaseService.client
-              .from('paymentdetails')
+          final details = await SupabaseService.fromSchema('paymentdetails')
               .select('pay_id, dem_id, transtotalamount')
               .inFilter('pay_id', chunk)
               .eq('activestatus', 1);
@@ -2976,8 +2975,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         for (int i = 0; i < allDemIds.length; i += 50) {
           final chunk = allDemIds.toList().sublist(i, (i + 50).clamp(0, allDemIds.length));
           final auth = context.read<AuthProvider>();
-          final demands = await SupabaseService.client
-              .from('feedemand')
+          final demands = await SupabaseService.fromSchema('feedemand')
               .select('dem_id, demfeetype')
               .eq('ins_id', auth.insId!)
               .inFilter('dem_id', chunk);
@@ -3163,8 +3161,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     const pageSize = 1000;
     int offset = 0;
     while (true) {
-      final batch = await SupabaseService.client
-          .from('feedemand')
+      final batch = await SupabaseService.fromSchema('feedemand')
           .select('stu_id, stuadmno, stuclass, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidstatus')
           .eq('ins_id', insId)
           .eq('activestatus', 1)

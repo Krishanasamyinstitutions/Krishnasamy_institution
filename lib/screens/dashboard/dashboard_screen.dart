@@ -18,6 +18,7 @@ import '../fees/fee_demand_screen.dart';
 import '../fees/fee_demand_approval_screen.dart';
 import '../admin/master_import_screen.dart';
 import '../admin/settings_screen.dart';
+import '../fees/bank_reconciliation_screen.dart';
 
 
 
@@ -35,6 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Notification unread count
   int _unreadNotifCount = 0;
   String _academicYear = '';
+  List<Map<String, dynamic>> _availableYears = [];
 
   // Global search
   final TextEditingController _searchController = TextEditingController();
@@ -55,7 +57,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
-    _NavItem(Icons.settings_rounded, 'Settings', adminOnly: true),
+    _NavItem(Icons.settings_rounded, 'Sequence Creation', adminOnly: true),
+    _NavItem(Icons.account_balance_rounded, 'Bank Reconciliation', accountantOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
@@ -96,11 +99,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      final years = await SupabaseService.getYears(insId);
+      // Load from institutionyear (public) - all years for this institution
+      final result = await SupabaseService.client
+          .from('institutionyear')
+          .select('yrlabel, iyrstadate, iyrenddate, activestatus')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('iyr_id', ascending: false);
+      final years = List<Map<String, dynamic>>.from(result);
       if (years.isNotEmpty && mounted) {
-        setState(() => _academicYear = years.first['yrlabel']?.toString() ?? '');
+        setState(() {
+          _availableYears = years;
+          _academicYear = years.first['yrlabel']?.toString() ?? '';
+        });
       }
     } catch (_) {}
+  }
+
+  Future<void> _switchYear(String yearLabel) async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+
+    // Get institution short name
+    final insRow = await SupabaseService.client
+        .from('institution')
+        .select('inshortname')
+        .eq('ins_id', insId)
+        .maybeSingle();
+    if (insRow == null || insRow['inshortname'] == null) return;
+
+    final shortName = (insRow['inshortname'] as String).toLowerCase();
+    final newSchema = '$shortName${yearLabel.replaceAll('-', '')}';
+
+    // Set new schema
+    SupabaseService.setSchema(newSchema);
+    setState(() => _academicYear = yearLabel);
+
+    // Reload all data
+    _loadStudentsForSearch();
+    _loadUnreadNotifCount();
+    // Reset to dashboard tab to refresh
+    setState(() => _selectedNavIndex = 0);
   }
 
   Future<void> _loadStudentsForSearch() async {
@@ -115,8 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final auth = context.read<AuthProvider>();
       final insId = auth.insId;
       if (insId == null) return;
-      final rows = await SupabaseService.client
-          .from('notification')
+      final rows = await SupabaseService.fromSchema('notification')
           .select('isread')
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -448,12 +487,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _navItems[_selectedNavIndex].label,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              Text(
-                _academicYear.isNotEmpty ? 'Academic Year $_academicYear' : '',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 13.sp,
-                    ),
-              ),
+              if (_availableYears.length > 1)
+                PopupMenuButton<String>(
+                  tooltip: 'Switch academic year',
+                  position: PopupMenuPosition.under,
+                  offset: Offset(0, 4.h),
+                  color: Colors.white,
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  onSelected: (year) => _switchYear(year),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today_rounded, size: 14.sp, color: AppColors.accent),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'AY $_academicYear',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      Icon(Icons.arrow_drop_down_rounded, size: 18.sp, color: AppColors.accent),
+                    ],
+                  ),
+                  itemBuilder: (context) => _availableYears.map((y) {
+                    final label = y['yrlabel']?.toString() ?? '';
+                    final isActive = label == _academicYear;
+                    return PopupMenuItem<String>(
+                      value: label,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isActive ? Icons.radio_button_checked : Icons.radio_button_off,
+                            size: 16.sp,
+                            color: isActive ? AppColors.accent : AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(label, style: TextStyle(fontWeight: isActive ? FontWeight.w700 : FontWeight.w400)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                )
+              else
+                Text(
+                  _academicYear.isNotEmpty ? 'AY $_academicYear' : '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 13.sp,
+                      ),
+                ),
             ],
           ),
 
@@ -634,7 +716,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Settings';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -676,8 +758,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (selectedMenu == 'Master Data') {
       return const MasterImportScreen();
     }
-    if (selectedMenu == 'Settings') {
+    if (selectedMenu == 'Sequence Creation') {
       return const SettingsScreen();
+    }
+    if (selectedMenu == 'Bank Reconciliation') {
+      return const BankReconciliationScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();

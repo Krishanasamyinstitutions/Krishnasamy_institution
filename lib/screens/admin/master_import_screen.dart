@@ -736,7 +736,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       if (feeGroups.isEmpty) { if (mounted) setState(() => _isLoadingExisting = false); return; }
       final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
       final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
-      final types = await SupabaseService.client.from('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id');
+      final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id');
       if (mounted) setState(() {
         _existingRows = (types as List).map((t) {
           return [t['feedesc'] ?? '', t['feeshort'] ?? '', fgNameMap[t['fg_id']] ?? '', t['yrlabel'] ?? '', t['feeoptional'] ?? '', t['feecategory'] ?? ''];
@@ -988,7 +988,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.client.from('classfeedemand').select('*').eq('ins_id', insId);
+      final rows = await SupabaseService.fromSchema('classfeedemand').select('*');
       if (mounted) setState(() {
         const classOrder = {'PKG': 0, 'LKG': 1, 'UKG': 2, 'I': 3, 'II': 4, 'III': 5, 'IV': 6, 'V': 7, 'VI': 8, 'VII': 9, 'VIII': 10, 'IX': 11, 'X': 12, 'XI': 13, 'XII': 14};
         final sorted = List<Map<String, dynamic>>.from(rows as List);

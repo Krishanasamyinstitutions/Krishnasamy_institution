@@ -20,6 +20,7 @@ class ReceiptData {
   final String paymentMethod;
   final String paymentDate;
   final String status; // 'paid' or 'pending'
+  final String reconStatus; // 'P' = pending recon, 'R' = reconciled
   final double total;
 
   const ReceiptData({
@@ -39,6 +40,7 @@ class ReceiptData {
     required this.paymentMethod,
     required this.paymentDate,
     required this.status,
+    this.reconStatus = 'R',
     required this.total,
   });
 }
@@ -250,7 +252,7 @@ class ReceiptWidget extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        data.status == 'paid' ? 'PAID' : 'FAILED',
+                        data.reconStatus == 'P' ? 'SUBJECT TO\nREALIZATION' : (data.status == 'paid' ? 'PAID' : 'FAILED'),
                         style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.w600, color: data.status == 'paid' ? _paidGreen : const Color(0xFFFF3B30)),
                       ),
                     ),
@@ -303,7 +305,7 @@ class ReceiptWidget extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Fee Receipt', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: _primaryBlue)),
+                Text(data.reconStatus == 'P' ? 'Acknowledgement' : 'Fee Receipt', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: _primaryBlue)),
                 const SizedBox(height: 6),
                 _labelValue('Receipt No:', data.receiptNo),
                 const SizedBox(height: 3),

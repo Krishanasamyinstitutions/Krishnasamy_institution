@@ -32,8 +32,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final data = await SupabaseService.client
-          .from('notification')
+      final data = await SupabaseService.fromSchema('notification')
           .select()
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -57,7 +56,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           if (readStatus[key] == true && !isRead) {
             final id = n['noti_id'];
             if (id != null) {
-              SupabaseService.client.from('notification').update({'isread': 1}).eq('noti_id', id).eq('ins_id', insId).then((_) {});
+              SupabaseService.fromSchema('notification').update({'isread': 1}).eq('noti_id', id).eq('ins_id', insId).then((_) {});
             }
           }
         }
@@ -153,7 +152,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (insId == null) return;
     try {
       // Mark all duplicates with same title+body+type as read
-      var query = SupabaseService.client.from('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
+      var query = SupabaseService.fromSchema('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
       final title = notif['notititle']?.toString();
       final body = notif['notibody']?.toString();
       final type = notif['notitype']?.toString();
@@ -173,7 +172,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      await SupabaseService.client.from('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
+      await SupabaseService.fromSchema('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
       await _fetchNotifications();
       widget.onReadChanged?.call();
     } catch (e) {

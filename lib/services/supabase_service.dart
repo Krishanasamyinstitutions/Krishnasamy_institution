@@ -9,6 +9,25 @@ import '../models/fee_model.dart';
 class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
 
+  /// Current institution schema name (e.g. 'kcet20262027')
+  static String? _currentSchema;
+  static String? get currentSchema => _currentSchema;
+
+  /// Set the schema after login
+  static void setSchema(String? schema) {
+    _currentSchema = schema;
+    debugPrint('SupabaseService schema set to: $schema');
+  }
+
+  /// Query from institution-specific schema table
+  /// Falls back to public if no schema is set
+  static SupabaseQueryBuilder fromSchema(String table) {
+    if (_currentSchema != null && _currentSchema!.isNotEmpty) {
+      return client.schema(_currentSchema!).from(table);
+    }
+    return client.from(table);
+  }
+
   // ==================== LICENSE ====================
 
   /// Verify a license key against the institutionyear table
@@ -32,6 +51,7 @@ class SupabaseService {
     required String email,
     required String password,
     int? insId,
+    bool isSuperAdmin = false,
   }) async {
     try {
       final List<dynamic> result = await client.rpc('verify_user_login', params: {
@@ -66,6 +86,8 @@ class SupabaseService {
       return null;
     }
   }
+
+
 
   // ==================== SUBSCRIPTION ====================
 
@@ -113,10 +135,10 @@ class SupabaseService {
   static Future<({bool hasFeeGroups, bool hasFeeTypes, bool hasConcessions, bool hasClassFeeDemand})> checkMasterData(int insId) async {
     try {
       final results = await Future.wait([
-        client.from('feegroup').select('fg_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
-        client.from('feetype').select('fee_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
-        client.from('concessioncategory').select('con_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
-        client.from('classfeedemand').select('cfd_id').eq('ins_id', insId).limit(1),
+        fromSchema('feegroup').select('fg_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        fromSchema('feetype').select('fee_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        fromSchema('concessioncategory').select('con_id').eq('ins_id', insId).eq('activestatus', 1).limit(1),
+        fromSchema('classfeedemand').select('cf_id').limit(1),
       ]);
       return (
         hasFeeGroups: (results[0] as List).isNotEmpty,
@@ -205,8 +227,7 @@ class SupabaseService {
   /// Get total active student count for an institution
   static Future<int> getStudentCount(int insId) async {
     try {
-      final count = await client
-          .from('students')
+      final count = await fromSchema('students')
           .count()
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -225,8 +246,7 @@ class SupabaseService {
       final List<Map<String, dynamic>> allResults = [];
 
       while (true) {
-        final batch = await client
-            .from('students')
+        final batch = await fromSchema('students')
             .select('*')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
@@ -253,8 +273,7 @@ class SupabaseService {
       int offset = 0;
       final Map<int, String> result = {};
       while (true) {
-        final batch = await client
-            .from('students')
+        final batch = await fromSchema('students')
             .select('stu_id, stucondesc')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
@@ -314,8 +333,7 @@ class SupabaseService {
     }
     // Fallback: direct query filtered by class
     try {
-      final response = await client
-          .from('students')
+      final response = await fromSchema('students')
           .select('*')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -331,8 +349,7 @@ class SupabaseService {
   /// Get fee types (feedesc) from fee table
   static Future<List<String>> getFeeTypes(int insId) async {
     try {
-      final response = await client
-          .from('feetype')
+      final response = await fromSchema('feetype')
           .select('feedesc')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -351,8 +368,7 @@ class SupabaseService {
       int offset = 0;
       final Map<int, Map<String, String>> result = {};
       while (true) {
-        final batch = await client
-            .from('students')
+        final batch = await fromSchema('students')
             .select('stu_id, stuname, stuadmno')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
@@ -376,8 +392,7 @@ class SupabaseService {
 
   /// Add a new student record — returns the new stu_id
   static Future<int> addStudent(Map<String, dynamic> data) async {
-    final response = await client
-        .from('students')
+    final response = await fromSchema('students')
         .insert(data)
         .select('stu_id')
         .maybeSingle();
@@ -387,14 +402,13 @@ class SupabaseService {
 
   /// Update an existing student record
   static Future<void> updateStudent(int stuId, Map<String, dynamic> data) async {
-    await client.from('students').update(data).eq('stu_id', stuId);
+    await fromSchema('students').update(data).eq('stu_id', stuId);
   }
 
   /// Get academic years for an institution
   static Future<List<Map<String, dynamic>>> getYears(int insId) async {
     try {
-      final response = await client
-          .from('year')
+      final response = await fromSchema('year')
           .select('yr_id, yrlabel')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -409,8 +423,7 @@ class SupabaseService {
   /// Get distinct class names for an institution
   static Future<List<String>> getClasses(int insId) async {
     try {
-      final response = await client
-          .from('students')
+      final response = await fromSchema('students')
           .select('stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -438,8 +451,7 @@ class SupabaseService {
   /// Get concession categories for an institution
   static Future<List<Map<String, dynamic>>> getConcessions(int insId) async {
     try {
-      final response = await client
-          .from('concessioncategory')
+      final response = await fromSchema('concessioncategory')
           .select('con_id, condesc')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -460,8 +472,7 @@ class SupabaseService {
     String? payMobile,
   }) async {
     if (fatherMobile != null && fatherMobile.isNotEmpty) {
-      final result = await client
-          .from('parents')
+      final result = await fromSchema('parents')
           .select('par_id')
           .eq('ins_id', insId)
           .eq('fathermobile', fatherMobile)
@@ -470,8 +481,7 @@ class SupabaseService {
       if (result != null) return result['par_id'] as int;
     }
     if (motherMobile != null && motherMobile.isNotEmpty) {
-      final result = await client
-          .from('parents')
+      final result = await fromSchema('parents')
           .select('par_id')
           .eq('ins_id', insId)
           .eq('mothermobile', motherMobile)
@@ -480,8 +490,7 @@ class SupabaseService {
       if (result != null) return result['par_id'] as int;
     }
     if (payMobile != null && payMobile.isNotEmpty) {
-      final result = await client
-          .from('parents')
+      final result = await fromSchema('parents')
           .select('par_id')
           .eq('ins_id', insId)
           .eq('payinchargemob', payMobile)
@@ -494,8 +503,7 @@ class SupabaseService {
 
   /// Insert parent record — returns the new par_id
   static Future<int> saveParent(Map<String, dynamic> data) async {
-    final response = await client
-        .from('parents')
+    final response = await fromSchema('parents')
         .insert(data)
         .select('par_id')
         .maybeSingle();
@@ -505,30 +513,27 @@ class SupabaseService {
 
   /// Insert parentdetail record linking student ↔ parent
   static Future<void> saveParentDetail(Map<String, dynamic> data) async {
-    await client.from('parentdetail').insert(data);
+    await fromSchema('parentdetail').insert(data);
   }
 
   /// Fetch parent record for a given student (via parentdetail → parents)
   static Future<Map<String, dynamic>?> getStudentParent(int stuId, {String? stuadmno}) async {
     try {
       // Try by stu_id first
-      var detail = await client
-          .from('parentdetail')
+      var detail = await fromSchema('parentdetail')
           .select('par_id')
           .eq('stu_id', stuId)
           .maybeSingle();
       // Fallback: try by stuadmno if stu_id lookup returned nothing
       if (detail == null && stuadmno != null && stuadmno.isNotEmpty) {
-        detail = await client
-            .from('parentdetail')
+        detail = await fromSchema('parentdetail')
             .select('par_id')
             .eq('stuadmno', stuadmno)
             .maybeSingle();
       }
       if (detail == null) return null;
       final parId = detail['par_id'] as int;
-      final parent = await client
-          .from('parents')
+      final parent = await fromSchema('parents')
           .select('*')
           .eq('par_id', parId)
           .maybeSingle();
@@ -615,8 +620,7 @@ class SupabaseService {
     try {
       debugPrint('Terminating student with stu_id: $stuId');
       final now = DateTime.now().toIso8601String();
-      await client
-          .from('students')
+      await fromSchema('students')
           .update({
             'activestatus': 9,
             'terminatedby': terminatedBy,
@@ -638,8 +642,7 @@ class SupabaseService {
   /// Get all active fee groups for an institution
   static Future<List<Map<String, dynamic>>> getFeeGroups(int insId) async {
     try {
-      final response = await client
-          .from('feegroup')
+      final response = await fromSchema('feegroup')
           .select('*')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -653,8 +656,7 @@ class SupabaseService {
 
   /// Insert a fee group — returns the new fg_id
   static Future<int> addFeeGroup(Map<String, dynamic> data) async {
-    final response = await client
-        .from('feegroup')
+    final response = await fromSchema('feegroup')
         .insert(data)
         .select('fg_id')
         .maybeSingle();
@@ -671,8 +673,7 @@ class SupabaseService {
       final feeGroups = await getFeeGroups(insId);
       if (feeGroups.isEmpty) return [];
       final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
-      final response = await client
-          .from('feetype')
+      final response = await fromSchema('feetype')
           .select('*')
           .inFilter('fg_id', fgIds)
           .eq('activestatus', 1)
@@ -686,8 +687,7 @@ class SupabaseService {
 
   /// Insert a fee master record — returns the new fee_id
   static Future<int> addFeeMaster(Map<String, dynamic> data) async {
-    final response = await client
-        .from('feetype')
+    final response = await fromSchema('feetype')
         .insert(data)
         .select('fee_id')
         .maybeSingle();
@@ -729,8 +729,7 @@ class SupabaseService {
       int offset = 0;
       final Map<int, String> result = {};
       while (true) {
-        final batch = await client
-            .from('feedemand')
+        final batch = await fromSchema('feedemand')
             .select('fee_id, demfeeterm')
             .eq('ins_id', insId)
             .range(offset, offset + batchSize - 1);
@@ -758,8 +757,7 @@ class SupabaseService {
       int offset = 0;
       final List<Map<String, dynamic>> allResults = [];
       while (true) {
-        final batch = await client
-            .from('feedemand')
+        final batch = await fromSchema('feedemand')
             .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
             .eq('ins_id', insId)
             .range(offset, offset + batchSize - 1);
@@ -787,8 +785,7 @@ class SupabaseService {
       const batchSize = 1000;
       int offset = 0;
       while (true) {
-        final demands = await client
-            .from('feedemand')
+        final demands = await fromSchema('feedemand')
             .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
             .eq('ins_id', insId)
             .inFilter('paidstatus', ['P', 'U'])
@@ -823,8 +820,7 @@ class SupabaseService {
       // Payment date futures
       for (var i = 0; i < payIds.length; i += 500) {
         final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
-        enrichFutures.add(client
-            .from('payment')
+        enrichFutures.add(fromSchema('payment')
             .select('pay_id, paydate')
             .inFilter('pay_id', chunk)
             .then((payRows) {
@@ -839,8 +835,7 @@ class SupabaseService {
       // Student name futures
       for (var i = 0; i < stuIds.length; i += 500) {
         final chunk = stuIds.sublist(i, (i + 500).clamp(0, stuIds.length));
-        enrichFutures.add(client
-            .from('students')
+        enrichFutures.add(fromSchema('students')
             .select('stu_id, stuname')
             .inFilter('stu_id', chunk)
             .then((stuRows) {
@@ -877,8 +872,7 @@ class SupabaseService {
       // Batch in chunks of 500 to avoid query size limits
       for (var i = 0; i < payIds.length; i += 500) {
         final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
-        final response = await client
-            .from('payment')
+        final response = await fromSchema('payment')
             .select('pay_id, paynumber')
             .eq('ins_id', insId)
             .inFilter('pay_id', chunk);
@@ -915,8 +909,7 @@ class SupabaseService {
       const batchSize = 1000;
       int offset = 0;
       while (true) {
-        final demandRes = await client
-            .from('feedemand')
+        final demandRes = await fromSchema('feedemand')
             .select('feeamount, paidamount, balancedue')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
@@ -945,8 +938,7 @@ class SupabaseService {
       final Map<int, double> result = {};
       for (var i = 0; i < payIds.length; i += 500) {
         final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
-        final response = await client
-            .from('payment')
+        final response = await fromSchema('payment')
             .select('pay_id, transtotalamount')
             .eq('ins_id', insId)
             .inFilter('pay_id', chunk);
@@ -1051,6 +1043,7 @@ class SupabaseService {
 
       // Normalise: wrap flat student fields into nested 'students' map
       // so existing UI code (p['students']['stuname'] etc.) keeps working
+      if (response == null) return [];
       final payments = List<Map<String, dynamic>>.from(response as List);
       debugPrint('RPC get_payments_by_date_range returned ${payments.length} rows');
       for (final p in payments) {
@@ -1080,8 +1073,7 @@ class SupabaseService {
       const batchSize = 1000;
       int offset = 0;
       while (true) {
-        final response = await client
-            .from('payment')
+        final response = await fromSchema('payment')
             .select('*')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
@@ -1104,8 +1096,7 @@ class SupabaseService {
           .toList();
 
       if (stuIds.isNotEmpty) {
-        final students = await client
-            .from('students')
+        final students = await fromSchema('students')
             .select('stu_id, stuname, stuadmno, stuclass')
             .inFilter('stu_id', stuIds);
         final stuMap = <int, Map<String, dynamic>>{};
@@ -1130,8 +1121,7 @@ class SupabaseService {
   /// Get fee details for a payment, with fee group name lookup
   static Future<List<Map<String, dynamic>>> getFeeDetailsByPayId(int payId, {int? insId}) async {
     try {
-      final response = await client
-          .from('feedemand')
+      final response = await fromSchema('feedemand')
           .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus, duedate')
           .eq('pay_id', payId)
           .eq('activestatus', 1);
@@ -1146,8 +1136,7 @@ class SupabaseService {
               .toSet()
               .toList();
           if (feeIds.isNotEmpty) {
-            final feeTypes = await client
-                .from('feetype')
+            final feeTypes = await fromSchema('feetype')
                 .select('fee_id, feedesc, fg_id')
                 .inFilter('fee_id', feeIds)
                 .eq('activestatus', 1);
@@ -1157,8 +1146,7 @@ class SupabaseService {
               feeIdToFgId[ft['fee_id'] as int] = ft['fg_id'] as int;
               fgIds.add(ft['fg_id'] as int);
             }
-            final feeGroups = await client
-                .from('feegroup')
+            final feeGroups = await fromSchema('feegroup')
                 .select('fg_id, fgdesc')
                 .inFilter('fg_id', fgIds.toList());
             final fgMap = <int, String>{};
@@ -1190,8 +1178,7 @@ class SupabaseService {
   /// - 'byName': fee type name (feedesc) -> fee group name
   static Future<Map<String, Map>> getFeeGroupMaps(int insId) async {
     try {
-      final feeTypes = await client
-          .from('feetype')
+      final feeTypes = await fromSchema('feetype')
           .select('fee_id, feedesc, fg_id')
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -1213,8 +1200,7 @@ class SupabaseService {
         }
       }
       if (fgIds.isEmpty) return {'byId': {}, 'byName': {}};
-      final feeGroups = await client
-          .from('feegroup')
+      final feeGroups = await fromSchema('feegroup')
           .select('fg_id, fgdesc')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -1248,8 +1234,7 @@ class SupabaseService {
   static Future<List<PaymentModel>> getRecentPayments(int insId,
       {int limit = 10}) async {
     try {
-      final response = await client
-          .from('payment')
+      final response = await fromSchema('payment')
           .select('*')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -1279,8 +1264,7 @@ class SupabaseService {
       const batchSize = 1000;
       int offset = 0;
       while (true) {
-        final response = await client
-            .from('payment')
+        final response = await fromSchema('payment')
             .select()
             .eq('ins_id', insId)
             .order('createdat', ascending: false)

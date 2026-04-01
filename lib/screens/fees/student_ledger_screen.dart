@@ -123,8 +123,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
       // Try stuadmno first (primary key used in feedemand)
       const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, balancedue, duedate, paidstatus, pay_id';
-      final demandsByAdmno = await SupabaseService.client
-          .from('feedemand')
+      final demandsByAdmno = await SupabaseService.fromSchema('feedemand')
           .select(selectFields)
           .eq('ins_id', insId)
           .eq('stuadmno', student.stuadmno)
@@ -135,8 +134,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       // Fallback to stu_id if no results
       List<Map<String, dynamic>> demandList;
       if ((demandsByAdmno as List).isEmpty) {
-        final demandsByStuId = await SupabaseService.client
-            .from('feedemand')
+        final demandsByStuId = await SupabaseService.fromSchema('feedemand')
             .select(selectFields)
             .eq('ins_id', insId)
             .eq('stu_id', student.stuId)
@@ -156,8 +154,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
       Map<int, Map<String, dynamic>> paymentMap = {};
       if (payIds.isNotEmpty) {
-        final payments = await SupabaseService.client
-            .from('payment')
+        final payments = await SupabaseService.fromSchema('payment')
             .select('pay_id, paynumber, paydate, paymethod')
             .eq('ins_id', insId)
             .inFilter('pay_id', payIds);
