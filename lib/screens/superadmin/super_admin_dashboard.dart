@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../../models/fee_model.dart';
+import '../../models/payment_model.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
@@ -26,6 +28,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   List<Map<String, dynamic>> _institutions = [];
   bool _loadingInstitutions = true;
+  bool _loadingFinanceData = true;
+  List<_InstitutionFinanceSummary> _institutionSummaries = [];
+  List<_SuperAdminTransactionRow> _recentTransactions = [];
 
   @override
   void initState() {
@@ -37,17 +42,135 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     try {
       final result = await SupabaseService.client
           .from('institution')
-          .select('ins_id, insname, inscode, insmail, insmobno, inscity, insstate, activestatus')
+          .select('ins_id, insname, inscode, inshortname, insmail, insmobno, inscity, insstate, activestatus')
           .order('insname');
+      final institutions = List<Map<String, dynamic>>.from(result);
+      await _loadFinanceData(institutions);
       if (mounted) {
         setState(() {
-          _institutions = List<Map<String, dynamic>>.from(result);
+          _institutions = institutions;
           _loadingInstitutions = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loadingInstitutions = false);
+      if (mounted) {
+        setState(() {
+          _loadingInstitutions = false;
+          _loadingFinanceData = false;
+        });
+      }
     }
+  }
+
+  Future<void> _loadFinanceData(List<Map<String, dynamic>> institutions) async {
+    final previousSchema = SupabaseService.currentSchema;
+    final summaries = <_InstitutionFinanceSummary>[];
+    final allTransactions = <_SuperAdminTransactionRow>[];
+
+    try {
+      for (final ins in institutions) {
+        final insId = ins['ins_id'] as int?;
+        final insName = ins['insname']?.toString() ?? 'Institution';
+        final insCode = ins['inscode']?.toString() ?? '';
+        final shortName = ins['inshortname']?.toString().toLowerCase();
+
+        if (insId == null || shortName == null || shortName.isEmpty) {
+          summaries.add(
+            _InstitutionFinanceSummary(
+              insId: insId ?? 0,
+              insName: insName,
+              insCode: insCode,
+              totalCollected: 0,
+              totalPending: 0,
+              transactionCount: 0,
+              activeStatus: ins['activestatus'] == 1,
+            ),
+          );
+          continue;
+        }
+
+        final yearLabel = await _fetchLatestYearLabel(insId);
+        final schemaName = '$shortName${yearLabel.replaceAll('-', '')}';
+
+        SupabaseService.setSchema(schemaName);
+
+        final results = await Future.wait([
+          SupabaseService.getFeeSummary(insId),
+          SupabaseService.getAllTransactions(insId),
+        ]);
+
+        final feeSummary = results[0] as FeeSummary;
+        final transactionMaps = results[1] as List<Map<String, dynamic>>;
+        final payments = transactionMaps.map(PaymentModel.fromJson).toList()
+          ..sort((a, b) {
+            final aDate = a.paydate ?? a.createdat;
+            final bDate = b.paydate ?? b.createdat;
+            return bDate.compareTo(aDate);
+          });
+
+        summaries.add(
+          _InstitutionFinanceSummary(
+            insId: insId,
+            insName: insName,
+            insCode: insCode,
+            totalCollected: feeSummary.totalPaid,
+            totalPending: feeSummary.totalPending,
+            transactionCount: payments.length,
+            activeStatus: ins['activestatus'] == 1,
+          ),
+        );
+
+        allTransactions.addAll(
+          payments.take(10).map(
+            (payment) => _SuperAdminTransactionRow(
+              institutionName: insName,
+              institutionCode: insCode,
+              payment: payment,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading super admin finance data: $e');
+    } finally {
+      SupabaseService.setSchema(previousSchema);
+    }
+
+    allTransactions.sort((a, b) {
+      final aDate = a.payment.paydate ?? a.payment.createdat;
+      final bDate = b.payment.paydate ?? b.payment.createdat;
+      return bDate.compareTo(aDate);
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _institutionSummaries = summaries;
+      _recentTransactions = allTransactions.take(20).toList();
+      _loadingFinanceData = false;
+    });
+  }
+
+  Future<String> _fetchLatestYearLabel(int insId) async {
+    try {
+      final result = await SupabaseService.client
+          .from('institutionyear')
+          .select('yrlabel')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('iyr_id', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      final yrLabel = result?['yrlabel']?.toString();
+      if (yrLabel != null && yrLabel.isNotEmpty) {
+        return yrLabel;
+      }
+    } catch (e) {
+      debugPrint('Error fetching latest year for institution $insId: $e');
+    }
+
+    final year = DateTime.now().year;
+    return '$year-${year + 1}';
   }
 
   @override
@@ -287,86 +410,108 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildDashboardHome(BuildContext context) {
     final activeCount = _institutions.where((i) => i['activestatus'] == 1).length;
+    final totalCollected = _institutionSummaries.fold<double>(
+      0,
+      (sum, item) => sum + item.totalCollected,
+    );
+    final totalPending = _institutionSummaries.fold<double>(
+      0,
+      (sum, item) => sum + item.totalPending,
+    );
+    final totalTransactions = _institutionSummaries.fold<int>(
+      0,
+      (sum, item) => sum + item.transactionCount,
+    );
     return Padding(
       padding: EdgeInsets.all(28.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Overview', style: Theme.of(context).textTheme.headlineSmall),
-          SizedBox(height: 24.h),
-          Row(
-            children: [
-              _buildStatCard(context, 'Total Institutions', '${_institutions.length}', Icons.business_rounded, AppColors.primary),
-              SizedBox(width: 20.w),
-              _buildStatCard(context, 'Active Institutions', '$activeCount', Icons.check_circle_rounded, AppColors.success),
-              SizedBox(width: 20.w),
-              _buildStatCard(context, 'Inactive', '${_institutions.length - activeCount}', Icons.pause_circle_rounded, AppColors.error),
-            ],
-          ),
-          SizedBox(height: 32.h),
-          Text('Recent Institutions', style: Theme.of(context).textTheme.titleMedium),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: _loadingInstitutions
-                ? const Center(child: CircularProgressIndicator())
-                : _institutions.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.business_outlined, size: 48.sp, color: AppColors.textLight),
-                            SizedBox(height: 12.h),
-                            Text('No institutions registered yet', style: Theme.of(context).textTheme.bodyLarge),
-                            SizedBox(height: 12.h),
-                            ElevatedButton.icon(
-                              onPressed: () => setState(() => _selectedNavIndex = 1),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Register Institution'),
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _institutions.length > 5 ? 5 : _institutions.length,
-                        itemBuilder: (context, index) {
-                          final ins = _institutions[index];
-                          return Card(
-                            margin: EdgeInsets.only(bottom: 8.h),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
-                                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text('${ins['inscode'] ?? ''} - ${ins['inscity'] ?? ''}'),
-                              trailing: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: ins['activestatus'] == 1
-                                      ? AppColors.success.withValues(alpha: 0.1)
-                                      : AppColors.error.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20.r),
-                                ),
-                                child: Text(
-                                  ins['activestatus'] == 1 ? 'Active' : 'Inactive',
-                                  style: TextStyle(
-                                    color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+      child: _loadingInstitutions
+          ? const Center(child: CircularProgressIndicator())
+          : _institutions.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.business_outlined, size: 48.sp, color: AppColors.textLight),
+                      SizedBox(height: 12.h),
+                      Text('No institutions registered yet', style: Theme.of(context).textTheme.bodyLarge),
+                      SizedBox(height: 12.h),
+                      ElevatedButton.icon(
+                        onPressed: () => setState(() => _selectedNavIndex = 1),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Register Institution'),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
                       ),
-          ),
-        ],
-      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Overview', style: Theme.of(context).textTheme.headlineSmall),
+                      SizedBox(height: 24.h),
+                      Row(
+                        children: [
+                          _buildStatCard(context, 'Total Institutions', '${_institutions.length}', Icons.business_rounded, AppColors.primary),
+                          SizedBox(width: 20.w),
+                          _buildStatCard(context, 'Active Institutions', '$activeCount', Icons.check_circle_rounded, AppColors.success),
+                          SizedBox(width: 20.w),
+                          _buildStatCard(context, 'Inactive', '${_institutions.length - activeCount}', Icons.pause_circle_rounded, AppColors.error),
+                        ],
+                      ),
+                      SizedBox(height: 20.h),
+                      Row(
+                        children: [
+                          _buildStatCard(context, 'Fee Collection', _formatCurrency(totalCollected), Icons.payments_rounded, AppColors.accent),
+                          SizedBox(width: 20.w),
+                          _buildStatCard(context, 'Pending Fees', _formatCurrency(totalPending), Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
+                          SizedBox(width: 20.w),
+                          _buildStatCard(context, 'Transactions', '$totalTransactions', Icons.receipt_long_rounded, const Color(0xFF7C3AED)),
+                        ],
+                      ),
+                      SizedBox(height: 32.h),
+                      _buildInstitutionFinanceSection(context),
+                      SizedBox(height: 24.h),
+                      _buildRecentTransactionsSection(context),
+                      SizedBox(height: 24.h),
+                      Text('Recent Institutions', style: Theme.of(context).textTheme.titleMedium),
+                      SizedBox(height: 12.h),
+                      ..._institutions.take(5).map((ins) {
+                        return Card(
+                          margin: EdgeInsets.only(bottom: 8.h),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              child: Text(
+                                (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
+                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text('${ins['inscode'] ?? ''} - ${ins['inscity'] ?? ''}'),
+                            trailing: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                              decoration: BoxDecoration(
+                                color: ins['activestatus'] == 1
+                                    ? AppColors.success.withValues(alpha: 0.1)
+                                    : AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20.r),
+                              ),
+                              child: Text(
+                                ins['activestatus'] == 1 ? 'Active' : 'Inactive',
+                                style: TextStyle(
+                                  color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -402,6 +547,217 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
       ),
     );
+  }
+
+  Widget _buildInstitutionFinanceSection(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'All Colleges Fee Overview',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
+                child: Text(
+                  'View Only',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16.h),
+          if (_loadingFinanceData)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_institutionSummaries.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.h),
+              child: Text(
+                'No fee collection data available yet.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                columns: const [
+                  DataColumn(label: Text('COLLEGE')),
+                  DataColumn(label: Text('CODE')),
+                  DataColumn(label: Text('FEE COLLECTION')),
+                  DataColumn(label: Text('PENDING FEES')),
+                  DataColumn(label: Text('TRANSACTIONS')),
+                  DataColumn(label: Text('STATUS')),
+                ],
+                rows: _institutionSummaries.map((item) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(item.insName)),
+                      DataCell(Text(item.insCode)),
+                      DataCell(Text(_formatCurrency(item.totalCollected))),
+                      DataCell(Text(_formatCurrency(item.totalPending))),
+                      DataCell(Text('${item.transactionCount}')),
+                      DataCell(
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: item.activeStatus
+                                ? AppColors.success.withValues(alpha: 0.1)
+                                : AppColors.error.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20.r),
+                          ),
+                          child: Text(
+                            item.activeStatus ? 'Active' : 'Inactive',
+                            style: TextStyle(
+                              color: item.activeStatus ? AppColors.success : AppColors.error,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentTransactionsSection(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recent Transactions Across Colleges',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          SizedBox(height: 16.h),
+          if (_loadingFinanceData)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else if (_recentTransactions.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.h),
+              child: Text(
+                'No transactions found.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                columns: const [
+                  DataColumn(label: Text('COLLEGE')),
+                  DataColumn(label: Text('PAY NO')),
+                  DataColumn(label: Text('AMOUNT')),
+                  DataColumn(label: Text('METHOD')),
+                  DataColumn(label: Text('REFERENCE')),
+                  DataColumn(label: Text('DATE')),
+                  DataColumn(label: Text('STATUS')),
+                ],
+                rows: _recentTransactions.map((row) {
+                  final payment = row.payment;
+                  final date = payment.paydate ?? payment.createdat;
+                  final isPaid = payment.paystatus == 'C';
+                  final statusColor = isPaid ? AppColors.success : AppColors.error;
+                  final statusText = isPaid ? 'Paid' : payment.statusText;
+
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(row.institutionName)),
+                      DataCell(Text(payment.paynumber ?? '${payment.payId}')),
+                      DataCell(Text(_formatCurrency(payment.transtotalamount))),
+                      DataCell(Text(payment.paymethod ?? '-')),
+                      DataCell(
+                        SizedBox(
+                          width: 160.w,
+                          child: Text(
+                            payment.payreference ?? '-',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      DataCell(Text(_formatDate(date))),
+                      DataCell(
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20.r),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCurrency(double value) {
+    final fixed = value.toStringAsFixed(2);
+    final parts = fixed.split('.');
+    final whole = parts[0].replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+    return 'Rs. $whole.${parts[1]}';
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
   Widget _buildManageInstitutions(BuildContext context) {
@@ -476,4 +832,36 @@ class _SANavItem {
   final IconData icon;
   final String label;
   const _SANavItem(this.icon, this.label);
+}
+
+class _InstitutionFinanceSummary {
+  final int insId;
+  final String insName;
+  final String insCode;
+  final double totalCollected;
+  final double totalPending;
+  final int transactionCount;
+  final bool activeStatus;
+
+  const _InstitutionFinanceSummary({
+    required this.insId,
+    required this.insName,
+    required this.insCode,
+    required this.totalCollected,
+    required this.totalPending,
+    required this.transactionCount,
+    required this.activeStatus,
+  });
+}
+
+class _SuperAdminTransactionRow {
+  final String institutionName;
+  final String institutionCode;
+  final PaymentModel payment;
+
+  const _SuperAdminTransactionRow({
+    required this.institutionName,
+    required this.institutionCode,
+    required this.payment,
+  });
 }
