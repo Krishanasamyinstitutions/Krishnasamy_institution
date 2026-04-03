@@ -106,6 +106,10 @@ class _StudentFeeCollectionScreenState
     _nameController.dispose();
     _classController.dispose();
     _remarksController.dispose();
+    _chequeNoController.dispose();
+    _upiRefController.dispose();
+    _chequeDateController.dispose();
+    _bankNameController.dispose();
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
     super.dispose();
@@ -1030,194 +1034,335 @@ class _StudentFeeCollectionScreenState
 
     showDialog(
       context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-          title: Text('Proceed to Pay', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
-          content: SizedBox(
-            width: 400.w,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Student: ${_student!['stuname']} (${_student!['stuadmno']})', style: TextStyle(fontSize: 14.sp)),
-                SizedBox(height: 4.h),
-                Text('Demands selected: ${_selected.length}', style: TextStyle(fontSize: 14.sp)),
-                SizedBox(height: 8.h),
-                Text('Total: Rs.${totalNet.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18.sp, color: AppColors.accent)),
-                SizedBox(height: 16.h),
-                const Divider(),
-                SizedBox(height: 8.h),
-                Text('Payment Mode *', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                SizedBox(height: 10.h),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: ['Cash', 'QR/UPI', 'Online', 'Cheque'].map((mode) {
-                    final sel = _paymentMode == mode;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => setState(() => _paymentMode = mode)),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
-                        decoration: BoxDecoration(
-                          color: sel ? AppColors.accent : AppColors.surface,
-                          borderRadius: BorderRadius.circular(20.r),
-                          border: Border.all(color: sel ? AppColors.accent : AppColors.border),
-                        ),
-                        child: Text(mode, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: sel ? Colors.white : AppColors.textSecondary)),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                if (_paymentMode == 'QR/UPI') ...[
-                  SizedBox(height: 16.h),
-                  Container(
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: AppColors.info.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, size: 16.sp, color: AppColors.info),
-                        SizedBox(width: 8.w),
-                        Expanded(child: Text('Enter the UPI Transaction ID shared by the student', style: TextStyle(fontSize: 11.sp, color: AppColors.info))),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 12.h),
-                  Text('UPI Transaction ID *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                  SizedBox(height: 6.h),
-                  TextField(
-                    controller: _upiRefController,
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 412345678901',
-                      prefixIcon: Icon(Icons.receipt_long_rounded, size: 18.sp),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                      isDense: true,
-                    ),
-                    style: TextStyle(fontSize: 13.sp),
+        builder: (ctx, setDialogState) => Dialog(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 470.w),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 22.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 36,
+                    offset: const Offset(0, 18),
                   ),
                 ],
-                if (_paymentMode == 'Cheque') ...[
-                  SizedBox(height: 16.h),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Cheque No *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                            SizedBox(height: 6.h),
-                            TextField(
-                              controller: _chequeNoController,
-                              decoration: InputDecoration(
-                                hintText: 'Enter cheque number',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                                isDense: true,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Proceed to Pay',
+                      style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 14.h),
+                    Text(
+                      'Student: ${_student!['stuname']} (${_student!['stuadmno']})',
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      'Demands selected: ${_selected.length}',
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Total: Rs.${totalNet.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16.sp,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                    SizedBox(height: 18.h),
+                    Divider(color: AppColors.border, height: 1),
+                    SizedBox(height: 18.h),
+                    Text(
+                      'Payment Mode *',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    ),
+                    SizedBox(height: 12.h),
+                    Wrap(
+                      spacing: 10.w,
+                      runSpacing: 10.h,
+                      children: ['Cash', 'QR/UPI', 'Online', 'Cheque']
+                          .map(
+                            (mode) => _buildPaymentModeChip(
+                              mode: mode,
+                              selected: _paymentMode == mode,
+                              onTap: () => setDialogState(
+                                () => setState(() => _paymentMode = mode),
                               ),
-                              style: TextStyle(fontSize: 13.sp),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    if (_paymentMode == 'QR/UPI') ...[
+                      SizedBox(height: 18.h),
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: AppColors.info.withValues(alpha: 0.16),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline_rounded,
+                              size: 16.sp,
+                              color: AppColors.info,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                'Enter the UPI Transaction ID shared by the student',
+                                style: TextStyle(fontSize: 11.sp, color: AppColors.info),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(width: 10.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Cheque Date *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                            SizedBox(height: 6.h),
-                            TextField(
-                              controller: _chequeDateController,
-                              readOnly: true,
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: ctx,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2030),
-                                );
-                                if (picked != null) {
-                                  _chequeDate = picked;
-                                  _chequeDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                  setDialogState(() {});
-                                }
-                              },
-                              decoration: InputDecoration(
-                                hintText: 'DD/MM/YYYY',
-                                suffixIcon: Icon(Icons.calendar_today, size: 16.sp),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                                isDense: true,
-                              ),
-                              style: TextStyle(fontSize: 13.sp),
+                      SizedBox(height: 14.h),
+                      _buildDialogInput(
+                        label: 'UPI Transaction ID *',
+                        child: TextField(
+                          controller: _upiRefController,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. 412345678901',
+                            prefixIcon: Icon(Icons.receipt_long_rounded, size: 18.sp),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12.w,
+                              vertical: 12.h,
                             ),
-                          ],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            isDense: true,
+                          ),
+                          style: TextStyle(fontSize: 13.sp),
                         ),
                       ),
                     ],
-                  ),
-                  SizedBox(height: 10.h),
-                  Text('Bank Name *', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                  SizedBox(height: 6.h),
-                  TextField(
-                    controller: _bankNameController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter bank name',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                      isDense: true,
+                    if (_paymentMode == 'Cheque') ...[
+                      SizedBox(height: 18.h),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildDialogInput(
+                              label: 'Cheque No *',
+                              child: TextField(
+                                controller: _chequeNoController,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter cheque number',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 12.h,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                  ),
+                                  isDense: true,
+                                ),
+                                style: TextStyle(fontSize: 13.sp),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: _buildDialogInput(
+                              label: 'Cheque Date *',
+                              child: TextField(
+                                controller: _chequeDateController,
+                                readOnly: true,
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: ctx,
+                                    initialDate: DateTime.now(),
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                  );
+                                  if (picked != null) {
+                                    _chequeDate = picked;
+                                    _chequeDateController.text =
+                                        '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                    setDialogState(() {});
+                                  }
+                                },
+                                decoration: InputDecoration(
+                                  hintText: 'DD/MM/YYYY',
+                                  suffixIcon: Icon(Icons.calendar_today, size: 16.sp),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 12.h,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                  ),
+                                  isDense: true,
+                                ),
+                                style: TextStyle(fontSize: 13.sp),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 14.h),
+                      _buildDialogInput(
+                        label: 'Bank Name *',
+                        child: TextField(
+                          controller: _bankNameController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter bank name',
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12.w,
+                              vertical: 12.h,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            isDense: true,
+                          ),
+                          style: TextStyle(fontSize: 13.sp),
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 22.h),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            backgroundColor: const Color(0xFFF3F6FD),
+                            side: const BorderSide(color: AppColors.border),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 18.w,
+                              vertical: 12.h,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                          ),
+                          child: Text('Cancel', style: TextStyle(fontSize: 14.sp)),
+                        ),
+                        SizedBox(width: 10.w),
+                        ElevatedButton(
+                          onPressed: () {
+                            if (_paymentMode == 'QR/UPI') {
+                              if (_upiRefController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please enter UPI Transaction ID'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (_paymentMode == 'Cheque') {
+                              if (_chequeNoController.text.trim().isEmpty ||
+                                  _chequeDateController.text.trim().isEmpty ||
+                                  _bankNameController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please fill Cheque No, Cheque Date and Bank Name',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            Navigator.pop(ctx);
+                            _processPayment();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 26.w,
+                              vertical: 14.h,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                          ),
+                          child: Text(
+                            'Confirm Payment',
+                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
                     ),
-                    style: TextStyle(fontSize: 13.sp),
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(fontSize: 14.sp)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (_paymentMode == 'QR/UPI') {
-                  if (_upiRefController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('Please enter UPI Transaction ID'), backgroundColor: Colors.red),
-                    );
-                    return;
-                  }
-                }
-                if (_paymentMode == 'Cheque') {
-                  if (_chequeNoController.text.trim().isEmpty ||
-                      _chequeDateController.text.trim().isEmpty ||
-                      _bankNameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('Please fill Cheque No, Cheque Date and Bank Name'), backgroundColor: Colors.red),
-                    );
-                    return;
-                  }
-                }
-                Navigator.pop(ctx);
-                _processPayment();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 14.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-              ),
-              child: Text('Confirm Payment', style: TextStyle(fontSize: 14.sp)),
-            ),
-          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPaymentModeChip({
+    required String mode,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 11.h),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : const Color(0xFFF3F6FD),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.border,
+          ),
+        ),
+        child: Text(
+          mode,
+          style: TextStyle(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogInput({required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary),
+        ),
+        SizedBox(height: 6.h),
+        child,
+      ],
     );
   }
 
@@ -1407,14 +1552,12 @@ class _StudentFeeCollectionScreenState
     final totalNet = _totalNetSelected;
     final amountInPaise = (totalNet * 100).round();
 
-    int? payId;
-
     try {
       final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
       final yrId = firstDemand['yr_id'] as int?;
       final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
 
-      // 1. Initiate payment atomically (validates fees, creates payment + paymentdetails)
+      // Build items with demfeetype for grouping
       final items = <Map<String, dynamic>>[];
       for (final key in _selected) {
         final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
@@ -1422,7 +1565,6 @@ class _StudentFeeCollectionScreenState
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
         final col = _con(key);
-        // If col amount entered, pay that amount (partial); otherwise pay full balance
         final net = (col > 0 ? col : bal) + fine;
         items.add({
           'dem_id': d['dem_id'] as int,
@@ -1430,22 +1572,37 @@ class _StudentFeeCollectionScreenState
           'yrlabel': d['demfeeyear']?.toString() ?? '',
           'ins_id': insId,
           'amount': net,
+          'demfeetype': d['demfeetype']?.toString() ?? '',
         });
       }
 
-      payId = await SupabaseService.client.rpc('initiate_payment_atomic', params: {
-        'p_car_id': 0,
-        'p_ins_id': insId,
-        'p_inscode': inscode,
-        'p_stu_id': stuId,
-        'p_yr_id': yrId,
-        'p_yrlabel': yrlabel,
-        'p_total_amount': totalNet,
-        'p_created_by': createdBy,
-        'p_items': items,
-      }) as int;
+      // 1. Create a temporary payment for Razorpay order (status I)
+      await SupabaseService.fromSchema('payment').insert({
+        'ins_id': insId,
+        'inscode': inscode,
+        'stu_id': stuId,
+        'yr_id': yrId ?? 0,
+        'yrlabel': yrlabel,
+        'transtotalamount': totalNet,
+        'transcurrency': 'INR',
+        'paydate': DateTime.now().toIso8601String(),
+        'paystatus': 'I',
+        'createdby': createdBy,
+        'recon_status': 'P',
+      });
 
-      // 2. Create Razorpay order via edge function (old project)
+      // Get the pay_id of the inserted record
+      final insertedPay = await SupabaseService.fromSchema('payment')
+          .select('pay_id')
+          .eq('ins_id', insId!)
+          .eq('stu_id', stuId)
+          .eq('paystatus', 'I')
+          .order('pay_id', ascending: false)
+          .limit(1)
+          .single();
+      final payId = insertedPay['pay_id'] as int;
+
+      // 2. Create Razorpay order
       final orderResponse = await SupabaseService.client.functions.invoke(
         'create-razorpay-order',
         body: {
@@ -1460,6 +1617,11 @@ class _StudentFeeCollectionScreenState
           ? orderResponse.data as Map<String, dynamic>
           : <String, dynamic>{};
       final orderId = orderData['order_id'] as String;
+
+      // Update payorderid
+      await SupabaseService.fromSchema('payment').update({
+        'payorderid': orderId,
+      }).eq('pay_id', payId).eq('ins_id', insId!);
 
       // 3. Build checkout HTML and open in browser
       final studentName = _student!['stuname']?.toString() ?? '';
@@ -1527,18 +1689,9 @@ class _StudentFeeCollectionScreenState
 
       // 4. Show WebView dialog with Razorpay checkout + polling
       if (mounted) {
-        await _showRazorpayWebViewDialog(payId, insId, totalNet, tempFile.path);
+        await _showRazorpayWebViewDialog(payId, insId, totalNet, tempFile.path, inscode, stuId, createdBy);
       }
     } catch (e) {
-      if (payId != null) {
-        try {
-          await SupabaseService.fromSchema('payment').update({
-            'paystatus': 'F',
-            'paydate': DateTime.now().toIso8601String(),
-          }).eq('pay_id', payId).eq('ins_id', insId!);
-        } catch (_) {}
-      }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Online payment failed: $e'), backgroundColor: Colors.red),
@@ -1550,7 +1703,7 @@ class _StudentFeeCollectionScreenState
     }
   }
 
-  Future<void> _showRazorpayWebViewDialog(int payId, int? insId, double totalNet, String htmlPath) async {
+  Future<void> _showRazorpayWebViewDialog(int payId, int? insId, double totalNet, String htmlPath, String inscode, int stuId, String createdBy) async {
     final completer = Completer<String?>(); // 'C', 'F', or null (cancelled)
     final webviewController = WebviewController();
 
@@ -1636,9 +1789,25 @@ class _StudentFeeCollectionScreenState
                         ),
                       ),
                       InkWell(
-                        onTap: () {
+                        onTap: () async {
                           _pollTimer?.cancel();
-                          webviewController.dispose();
+                          // Check if payment was already completed before closing
+                          try {
+                            final checkPay = await SupabaseService.fromSchema('payment')
+                                .select('payreference')
+                                .eq('pay_id', payId)
+                                .eq('ins_id', insId!)
+                                .maybeSingle();
+                            final ref = checkPay?['payreference']?.toString() ?? '';
+                            if (ref.isNotEmpty && ref.startsWith('pay_')) {
+                              // Payment was successful
+                              try { webviewController.dispose(); } catch (_) {}
+                              Navigator.pop(ctx);
+                              if (!completer.isCompleted) completer.complete('C');
+                              return;
+                            }
+                          } catch (_) {}
+                          try { webviewController.dispose(); } catch (_) {}
                           Navigator.pop(ctx);
                           if (!completer.isCompleted) completer.complete(null);
                         },
@@ -1660,32 +1829,32 @@ class _StudentFeeCollectionScreenState
 
     final result = await completer.future;
 
+    // Dispose webview first
+    try { webviewController.dispose(); } catch (_) {}
+
     // Close dialog if still open
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
-    webviewController.dispose();
 
-    if (result == 'C') {
-      // Get Razorpay reference before deleting
-      final payRecord = await SupabaseService.fromSchema('payment')
-          .select('payreference')
-          .eq('pay_id', payId)
-          .eq('ins_id', insId!)
-          .maybeSingle();
-      final rpRef = payRecord?['payreference']?.toString() ?? '';
+    // Wait a moment for dialog to close
+    await Future.delayed(const Duration(milliseconds: 300));
 
-      // Delete the initiated payment (process_grouped_payment will create new ones per group)
+    if (result == 'C' || result == 'F' || result == null) {
+      final status = result == 'C' ? 'C' : 'F';
+
+      // Get Razorpay reference
+      String rpRef = '';
       try {
-        await SupabaseService.fromSchema('paymentdetails').delete().eq('pay_id', payId);
-        await SupabaseService.fromSchema('payment').delete().eq('pay_id', payId);
+        final payRecord = await SupabaseService.fromSchema('payment')
+            .select('payreference')
+            .eq('pay_id', payId)
+            .eq('ins_id', insId!)
+            .maybeSingle();
+        rpRef = payRecord?['payreference']?.toString() ?? '';
       } catch (_) {}
 
-      // Re-read auth values
-      final auth2 = context.read<AuthProvider>();
-      final firstDem = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)), orElse: () => {});
-
-      // Build items with demfeetype for grouping
+      // Build items with demfeetype for per-group receipts
       final items = <Map<String, dynamic>>[];
       for (final key in _selected) {
         final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
@@ -1696,51 +1865,52 @@ class _StudentFeeCollectionScreenState
         final net = (col > 0 ? col : bal) + fine;
         items.add({
           'dem_id': d['dem_id'] as int,
-          'yr_id': d['yr_id'],
-          'yrlabel': d['demfeeyear']?.toString() ?? '',
-          'ins_id': insId,
           'amount': net,
           'demfeetype': d['demfeetype']?.toString() ?? '',
         });
       }
 
-      final rpResult = await SupabaseService.client.rpc('process_grouped_payment', params: {
-        'p_ins_id': insId,
-        'p_inscode': auth2.currentUser?.inscode ?? '',
-        'p_stu_id': _student!['stu_id'] as int,
-        'p_yr_id': firstDem['yr_id'] ?? 0,
-        'p_yrlabel': firstDem['demfeeyear']?.toString() ?? '',
-        'p_total_amount': totalNet,
-        'p_created_by': auth2.currentUser?.usename ?? '',
-        'p_pay_method': 'razorpay',
-        'p_pay_reference': 'Razorpay: $rpRef',
-        'p_items': items,
-      });
+      String payRef = status == 'C' ? 'Razorpay: $rpRef' : (result == 'F' ? 'Razorpay Failed: $rpRef' : 'Cancelled by user');
 
-      final receipts = rpResult is List ? rpResult : [rpResult];
-      final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
-      _showSuccessDialog(receiptStr, totalNet);
-    } else if (result == 'F') {
-      await SupabaseService.fromSchema('payment').update({
-        'paystatus': 'F',
-        'paydate': DateTime.now().toIso8601String(),
-      }).eq('pay_id', payId).eq('ins_id', insId!);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Online payment failed'), backgroundColor: Colors.red),
-        );
-      }
-    } else {
       try {
-        await SupabaseService.fromSchema('payment').update({
-          'paystatus': 'F',
-          'paydate': DateTime.now().toIso8601String(),
-        }).eq('pay_id', payId).eq('ins_id', insId!);
-      } catch (_) {}
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment cancelled'), backgroundColor: Colors.orange),
-        );
+        final rpResult = await SupabaseService.client.rpc('complete_payment_grouped', params: {
+          'p_pay_id': payId,
+          'p_pay_method': 'razorpay',
+          'p_pay_reference': payRef,
+          'p_items': items,
+          'p_ins_id': insId,
+          'p_status': status,
+        });
+
+        final receipts = rpResult is List ? rpResult : [rpResult];
+        final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+
+        if (mounted) {
+          if (status == 'C') {
+            _showSuccessDialog(receiptStr, totalNet);
+          } else if (result == 'F') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Payment failed. Receipt: $receiptStr'), backgroundColor: Colors.red),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Payment cancelled. Receipt: $receiptStr'), backgroundColor: Colors.orange),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('complete_payment_grouped failed: $e');
+        // Fallback: just mark as failed
+        try {
+          await SupabaseService.fromSchema('payment').update({
+            'paystatus': 'F',
+          }).eq('pay_id', payId).eq('ins_id', insId!);
+        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment error: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
