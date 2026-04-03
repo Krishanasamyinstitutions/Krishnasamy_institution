@@ -19,6 +19,7 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
+  DateTime _selectedDate = DateTime.now();
 
   static const List<_SANavItem> _navItems = [
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -409,109 +410,187 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildDashboardHome(BuildContext context) {
-    final activeCount = _institutions.where((i) => i['activestatus'] == 1).length;
-    final totalCollected = _institutionSummaries.fold<double>(
-      0,
-      (sum, item) => sum + item.totalCollected,
-    );
-    final totalPending = _institutionSummaries.fold<double>(
-      0,
-      (sum, item) => sum + item.totalPending,
-    );
-    final totalTransactions = _institutionSummaries.fold<int>(
-      0,
-      (sum, item) => sum + item.transactionCount,
-    );
+    final cards = ['KCET', 'KA', 'KP'];
     return Padding(
-      padding: EdgeInsets.all(28.w),
-      child: _loadingInstitutions
-          ? const Center(child: CircularProgressIndicator())
-          : _institutions.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.business_outlined, size: 48.sp, color: AppColors.textLight),
-                      SizedBox(height: 12.h),
-                      Text('No institutions registered yet', style: Theme.of(context).textTheme.bodyLarge),
-                      SizedBox(height: 12.h),
-                      ElevatedButton.icon(
-                        onPressed: () => setState(() => _selectedNavIndex = 1),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Register Institution'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-                      ),
-                    ],
+      padding: EdgeInsets.all(20.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 6.h),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              child: Text(
+                'View Only',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+              ),
+            ),
+          ),
+          SizedBox(height: 8.h),
+          GestureDetector(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2030),
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: Colors.black, width: 0.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Overview', style: Theme.of(context).textTheme.headlineSmall),
-                      SizedBox(height: 24.h),
-                      Row(
-                        children: [
-                          _buildStatCard(context, 'Total Institutions', '${_institutions.length}', Icons.business_rounded, AppColors.primary),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Active Institutions', '$activeCount', Icons.check_circle_rounded, AppColors.success),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Inactive', '${_institutions.length - activeCount}', Icons.pause_circle_rounded, AppColors.error),
-                        ],
-                      ),
-                      SizedBox(height: 20.h),
-                      Row(
-                        children: [
-                          _buildStatCard(context, 'Fee Collection', _formatCurrency(totalCollected), Icons.payments_rounded, AppColors.accent),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Pending Fees', _formatCurrency(totalPending), Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Transactions', '$totalTransactions', Icons.receipt_long_rounded, const Color(0xFF7C3AED)),
-                        ],
-                      ),
-                      SizedBox(height: 32.h),
-                      _buildInstitutionFinanceSection(context),
-                      SizedBox(height: 24.h),
-                      _buildRecentTransactionsSection(context),
-                      SizedBox(height: 24.h),
-                      Text('Recent Institutions', style: Theme.of(context).textTheme.titleMedium),
-                      SizedBox(height: 12.h),
-                      ..._institutions.take(5).map((ins) {
-                        return Card(
-                          margin: EdgeInsets.only(bottom: 8.h),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                              child: Text(
-                                (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
-                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 18.sp, color: AppColors.primary),
+                  SizedBox(width: 10.w),
+                  Text(
+                    '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Icon(Icons.arrow_drop_down, size: 20.sp, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ...cards.map((name) {
+            return Expanded(
+              child: Padding(
+              padding: EdgeInsets.only(bottom: 10.h),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => _InstitutionDetailPage(institutionName: name),
+                    ),
+                  );
+                },
+                child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(color: Colors.black, width: 0.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
-                            ),
-                            title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('${ins['inscode'] ?? ''} - ${ins['inscity'] ?? ''}'),
-                            trailing: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                              decoration: BoxDecoration(
-                                color: ins['activestatus'] == 1
-                                    ? AppColors.success.withValues(alpha: 0.1)
-                                    : AppColors.error.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20.r),
-                              ),
-                              child: Text(
-                                ins['activestatus'] == 1 ? 'Active' : 'Inactive',
-                                style: TextStyle(
-                                  color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
-                                  fontSize: 12.sp,
-                                  fontWeight: FontWeight.w600,
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            const Expanded(child: SizedBox()),
+                            ...['Total Demand', 'Total Collection', 'Total Pending'].map((label) {
+                              return Expanded(
+                                child: Center(
+                                  child: Text(
+                                    label,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
                                 ),
-                              ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 28.sp,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ),
+            ),
+            );
+          }),
+          Row(
+            children: ['Active Institutes', 'Total Demand', 'Total Collection', 'Total Pending'].map((label) {
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  child: Container(
+                    height: 60,
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: Colors.black, width: 0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
-                          ),
-                        );
-                      }),
-                    ],
+                      ),
+                    ),
                   ),
                 ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -864,4 +943,30 @@ class _SuperAdminTransactionRow {
     required this.institutionCode,
     required this.payment,
   });
+}
+
+class _InstitutionDetailPage extends StatelessWidget {
+  final String institutionName;
+  const _InstitutionDetailPage({required this.institutionName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: Text(institutionName),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Text(
+          '$institutionName - Details Coming Soon',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+      ),
+    );
+  }
 }
