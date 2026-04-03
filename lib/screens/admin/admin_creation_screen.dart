@@ -272,13 +272,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Left: Creation Form
-              SizedBox(
-                width: isCompact ? 260.w : 340.w,
+              Expanded(
+                flex: 3,
                 child: _buildCreationForm(),
               ),
               SizedBox(width: isCompact ? 12.w : 24.w),
               // Right: Existing Users List
               Expanded(
+                flex: 7,
                 child: _buildUserList(),
               ),
             ],
@@ -323,6 +324,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
+              isExpanded: true,
               decoration: _inputDecoration('Select designation'),
               style: _inputStyle,
               items: [
@@ -368,6 +370,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
+              isExpanded: true,
               decoration: _inputDecoration('Select reporting person'),
               style: _inputStyle,
               items: [
@@ -390,6 +393,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedRole,
+              isExpanded: true,
               decoration: _inputDecoration('Select role'),
               style: _inputStyle,
               items: _rolesList
