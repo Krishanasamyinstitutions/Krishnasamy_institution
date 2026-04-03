@@ -502,7 +502,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Icon(Icons.calendar_today_rounded, size: 14.sp, color: AppColors.accent),
                       SizedBox(width: 6.w),
                       Text(
-                        'AY $_academicYear',
+                        'Academic Year $_academicYear',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600,
                             ),
@@ -531,7 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
               else
                 Text(
-                  _academicYear.isNotEmpty ? 'AY $_academicYear' : '',
+                  _academicYear.isNotEmpty ? 'Academic Year $_academicYear' : '',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontSize: 13.sp,
                       ),
