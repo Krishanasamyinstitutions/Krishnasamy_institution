@@ -595,7 +595,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             color: const Color(0xFF6C8EEF),
             child: Row(
               children: [
-                SizedBox(width: 36.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 16.w),
                 Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                 Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                 Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
@@ -619,7 +620,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   color: i.isEven ? Colors.white : AppColors.surface,
                   child: Row(
                     children: [
-                      SizedBox(width: 36.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 16.w),
                       Expanded(
                         flex: 3,
                         child: Text(u.usename, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
