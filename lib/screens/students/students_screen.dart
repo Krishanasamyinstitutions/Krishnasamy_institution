@@ -136,7 +136,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass', 'concession', 'payincharge', 'payinchargemob'};
 
-  static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 15.sp, color: const Color(0xFF555555));
+  static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: const Color(0xFF555555));
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _genders = ['Male', 'Female', 'Other'];
@@ -585,7 +585,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         : classColor.withValues(alpha: 0.1);
     final letter = Text(
       s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
-      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 15.sp),
+      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 13.sp),
     );
 
     if (s.stuphoto != null && s.stuphoto!.startsWith('http')) {
@@ -718,7 +718,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
+                        Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
                         Text('$count students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                       ],
                     ),
@@ -729,7 +729,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
                       borderRadius: BorderRadius.circular(10.r),
                     ),
-                    child: Text('$count', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
+                    child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
                   ),
                   SizedBox(width: 8.w),
                   Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, size: 18.sp, color: isSelected ? classColor : AppColors.textSecondary),
@@ -780,7 +780,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               ),
               Icon(Icons.class_rounded, size: 14.sp, color: classColor.withValues(alpha: 0.7)),
               SizedBox(width: 6.w),
-              Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
+              Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
               SizedBox(width: 6.w),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 1.h),
@@ -797,7 +797,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         // Student list
         Expanded(
           child: students.isEmpty
-              ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 15.sp)))
+              ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
               : ListView.builder(
                   padding: EdgeInsets.symmetric(vertical: 4.h),
                   itemCount: students.length,
@@ -821,7 +821,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 15.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
                                     Text(s.stuadmno, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                                   ],
                                 ),
@@ -898,7 +898,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 ),
                 Icon(Icons.class_rounded, size: 20.sp, color: classColor),
                 SizedBox(width: 8.w),
-                Text('Class $className', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: classColor)),
+                Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
                 SizedBox(width: 8.w),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -906,7 +906,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     color: classColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: classColor)),
+                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: classColor)),
                 ),
                 const Spacer(),
                 // Search
@@ -923,7 +923,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
                       isDense: true,
                     ),
-                    style: TextStyle(fontSize: 15.sp),
+                    style: TextStyle(fontSize: 13.sp),
                     onChanged: (_) => setState(() => _studentPage = 0),
                   ),
                 ),
@@ -945,7 +945,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         children: [
                           Icon(Icons.file_download_rounded, size: 14.sp, color: AppColors.success),
                           SizedBox(width: 4.w),
-                          Text('Export', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
+                          Text('Export', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
                         ],
                       ),
                     ),
@@ -964,11 +964,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       color: const Color(0xFF6C8EEF),
                       child: Row(
                         children: [
-                          SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 16.w),
+                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 30.w),
                         ],
                       ),
@@ -976,7 +977,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     // Student rows
                     Expanded(
                       child: pagedStudents.isEmpty
-                          ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 15.sp)))
+                          ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
                           : ListView.builder(
                               padding: EdgeInsets.zero,
                               itemCount: pagedStudents.length,
@@ -993,11 +994,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 50.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 16.w),
+                                        SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                                        SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
                                       ],
                                     ),
@@ -1021,7 +1023,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           children: [
                             Text(
                               'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-                              style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                             ),
                             const Spacer(),
                             IconButton(
@@ -1037,7 +1039,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
                               decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
-                              child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                              child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                             ),
                             IconButton(
                               icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
@@ -1085,7 +1087,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -1119,7 +1121,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20.sp),
                             SizedBox(width: 8.w),
                             Expanded(
-                              child: Text('Students', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                              child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                             ),
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -1127,7 +1129,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 color: AppColors.accent.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10.r),
                               ),
-                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                             ),
                           ],
                         ),
@@ -1166,7 +1168,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           child: Row(
                             children: [
                               InkWell(
-                                onTap: () => setState(() { _selectedStudent = null; _selectedClassFilter = null; }),
+                                onTap: () => setState(() { _selectedStudent = null; }),
                                 borderRadius: BorderRadius.circular(6.r),
                                 child: Container(
                                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
@@ -1179,7 +1181,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     children: [
                                       Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
                                       SizedBox(width: 6.w),
-                                      Text('Back to Student List', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                      Text('Back to Student List', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                                     ],
                                   ),
                                 ),
@@ -1187,9 +1189,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                               SizedBox(width: 8.w),
                               Icon(Icons.chevron_right_rounded, size: 16.sp, color: AppColors.textSecondary),
                               SizedBox(width: 4.w),
-                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                               SizedBox(width: 6.w),
-                              Text('(${_selectedStudent!.stuadmno})', style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary)),
+                              Text('(${_selectedStudent!.stuadmno})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
@@ -1220,7 +1222,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   Icon(Icons.person_rounded, color: AppColors.accent, size: 20.sp),
                                                   SizedBox(width: 8.w),
                                                   Text('Student Information',
-                                                      style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                                                 ]),
                                                 SizedBox(height: 6.h),
                                                 Row(children: [
@@ -1236,7 +1238,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   Flexible(
                                                     child: Text(
                                                       _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
-                                                      style: TextStyle(fontSize: 17.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+                                                      style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
@@ -1260,7 +1262,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 icon: _isUploadingPhoto
                                                     ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2))
                                                     : Icon(Icons.camera_alt_rounded, size: 14.sp),
-                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 15.sp)),
+                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 13.sp)),
                                               ),
                                             ],
                                           ),
@@ -1406,7 +1408,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       : 'Select admission date',
                   style: TextStyle(
                     color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                    fontSize: 15.sp,
+                    fontSize: 13.sp,
                     fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
                   ),
                 ),
@@ -1444,7 +1446,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     : 'DD/MM/YYYY',
                 style: TextStyle(
                   color: _dob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
-                  fontSize: 15.sp,
+                  fontSize: 13.sp,
                   fontWeight: _dob != null ? FontWeight.w700 : FontWeight.normal,
                 ),
               ),
@@ -2159,10 +2161,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
             children: [
               Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
               SizedBox(width: 8.w),
-              Text('Import Students', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
+              Text('Import Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (_importFileName != null)
-                Text(_importFileName!, style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary)),
+                Text(_importFileName!, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickImportFile,
@@ -2173,7 +2175,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
               SizedBox(width: 8.w),
@@ -2186,7 +2188,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
               SizedBox(width: 8.w),
@@ -2199,14 +2201,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           if (_importErrorMsg != null) ...[
             SizedBox(height: 8.h),
-            Text(_importErrorMsg!, style: TextStyle(color: AppColors.error, fontSize: 15.sp)),
+            Text(_importErrorMsg!, style: TextStyle(color: AppColors.error, fontSize: 13.sp)),
           ],
           SizedBox(height: 12.h),
 
@@ -2257,9 +2259,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     children: [
                                       Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
                                       SizedBox(height: 8.h),
-                                      Text('No data loaded', style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary)),
+                                      Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                       SizedBox(height: 4.h),
-                                      Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary)),
+                                      Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                     ],
                                   ),
                                 )
@@ -2309,7 +2311,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             children: [
               Text(
                 '${_importRows.length} rows',
-                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               ),
               const Spacer(),
               ElevatedButton.icon(
@@ -2321,7 +2323,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
               SizedBox(width: 8.w),
@@ -2334,7 +2336,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
               SizedBox(width: 8.w),
@@ -2343,7 +2345,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Close'),
               ),
@@ -2370,11 +2372,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
           children: [
             const CircularProgressIndicator(),
             SizedBox(height: 20.h),
-            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600)),
+            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
             SizedBox(height: 12.h),
             LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
             SizedBox(height: 8.h),
-            Text('$_importedCount imported, $_skippedCount skipped', style: TextStyle(fontSize: 15.sp, color: AppColors.textSecondary)),
+            Text('$_importedCount imported, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -2398,7 +2400,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             SizedBox(height: 16.h),
             Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             SizedBox(height: 12.h),
-            Text('$_importedCount imported successfully, $_skippedCount skipped', style: TextStyle(fontSize: 15.sp)),
+            Text('$_importedCount imported successfully, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp)),
             if (_importErrors.isNotEmpty) ...[
               SizedBox(height: 16.h),
               Container(
@@ -2411,7 +2413,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 child: ListView(
                   children: _importErrors.map((e) => Padding(
                     padding: EdgeInsets.only(bottom: 4.h),
-                    child: Text(e, style: TextStyle(fontSize: 15.sp, color: AppColors.error)),
+                    child: Text(e, style: TextStyle(fontSize: 13.sp, color: AppColors.error)),
                   )).toList(),
                 ),
               ),
@@ -2463,7 +2465,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -2479,7 +2481,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
       ),
-      child: Text(text, style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
@@ -2502,7 +2504,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           Row(children: [
             Icon(icon, color: AppColors.accent, size: 20.sp),
             SizedBox(width: 8.w),
-            Text(title, style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
           SizedBox(height: 4.h),
           const Divider(color: AppColors.border),
@@ -2530,7 +2532,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: Colors.black)),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
         SizedBox(height: 6.h),
         child,
       ],

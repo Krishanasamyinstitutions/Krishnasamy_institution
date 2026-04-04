@@ -19,7 +19,9 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
-  DateTime _selectedDate = DateTime.now();
+  DateTime _fromDate = DateTime.now();
+  DateTime _toDate = DateTime.now();
+  String _activeFilter = 'Today';
 
   static const List<_SANavItem> _navItems = [
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -416,65 +418,70 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Text(
-                'View Only',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-              ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(color: AppColors.border),
             ),
-          ),
-          SizedBox(height: 8.h),
-          GestureDetector(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
-              if (picked != null) {
-                setState(() => _selectedDate = picked);
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: Colors.black, width: 0.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+            child: Row(
+              children: [
+                Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
+                SizedBox(width: 8.w),
+                Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+                SizedBox(width: 8.w),
+                _buildDateChip(_fromDate, () => _pickDate(true)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                _buildDateChip(_toDate, () => _pickDate(false)),
+                SizedBox(width: 12.w),
+                _buildQuickFilter('Today', () {
+                  setState(() {
+                    _fromDate = DateTime.now();
+                    _toDate = DateTime.now();
+                    _activeFilter = 'Today';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('7 Days', () {
+                  setState(() {
+                    _toDate = DateTime.now();
+                    _fromDate = DateTime.now().subtract(const Duration(days: 7));
+                    _activeFilter = '7 Days';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('30 Days', () {
+                  setState(() {
+                    _toDate = DateTime.now();
+                    _fromDate = DateTime.now().subtract(const Duration(days: 30));
+                    _activeFilter = '30 Days';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('This Month', () {
+                  final now = DateTime.now();
+                  setState(() {
+                    _fromDate = DateTime(now.year, now.month, 1);
+                    _toDate = now;
+                    _activeFilter = 'This Month';
+                  });
+                }),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _loadInstitutions,
+                  icon: Icon(Icons.refresh_rounded, size: 16.sp),
+                  label: const Text('Refresh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.calendar_today_rounded, size: 18.sp, color: AppColors.primary),
-                  SizedBox(width: 10.w),
-                  Text(
-                    '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Icon(Icons.arrow_drop_down, size: 20.sp, color: AppColors.textSecondary),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           SizedBox(height: 12.h),
@@ -496,14 +503,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14.r),
-                  border: Border.all(color: Colors.black, width: 0.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Stack(
                   children: [
@@ -567,14 +567,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(color: Colors.black, width: 0.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: Center(
                       child: Text(
@@ -825,6 +818,72 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isFrom ? _fromDate : _toDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+        _activeFilter = '';
+      });
+    }
+  }
+
+  Widget _buildDateChip(DateTime date, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
+            SizedBox(width: 6.w),
+            Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilter(String label, VoidCallback onTap) {
+    final isActive = _activeFilter == label;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.sp,
+            color: isActive ? Colors.white : AppColors.textSecondary,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatCurrency(double value) {
     final fixed = value.toStringAsFixed(2);
     final parts = fixed.split('.');
@@ -868,33 +927,67 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         itemBuilder: (context, index) {
                           final ins = _institutions[index];
                           return Card(
-                            margin: EdgeInsets.only(bottom: 8.h),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
-                                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text('Code: ${ins['inscode'] ?? ''} | ${ins['insmail'] ?? ''} | ${ins['inscity'] ?? ''}, ${ins['insstate'] ?? ''}'),
-                              trailing: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: ins['activestatus'] == 1
-                                      ? AppColors.success.withValues(alpha: 0.1)
-                                      : AppColors.error.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20.r),
-                                ),
-                                child: Text(
-                                  ins['activestatus'] == 1 ? 'Active' : 'Inactive',
-                                  style: TextStyle(
-                                    color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w600,
+                            margin: EdgeInsets.only(bottom: 10.h),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22.r,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                    child: Text(
+                                      (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
+                                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 16.sp),
+                                    ),
                                   ),
-                                ),
+                                  SizedBox(width: 14.w),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          ins['insname'] ?? '',
+                                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15.sp, color: AppColors.textPrimary),
+                                        ),
+                                        SizedBox(height: 6.h),
+                                        Text(
+                                          'Code: ${ins['inscode'] ?? ''}',
+                                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${ins['insmail'] ?? ''}',
+                                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                        ),
+                                        if ((ins['inscity'] ?? '').toString().isNotEmpty || (ins['insstate'] ?? '').toString().isNotEmpty) ...[
+                                          SizedBox(height: 2.h),
+                                          Text(
+                                            '${ins['inscity'] ?? ''}${(ins['inscity'] ?? '').toString().isNotEmpty && (ins['insstate'] ?? '').toString().isNotEmpty ? ', ' : ''}${ins['insstate'] ?? ''}',
+                                            style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(width: 12.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                    decoration: BoxDecoration(
+                                      color: ins['activestatus'] == 1
+                                          ? AppColors.success.withValues(alpha: 0.1)
+                                          : AppColors.error.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      ins['activestatus'] == 1 ? 'Active' : 'Inactive',
+                                      style: TextStyle(
+                                        color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           );
