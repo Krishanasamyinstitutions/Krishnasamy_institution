@@ -20,6 +20,8 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   // Class list
   List<String> _classes = [];
   Map<String, int> _classCounts = {};
+  Map<String, Map<String, int>> _courseClassCounts = {};
+  List<StudentModel> _allStudents = [];
   bool _loadingClasses = true;
 
   // Selected class & students
@@ -71,13 +73,23 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     if (insId == null) return;
     setState(() => _loadingClasses = true);
     try {
-      final counts = await SupabaseService.getStudentCountsByClass(insId);
+      final students = await SupabaseService.getStudents(insId);
+      final counts = <String, int>{};
+      final courseCounts = <String, Map<String, int>>{};
+      for (final s in students) {
+        counts[s.stuclass] = (counts[s.stuclass] ?? 0) + 1;
+        final course = s.courname ?? 'Other';
+        courseCounts.putIfAbsent(course, () => {});
+        courseCounts[course]![s.stuclass] = (courseCounts[course]![s.stuclass] ?? 0) + 1;
+      }
       final rawClasses = counts.keys.toList();
       final ordered = _classOrder.where(rawClasses.contains).toList();
       final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList()..sort();
       setState(() {
+        _allStudents = students;
         _classes = [...ordered, ...extra];
         _classCounts = counts;
+        _courseClassCounts = courseCounts;
         _loadingClasses = false;
       });
     } catch (_) {
@@ -286,10 +298,24 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
                     : ListView.builder(
                         padding: EdgeInsets.symmetric(vertical: 4.h),
-                        itemCount: _classes.length,
-                        itemBuilder: (context, index) {
-                          final cls = _classes[index];
-                          final count = _classCounts[cls] ?? 0;
+                        itemCount: _courseClassCounts.keys.length,
+                        itemBuilder: (context, courseIndex) {
+                          final courseNames = _courseClassCounts.keys.toList()..sort();
+                          final courseName = courseNames[courseIndex];
+                          final classCounts = _courseClassCounts[courseName]!;
+                          final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
+
+                          return ExpansionTile(
+                            initiallyExpanded: false,
+                            tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
+                            title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                            trailing: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+                              child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                            ),
+                            children: classCounts.keys.map((cls) {
+                              final count = classCounts[cls] ?? 0;
                           final color = _classColor(cls);
                           final isSelected = _selectedClass == cls;
                           return Material(
@@ -340,6 +366,8 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                               ),
                             ),
                           );
+                            }).toList(),
+                          );
                         },
                       ),
               ),
@@ -357,11 +385,97 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
               borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: AppColors.border),
             ),
-            child: _selectedClass == null
-                ? _emptyState(Icons.class_outlined, 'Select a class to view students')
-                : _selectedStudent == null
-                    ? _buildStudentList()
-                    : _buildLedger(),
+            child: _selectedStudent != null
+                ? _buildLedger()
+                : _selectedClass == null
+                    ? _buildAllStudentsList()
+                    : _buildStudentList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── All Students List (default view) ──
+  Widget _buildAllStudentsList() {
+    final q = _searchController.text.toLowerCase();
+    final students = q.isEmpty
+        ? _allStudents
+        : _allStudents.where((s) =>
+            s.stuname.toLowerCase().contains(q) ||
+            s.stuadmno.toLowerCase().contains(q) ||
+            (s.courname ?? '').toLowerCase().contains(q)).toList();
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
+          child: Row(
+            children: [
+              Icon(Icons.people_alt_rounded, size: 18.sp, color: AppColors.primary),
+              SizedBox(width: 8.w),
+              Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10.r)),
+                child: Text('${students.length}', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 200.w, height: 36.h,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(hintText: 'Search...', prefixIcon: Icon(Icons.search, size: 18.sp), isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8.h)),
+                  style: TextStyle(fontSize: 13.sp),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          color: AppColors.primary,
+          child: Row(
+            children: [
+              SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 40.w),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: students.length,
+            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            itemBuilder: (context, i) {
+              final s = students[i];
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _selectStudent(s),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 48.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                        SizedBox(width: 80.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                        SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
+                        SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
+                        SizedBox(width: 60.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                        SizedBox(width: 40.w, child: Icon(Icons.chevron_right_rounded, size: 18.sp, color: AppColors.accent)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -435,8 +549,9 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           child: Row(
             children: [
               SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
               Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
               SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
               SizedBox(width: 40.w),
             ],
@@ -472,6 +587,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                   ),
                                   Expanded(
                                     child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                  ),
+                                  SizedBox(
+                                    width: 100.w,
+                                    child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w500)),
                                   ),
                                   SizedBox(
                                     width: 60.w,
@@ -542,7 +661,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.stuname, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Adm: ${s.stuadmno}  •  Class ${s.stuclass}  •  Father: $fatherName',
+                    Text('Roll: ${s.stuadmno}  •  ${s.courname ?? ''} ${s.stuclass}  •  Father: $fatherName',
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
                 ),

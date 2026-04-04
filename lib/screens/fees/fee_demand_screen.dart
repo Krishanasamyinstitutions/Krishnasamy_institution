@@ -720,7 +720,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search...',
+                        hintText: 'Search by class...',
                         hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
                         prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
                         suffixIcon: _searchQuery.isNotEmpty

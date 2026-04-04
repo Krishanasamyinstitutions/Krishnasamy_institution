@@ -76,7 +76,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -93,7 +93,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
           listenable: _tabCtrl,
           builder: (context, _) {
             final selected = _tabCtrl.index;
-            final tabLabels = ['Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand'];
+            final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand'];
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -137,6 +137,8 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
           child: TabBarView(
             controller: _tabCtrl,
             children: const [
+              _CourseTab(),
+              _ClassTab(),
               _FeeGroupTab(),
               _FeeTypeTab(),
               _ConcessionTab(),
@@ -570,6 +572,267 @@ Widget _buildImportCard({
 
 // ═══════════════════════════════════════════════
 // 1. FEE GROUP TAB
+// ═══════════════════════════════════════════════
+// COURSE TAB
+// ═══════════════════════════════════════════════
+
+class _CourseTab extends StatefulWidget {
+  const _CourseTab();
+  @override
+  State<_CourseTab> createState() => _CourseTabState();
+}
+
+class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMixin {
+  List<List<dynamic>> _rows = [];
+  String? _fileName;
+  bool _saving = false;
+  bool _isValidated = false;
+  int _imported = 0, _skipped = 0;
+  List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
+  static const _headers = ['Course Name *', 'Order'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId).order('ordid');
+      if (mounted) setState(() {
+        _existingRows = (rows as List).map((r) => [r['courname'] ?? '', r['ordid']?.toString() ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
+
+  Future<void> _browse() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
+    if (result == null) return;
+    final parsed = _parseExcel(result.files.single.path!);
+    if (parsed.length < 2) return;
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+  }
+
+  void _validate() {
+    final rowErrs = <int, String>{};
+    for (int i = 0; i < _rows.length; i++) {
+      final name = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      if (name.isEmpty) rowErrs[i] = 'Missing: Course Name';
+    }
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors'), backgroundColor: Colors.red));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() {
+    setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; });
+  }
+
+  Future<void> _save() async {
+    if (_rows.isEmpty) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 0;
+    setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
+    for (final row in _rows) {
+      if (row.isEmpty || row[0].toString().trim().isEmpty) { _skipped++; continue; }
+      try {
+        await SupabaseService.fromSchema('course').insert({
+          'courname': row[0].toString().trim(),
+          'ordid': row.length > 1 ? int.tryParse(row[1].toString().trim()) : null,
+          'ins_id': insId,
+        });
+        _imported++;
+      } catch (e) {
+        _skipped++;
+        _errors.add('${row[0]}: ${_friendlyError(e.toString())}');
+      }
+    }
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildImportCard(
+      title: 'Import Courses',
+      headers: _headers,
+      rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
+      onBrowse: _browse,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
+      onTemplate: () => _exportTemplate('Course', _headers),
+      onSampleDownload: () => _exportSampleData('Course', _headers, [
+        ['Pre-KG', '1'],
+        ['LKG', '2'],
+        ['UKG', '3'],
+        ['I', '4'],
+        ['II', '5'],
+      ]),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Course Name', 'Order'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════
+// CLASS TAB
+// ═══════════════════════════════════════════════
+
+class _ClassTab extends StatefulWidget {
+  const _ClassTab();
+  @override
+  State<_ClassTab> createState() => _ClassTabState();
+}
+
+class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin {
+  List<List<dynamic>> _rows = [];
+  String? _fileName;
+  bool _saving = false;
+  bool _isValidated = false;
+  int _imported = 0, _skipped = 0;
+  List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
+  static const _headers = ['Class Name *', 'Course *', 'Order'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final courses = await SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId);
+      final courseMap = { for (final c in courses as List) c['cour_id'] as int: c['courname']?.toString() ?? '' };
+      final rows = await SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('ordid');
+      if (mounted) setState(() {
+        _existingRows = (rows as List).map((r) => [r['claname'] ?? '', courseMap[r['cour_id']] ?? '${r['cour_id'] ?? ''}', r['ordid']?.toString() ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
+
+  Future<void> _browse() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
+    if (result == null) return;
+    final parsed = _parseExcel(result.files.single.path!);
+    if (parsed.length < 2) return;
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+  }
+
+  void _validate() {
+    final rowErrs = <int, String>{};
+    for (int i = 0; i < _rows.length; i++) {
+      final missing = <String>[];
+      final name = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final course = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      if (name.isEmpty) missing.add('Class Name');
+      if (course.isEmpty) missing.add('Course');
+      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+    }
+    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    if (rowErrs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors'), backgroundColor: Colors.red));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
+    }
+  }
+
+  void _close() {
+    setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; });
+  }
+
+  Future<void> _save() async {
+    if (_rows.isEmpty) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 0;
+    setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
+    for (final row in _rows) {
+      if (row.length < 2 || row[0].toString().trim().isEmpty) { _skipped++; continue; }
+      try {
+        final courseName = row[1].toString().trim();
+        final courseResult = await SupabaseService.fromSchema('course')
+            .select('cour_id').eq('ins_id', insId).ilike('courname', courseName).limit(1).maybeSingle();
+        if (courseResult == null) { _skipped++; _errors.add('${row[0]}: Course "$courseName" not found'); continue; }
+        await SupabaseService.fromSchema('class').insert({
+          'claname': row[0].toString().trim(),
+          'cour_id': courseResult['cour_id'],
+          'ordid': row.length > 2 ? int.tryParse(row[2].toString().trim()) : null,
+          'ins_id': insId,
+        });
+        _imported++;
+      } catch (e) {
+        _skipped++;
+        _errors.add('${row[0]}: ${_friendlyError(e.toString())}');
+      }
+    }
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildImportCard(
+      title: 'Import Classes',
+      headers: _headers,
+      rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
+      onBrowse: _browse,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
+      onTemplate: () => _exportTemplate('Class', _headers),
+      onSampleDownload: () => _exportSampleData('Class', _headers, [
+        ['Section A', 'LKG', '1'],
+        ['Section B', 'LKG', '2'],
+        ['Section A', 'UKG', '1'],
+      ]),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Class Name', 'Course', 'Order'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════
 
 class _FeeGroupTab extends StatefulWidget {

@@ -73,6 +73,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   bool _loadingClassStudents = false;
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
+  String? _selectedCourseFilter; // tracks which course the selected class belongs to
   final _searchController = TextEditingController();
   int _studentPage = 0;
   static const int _studentsPerPage = 20;
@@ -93,7 +94,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   String? _importErrorMsg;
 
   static const _importGridKeys = [
-    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass',
+    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
     'stumobile', 'stuemail', 'concession',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
@@ -104,12 +105,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
   ];
 
   static const Map<String, String> _importGridLabels = {
-    'stuadmno': 'Adm No *',
+    'stuadmno': 'Roll No *',
     'stuname': 'Name *',
     'stugender': 'Gender *',
     'studob': 'DOB *',
     'stuadmdate': 'Adm Date',
     'stuclass': 'Class *',
+    'courname': 'Course',
     'stumobile': 'Mobile *',
     'stuemail': 'Email',
     'concession': 'Concession *',
@@ -134,7 +136,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   final ScrollController _importScrollController = ScrollController();
 
-  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'studob', 'stumobile', 'stuclass', 'concession', 'payincharge', 'payinchargemob'};
+  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'stumobile', 'stuclass', 'payincharge', 'payinchargemob'};
 
   static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: const Color(0xFF555555));
 
@@ -235,9 +237,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedYrId = years.first['yr_id'].toString();
         _selectedYrLabel = years.first['yrlabel'];
       }
-      if (_selectedClassFilter == null && allClasses.isNotEmpty) {
-        _selectedClassFilter = allClasses.first;
-      }
+      // Don't auto-select — show all students by default
     });
 
     // Stage 2: background — load all students for search/export
@@ -397,7 +397,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedClass == null ||
         _mobileController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields (Adm No, Name, Class, Mobile)'), backgroundColor: AppColors.error),
+        const SnackBar(content: Text('Please fill all required fields (Roll No, Name, Class, Mobile)'), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -619,7 +619,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       return;
     }
 
-    final headers = ['Adm No', 'Student Name', 'Gender', 'DOB', 'Class', 'Mobile', 'Email', 'Address', 'City', 'State', 'Blood Group'];
+    final headers = ['Roll No', 'Student Name', 'Gender', 'DOB', 'Class', 'Course', 'Mobile', 'Email', 'Address', 'City', 'State', 'Blood Group'];
     final rows = <List<String>>[headers];
     for (final s in students) {
       rows.add([
@@ -659,17 +659,48 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   // ─── Left Panel Builders ─────────────────────────────────────────────────────
 
+  // Group classes by course with correct counts
+  Map<String, Map<String, int>> _getCoursewiseClassCounts() {
+    final courseMap = <String, Map<String, int>>{};
+    for (final s in _students) {
+      final course = s.courname ?? 'Other';
+      final cls = s.stuclass;
+      courseMap.putIfAbsent(course, () => {});
+      courseMap[course]![cls] = (courseMap[course]![cls] ?? 0) + 1;
+    }
+    if (courseMap.isEmpty && _classes.isNotEmpty) {
+      courseMap['All'] = { for (final c in _classes) c: _classCounts[c] ?? 0 };
+    }
+    return courseMap;
+  }
+
   Widget _buildClassList() {
     if (_classes.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final courseClassCounts = _getCoursewiseClassCounts();
+    final courseNames = courseClassCounts.keys.toList()..sort();
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: _classes.length,
-      itemBuilder: (context, index) {
-        final className = _classes[index];
-        // Use background-loaded count if available, else RPC count
-        final count = _groupedStudents[className]?.length ?? _classCounts[className] ?? 0;
+      itemCount: courseNames.length,
+      itemBuilder: (context, courseIndex) {
+        final courseName = courseNames[courseIndex];
+        final classCounts = courseClassCounts[courseName]!;
+        final courseStudentCount = classCounts.values.fold<int>(0, (sum, c) => sum + c);
+
+        return ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
+          title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          trailing: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+            child: Text('$courseStudentCount', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          ),
+          children: classCounts.keys.toList().map((className) {
+            final count = classCounts[className] ?? 0;
         final classColor = _getClassColor(className);
         final isSelected = _selectedClassFilter == className;
         return Material(
@@ -678,6 +709,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onTap: () async {
               setState(() {
                 _selectedClassFilter = className;
+                _selectedCourseFilter = courseName;
                 _selectedStudent = null;
                 _studentPage = 0;
                 _searchController.clear();
@@ -738,14 +770,20 @@ class _StudentsScreenState extends State<StudentsScreen> {
             ),
           ),
         );
+          }).toList(),
+        );
       },
     );
   }
 
   Widget _buildStudentListForClass(String className) {
-    final allStudents = _groupedStudents[className]?.isNotEmpty == true
+    var allStudents = _groupedStudents[className]?.isNotEmpty == true
         ? _groupedStudents[className]!
         : _cachedClassStudents[className] ?? [];
+    // Filter by course if selected
+    if (_selectedCourseFilter != null) {
+      allStudents = allStudents.where((s) => (s.courname ?? 'Other') == _selectedCourseFilter).toList();
+    }
     if (_loadingClassStudents && allStudents.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -840,10 +878,116 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  Widget _buildAllStudentsTable() {
+    final q = _searchController.text.toLowerCase();
+    final allStudents = q.isEmpty
+        ? _students
+        : _students.where((s) => s.stuname.toLowerCase().contains(q) || s.stuadmno.toLowerCase().contains(q) || (s.courname ?? '').toLowerCase().contains(q)).toList();
+    final totalStudents = allStudents.length;
+    final totalPages = (totalStudents / _studentsPerPage).ceil();
+    final startIdx = _studentPage * _studentsPerPage;
+    final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
+    final pagedStudents = allStudents.sublist(startIdx, endIdx);
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(6.w, 6.h, 14.w, 6.h),
+          child: Row(
+            children: [
+              Icon(Icons.people_alt_rounded, size: 18.sp, color: AppColors.primary),
+              SizedBox(width: 8.w),
+              Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10.r)),
+                child: Text('$totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 200.w,
+                height: 36.h,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() => _studentPage = 0),
+                  decoration: InputDecoration(hintText: 'Search...', prefixIcon: Icon(Icons.search, size: 18.sp), isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8.h)),
+                  style: TextStyle(fontSize: 13.sp),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          color: AppColors.primary,
+          child: Row(
+            children: [
+              SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 30.w),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: pagedStudents.length,
+            itemBuilder: (context, index) {
+              final s = pagedStudents[index];
+              final serialNo = startIdx + index + 1;
+              return InkWell(
+                onTap: () => setState(() { _selectedStudent = s; _selectedClassFilter = s.stuclass; _selectedCourseFilter = s.courname; }),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5))),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                      Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                      SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
+                      SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+          child: Row(
+            children: [
+              Text('Showing ${startIdx + 1}-$endIdx of $totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+              const Spacer(),
+              IconButton(icon: Icon(Icons.first_page, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null),
+              IconButton(icon: Icon(Icons.chevron_left, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null),
+              Container(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h), decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)), child: Text('${_studentPage + 1}/${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 12.sp, color: Colors.white, fontWeight: FontWeight.w600))),
+              IconButton(icon: Icon(Icons.chevron_right, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null),
+              IconButton(icon: Icon(Icons.last_page, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildClassStudentTable(String className) {
-    final allStudents = _groupedStudents[className]?.isNotEmpty == true
+    var allStudents = _groupedStudents[className]?.isNotEmpty == true
         ? _groupedStudents[className]!
         : _cachedClassStudents[className] ?? [];
+    // Filter by course
+    if (_selectedCourseFilter != null) {
+      allStudents = allStudents.where((s) => (s.courname ?? 'Other') == _selectedCourseFilter).toList();
+    }
     if (_loadingClassStudents && allStudents.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -965,8 +1109,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       child: Row(
                         children: [
                           SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 30.w),
@@ -996,6 +1141,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                         SizedBox(width: 40, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 100, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
                                         Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                                        SizedBox(width: 100, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
                                         SizedBox(width: 80, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 120, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
@@ -1150,7 +1296,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // RIGHT — Student Details or Class Table
           Expanded(
             child: _selectedStudent == null
-                ? (_selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : const SizedBox())
+                ? (_selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : _buildAllStudentsTable())
                 : Column(
                     children: [
                       // Back breadcrumb
@@ -1479,6 +1625,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ),
         SizedBox(height: 14.h),
 
+        _fieldFull(label: 'Course', child: TextFormField(
+          initialValue: _selectedStudent?.courname ?? '',
+          decoration: _dec('Course'),
+          style: _inputStyle,
+          enabled: false,
+        )),
+        SizedBox(height: 14.h),
+
         _row2(
           _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
             initialValue: _selectedBloodGroup,
@@ -1626,12 +1780,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
   /// Known student fields for column mapping
   static const _importFields = <String, String>{
     '': '-- Skip --',
-    'stuadmno': 'Adm No',
+    'stuadmno': 'Roll No',
     'stuname': 'Name',
     'stugender': 'Gender',
     'studob': 'DOB',
     'stumobile': 'Mobile',
     'stuclass': 'Class',
+    'courname': 'Course',
     'stuemail': 'Email',
     'stuaddress': 'Address',
     'stucity': 'City',
@@ -1657,12 +1812,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static String _autoMapHeader(String header) {
     final h = header.trim().toLowerCase();
     const map = {
-      'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno',
+      'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno', 'roll no': 'stuadmno', 'rollno': 'stuadmno', 'roll number': 'stuadmno',
       'name': 'stuname', 'student name': 'stuname', 'stuname': 'stuname',
       'gender': 'stugender', 'sex': 'stugender',
       'dob': 'studob', 'date of birth': 'studob', 'birth date': 'studob',
       'mobile': 'stumobile', 'phone': 'stumobile', 'mobile no': 'stumobile', 'phone no': 'stumobile',
       'class': 'stuclass', 'grade': 'stuclass',
+      'course': 'courname', 'course name': 'courname', 'courname': 'courname',
       'email': 'stuemail', 'e-mail': 'stuemail',
       'address': 'stuaddress',
       'city': 'stucity', 'town': 'stucity',
@@ -1691,18 +1847,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static DateTime? _parseDate(String? s) {
     if (s == null || s.trim().isEmpty) return null;
     final t = s.trim();
-    // yyyy-MM-dd
+    // yyyy-MM-dd (ISO format)
     try { return DateTime.parse(t); } catch (_) {}
-    // dd/MM/yyyy or dd-MM-yyyy
     final parts = t.split(RegExp(r'[/\-.]'));
     if (parts.length == 3) {
-      final d = int.tryParse(parts[0]);
-      final m = int.tryParse(parts[1]);
-      final y = int.tryParse(parts[2]);
-      if (d != null && m != null && y != null) {
-        final year = y < 100 ? (y + 2000) : y;
-        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-          return DateTime(year, m, d);
+      final a = int.tryParse(parts[0]);
+      final b = int.tryParse(parts[1]);
+      final c = int.tryParse(parts[2]);
+      if (a != null && b != null && c != null) {
+        // Try MM-DD-YYYY or MM-DD-YY (US format)
+        if (a >= 1 && a <= 12 && b >= 1 && b <= 31) {
+          final year = c < 100 ? (c > 50 ? c + 1900 : c + 2000) : c;
+          return DateTime(year, a, b);
+        }
+        // Try DD-MM-YYYY or DD-MM-YY (Indian format)
+        if (b >= 1 && b <= 12 && a >= 1 && a <= 31) {
+          final year = c < 100 ? (c > 50 ? c + 1900 : c + 2000) : c;
+          return DateTime(year, b, a);
+        }
+        // Try YYYY-MM-DD where first part is year
+        if (a > 1900 && b >= 1 && b <= 12 && c >= 1 && c <= 31) {
+          return DateTime(a, b, c);
         }
       }
     }
@@ -1795,7 +1960,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     excel.delete('Sheet1');
 
     final headers = [
-      'Adm No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Mobile', 'Email', 'Concession',
+      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
@@ -1850,7 +2015,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     excel.delete('Sheet1');
 
     final headers = [
-      'Adm No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Mobile', 'Email', 'Concession',
+      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
@@ -1858,10 +2023,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Payment In Charge', 'Payment Mobile',
     ];
     final sampleRows = [
-      ['1001', 'RAHUL KUMAR', 'Male', '2015-06-15', '2025-04-01', 'I', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
-      ['1002', 'PRIYA S', 'Female', '2014-03-22', '2025-04-01', 'II', '9876543220', '', 'SC/ST', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220'],
-      ['1003', 'ARUN M', 'Male', '2013-11-08', '2025-04-01', 'III', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230'],
-      ['1004', 'DIVYA R', 'Female', '2012-08-30', '2025-04-01', 'IV', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240'],
+      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
+      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'I Year', 'BSC-CS', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220'],
+      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'II Year', 'BBA', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230'],
+      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'I Year', 'MCA', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240'],
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2057,6 +2222,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'studob': dob?.toIso8601String().split('T').first,
         'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
         'stuclass': _importCellByKey(row, 'stuclass'),
+        'courname': _nullIfEmpty(_importCellByKey(row, 'courname')),
         'stumobile': _importCellByKey(row, 'stumobile'),
         'stuemail': _validEmail(_importCellByKey(row, 'stuemail')),
         'concession': _nullIfEmpty(_importCellByKey(row, 'concession')),

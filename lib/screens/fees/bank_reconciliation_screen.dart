@@ -349,23 +349,48 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Tab bar
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
-            tabs: [
-              Tab(text: 'Pending (${_pendingPayments.length})'),
-              const Tab(text: 'Bank Statement'),
-              Tab(text: 'Reconciled (${_reconciledPayments.length})'),
-            ],
-          ),
+        // Tab bar (pill style like Dashboard)
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            final tabLabels = ['Pending (${_pendingPayments.length})', 'Bank Statement', 'Reconciled (${_reconciledPayments.length})'];
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              padding: EdgeInsets.all(4.w),
+              child: Row(
+                children: List.generate(tabLabels.length, (i) {
+                  final isActive = selected == i;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => _tabController.animateTo(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.accent : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Text(
+                          tabLabels[i],
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                            color: isActive ? Colors.white : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          },
         ),
 
         // Content
