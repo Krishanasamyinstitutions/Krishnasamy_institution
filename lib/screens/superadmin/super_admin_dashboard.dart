@@ -19,9 +19,6 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
-  DateTime _fromDate = DateTime.now();
-  DateTime _toDate = DateTime.now();
-  String _activeFilter = 'Today';
 
   static const List<_SANavItem> _navItems = [
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -436,73 +433,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
-                SizedBox(width: 8.w),
-                _buildDateChip(_fromDate, () => _pickDate(true)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                _buildDateChip(_toDate, () => _pickDate(false)),
-                SizedBox(width: 12.w),
-                _buildQuickFilter('Today', () {
-                  setState(() {
-                    _fromDate = DateTime.now();
-                    _toDate = DateTime.now();
-                    _activeFilter = 'Today';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('7 Days', () {
-                  setState(() {
-                    _toDate = DateTime.now();
-                    _fromDate = DateTime.now().subtract(const Duration(days: 7));
-                    _activeFilter = '7 Days';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('30 Days', () {
-                  setState(() {
-                    _toDate = DateTime.now();
-                    _fromDate = DateTime.now().subtract(const Duration(days: 30));
-                    _activeFilter = '30 Days';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('This Month', () {
-                  final now = DateTime.now();
-                  setState(() {
-                    _fromDate = DateTime(now.year, now.month, 1);
-                    _toDate = now;
-                    _activeFilter = 'This Month';
-                  });
-                }),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _loadInstitutions,
-                  icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                  label: const Text('Refresh'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16.h),
           if (_loadingFinanceData)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_institutionSummaries.isEmpty)
@@ -922,72 +852,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _pickDate(bool isFrom) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: isFrom ? _fromDate : _toDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isFrom) {
-          _fromDate = picked;
-        } else {
-          _toDate = picked;
-        }
-        _activeFilter = '';
-      });
-    }
-  }
-
-  Widget _buildDateChip(DateTime date, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8.r),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
-            SizedBox(width: 6.w),
-            Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickFilter(String label, VoidCallback onTap) {
-    final isActive = _activeFilter == label;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.sp,
-            color: isActive ? Colors.white : AppColors.textSecondary,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
       ),
     );
   }
