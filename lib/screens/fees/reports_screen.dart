@@ -86,7 +86,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     final List<Map<String, dynamic>> allResults = [];
     while (true) {
       final batch = await SupabaseService.fromSchema('feedemand')
-          .select('fee_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, activestatus')
+          .select('fee_id, stu_id, feeamount, conamount, paidamount, balancedue, reconbalancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, activestatus')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .range(offset, offset + batchSize - 1);
@@ -95,16 +95,23 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       if (list.length < batchSize) break;
       offset += batchSize;
     }
-    // Enrich with student names
+    // Enrich with student names — fetch all chunks in parallel
     final stuIds = allResults.map((d) => d['stu_id']).where((id) => id != null).toSet().toList();
     final Map<int, String> stuNameMap = {};
-    for (int i = 0; i < stuIds.length; i += 50) {
-      final chunk = stuIds.sublist(i, (i + 50).clamp(0, stuIds.length));
-      final students = await SupabaseService.fromSchema('students')
-          .select('stu_id, stuname')
-          .inFilter('stu_id', chunk);
-      for (final s in students) {
-        stuNameMap[s['stu_id'] as int] = s['stuname']?.toString() ?? '';
+    if (stuIds.isNotEmpty) {
+      final chunks = <List>[];
+      for (int i = 0; i < stuIds.length; i += 200) {
+        chunks.add(stuIds.sublist(i, (i + 200).clamp(0, stuIds.length)));
+      }
+      final results = await Future.wait(chunks.map((chunk) =>
+        SupabaseService.fromSchema('students')
+            .select('stu_id, stuname')
+            .inFilter('stu_id', chunk)
+      ));
+      for (final students in results) {
+        for (final s in students) {
+          stuNameMap[s['stu_id'] as int] = s['stuname']?.toString() ?? '';
+        }
       }
     }
     for (final d in allResults) {
@@ -176,7 +183,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   }
 
   // Build student-wise pivot data with total and remarks
-  // Always uses feeamount for term columns (demanded amount)
+  // showPending=true uses reconbalancedue (reconciled pending), showPending=false uses feeamount (demanded)
   List<Map<String, dynamic>> _buildPivotData(List<Map<String, dynamic>> demands, List<String> terms, {required bool showPending}) {
     final Map<String, Map<String, dynamic>> studentMap = {};
     final Map<String, Set<String>> studentRemarks = {};
@@ -184,7 +191,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final admNo = d['stuadmno']?.toString() ?? '';
       if (admNo.isEmpty) continue;
       final term = d['demfeeterm']?.toString() ?? '';
-      final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
+      final amount = showPending
+          ? (d['reconbalancedue'] as num?)?.toDouble() ?? (d['balancedue'] as num?)?.toDouble() ?? 0
+          : (d['feeamount'] as num?)?.toDouble() ?? 0;
 
       studentMap.putIfAbsent(admNo, () => {
         'stuadmno': admNo,
@@ -379,7 +388,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   Widget _buildCollectionStatement() {
     final demands = _filteredDemands;
     final terms = _getTermColumns(demands);
-    final pivotData = _buildPivotData(demands, terms, showPending: false);
+    final pivotData = _buildPivotData(demands, terms, showPending: true);
     if (pivotData.isEmpty) return _emptyState('No fee data found');
 
     // Calculate totals per term
@@ -391,12 +400,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
 
     return _buildReportTable(
-      title: 'FEE REPORT AS ON ${_formatDate(DateTime.now())}',
-      subtitle: _selectedFeeType ?? 'ALL FEE TYPE',
+      title: 'PENDING FEE REPORT AS ON ${_formatDate(DateTime.now())}',
+      subtitle: 'FEE TYPE : ${_selectedFeeType ?? 'ALL FEE TYPE'}',
       terms: terms,
       pivotData: pivotData,
       termTotals: termTotals,
-      showPending: false,
+      showPending: true,
     );
   }
 
@@ -643,11 +652,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   }
 
   Widget _buildDataTable(List<String> terms, List<Map<String, dynamic>> pivotData, Map<String, double> termTotals, {bool grouped = false}) {
-    // Group by class for display
+    // Group by course + class for display
     final Map<String, List<Map<String, dynamic>>> classGroups = {};
     for (final row in pivotData) {
+      final course = row['courname']?.toString() ?? '';
       final cls = row['stuclass']?.toString() ?? 'Unknown';
-      classGroups.putIfAbsent(cls, () => []).add(row);
+      final key = course.isNotEmpty ? '$course - $cls' : cls;
+      classGroups.putIfAbsent(key, () => []).add(row);
     }
 
     final allRows = <DataRow>[];
@@ -793,11 +804,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       }
       row++;
 
-      // Group by class
+      // Group by course + class
       final Map<String, List<Map<String, dynamic>>> classGroups = {};
       for (final s in pivotData) {
+        final course = s['courname']?.toString() ?? '';
         final cls = s['stuclass']?.toString() ?? 'Unknown';
-        classGroups.putIfAbsent(cls, () => []).add(s);
+        final key = course.isNotEmpty ? '$course - $cls' : cls;
+        classGroups.putIfAbsent(key, () => []).add(s);
       }
 
       int sno = 0;
@@ -925,11 +938,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       }
       row++;
 
-      // Group by class
+      // Group by course + class
       final Map<String, List<Map<String, dynamic>>> classGroups = {};
       for (final d in demands) {
+        final course = d['courname']?.toString() ?? '';
         final cls = d['stuclass']?.toString() ?? 'Unknown';
-        classGroups.putIfAbsent(cls, () => []).add(d);
+        final key = course.isNotEmpty ? '$course - $cls' : cls;
+        classGroups.putIfAbsent(key, () => []).add(d);
       }
 
       int sno = 0;

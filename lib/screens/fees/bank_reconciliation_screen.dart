@@ -45,22 +45,26 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
 
     setState(() => _isLoading = true);
     try {
-      final pending = await SupabaseService.fromSchema('payment')
-          .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, paychequeno, payorderid, stu_id, createdby, recon_status')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'C')
-          .eq('recon_status', 'P')
-          .eq('activestatus', 1)
-          .order('paydate', ascending: false);
-
-      final reconciled = await SupabaseService.fromSchema('payment')
-          .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, stu_id, createdby, recon_status, reconciled_by, reconciled_date, bank_reference')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'C')
-          .eq('recon_status', 'R')
-          .eq('activestatus', 1)
-          .order('reconciled_date', ascending: false)
-          .limit(100);
+      // Fetch pending and reconciled in parallel
+      final results = await Future.wait([
+        SupabaseService.fromSchema('payment')
+            .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, paychequeno, payorderid, stu_id, createdby, recon_status')
+            .eq('ins_id', insId)
+            .eq('paystatus', 'C')
+            .eq('recon_status', 'P')
+            .eq('activestatus', 1)
+            .order('paydate', ascending: false),
+        SupabaseService.fromSchema('payment')
+            .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, stu_id, createdby, recon_status, reconciled_by, reconciled_date, bank_reference')
+            .eq('ins_id', insId)
+            .eq('paystatus', 'C')
+            .eq('recon_status', 'R')
+            .eq('activestatus', 1)
+            .order('reconciled_date', ascending: false)
+            .limit(100),
+      ]);
+      final pending = results[0];
+      final reconciled = results[1];
 
       // Fetch student names for display
       final allPayments = [...pending, ...reconciled];
@@ -276,17 +280,39 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     setState(() => _isLoading = true);
     int count = 0;
 
-    for (final payId in _selectedForRecon) {
-      try {
-        await SupabaseService.fromSchema('payment').update({
-          'recon_status': 'R',
-          'reconciled_by': userName,
-          'reconciled_date': DateTime.now().toIso8601String(),
-        }).eq('pay_id', payId).eq('ins_id', insId);
-        count++;
-      } catch (e) {
-        debugPrint('Reconcile error for pay_id $payId: $e');
+    // Batch update all selected payments in parallel
+    final now = DateTime.now().toIso8601String();
+    final payIdList = _selectedForRecon.toList();
+
+    await Future.wait(payIdList.map((payId) =>
+      SupabaseService.fromSchema('payment').update({
+        'recon_status': 'R',
+        'reconciled_by': userName,
+        'reconciled_date': now,
+      }).eq('pay_id', payId).eq('ins_id', insId)
+    ));
+    count = payIdList.length;
+
+    // Fetch all demands and batch update reconbalancedue in parallel
+    try {
+      final demands = await SupabaseService.fromSchema('feedemand')
+          .select('dem_id, balancedue')
+          .eq('ins_id', insId)
+          .inFilter('pay_id', payIdList);
+
+      if ((demands as List).isNotEmpty) {
+        await Future.wait(demands.map((d) {
+          final demId = d['dem_id'];
+          return demId != null
+              ? SupabaseService.fromSchema('feedemand')
+                  .update({'reconbalancedue': d['balancedue']})
+                  .eq('dem_id', demId)
+                  .eq('ins_id', insId)
+              : Future.value();
+        }));
       }
+    } catch (e) {
+      debugPrint('Reconcile feedemand update error: $e');
     }
 
     _selectedForRecon.clear();
@@ -316,22 +342,49 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     setState(() => _isLoading = true);
     int count = 0;
 
+    // Collect all pay IDs and update in parallel
+    final allPayIds = <int>[];
+    final payIdRefMap = <int, Map<String, String?>>{};
+    final now = DateTime.now().toIso8601String();
     for (final row in matched) {
-      // Get all pay IDs to reconcile (for cheque, multiple receipts per cheque)
       final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
       for (final payId in payIds) {
-        try {
-          await SupabaseService.fromSchema('payment').update({
-            'recon_status': 'R',
-            'reconciled_by': userName,
-            'reconciled_date': DateTime.now().toIso8601String(),
-            'bank_reference': row['reference']?.toString() ?? '',
-            'bank_date': row['date']?.toString(),
-          }).eq('pay_id', payId).eq('ins_id', insId);
-          count++;
-        } catch (e) {
-          debugPrint('Bank reconcile error: $e');
+        allPayIds.add(payId);
+        payIdRefMap[payId] = {'reference': row['reference']?.toString(), 'date': row['date']?.toString()};
+      }
+    }
+
+    await Future.wait(allPayIds.map((payId) =>
+      SupabaseService.fromSchema('payment').update({
+        'recon_status': 'R',
+        'reconciled_by': userName,
+        'reconciled_date': now,
+        'bank_reference': payIdRefMap[payId]?['reference'] ?? '',
+        'bank_date': payIdRefMap[payId]?['date'],
+      }).eq('pay_id', payId).eq('ins_id', insId)
+    ));
+    count = allPayIds.length;
+
+    // Fetch all demands and batch update reconbalancedue in parallel
+    if (allPayIds.isNotEmpty) {
+      try {
+        final demands = await SupabaseService.fromSchema('feedemand')
+            .select('dem_id, balancedue')
+            .eq('ins_id', insId)
+            .inFilter('pay_id', allPayIds);
+        if ((demands as List).isNotEmpty) {
+          await Future.wait(demands.map((d) {
+            final demId = d['dem_id'];
+            return demId != null
+                ? SupabaseService.fromSchema('feedemand')
+                    .update({'reconbalancedue': d['balancedue']})
+                    .eq('dem_id', demId)
+                    .eq('ins_id', insId)
+                : Future.value();
+          }));
         }
+      } catch (e) {
+        debugPrint('Bank reconcile feedemand update error: $e');
       }
     }
 
