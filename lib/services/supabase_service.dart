@@ -52,6 +52,7 @@ class SupabaseService {
     required String password,
     int? insId,
     bool isSuperAdmin = false,
+    String? selectedYearLabel,
   }) async {
     try {
       List<dynamic> result;
@@ -99,17 +100,23 @@ class SupabaseService {
               .maybeSingle();
           debugPrint('LOGIN: insRow=$insRow for insId=$insId');
           if (insRow != null && insRow['inshortname'] != null) {
-            final yearRows = await client
-                .from('institutionyear')
-                .select('yrlabel')
-                .eq('ins_id', insId)
-                .eq('activestatus', 1)
-                .limit(1);
-            debugPrint('LOGIN: yearRows=$yearRows');
-            if ((yearRows as List).isNotEmpty) {
-              final shortName = (insRow['inshortname'] as String).toLowerCase();
-              final yearLabel = (yearRows.first['yrlabel'] as String).replaceAll('-', '');
-              final schema = '$shortName$yearLabel';
+            final shortName = (insRow['inshortname'] as String).toLowerCase();
+            String? yearLabel = selectedYearLabel;
+            if (yearLabel == null || yearLabel.isEmpty) {
+              final yearRows = await client
+                  .from('institutionyear')
+                  .select('yrlabel')
+                  .eq('ins_id', insId)
+                  .eq('activestatus', 1)
+                  .order('iyr_id', ascending: false)
+                  .limit(1);
+              debugPrint('LOGIN: yearRows=$yearRows');
+              if ((yearRows as List).isNotEmpty) {
+                yearLabel = yearRows.first['yrlabel'] as String;
+              }
+            }
+            if (yearLabel != null) {
+              final schema = '$shortName${yearLabel.replaceAll('-', '')}';
               debugPrint('LOGIN: Setting schema to $schema');
               setSchema(schema);
             }
@@ -117,7 +124,7 @@ class SupabaseService {
         }
         debugPrint('LOGIN: Querying schema=$_currentSchema for use_id=$useId');
         try {
-          var query = fromSchema('institutionusers')
+          var query = client.from('institutionusers')
               .select()
               .eq('use_id', useId)
               .eq('activestatus', 1);
@@ -461,7 +468,7 @@ class SupabaseService {
       final Map<int, Map<String, String>> result = {};
       while (true) {
         final batch = await fromSchema('students')
-            .select('stu_id, stuname, stuadmno')
+            .select('stu_id, stuname, stuadmno, stuclass, courname')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
             .range(offset, offset + batchSize - 1);
@@ -470,6 +477,8 @@ class SupabaseService {
           result[s['stu_id'] as int] = {
             'stuname': s['stuname'] as String? ?? '',
             'stuadmno': s['stuadmno'] as String? ?? '',
+            'stuclass': s['stuclass'] as String? ?? '',
+            'courname': s['courname'] as String? ?? '',
           };
         }
         if (list.length < batchSize) break;
@@ -641,7 +650,7 @@ class SupabaseService {
   /// Get total active staff count for an institution
   static Future<int> getTeacherCount(int insId) async {
     try {
-      final response = await fromSchema('institutionusers')
+      final response = await client.from('institutionusers')
           .select('use_id')
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -656,7 +665,7 @@ class SupabaseService {
   static Future<List<InstitutionUserModel>> getInstitutionUsers(
       int insId) async {
     try {
-      final response = await fromSchema('institutionusers')
+      final response = await client.from('institutionusers')
           .select('*')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -673,7 +682,7 @@ class SupabaseService {
   /// Create a new institution user (admin/staff)
   static Future<bool> createInstitutionUser(Map<String, dynamic> data) async {
     try {
-      await fromSchema('institutionusers').insert(data);
+      await client.from('institutionusers').insert(data);
       return true;
     } catch (e) {
       debugPrint('Error creating institution user: $e');
@@ -687,7 +696,7 @@ class SupabaseService {
     try {
       debugPrint('Terminating user with use_id: $useId');
       final now = DateTime.now().toIso8601String();
-      await fromSchema('institutionusers')
+      await client.from('institutionusers')
           .update({
             'activestatus': 9,
             'terminatedby': terminatedBy,
@@ -1141,6 +1150,7 @@ class SupabaseService {
             'stuname': p['stuname'],
             'stuadmno': p['stuadmno'],
             'stuclass': p['stuclass'],
+            'courname': p['courname'] ?? '',
           };
         }
       }
@@ -1186,7 +1196,7 @@ class SupabaseService {
 
       if (stuIds.isNotEmpty) {
         final students = await fromSchema('students')
-            .select('stu_id, stuname, stuadmno, stuclass')
+            .select('stu_id, stuname, stuadmno, stuclass, courname')
             .inFilter('stu_id', stuIds);
         final stuMap = <int, Map<String, dynamic>>{};
         for (final s in (students as List)) {
