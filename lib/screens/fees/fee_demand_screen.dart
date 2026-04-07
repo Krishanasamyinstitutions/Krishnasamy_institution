@@ -69,6 +69,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   static const _importFieldKeys = [
     'stuadmno',
     'stuclass',
+    'courname',
     'demfeetype',
     'yr_id',
     'demfeeterm',
@@ -79,11 +80,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   ];
 
   static const Map<String, String> _importFieldLabels = {
-    'stuadmno': 'Admission No',
+    'stuadmno': 'Roll No',
     'stuclass': 'Class',
+    'courname': 'Course',
     'demfeetype': 'Fee Type',
     'yr_id': 'Fee Year',
-    'demfeeterm': 'Fee Term',
+    'demfeeterm': 'Semester',
     'con_id': 'Concession',
     'feeamount': 'Fee Amount',
     'conamount': 'Concession Amount',
@@ -178,21 +180,28 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     }
   }
 
-  Future<void> _loadDrilldown(String className) async {
+  String? _drilldownCourse;
+
+  Future<void> _loadDrilldown(String className, {String? courseName}) async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
     if (insId == null) return;
 
     setState(() {
       _drilldownClass = className;
+      _drilldownCourse = courseName;
       _loadingDrilldown = true;
       _drilldownDemands = [];
     });
     try {
       final demands = await SupabaseService.getFeeDemandsByClass(insId, className);
+      // Filter by course if specified
+      final filtered = courseName != null
+          ? demands.where((d) => (d['courname']?.toString() ?? d['stuname_course'] ?? '') == courseName || courseName == 'Other').toList()
+          : demands;
       if (mounted) {
         setState(() {
-          _drilldownDemands = demands;
+          _drilldownDemands = filtered;
           _loadingDrilldown = false;
         });
       }
@@ -346,8 +355,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   static String? _autoMapHeader(String header) {
     final h = header.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     const aliases = {
-      'admissionno': 'stuadmno', 'admno': 'stuadmno', 'stuadmno': 'stuadmno', 'admissionnumber': 'stuadmno',
+      'admissionno': 'stuadmno', 'admno': 'stuadmno', 'stuadmno': 'stuadmno', 'admissionnumber': 'stuadmno', 'rollno': 'stuadmno', 'roll': 'stuadmno', 'rollnumber': 'stuadmno',
       'class': 'stuclass', 'stuclass': 'stuclass',
+      'course': 'courname', 'courname': 'courname', 'coursename': 'courname',
       'feetype': 'demfeetype', 'demfeetype': 'demfeetype', 'type': 'demfeetype',
       'feeyear': 'yr_id', 'yrid': 'yr_id', 'year': 'yr_id',
       'feeterm': 'demfeeterm', 'demfeeterm': 'demfeeterm', 'term': 'demfeeterm',
@@ -541,6 +551,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           'stuadmno': admNoRaw,
           'stu_id': stuId,
           'stuclass': _cellByKey(row, 'stuclass'),
+          'courname': _cellByKey(row, 'courname'),
           'demfeetype': _cellByKey(row, 'demfeetype'),
           'yr_id': yrId,
           'demfeeyear': yrLabel ?? yrRaw ?? '',
@@ -690,7 +701,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           _searchQuery = '';
                           _searchController.clear();
                         }),
-                        child: Text('Class $_drilldownClass', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                        child: Text('${_drilldownCourse != null ? '$_drilldownCourse > ' : ''}$_drilldownClass', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
@@ -720,7 +731,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search...',
+                        hintText: 'Search by class...',
                         hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
                         prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
                         suffixIcon: _searchQuery.isNotEmpty
@@ -819,7 +830,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     SizedBox(height: 20.h),
 
                     // Admission No
-                    _buildLabel('Admission No *'),
+                    _buildLabel('Roll No *'),
                     TextFormField(
                       controller: _admNoController,
                       decoration: _inputDecoration('Enter admission number'),
@@ -875,7 +886,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildLabel('Fee Term'),
+                              _buildLabel('Semester'),
                               TextFormField(
                                 controller: _feeTermController,
                                 decoration: _inputDecoration('Enter term'),
@@ -1040,7 +1051,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     if (_searchQuery.isEmpty) return _classSummary;
     return _classSummary.where((c) {
       final cls = c['stuclass']?.toString().toLowerCase() ?? '';
-      return cls.contains(_searchQuery);
+      final course = c['courname']?.toString().toLowerCase() ?? '';
+      return cls.contains(_searchQuery) || course.contains(_searchQuery);
     }).toList();
   }
 
@@ -1064,6 +1076,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         grouped[admNo] = {
           'stuadmno': admNo,
           'stuname': d['stuname'] ?? d['studentname'] ?? '',
+          'courname': d['courname']?.toString(),
           'total_demand': 0.0,
           'total_concession': 0.0,
           'total_paid': 0.0,
@@ -1136,7 +1149,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               color: const Color(0xFF6C8EEF),
               child: Row(
                 children: [
-                  SizedBox(width: 100.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                  SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                  SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                   Expanded(child: Text('STUDENTS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
                   Expanded(child: Text('TOTAL DEMAND', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                   Expanded(child: Text('COLLECTED', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
@@ -1160,7 +1174,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   final totalPending = (s['total_pending'] as num?)?.toDouble() ?? 0;
 
                   return InkWell(
-                    onTap: () => _loadDrilldown(className),
+                    onTap: () => _loadDrilldown(className, courseName: s['courname']?.toString()),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                       color: i.isEven ? Colors.white : const Color(0xFFF7FAFC),
@@ -1168,7 +1182,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         children: [
                           SizedBox(
                             width: 100.w,
-                            child: Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+                            child: Text(s['courname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                          ),
+                          SizedBox(
+                            width: 80.w,
+                            child: Text(className, style: TextStyle(fontSize: 13.sp)),
                           ),
                           Expanded(child: Text('$studentCount', style: TextStyle(fontSize: 13.sp), textAlign: TextAlign.center)),
                           Expanded(child: Text('₹${_formatAmount(totalDemand)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
@@ -1192,6 +1210,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               child: Row(
                 children: [
                   SizedBox(width: 100.w, child: Text('TOTAL', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                  SizedBox(width: 80.w),
                   Expanded(child: Text('${summaries.fold<int>(0, (sum, s) => sum + ((s['student_count'] as num?)?.toInt() ?? 0))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_demand'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_paid'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
@@ -1259,8 +1278,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 color: const Color(0xFF6C8EEF),
                 child: Row(
                   children: [
-                    Expanded(flex: 1, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                    Expanded(flex: 1, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                     Expanded(flex: 2, child: Text('NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                    Expanded(flex: 1, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                     Expanded(flex: 1, child: Text('DEMAND', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                     Expanded(flex: 1, child: Text('PAID', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                     Expanded(flex: 1, child: Text('PENDING', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
@@ -1306,6 +1326,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                 style: TextStyle(fontSize: 13.sp),
                                 overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: Text(s['courname']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary)),
                             ),
                             Expanded(
                               flex: 1,
@@ -1413,7 +1437,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('TERM')),
+                DataColumn(label: Text('SEMESTER')),
                 DataColumn(label: Text('FEE TYPE')),
                 DataColumn(label: Text('AMOUNT'), numeric: true),
                 DataColumn(label: Text('PAID'), numeric: true),
@@ -1568,15 +1592,17 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       children: [
                         _gridHeaderCell('S.No', width: 60, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Adm No *', flex: 2),
+                        _gridHeaderCell('Roll No *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Class *', flex: 1),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Course', flex: 1),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Type *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Year *', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Term *', flex: 1),
+                        _gridHeaderCell('Semester *', flex: 1),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Concession *', flex: 2),
                         _gridHeaderDivider(),
@@ -1619,6 +1645,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                       _gridDataCell('${index + 1}', width: 60, center: true),
                                       _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'stuclass'), flex: 1),
+                                      _gridDataCell(_mappedCell(row, 'courname'), flex: 1),
                                       _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'yr_id'), flex: 1),
                                       _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 1),
@@ -1726,11 +1753,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     excel.delete('Sheet1');
 
     final headers = [
-      'Admission No',
+      'Roll No',
       'Class',
+      'Course',
       'Fee Type',
       'Fee Year',
-      'Fee Term',
+      'Semester',
       'Concession',
       'Fee Amount',
       'Concession Amount',
@@ -1785,12 +1813,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final sheet = excel['Fee Demands'];
     excel.delete('Sheet1');
 
-    final headers = ['Admission No', 'Class', 'Fee Type', 'Fee Year', 'Fee Term', 'Concession', 'Fee Amount', 'Concession Amount', 'Due Date'];
+    final headers = ['Roll No', 'Class', 'Course', 'Fee Type', 'Fee Year', 'Semester', 'Concession', 'Fee Amount', 'Concession Amount', 'Due Date'];
     final sampleRows = [
-      ['1787', 'XII', 'SCHOOL FEES', '2025-2026', 'I TERM', 'GENERAL', '10080', '0', '2025-05-31'],
-      ['1787', 'XII', 'TUITION FEES', '2025-2026', 'JUNE', 'GENERAL', '700', '0', '2025-06-30'],
-      ['1844', 'XII', 'SCHOOL FEES', '2025-2026', 'I TERM', 'SC/ST', '10080', '2000', '2025-05-31'],
-      ['6648', 'IX', 'SCHOOL FEES', '2025-2026', 'I TERM', 'GENERAL', '6500', '0', '2025-05-31'],
+      ['CS001', 'I Year', 'BSC-CS', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
+      ['CS001', 'I Year', 'BSC-CS', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],
+      ['BBA001', 'II Year', 'BBA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '2000', '2026-05-31'],
+      ['MCA001', 'I Year', 'MCA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '6500', '0', '2026-05-31'],
     ];
 
     final headerStyle = xl.CellStyle(
