@@ -361,7 +361,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               onChanged: (v) => setState(() => _selectedFeeType = v),
             ),
           ),
-          SizedBox(width: 12.w),
+          const Spacer(),
           // Reset
           TextButton.icon(
             onPressed: () => setState(() { _selectedCourse = null; _selectedClass = null; _selectedFeeType = null; }),
