@@ -115,7 +115,7 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      final rows = await SupabaseService.fromSchema('students')
+      var query = SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
