@@ -18,6 +18,8 @@ class StudentModel {
   final String? stubloodgrp;
   final String? stuphoto;
   final String stuclass;
+  final int? courId;
+  final String? courname;
   final int? conId;
   final String stuserId;
   final int activestatus;
@@ -42,6 +44,8 @@ class StudentModel {
     this.stubloodgrp,
     this.stuphoto,
     required this.stuclass,
+    this.courId,
+    this.courname,
     this.conId,
     required this.stuserId,
     this.activestatus = 1,
@@ -76,6 +80,8 @@ class StudentModel {
       stubloodgrp: json['stubloodgrp'],
       stuphoto: json['stuphoto'],
       stuclass: json['stuclass'] ?? '',
+      courId: json['cour_id'] as int?,
+      courname: json['courname']?.toString(),
       conId: json['con_id'] as int?,
       stuserId: json['stuser_id'] ?? '',
       activestatus: json['activestatus'] ?? 1,

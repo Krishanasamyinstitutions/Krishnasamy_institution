@@ -381,14 +381,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(height: 20.h),
                   ],
 
-                  // Email field
+                  // Email / Username field
                   FadeInDown(
                     delay: const Duration(milliseconds: 300),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Email Address',
+                          _isSuperAdmin ? 'Username' : 'Email Address',
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
@@ -397,19 +397,20 @@ class _LoginScreenState extends State<LoginScreen> {
                         SizedBox(height: 8.h),
                         TextFormField(
                           controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
+                          keyboardType: _isSuperAdmin ? TextInputType.text : TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            hintText: 'admin@edudesk.com',
-                            prefixIcon: Icon(Icons.email_outlined,
+                            hintText: _isSuperAdmin ? 'Enter username' : 'admin@edudesk.com',
+                            prefixIcon: Icon(
+                                _isSuperAdmin ? Icons.person_outline : Icons.email_outlined,
                                 size: 20.sp, color: AppColors.textLight),
                             prefixIconConstraints: BoxConstraints(
                                 minWidth: 52.w, minHeight: 0),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
+                              return _isSuperAdmin ? 'Please enter your username' : 'Please enter your email';
                             }
-                            if (!value.contains('@')) {
+                            if (!_isSuperAdmin && !value.contains('@')) {
                               return 'Please enter a valid email';
                             }
                             return null;
@@ -589,7 +590,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(width: 10.w),
                           Expanded(
                             child: Text(
-                              'Demo: admin@edudesk.com / admin123',
+                              _isSuperAdmin
+                                  ? 'Demo: superadmin / admin123'
+                                  : 'Demo: admin@edudesk.com / admin123',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium

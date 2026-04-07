@@ -538,11 +538,12 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                           child: Row(
                             children: [
                               SizedBox(width: 40.w),
-                              _headerCell('Adm No', 3),
+                              _headerCell('Roll No', 3),
                               _headerCell('Student Name', 5),
                               _headerCell('Class', 2, center: true),
+                              _headerCell('Course', 2, center: true),
                               _headerCell('Year', 3, center: true),
-                              _headerCell('Fee Term', 3, center: true),
+                              _headerCell('Semester', 3, center: true),
                               _headerCell('Fee Type', 3),
                               _headerCell('Fee Amount', 3, right: true),
                               _headerCell('Concession', 4),
@@ -792,7 +793,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                   activeColor: AppColors.accent,
                 ),
               ),
-              // Adm No
+              // Roll No
               Expanded(
                 flex: 3,
                 child: Text(admNo,
@@ -814,6 +815,13 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 flex: 2,
                 child: Text(cls,
                     style: TextStyle(fontSize: 13.sp),
+                    textAlign: TextAlign.center),
+              ),
+              // Course
+              Expanded(
+                flex: 2,
+                child: Text(d['courname']?.toString() ?? '-',
+                    style: TextStyle(fontSize: 12.sp, color: AppColors.primary),
                     textAlign: TextAlign.center),
               ),
               // Year

@@ -346,7 +346,7 @@ class ReceiptWidget extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _labelValue('Admission No:', data.admissionNo),
+                _labelValue('Roll No:', data.admissionNo),
                 const SizedBox(height: 6),
                 _labelValue('Class:', data.className),
               ],
@@ -396,7 +396,7 @@ class ReceiptWidget extends StatelessWidget {
                   children: [
                     _headerCell('S.No', width: 46),
                     Container(width: 1, color: _borderColor),
-                    _headerCell('Term', width: 124),
+                    _headerCell('Semester', width: 124),
                     Container(width: 1, color: _borderColor),
                     _headerCell('Fee Type', flex: true),
                     Container(width: 1, color: _borderColor),
