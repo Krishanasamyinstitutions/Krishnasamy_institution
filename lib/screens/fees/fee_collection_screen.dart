@@ -1242,7 +1242,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 onChanged: (v) => setState(() => _pendingSearchQuery = v),
                 style: TextStyle(fontSize: 13.sp),
                 decoration: InputDecoration(
-                  hintText: 'Search student / adm no...',
+                  hintText: 'Search student / roll no...',
                   hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                   prefixIcon: Icon(Icons.search, size: 16.sp),
                   contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
@@ -1456,7 +1456,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               children: [
                 Text(stuName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                 SizedBox(height: 2.h),
-                Text('Adm No: $admNo  |  Class: $stuClass', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                Text('Roll No: $admNo  |  Class: $stuClass', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               ],
             ),
           ],
@@ -1485,7 +1485,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('TERM')),
+                DataColumn(label: Text('SEMESTER')),
                 DataColumn(label: Text('FEE TYPE')),
                 DataColumn(label: Text('FEE AMOUNT'), numeric: true),
                 DataColumn(label: Text('PAID'), numeric: true),
@@ -1631,7 +1631,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 }),
                 style: TextStyle(fontSize: 13.sp),
                 decoration: InputDecoration(
-                  hintText: 'Search student / adm no...',
+                  hintText: 'Search student / roll no...',
                   hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
                   prefixIcon: Icon(Icons.search, size: 16.sp),
                   suffixIcon: _pendingStudentSearch.isNotEmpty
@@ -1728,8 +1728,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('ADM NO')),
+                DataColumn(label: Text('ROLL NO')),
                 DataColumn(label: Text('STUDENT NAME')),
+                DataColumn(label: Text('COURSE')),
                 DataColumn(label: Text('CLASS')),
                 DataColumn(label: Text('FEE AMOUNT'), numeric: true),
                 DataColumn(label: Text('PAID'), numeric: true),
@@ -1739,7 +1740,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               rows: pagedKeys.isEmpty ? [
                 const DataRow(cells: [
                   DataCell(Text('')), DataCell(Text('No students found')), DataCell(Text('')), DataCell(Text('')),
-                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
+                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
                 ]),
               ] : [
                 ...pagedKeys.asMap().entries.map((entry) {
@@ -1750,6 +1751,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final admNo = first['stuadmno']?.toString() ?? '-';
                   final stuName = _getStudentName(first);
                   final stuClass = first['stuclass']?.toString() ?? '-';
+                  final stuCourse = first['courname']?.toString() ?? '-';
                   double sDemand = 0, sPaid = 0, sBalance = 0;
                   for (final d in demands) {
                     sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
@@ -1768,6 +1770,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       DataCell(Text('${startIdx + idx + 1}')),
                       DataCell(Text(admNo)),
                       DataCell(Text(stuName, style: const TextStyle(fontWeight: FontWeight.w500))),
+                      DataCell(Text(stuCourse, style: const TextStyle(color: AppColors.primary))),
                       DataCell(Text(stuClass)),
                       DataCell(Text(_formatCurrency(sDemand))),
                       DataCell(Text(_formatCurrency(sPaid), style: const TextStyle(color: AppColors.success))),
@@ -1790,6 +1793,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     const DataCell(Text('')),
                     const DataCell(Text('')),
                     DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    const DataCell(Text('')),
                     const DataCell(Text('')),
                     DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
@@ -2196,7 +2200,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           DataColumn(label: Text('S No.')),
                           DataColumn(label: Text('PAY NO')),
                           DataColumn(label: Text('TIME')),
-                          DataColumn(label: Text('ADMN.NO')),
+                          DataColumn(label: Text('ROLL NO')),
                           DataColumn(label: Text('STUDENT NAME')),
                           DataColumn(label: Text('CLASS')),
                           DataColumn(label: Text('METHOD')),
@@ -2501,7 +2505,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.end,
                         children: [
-                          labelValue('Admission No:', data.admissionNo),
+                          labelValue('Roll No:', data.admissionNo),
                           pw.SizedBox(height: 6),
                           labelValue('Class:', data.className),
                         ],
@@ -2528,7 +2532,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               decoration: const pw.BoxDecoration(color: headerBg),
                               children: [
                                 tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
-                                tableCell('Term', sSemiBold.copyWith(color: primaryBlue)),
+                                tableCell('Semester', sSemiBold.copyWith(color: primaryBlue)),
                                 tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
                                 tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
                               ],
@@ -2846,7 +2850,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                       columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
                       columns: const [
-                        DataColumn(label: Text('S No.')), DataColumn(label: Text('TERM')), DataColumn(label: Text('FEE TYPE')),
+                        DataColumn(label: Text('S No.')), DataColumn(label: Text('SEMESTER')), DataColumn(label: Text('FEE TYPE')),
                         DataColumn(label: Text('AMOUNT'), numeric: true), DataColumn(label: Text('PAID'), numeric: true),
                         DataColumn(label: Text('BALANCE'), numeric: true), DataColumn(label: Text('STATUS')),
                       ],
@@ -3203,28 +3207,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     excel.rename('Sheet1', sheetName);
     final sheet = excel[sheetName];
 
-    // Term/month columns
-    const termCols = [
-      'I TERM', 'II TERM', 'III TERM',
-      'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
-      'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY',
+    // Build dynamic term columns from actual demfeeterm values in the data
+    final termSet = <String>{};
+    for (final d in allFresh) {
+      final t = d['demfeeterm']?.toString() ?? '';
+      if (t.isNotEmpty) termSet.add(t);
+    }
+    const _pendingTermOrder = [
+      'I SEMESTER', 'I TERM', 'II SEMESTER', 'II TERM', 'III SEMESTER', 'III TERM',
+      'IV SEMESTER', 'V SEMESTER', 'VI SEMESTER',
+      'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER',
+      'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY',
+      'MARCH', 'APRIL', 'MAY',
     ];
+    final termCols = termSet.toList()..sort((a, b) {
+      final ia = _pendingTermOrder.indexWhere((x) => x.toLowerCase() == a.toLowerCase());
+      final ib = _pendingTermOrder.indexWhere((x) => x.toLowerCase() == b.toLowerCase());
+      return (ia >= 0 ? ia : 999).compareTo(ib >= 0 ? ib : 999);
+    });
 
+    // Use actual demfeeterm value directly (no mapping needed)
     String mapTermToCol(String? term) {
       if (term == null || term.isEmpty) return '';
-      final t = term.toUpperCase().trim();
-      if (t == 'I' || t == 'I TERM' || t == 'TERM I' || t == 'TERM 1' || t == '1') return 'I TERM';
-      if (t == 'II' || t == 'II TERM' || t == 'TERM II' || t == 'TERM 2' || t == '2') return 'II TERM';
-      if (t == 'III' || t == 'III TERM' || t == 'TERM III' || t == 'TERM 3' || t == '3') return 'III TERM';
-      const months = {
-        'JUNE': 'JUNE', 'JUN': 'JUNE', 'JULY': 'JULY', 'JUL': 'JULY',
-        'AUGUST': 'AUGUST', 'AUG': 'AUGUST', 'SEPTEMBER': 'SEPTEMBER', 'SEP': 'SEPTEMBER',
-        'OCTOBER': 'OCTOBER', 'OCT': 'OCTOBER', 'NOVEMBER': 'NOVEMBER', 'NOV': 'NOVEMBER',
-        'DECEMBER': 'DECEMBER', 'DEC': 'DECEMBER', 'JANUARY': 'JANUARY', 'JAN': 'JANUARY',
-        'FEBRUARY': 'FEBRUARY', 'FEB': 'FEBRUARY', 'MARCH': 'MARCH', 'MAR': 'MARCH',
-        'APRIL': 'APRIL', 'APR': 'APRIL', 'MAY': 'MAY',
-      };
-      return months[t] ?? t;
+      return term.toUpperCase().trim();
     }
 
     // Styles
@@ -3243,7 +3248,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
     );
 
-    final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...termCols, 'Total', 'Remarks'];
+    final headers = ['Sno', 'Class', 'Roll No', 'Student Name', ...termCols, 'Total', 'Remarks'];
     final totalCols = headers.length;
     int row = 0;
 
@@ -3651,6 +3656,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           : [];
       return _ClassGroup(
         className: r['stuclass']?.toString() ?? '',
+        courseName: r['courname']?.toString(),
         demands: const [],
         totalDemand: (r['total_demand'] as num?)?.toDouble() ?? 0,
         totalConcession: (r['total_concession'] as num?)?.toDouble() ?? 0,
@@ -3785,15 +3791,16 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   const double cHMargin = 16;
                   const double cColSpacing = 20;
                   const double cSnoW = 50;
-                  const double cClassW = 80;
-                  const double cStudentsW = 80;
+                  const double cCourseW = 90;
+                  const double cClassW = 70;
+                  const double cStudentsW = 70;
                   const double cFeeTypesW = 280;
                   const double cTotalDemandW = 110;
                   const double cPaidW = 110;
                   const double cCollectedW = 90;
                   const double cPendingW = 110;
                   const double cActionW = 130;
-                  final List<double> cColWidths = [cSnoW, cClassW, cStudentsW, cFeeTypesW, cTotalDemandW, cPaidW, cCollectedW, cPendingW, cActionW];
+                  final List<double> cColWidths = [cSnoW, cCourseW, cClassW, cStudentsW, cFeeTypesW, cTotalDemandW, cPaidW, cCollectedW, cPendingW, cActionW];
                   final cTotalFixedWidth = cColWidths.reduce((a, b) => a + b) + (cColWidths.length - 1) * cColSpacing + 2 * cHMargin;
                   final cTableWidth = cTotalFixedWidth > effectiveW ? cTotalFixedWidth : effectiveW;
                   final cExtraSpace = cTableWidth - cTotalFixedWidth;
@@ -3830,14 +3837,15 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   final classHeaderRow = cBuildRow(
                     [
                       cBuildCell('S No.', 0, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('CLASS', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('STUDENTS', 2, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('FEE TYPES', 3, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('TOTAL DEMAND', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('PAID', 5, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('% COLLECTED', 6, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('PENDING', 7, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                      cBuildCell('ACTION', 8, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('COURSE', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('CLASS', 2, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('STUDENTS', 3, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('FEE TYPES', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('TOTAL DEMAND', 5, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('PAID', 6, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('% COLLECTED', 7, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('PENDING', 8, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                      cBuildCell('ACTION', 9, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
                     ],
                     bgColor: const Color(0xFF6C8EEF),
                     height: 42,
@@ -3850,7 +3858,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       [
                         cBuildCell('', 0),
                         cBuildCell('No fee demands found', 1),
-                        for (int ci = 2; ci < 9; ci++) cBuildCell('', ci),
+                        for (int ci = 2; ci < 10; ci++) cBuildCell('', ci),
                       ],
                       height: 44,
                     ));
@@ -3871,12 +3879,16 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         final insId = auth.insId;
                         if (insId != null) {
                           final demands = await SupabaseService.getFeeDemandsByClass(insId, g.className);
-                          for (final d in demands) {
+                          // Filter by course
+                          final filtered = g.courseName != null
+                              ? demands.where((d) => (d['courname']?.toString() ?? '') == g.courseName).toList()
+                              : demands;
+                          for (final d in filtered) {
                             d['_stuname'] = d['stuname']?.toString() ?? '';
                           }
                           if (mounted) {
                             setState(() {
-                              _drilldownDemands = demands;
+                              _drilldownDemands = filtered;
                               _drilldownLoading = false;
                             });
                           }
@@ -3892,12 +3904,14 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             children: [
                               SizedBox(width: cAdj[0], child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[1], child: Text(g.className, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                              SizedBox(width: cAdj[1], child: Text(g.courseName ?? '-', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[2], child: Text('${g.studentCount}', style: TextStyle(fontSize: 13.sp))),
+                              SizedBox(width: cAdj[2], child: Text(g.className, style: TextStyle(fontSize: 13.sp))),
+                              const SizedBox(width: cColSpacing),
+                              SizedBox(width: cAdj[3], child: Text('${g.studentCount}', style: TextStyle(fontSize: 13.sp))),
                               const SizedBox(width: cColSpacing),
                               SizedBox(
-                                width: cAdj[3],
+                                width: cAdj[4],
                                 child: Wrap(
                                   spacing: 4, runSpacing: 4,
                                   children: [
@@ -3910,11 +3924,11 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 ),
                               ),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[4], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalDemand), style: TextStyle(fontSize: 13.sp)))),
+                              SizedBox(width: cAdj[5], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalDemand), style: TextStyle(fontSize: 13.sp)))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[5], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPaid), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success)))),
+                              SizedBox(width: cAdj[6], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPaid), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success)))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[6], child: Container(
+                              SizedBox(width: cAdj[7], child: Container(
                                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                                 decoration: BoxDecoration(
                                   color: pct >= 100 ? AppColors.success.withValues(alpha: 0.1) : pct >= 50 ? Colors.orange.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
@@ -3923,9 +3937,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 child: Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: pct >= 100 ? AppColors.success : pct >= 50 ? Colors.orange : AppColors.warning)),
                               )),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[7], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPending), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary)))),
+                              SizedBox(width: cAdj[8], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPending), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: g.totalPending > 0 ? AppColors.warning : AppColors.textSecondary)))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[8], child: Align(
+                              SizedBox(width: cAdj[9], child: Align(
                                 alignment: Alignment.centerRight,
                                 child: InkWell(
                                   onTap: () => onClassTap(),
@@ -4127,6 +4141,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         ? (first['students'] is Map ? (first['students']['stuname']?.toString() ?? '-') : (first['stuname']?.toString() ?? '-'))
         : '-';
     final stuClass = first?['stuclass']?.toString() ?? '-';
+    final stuCourse = first?['courname']?.toString() ?? '';
 
     return Container(
       decoration: BoxDecoration(
@@ -4172,7 +4187,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     _drilldownAdmNo = null;
                     _drilldownDemands = [];
                   }),
-                  child: Text('Class $stuClass', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
+                  child: Text('${stuCourse.isNotEmpty ? '$stuCourse > ' : ''}$stuClass', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                 ),
                 Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 Text('$stuName ($admNo)', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
@@ -4198,7 +4213,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
               columns: const [
                 DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('TERM')),
+                DataColumn(label: Text('SEMESTER')),
                 DataColumn(label: Text('FEE TYPE')),
                 DataColumn(label: Text('AMOUNT'), numeric: true),
                 DataColumn(label: Text('PAID'), numeric: true),
@@ -4336,7 +4351,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       child: Text('Class-wise Demand', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                     ),
                     Text('  >  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-                    Text('Class ${group.className}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                    Text('${group.courseName != null ? '${group.courseName} > ' : ''}${group.className}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                     SizedBox(width: 12.w),
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -4460,7 +4475,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 final stuHeaderRow = sBuildRow(
                   [
                     sBuildCell('S No.', 0, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-                    sBuildCell('ADM NO', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                    sBuildCell('ROLL NO', 1, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
                     sBuildCell('STUDENT NAME', 2, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
                     sBuildCell('FEE AMOUNT', 3, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
                     sBuildCell('PAID', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
@@ -5115,6 +5130,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           ? (first['students']['stuname']?.toString() ?? '-')
           : (first['stuname']?.toString() ?? '-');
       final stuClass = first['stuclass']?.toString() ?? '-';
+      final stuCourse = first['courname']?.toString() ?? '-';
       final admNo = first['stuadmno']?.toString() ?? '-';
       final payNo = _payNumberMap[payId] ?? '-';
 
@@ -5133,6 +5149,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         'payNo': payNo,
         'admNo': admNo,
         'stuName': stuName,
+        'stuCourse': stuCourse,
         'stuClass': stuClass,
         'feeAmounts': feeAmounts,
         'total': total,
@@ -5194,6 +5211,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
           'payNo': row['payNo'] as String,
           'admNo': row['admNo'] as String,
           'stuName': row['stuName'] as String,
+          'stuCourse': row['stuCourse'] as String,
           'stuClass': row['stuClass'] as String,
           'feeAmounts': feeAmounts,
           'total': total,
@@ -5418,20 +5436,21 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             const headerBg = Color(0xFF6C8EEF);
                             const subTotalBg = Color(0xFFE2E8F0);
 
-                            // Column widths: SNO, RECPT.NO, ADMN.NO, NAME, CLASS, ...feeTypes, TOTAL
+                            // Column widths: SNO, RECPT.NO, ROLL NO, NAME, COURSE, CLASS, ...feeTypes, TOTAL
                             const double colSpacing = 12;
                             const double hMargin = 12;
                             const double snoW = 50;
                             const double recptW = 80;
                             const double admnW = 80;
                             const double nameW = 180;
+                            const double courseW = 90;
                             const double classW = 70;
                             const double feeColW = 80;
                             const double totalColW = 80;
                             final int feeCount = activeDisplayFeeTypes.length;
 
                             // Minimum width to keep columns readable
-                            final totalColumns = 6 + feeCount;
+                            final totalColumns = 7 + feeCount;
                             final minTableWidth = totalColumns * 80.0;
                             final effectiveMin = minTableWidth > constraints.maxWidth
                                 ? minTableWidth
@@ -5439,7 +5458,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
                             // Build column widths list
                             final List<double> colWidths = [
-                              snoW, recptW, admnW, nameW, classW,
+                              snoW, recptW, admnW, nameW, courseW, classW,
                               ...List.filled(feeCount, feeColW),
                               totalColW,
                             ];
@@ -5486,12 +5505,13 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               [
                                 buildCell('SNO', 0, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
                                 buildCell('RECPT.NO', 1, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
-                                buildCell('ADMN.NO', 2, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('ROLL NO', 2, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
                                 buildCell('NAME', 3, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
-                                buildCell('CLASS', 4, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('COURSE', 4, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('CLASS', 5, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
                                 for (int i = 0; i < feeCount; i++)
-                                  buildCell(activeDisplayFeeTypes[i].toUpperCase(), 5 + i, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
-                                buildCell('TOTAL', 5 + feeCount, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                  buildCell(activeDisplayFeeTypes[i].toUpperCase(), 6 + i, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
+                                buildCell('TOTAL', 6 + feeCount, fontWeight: FontWeight.w700, fontSize: 10.sp, color: Colors.white),
                               ],
                               bgColor: headerBg,
                               height: 40,
@@ -5523,13 +5543,14 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                     buildCell('', 2),
                                     buildCell('', 3),
                                     buildCell('', 4),
+                                    buildCell('', 5),
                                     for (int i = 0; i < feeCount; i++)
                                       buildCell(
                                         (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
                                             ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
-                                        5 + i, fontWeight: FontWeight.w700,
+                                        6 + i, fontWeight: FontWeight.w700,
                                       ),
-                                    buildCell(total.toStringAsFixed(0), 5 + feeCount, fontWeight: FontWeight.w700),
+                                    buildCell(total.toStringAsFixed(0), 6 + feeCount, fontWeight: FontWeight.w700),
                                   ],
                                   bgColor: subTotalBg,
                                   height: 36,
@@ -5543,16 +5564,17 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                     buildCell(row['payNo'] as String, 1, fontWeight: FontWeight.w500),
                                     buildCell(row['admNo'] as String, 2, fontWeight: FontWeight.w500),
                                     buildCell(row['stuName'] as String, 3, truncate: true),
-                                    buildCell(row['stuClass'] as String, 4),
+                                    buildCell(row['stuCourse'] as String, 4),
+                                    buildCell(row['stuClass'] as String, 5),
                                     for (int i = 0; i < feeCount; i++)
                                       buildCell(
                                         (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
                                             ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
-                                        5 + i,
+                                        6 + i,
                                       ),
                                     buildCell(
                                       (row['total'] as double).toStringAsFixed(0),
-                                      5 + feeCount, fontWeight: FontWeight.w600,
+                                      6 + feeCount, fontWeight: FontWeight.w600,
                                     ),
                                   ],
                                   height: 36,
@@ -5570,13 +5592,14 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 buildCell('', 2),
                                 buildCell('GRAND TOTAL', 3, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
                                 buildCell('', 4),
+                                buildCell('', 5),
                                 for (int i = 0; i < feeCount; i++)
                                   buildCell(
                                     (grandFeeTypeTotals[activeDisplayFeeTypes[i]] ?? 0) > 0
                                         ? (grandFeeTypeTotals[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
-                                    5 + i, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white,
+                                    6 + i, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white,
                                   ),
-                                buildCell(grandTotal.toStringAsFixed(0), 5 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
+                                buildCell(grandTotal.toStringAsFixed(0), 6 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white),
                               ],
                               bgColor: headerBg,
                               height: 40,
@@ -5768,7 +5791,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     // Filter fee types to only those with actual payments
     final activeFeeTypes = feeTypes.where((ft) => (grandFeeTypeTotals[ft] ?? 0) > 0).toList();
 
-    final totalCols = 5 + activeFeeTypes.length + 1;
+    final totalCols = 6 + activeFeeTypes.length + 1;
     int row = 0;
 
     // Institution name
@@ -5812,7 +5835,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     row++;
 
     // Column headers (no Challan No.)
-    final headers = ['SNO', 'Recpt. No.', 'Admn. No.', 'Name', 'Class', ...activeFeeTypes.map((ft) => ft.toUpperCase()), 'TOTAL'];
+    final headers = ['SNO', 'Recpt. No.', 'Roll No.', 'Name', 'Course', 'Class', ...activeFeeTypes.map((ft) => ft.toUpperCase()), 'TOTAL'];
     for (var c = 0; c < headers.length; c++) {
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
       cell.value = xl.TextCellValue(headers[c]);
@@ -5835,16 +5858,16 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         final stCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
         stCell.value = xl.TextCellValue('S.Total');
         stCell.cellStyle = subTotalStyle;
-        for (var i = 1; i < 5; i++) {
+        for (var i = 1; i < 6; i++) {
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: row)).cellStyle = subTotalStyle;
         }
         for (var i = 0; i < activeFeeTypes.length; i++) {
           final amt = feeAmts[activeFeeTypes[i]] ?? 0;
-          final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
+          final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + i, rowIndex: row));
           if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
           cell.cellStyle = subTotalStyle;
         }
-        final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
+        final tCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + activeFeeTypes.length, rowIndex: row));
         tCell.value = xl.IntCellValue(total.toInt());
         tCell.cellStyle = subTotalStyle;
         row++;
@@ -5854,17 +5877,18 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['payNo'] as String);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['admNo'] as String);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['stuName'] as String);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['stuClass'] as String);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['stuCourse'] as String);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue(r['stuClass'] as String);
 
         final feeAmts = r['feeAmounts'] as Map<String, double>;
         for (var i = 0; i < activeFeeTypes.length; i++) {
           final amt = feeAmts[activeFeeTypes[i]] ?? 0;
           if (amt > 0) {
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row)).value = xl.IntCellValue(amt.toInt());
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + i, rowIndex: row)).value = xl.IntCellValue(amt.toInt());
           }
         }
         final total = r['total'] as double;
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row)).value = xl.IntCellValue(total.toInt());
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + activeFeeTypes.length, rowIndex: row)).value = xl.IntCellValue(total.toInt());
         row++;
       }
     }
@@ -5873,16 +5897,16 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     final gtLabel = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
     gtLabel.value = xl.TextCellValue('GRAND TOTAL');
     gtLabel.cellStyle = totalRowStyle;
-    for (var c = 1; c < 5; c++) {
+    for (var c = 1; c < 6; c++) {
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = totalRowStyle;
     }
     for (var i = 0; i < activeFeeTypes.length; i++) {
       final amt = grandFeeTypeTotals[activeFeeTypes[i]] ?? 0;
-      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + i, rowIndex: row));
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + i, rowIndex: row));
       if (amt > 0) cell.value = xl.IntCellValue(amt.toInt());
       cell.cellStyle = totalRowStyle;
     }
-    final gtCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + activeFeeTypes.length, rowIndex: row));
+    final gtCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + activeFeeTypes.length, rowIndex: row));
     gtCell.value = xl.IntCellValue(grandTotal.toInt());
     gtCell.cellStyle = totalRowStyle;
 
@@ -5891,11 +5915,12 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     sheet.setColumnWidth(1, 16);
     sheet.setColumnWidth(2, 12);
     sheet.setColumnWidth(3, 22);
-    sheet.setColumnWidth(4, 8);
+    sheet.setColumnWidth(4, 14);
+    sheet.setColumnWidth(5, 8);
     for (var i = 0; i < activeFeeTypes.length; i++) {
-      sheet.setColumnWidth(5 + i, 14);
+      sheet.setColumnWidth(6 + i, 14);
     }
-    sheet.setColumnWidth(5 + activeFeeTypes.length, 12);
+    sheet.setColumnWidth(6 + activeFeeTypes.length, 12);
 
     // Save
     final result = await FilePicker.platform.saveFile(
@@ -5971,6 +5996,7 @@ class _DateGroup {
 
 class _ClassGroup {
   final String className;
+  final String? courseName;
   final List<Map<String, dynamic>> demands;
   final double totalDemand;
   final double totalConcession;
@@ -5981,6 +6007,7 @@ class _ClassGroup {
 
   _ClassGroup({
     required this.className,
+    this.courseName,
     required this.demands,
     required this.totalDemand,
     required this.totalConcession,
@@ -6119,7 +6146,7 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(flex: 2, child: Text('Term', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                      Expanded(flex: 2, child: Text('Semester', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                       Expanded(flex: 3, child: Text('Fee Type', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                       Expanded(flex: 2, child: Text('Due Date', textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                       Expanded(flex: 2, child: Text('Amount', textAlign: TextAlign.right, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
