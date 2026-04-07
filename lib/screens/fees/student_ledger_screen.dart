@@ -713,7 +713,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             children: [
               SizedBox(width: 100.w, child: const _TH('DATE')),
               SizedBox(width: 110.w, child: const _TH('DOC.NO')),
-              SizedBox(width: 90.w,  child: const _TH('TERM')),
+              SizedBox(width: 90.w,  child: const _TH('SEMESTER')),
               const Expanded(            child: _TH('FEE TYPE')),
               SizedBox(width: 110.w, child: const _TH('REFERENCE')),
               SizedBox(width: 100.w, child: const _TH('DUE', align: TextAlign.right)),
@@ -1035,9 +1035,9 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
     addInfo('Class', ':  ${s.stuclass}');
     addInfo('Student Name', ':  ${s.stuname}');
-    // Add admission no on same row as student name but further right
+    // Add roll no on same row as student name but further right
     final admCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row - 1));
-    admCell.value = xl.TextCellValue('Admission No : ${s.stuadmno}');
+    admCell.value = xl.TextCellValue('Roll No : ${s.stuadmno}');
     admCell.cellStyle = labelStyle;
     addInfo('Father Name', ':  $fatherName');
     row++;
@@ -1049,7 +1049,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     row++;
 
     // Column headers
-    final headers = ['Date', 'Doc No.', 'Term', 'Fee Type', 'Reference', 'Debit (Rs.)', 'Credit (Rs.)'];
+    final headers = ['Date', 'Doc No.', 'Semester', 'Fee Type', 'Reference', 'Debit (Rs.)', 'Credit (Rs.)'];
     for (var c = 0; c < headers.length; c++) {
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
       cell.value = xl.TextCellValue(headers[c]);

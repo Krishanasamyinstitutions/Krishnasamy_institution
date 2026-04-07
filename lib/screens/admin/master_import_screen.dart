@@ -1232,7 +1232,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Class *', 'Term *', 'Fee Type *', 'Amount *', 'Due Date *', 'New/Old *', 'Boys/Girls *', 'Dayscholar/Hostel *'];
+  static const _headers = ['Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'New/Old *', 'Boys/Girls *', 'Dayscholar/Hostel *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1291,7 +1291,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
 
   void _validate() {
     final rowErrs = <int, String>{};
-    final labels = ['Class', 'Term', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
+    final labels = ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
       for (int j = 0; j < labels.length; j++) {
@@ -1365,7 +1365,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class', 'Term', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'],
+      existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );

@@ -339,6 +339,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _payMobileController.text = clean(parent?['payinchargemob']?.toString());
 
     setState(() {
+      _selectedStudent = s;
       _selectedGender = s.gender;
       _selectedBloodGroup = _normalizeBloodGroup(s.stubloodgrp);
       _selectedClass = s.stuclass;
@@ -941,7 +942,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               final s = pagedStudents[index];
               final serialNo = startIdx + index + 1;
               return InkWell(
-                onTap: () => setState(() { _selectedStudent = s; _selectedClassFilter = s.stuclass; _selectedCourseFilter = s.courname; }),
+                onTap: () => _populateStudentForm(s),
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                   decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5))),
@@ -1138,12 +1139,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 40, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 100, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
                                         Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        SizedBox(width: 100, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
-                                        SizedBox(width: 80, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 120, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
+                                        SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
                                       ],
                                     ),
@@ -1512,9 +1513,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
             }),
             validator: (v) => v == null ? 'Required' : null,
           )),
-          _fieldFull(label: 'Admission Number *', child: TextFormField(
+          _fieldFull(label: 'Roll Number *', child: TextFormField(
             controller: _admNoController,
-            decoration: _dec('Enter admission no'),
+            decoration: _dec('Enter roll no'),
             style: _inputStyle,
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           )),
@@ -2118,7 +2119,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static String _friendlyError(String msg) {
     final m = msg.toLowerCase();
     if (m.contains('duplicate key') || m.contains('unique constraint')) {
-      if (m.contains('stuadmno') || m.contains('admission')) return 'Admission number already exists';
+      if (m.contains('stuadmno') || m.contains('admission')) return 'Roll number already exists';
       if (m.contains('stuemail') || m.contains('email')) return 'Email already exists';
       if (m.contains('payinchargemob')) return 'Payment mobile already exists';
       return 'Duplicate record found';
@@ -2126,7 +2127,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     if (m.contains('not-null') || m.contains('null value')) {
       final match = RegExp(r'column "(\w+)"').firstMatch(msg);
       final col = match?.group(1) ?? '';
-      final labels = {'stuadmno': 'Admission No', 'stuname': 'Name', 'stugender': 'Gender', 'studob': 'Date of Birth', 'stumobile': 'Mobile', 'stuclass': 'Class', 'payincharge': 'Pay In Charge', 'payinchargemob': 'Payment Mobile'};
+      final labels = {'stuadmno': 'Roll No', 'stuname': 'Name', 'stugender': 'Gender', 'studob': 'Date of Birth', 'stumobile': 'Mobile', 'stuclass': 'Class', 'payincharge': 'Pay In Charge', 'payinchargemob': 'Payment Mobile'};
       return '${labels[col] ?? col} is required';
     }
     if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check class, year, or concession values';
@@ -2285,9 +2286,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
         final status = e['status'];
         final admNo = e['stuadmno'] ?? '';
         if (status == 'NO_PARENT') {
-          _importErrors.add('Adm $admNo: Payment In Charge or Mobile is missing - student not created');
+          _importErrors.add('Roll $admNo: Payment In Charge or Mobile is missing - student not created');
         } else {
-          _importErrors.add('Adm $admNo: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}');
+          _importErrors.add('Roll $admNo: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}');
         }
       }
 

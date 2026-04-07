@@ -393,6 +393,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               decoration: _inputDecoration('Select role'),
               style: _inputStyle,
               items: _rolesList
+                  .where((r) => (r['urname'] as String) != 'Admin')
                   .map((r) => DropdownMenuItem(
                       value: r['urname'] as String,
                       child: Text(r['urname'] as String)))

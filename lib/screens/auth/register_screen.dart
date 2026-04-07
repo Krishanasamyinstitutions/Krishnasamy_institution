@@ -237,6 +237,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
           debugPrint('Year insert failed: $e');
         }
 
+        // Move admin user from public to institution schema
+        try {
+          SupabaseService.setSchema(schemaName);
+          // Fetch the admin user from public table
+          final adminRow = await SupabaseService.client
+              .from('institutionusers')
+              .select()
+              .eq('use_id', regResult['use_id'])
+              .maybeSingle();
+          if (adminRow != null) {
+            // Insert into schema table
+            await SupabaseService.fromSchema('institutionusers').insert({
+              'ins_id': adminRow['ins_id'],
+              'inscode': adminRow['inscode'],
+              'usename': adminRow['usename'],
+              'usemail': adminRow['usemail'],
+              'usephone': adminRow['usephone'],
+              'usepassword': adminRow['usepassword'], // already hashed
+              'usestadate': adminRow['usestadate'],
+              'useotpstatus': adminRow['useotpstatus'] ?? 0,
+              'usedob': adminRow['usedob'],
+              'ur_id': adminRow['ur_id'],
+              'urname': adminRow['urname'],
+              'des_id': adminRow['des_id'],
+              'desname': adminRow['desname'],
+              'userepto': adminRow['userepto'] ?? 0,
+              'activestatus': 1,
+            });
+            // Delete from public table (only super admin stays in public)
+            await SupabaseService.client
+                .from('institutionusers')
+                .delete()
+                .eq('use_id', regResult['use_id']);
+            debugPrint('Admin user moved to schema');
+          }
+          SupabaseService.setSchema(null);
+        } catch (e) {
+          SupabaseService.setSchema(null);
+          debugPrint('Admin user move to schema failed: $e');
+        }
+
         // Expose schema to API (try, but don't fail if permission denied)
         try {
           await SupabaseService.client.rpc('expose_schema', params: {

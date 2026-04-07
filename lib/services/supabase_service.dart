@@ -46,7 +46,7 @@ class SupabaseService {
 
   // ==================== AUTH ====================
 
-  /// Login institution user by email, returns user if found
+  /// Login institution user by email (or username for super admin), returns user if found
   static Future<InstitutionUserModel?> loginUser({
     required String email,
     required String password,
@@ -54,10 +54,21 @@ class SupabaseService {
     bool isSuperAdmin = false,
   }) async {
     try {
-      final List<dynamic> result = await client.rpc('verify_user_login', params: {
-        'p_email': email.trim(),
-        'p_plain_password': password,
-      });
+      List<dynamic> result;
+      try {
+        result = await client.rpc('verify_user_login', params: {
+          'p_email': email.trim(),
+          'p_plain_password': password,
+          'p_is_super_admin': isSuperAdmin,
+        });
+      } catch (e) {
+        // Fallback: old RPC signature without p_is_super_admin
+        debugPrint('LOGIN: New RPC failed ($e), trying old signature');
+        result = await client.rpc('verify_user_login', params: {
+          'p_email': email.trim(),
+          'p_plain_password': password,
+        });
+      }
 
       debugPrint('Login RPC result: $result');
 
@@ -67,17 +78,98 @@ class SupabaseService {
       if (row['is_valid'] != true) return null;
 
       final useId = row['use_id'];
-      var query = client
-          .from('institutionusers')
-          .select()
-          .eq('use_id', useId)
-          .eq('activestatus', 1);
+      final isSuperAdminUser = isSuperAdmin || row['urname']?.toString() == 'Super Admin';
 
-      if (insId != null) {
-        query = query.eq('ins_id', insId);
+      // Super admin lives in public table, institution users in schema table
+      Map<String, dynamic>? response;
+      if (isSuperAdminUser) {
+        var query = client
+            .from('institutionusers')
+            .select()
+            .eq('use_id', useId)
+            .eq('activestatus', 1);
+        response = await query.maybeSingle();
+      } else {
+        // Resolve schema from insId before querying
+        if (insId != null) {
+          final insRow = await client
+              .from('institution')
+              .select('inshortname')
+              .eq('ins_id', insId)
+              .maybeSingle();
+          debugPrint('LOGIN: insRow=$insRow for insId=$insId');
+          if (insRow != null && insRow['inshortname'] != null) {
+            final yearRows = await client
+                .from('institutionyear')
+                .select('yrlabel')
+                .eq('ins_id', insId)
+                .eq('activestatus', 1)
+                .limit(1);
+            debugPrint('LOGIN: yearRows=$yearRows');
+            if ((yearRows as List).isNotEmpty) {
+              final shortName = (insRow['inshortname'] as String).toLowerCase();
+              final yearLabel = (yearRows.first['yrlabel'] as String).replaceAll('-', '');
+              final schema = '$shortName$yearLabel';
+              debugPrint('LOGIN: Setting schema to $schema');
+              setSchema(schema);
+            }
+          }
+        }
+        debugPrint('LOGIN: Querying schema=$_currentSchema for use_id=$useId');
+        try {
+          var query = fromSchema('institutionusers')
+              .select()
+              .eq('use_id', useId)
+              .eq('activestatus', 1);
+          if (insId != null) {
+            query = query.eq('ins_id', insId);
+          }
+          response = await query.maybeSingle();
+          debugPrint('LOGIN: Schema user response=$response');
+        } catch (e) {
+          debugPrint('LOGIN: Schema query error: $e');
+        }
+
+        // Fallback: try public table if schema lookup returned nothing or failed
+        if (response == null) {
+          debugPrint('LOGIN: Trying public table fallback');
+          try {
+            var fallbackQuery = client
+                .from('institutionusers')
+                .select()
+                .eq('use_id', useId)
+                .eq('activestatus', 1);
+            if (insId != null) {
+              fallbackQuery = fallbackQuery.eq('ins_id', insId);
+            }
+            response = await fallbackQuery.maybeSingle();
+            debugPrint('LOGIN: Public fallback response=$response');
+          } catch (e) {
+            debugPrint('LOGIN: Public fallback error: $e');
+          }
+        }
+
+        // Last resort: build user from RPC result directly
+        if (response == null) {
+          debugPrint('LOGIN: All lookups failed, building from RPC result');
+          response = {
+            'use_id': row['use_id'],
+            'ins_id': insId,
+            'inscode': '',
+            'usename': row['usename'],
+            'usemail': row['usemail'],
+            'usephone': '',
+            'usestadate': DateTime.now().toIso8601String().split('T').first,
+            'usedob': '2000-01-01',
+            'ur_id': 0,
+            'urname': row['urname'],
+            'des_id': 0,
+            'desname': row['desname'],
+            'userepto': 0,
+            'activestatus': 1,
+          };
+        }
       }
-
-      final response = await query.maybeSingle();
 
       if (response == null) return null;
       return InstitutionUserModel.fromJson(response);
@@ -549,8 +641,7 @@ class SupabaseService {
   /// Get total active staff count for an institution
   static Future<int> getTeacherCount(int insId) async {
     try {
-      final response = await client
-          .from('institutionusers')
+      final response = await fromSchema('institutionusers')
           .select('use_id')
           .eq('ins_id', insId)
           .eq('activestatus', 1);
@@ -565,8 +656,7 @@ class SupabaseService {
   static Future<List<InstitutionUserModel>> getInstitutionUsers(
       int insId) async {
     try {
-      final response = await client
-          .from('institutionusers')
+      final response = await fromSchema('institutionusers')
           .select('*')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
@@ -583,7 +673,7 @@ class SupabaseService {
   /// Create a new institution user (admin/staff)
   static Future<bool> createInstitutionUser(Map<String, dynamic> data) async {
     try {
-      await client.from('institutionusers').insert(data);
+      await fromSchema('institutionusers').insert(data);
       return true;
     } catch (e) {
       debugPrint('Error creating institution user: $e');
@@ -597,8 +687,7 @@ class SupabaseService {
     try {
       debugPrint('Terminating user with use_id: $useId');
       final now = DateTime.now().toIso8601String();
-      await client
-          .from('institutionusers')
+      await fromSchema('institutionusers')
           .update({
             'activestatus': 9,
             'terminatedby': terminatedBy,
@@ -758,7 +847,7 @@ class SupabaseService {
       final List<Map<String, dynamic>> allResults = [];
       while (true) {
         final batch = await fromSchema('feedemand')
-            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
             .eq('ins_id', insId)
             .range(offset, offset + batchSize - 1);
         final list = batch as List;
@@ -786,7 +875,7 @@ class SupabaseService {
       int offset = 0;
       while (true) {
         final demands = await fromSchema('feedemand')
-            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, pay_id')
             .eq('ins_id', insId)
             .inFilter('paidstatus', ['P', 'U'])
             .eq('activestatus', 1)
