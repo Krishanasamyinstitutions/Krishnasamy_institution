@@ -41,11 +41,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     _loadInstitutions();
   }
 
+  void _refreshDashboard() {
+    setState(() {
+      _loadingInstitutions = true;
+      _loadingFinanceData = true;
+    });
+    _loadInstitutions();
+  }
+
   Future<void> _loadInstitutions() async {
     try {
       final result = await SupabaseService.client
           .from('institution')
-          .select('ins_id, insname, inscode, inshortname, insmail, insmobno, inscity, insstate, activestatus')
+          .select('ins_id, insname, inscode, inshortname, inslogo, insmail, insmobno, inscity, insstate, activestatus')
           .order('insname');
       final institutions = List<Map<String, dynamic>>.from(result);
       await _loadFinanceData(institutions);
@@ -76,6 +84,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         final insName = ins['insname']?.toString() ?? 'Institution';
         final insCode = ins['inscode']?.toString() ?? '';
         final shortName = ins['inshortname']?.toString().toLowerCase();
+        final insLogo = ins['inslogo']?.toString();
 
         if (insId == null || shortName == null || shortName.isEmpty) {
           summaries.add(
@@ -83,6 +92,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               insId: insId ?? 0,
               insName: insName,
               insCode: insCode,
+              insLogo: insLogo,
+              totalDemand: 0,
               totalCollected: 0,
               totalPending: 0,
               transactionCount: 0,
@@ -116,6 +127,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             insId: insId,
             insName: insName,
             insCode: insCode,
+            insLogo: insLogo,
+            totalDemand: feeSummary.totalDue,
             totalCollected: feeSummary.totalPaid,
             totalPending: feeSummary.totalPending,
             transactionCount: payments.length,
@@ -258,7 +271,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => setState(() => _selectedNavIndex = index),
+                      onTap: () {
+                        final prevIndex = _selectedNavIndex;
+                        setState(() => _selectedNavIndex = index);
+                        if (index == 0 && prevIndex != 0) {
+                          _refreshDashboard();
+                        }
+                      },
                       borderRadius: BorderRadius.circular(12.r),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -403,7 +422,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildContent(BuildContext context) {
     switch (_selectedNavIndex) {
       case 1:
-        return const RegisterScreen();
+        return RegisterScreen(onRegistered: _refreshDashboard);
       case 2:
         return _buildManageInstitutions(context);
       default:
@@ -412,9 +431,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildDashboardHome(BuildContext context) {
-    final cards = ['KCET', 'KA', 'KP'];
     return Padding(
-      padding: EdgeInsets.all(20.w),
+      padding: EdgeInsets.all(16.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -484,105 +502,195 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ],
             ),
           ),
-          SizedBox(height: 12.h),
-          ...cards.map((name) {
-            return Expanded(
-              child: Padding(
-              padding: EdgeInsets.only(bottom: 10.h),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => _InstitutionDetailPage(institutionName: name),
-                    ),
-                  );
+          SizedBox(height: 16.h),
+          if (_loadingFinanceData)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_institutionSummaries.isEmpty)
+            Expanded(child: Center(child: Text('No institutions found', style: TextStyle(color: AppColors.textSecondary, fontSize: 14.sp))))
+          else ...[
+            Expanded(
+              child: ListView.separated(
+                itemCount: _institutionSummaries.length,
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemBuilder: (context, index) {
+                  final s = _institutionSummaries[index];
+                  return _buildInstitutionCard(context, s);
                 },
-                child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(16.w),
+              ),
+            ),
+            SizedBox(height: 12.h),
+            _buildSummaryRow(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow() {
+    final activeCount = _institutionSummaries.where((s) => s.activeStatus).length;
+    final totalDemand = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalDemand);
+    final totalCollection = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalCollected);
+    final totalPending = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalPending);
+
+    const demandColor = Color(0xFF5C6BC0);
+    const collectionColor = Color(0xFF43A047);
+    const pendingColor = Color(0xFFEF5350);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 132.w,
+          child: _buildSummaryTile('Active Institutes', activeCount.toString(), demandColor),
+        ),
+        SizedBox(width: 12.w),
+        Expanded(child: _buildSummaryTile('Total Demand', _formatAmount(totalDemand), demandColor)),
+        SizedBox(width: 12.w),
+        Expanded(child: _buildSummaryTile('Total Collection', _formatAmount(totalCollection), collectionColor)),
+        SizedBox(width: 12.w),
+        Expanded(child: _buildSummaryTile('Total Pending', _formatAmount(totalPending), pendingColor)),
+      ],
+    );
+  }
+
+  Widget _buildSummaryTile(String label, String value, Color color) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        children: [
+          Text(label, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+          SizedBox(height: 6.h),
+          Text(value, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: color)),
+        ],
+      ),
+    );
+  }
+
+  String _formatAmount(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
+    }
+    final parts = amount.toStringAsFixed(2).split('.');
+    final intPart = parts[0].replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
+    return '₹$intPart.${parts[1]}';
+  }
+
+  Widget _buildInstitutionCard(BuildContext context, _InstitutionFinanceSummary s) {
+    const demandColor = Color(0xFF5C6BC0);
+    const collectionColor = Color(0xFF43A047);
+    const pendingColor = Color(0xFFEF5350);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => _InstitutionDetailPage(summary: s)),
+        );
+      },
+      child: Container(
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42.w,
+                height: 42.h,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14.r),
-                  border: Border.all(color: AppColors.border),
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10.r),
                 ),
-                child: Stack(
+                child: Center(child: Text(s.insCode.isNotEmpty ? s.insCode[0] : 'I', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.primary))),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            const Expanded(child: SizedBox()),
-                            ...['Total Demand', 'Total Collection', 'Total Pending'].map((label) {
-                              return Expanded(
-                                child: Center(
-                                  child: Text(
-                                    label,
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: AppColors.textSecondary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: Icon(
-                          Icons.chevron_right_rounded,
-                          size: 28.sp,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
+                    Text(s.insName, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                    SizedBox(height: 2.h),
+                    Text(s.insCode, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
-              ),
-            ),
-            );
-          }),
-          Row(
-            children: ['Active Institutes', 'Total Demand', 'Total Collection', 'Total Pending'].map((label) {
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w),
-                  child: Container(
-                    height: 60,
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Center(
-                      child: Text(
-                        label,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                    ),
-                  ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: s.activeStatus ? collectionColor.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20.r),
                 ),
-              );
-            }).toList(),
+                child: Text(
+                  s.activeStatus ? 'Active' : 'Inactive',
+                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: s.activeStatus ? collectionColor : Colors.grey),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16.h),
+          Row(
+            children: [
+              Container(
+                width: 120.w,
+                height: 120.h,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: AppColors.border),
+                  color: Colors.white,
+                ),
+                child: s.insLogo != null && s.insLogo!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(9.r),
+                        child: Image.network(
+                          s.insLogo!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(s.insName[0], style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Text(s.insName[0], style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                      ),
+              ),
+              SizedBox(width: 12.w),
+              _buildFinanceTile('Total Demand', s.totalDemand, demandColor),
+              SizedBox(width: 12.w),
+              _buildFinanceTile('Total Collection', s.totalCollected, collectionColor),
+              SizedBox(width: 12.w),
+              _buildFinanceTile('Total Pending', s.totalPending, pendingColor),
+            ],
           ),
         ],
+      ),
+    ),
+    );
+  }
+
+  Widget _buildFinanceTile(String label, double amount, Color color) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: color.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+            SizedBox(height: 6.h),
+            Text(_formatAmount(amount), style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: color)),
+          ],
+        ),
       ),
     );
   }
@@ -1010,6 +1118,8 @@ class _InstitutionFinanceSummary {
   final int insId;
   final String insName;
   final String insCode;
+  final String? insLogo;
+  final double totalDemand;
   final double totalCollected;
   final double totalPending;
   final int transactionCount;
@@ -1019,6 +1129,8 @@ class _InstitutionFinanceSummary {
     required this.insId,
     required this.insName,
     required this.insCode,
+    this.insLogo,
+    required this.totalDemand,
     required this.totalCollected,
     required this.totalPending,
     required this.transactionCount,
@@ -1038,28 +1150,247 @@ class _SuperAdminTransactionRow {
   });
 }
 
-class _InstitutionDetailPage extends StatelessWidget {
-  final String institutionName;
-  const _InstitutionDetailPage({required this.institutionName});
+class _InstitutionDetailPage extends StatefulWidget {
+  final _InstitutionFinanceSummary summary;
+  const _InstitutionDetailPage({required this.summary});
+
+  @override
+  State<_InstitutionDetailPage> createState() => _InstitutionDetailPageState();
+}
+
+class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
+  bool _loading = true;
+  // Each entry: { class, collection, pending }
+  List<Map<String, dynamic>> _classWiseData = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    final s = widget.summary;
+    final previousSchema = SupabaseService.currentSchema;
+    try {
+      final insResult = await SupabaseService.client
+          .from('institution')
+          .select('inshortname')
+          .eq('ins_id', s.insId)
+          .maybeSingle();
+      final shortName = insResult?['inshortname']?.toString().toLowerCase();
+      if (shortName == null || shortName.isEmpty) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+
+      final yrResult = await SupabaseService.client
+          .from('institutionyear')
+          .select('yrlabel')
+          .eq('ins_id', s.insId)
+          .eq('activestatus', 1)
+          .order('iyr_id', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      final year = DateTime.now().year;
+      final yrLabel = yrResult?['yrlabel']?.toString() ?? '$year-${year + 1}';
+      final schemaName = '$shortName${yrLabel.replaceAll('-', '')}';
+
+      SupabaseService.setSchema(schemaName);
+
+      // Fetch feedemand with stu_id, paidamount, balancedue (paginated)
+      final feedemandList = <Map<String, dynamic>>[];
+      const batchSize = 1000;
+      int offset = 0;
+      while (true) {
+        final batch = await SupabaseService.fromSchema('feedemand')
+            .select('stu_id, paidamount, balancedue')
+            .eq('ins_id', s.insId)
+            .range(offset, offset + batchSize - 1);
+        final list = List<Map<String, dynamic>>.from(batch);
+        feedemandList.addAll(list);
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      // Fetch students with courname (paginated) - table is 'students' (plural)
+      final stuCourseMap = <int, String>{};
+      offset = 0;
+      while (true) {
+        final batch = await SupabaseService.fromSchema('students')
+            .select('stu_id, courname')
+            .eq('ins_id', s.insId)
+            .range(offset, offset + batchSize - 1);
+        final list = List<Map<String, dynamic>>.from(batch);
+        for (final sr in list) {
+          final sid = sr['stu_id'] as int?;
+          final course = sr['courname']?.toString() ?? 'Other';
+          if (sid != null) stuCourseMap[sid] = course;
+        }
+        if (list.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      // Group feedemand by student's course
+      final collectionMap = <String, double>{};
+      final pendingMap = <String, double>{};
+      for (final row in feedemandList) {
+        final stuId = row['stu_id'] as int?;
+        final course = stuCourseMap[stuId ?? 0] ?? 'Other';
+        final paid = (row['paidamount'] as num?)?.toDouble() ?? 0;
+        final balance = (row['balancedue'] as num?)?.toDouble() ?? 0;
+        collectionMap[course] = (collectionMap[course] ?? 0) + paid;
+        pendingMap[course] = (pendingMap[course] ?? 0) + balance;
+      }
+
+      final allCourses = {...collectionMap.keys, ...pendingMap.keys}.toList()..sort();
+      final classWise = allCourses.map((course) => {
+        'class': course,
+        'collection': collectionMap[course] ?? 0.0,
+        'pending': pendingMap[course] ?? 0.0,
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _classWiseData = classWise;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading institution details: $e');
+      if (mounted) setState(() => _loading = false);
+    } finally {
+      SupabaseService.setSchema(previousSchema);
+    }
+  }
+
+  String _fmt(double amount) {
+    if (amount == amount.roundToDouble()) {
+      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
+    }
+    final parts = amount.toStringAsFixed(2).split('.');
+    final intPart = parts[0].replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
+    return '₹$intPart.${parts[1]}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final s = widget.summary;
+    const collectionColor = Color(0xFF43A047);
+    const pendingColor = Color(0xFFEF5350);
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: Text(institutionName),
+        title: Text(s.insName),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
-      body: Center(
-        child: Text(
-          '$institutionName - Details Coming Soon',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.textSecondary,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Column(
+                children: [
+                  // Summary row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          decoration: BoxDecoration(
+                            color: collectionColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: collectionColor.withValues(alpha: 0.2)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text('Total Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: collectionColor)),
+                              SizedBox(height: 6.h),
+                              Text(_fmt(_classWiseData.fold<double>(0, (sum, r) => sum + ((r['collection'] as double?) ?? 0))),
+                                  style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: collectionColor)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          decoration: BoxDecoration(
+                            color: pendingColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: pendingColor.withValues(alpha: 0.2)),
+                          ),
+                          child: Column(
+                            children: [
+                              Text('Total Pending', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: pendingColor)),
+                              SizedBox(height: 6.h),
+                              Text(_fmt(_classWiseData.fold<double>(0, (sum, r) => sum + ((r['pending'] as double?) ?? 0))),
+                                  style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: pendingColor)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+                  // Table header
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(12.r)),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 2, child: Text('Course', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+                        Expanded(child: Text('Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: collectionColor), textAlign: TextAlign.right)),
+                        Expanded(child: Text('Pending', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: pendingColor), textAlign: TextAlign.right)),
+                      ],
+                    ),
+                  ),
+                  // Table rows
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(12.r)),
+                        border: Border(
+                          left: BorderSide(color: AppColors.border),
+                          right: BorderSide(color: AppColors.border),
+                          bottom: BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                      child: _classWiseData.isEmpty
+                          ? Center(child: Text('No data', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
+                          : ListView.separated(
+                              itemCount: _classWiseData.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                              itemBuilder: (context, index) {
+                                final row = _classWiseData[index];
+                                final cls = row['class'] as String;
+                                final collection = (row['collection'] as double?) ?? 0;
+                                final pending = (row['pending'] as double?) ?? 0;
+                                return Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                                  child: Row(
+                                    children: [
+                                      Expanded(flex: 2, child: Text(cls, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                                      Expanded(child: Text(_fmt(collection), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: collectionColor), textAlign: TextAlign.right)),
+                                      Expanded(child: Text(_fmt(pending), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: pendingColor), textAlign: TextAlign.right)),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                ],
               ),
-        ),
-      ),
+            ),
     );
   }
 }
