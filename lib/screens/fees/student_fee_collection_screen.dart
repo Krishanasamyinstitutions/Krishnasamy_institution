@@ -48,7 +48,11 @@ class _StudentFeeCollectionScreenState
   final _bankNameController = TextEditingController();
   DateTime? _chequeDate;
   List<Map<String, dynamic>> _studentSuggestions = [];
+  List<String> _courseList = [];
+  String? _selectedCourse;
   List<String> _classList = [];
+  List<String> _allClasses = [];
+  Map<String, List<String>> _courseClassMap = {};
   String? _selectedClass;
   List<Map<String, dynamic>> _classSuggestions = [];
 
@@ -80,9 +84,30 @@ class _StudentFeeCollectionScreenState
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
     if (insId == null) return;
-    final classes = await SupabaseService.getClasses(insId);
-    classes.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
-    if (mounted) setState(() => _classList = classes);
+    // Get courses and classes from feedemand table
+    try {
+      final demands = await SupabaseService.getFeeDemands(insId);
+      final courseSet = <String>{};
+      final mapping = <String, Set<String>>{};
+      for (final d in demands) {
+        final course = d['courname']?.toString() ?? '';
+        final cls = d['stuclass']?.toString() ?? '';
+        if (course.isNotEmpty) courseSet.add(course);
+        if (course.isNotEmpty && cls.isNotEmpty) {
+          mapping.putIfAbsent(course, () => <String>{}).add(cls);
+        }
+      }
+      final allClasses = mapping.values.expand((s) => s).toSet().toList();
+      allClasses.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+      final courseClassMap = <String, List<String>>{ for (final e in mapping.entries) e.key: e.value.toList()..sort((a, b) => _classIndex(a).compareTo(_classIndex(b))) };
+      final courseList = courseSet.toList()..sort();
+      if (mounted) setState(() {
+        _courseList = courseList;
+        _courseClassMap = courseClassMap;
+        _allClasses = allClasses;
+        _classList = allClasses;
+      });
+    } catch (e) { debugPrint('Error loading course-class from feedemand: $e'); }
   }
 
   Future<void> _searchByClass(String className) async {
@@ -94,8 +119,11 @@ class _StudentFeeCollectionScreenState
           .select('stu_id, stuname, stuadmno, stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
-          .eq('stuclass', className)
-          .order('stuname', ascending: true);
+          .eq('stuclass', className);
+      if (_selectedCourse != null) {
+        query = query.eq('courname', _selectedCourse!);
+      }
+      final rows = await query.order('stuname', ascending: true);
       setState(() => _classSuggestions = List<Map<String, dynamic>>.from(rows));
     } catch (_) {}
   }
@@ -207,7 +235,7 @@ class _StudentFeeCollectionScreenState
 
       if ((studentRows as List).isEmpty) {
         setState(() {
-          _errorMsg = 'No student found with admission no "$admNo"';
+          _errorMsg = 'No student found with roll no "$admNo"';
           _searching = false;
         });
         return;
@@ -425,7 +453,7 @@ class _StudentFeeCollectionScreenState
                 child: TextField(
                   controller: _admNoController,
                   onSubmitted: (_) => _search(),
-                  decoration: _inputDec('Admission No'),
+                  decoration: _inputDec('Roll No'),
                   style: TextStyle(fontSize: 13.sp),
                 ),
               ),
@@ -480,7 +508,7 @@ class _StudentFeeCollectionScreenState
                   return ListTile(
                     dense: true,
                     title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
+                    subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
                     onTap: () => _selectSuggestion(s),
                   );
                 },
@@ -488,11 +516,45 @@ class _StudentFeeCollectionScreenState
             ),
           SizedBox(height: 10.h),
           DropdownButtonFormField<String>(
+            value: _selectedCourse,
+            decoration: _inputDec('Course'),
+            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+            isExpanded: true,
+            items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedCourse = val;
+                _selectedClass = null;
+                _classSuggestions = [];
+                if (val != null && _courseClassMap.containsKey(val)) {
+                  _classList = List<String>.from(_courseClassMap[val]!);
+                } else if (val != null) {
+                  // Fallback: use allClasses, limit to 2 years for M-courses
+                  _classList = List<String>.from(_allClasses);
+                } else {
+                  _classList = List<String>.from(_allClasses);
+                }
+                _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+                // M-courses (MBA, MCA, MCOM, etc.) have only 2 years
+                if (val != null && val.startsWith('M') && _classList.length > 2) {
+                  _classList = _classList.sublist(0, 2);
+                }
+              });
+            },
+          ),
+          SizedBox(height: 10.h),
+          DropdownButtonFormField<String>(
+            key: ValueKey(_selectedCourse),
             value: _selectedClass,
             decoration: _inputDec('Class'),
             style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
             isExpanded: true,
-            items: _classList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
+            items: _classList.map((c) {
+              final label = _selectedCourse != null && c.contains('-')
+                  ? '${c.split('-').first} Year'
+                  : c;
+              return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp)));
+            }).toList(),
             onChanged: (val) {
               setState(() {
                 _selectedClass = val;
@@ -521,7 +583,7 @@ class _StudentFeeCollectionScreenState
                   return ListTile(
                     dense: true,
                     title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Adm: ${s['stuadmno']} • Class: ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
+                    subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
                     onTap: () => _selectSuggestion(s),
                   );
                 },
@@ -580,7 +642,7 @@ class _StudentFeeCollectionScreenState
                             color: AppColors.textPrimary),
                         overflow: TextOverflow.ellipsis),
                     SizedBox(height: 2.h),
-                    Text('Adm No: $admNo',
+                    Text('Roll No: $admNo',
                         style: TextStyle(
                             fontSize: 13.sp,
                             color: AppColors.textSecondary)),
@@ -675,10 +737,10 @@ class _StudentFeeCollectionScreenState
                 ],
                 const Spacer(),
                 if (_student != null && _terms.isNotEmpty) ...[
-                  Text('Term:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                  Text('Semester:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                   SizedBox(width: 8.w),
                   SizedBox(
-                    width: 140.w,
+                    width: 180.w,
                     height: 38.h,
                     child: DropdownButtonFormField<String?>(
                       value: _selectedTerm,
@@ -691,7 +753,7 @@ class _StudentFeeCollectionScreenState
                       ),
                       items: [
                         DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp))),
-                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp)))),
+                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 12.sp), overflow: TextOverflow.ellipsis))),
                       ],
                       onChanged: (v) => setState(() => _selectedTerm = v),
                     ),
@@ -784,7 +846,7 @@ class _StudentFeeCollectionScreenState
                   visualDensity: VisualDensity.compact,
                 ),
               ),
-              const _THCell('Term', flex: 2),
+              const _THCell('Semester', flex: 2),
               const _THCell('Fee Type', flex: 3),
               const _THCell('Due Date', flex: 3),
               const _THCell('Fee Amt', flex: 2, textAlign: TextAlign.right),

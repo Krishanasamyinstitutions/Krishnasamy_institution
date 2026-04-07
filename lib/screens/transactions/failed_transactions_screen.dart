@@ -453,7 +453,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      labelValue('Admission No:', data.admissionNo),
+                      labelValue('Roll No:', data.admissionNo),
                       pw.SizedBox(height: 6),
                       labelValue('Class:', data.className),
                     ],
@@ -479,7 +479,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                             decoration: const pw.BoxDecoration(color: headerBg),
                             children: [
                               tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Term', sSemiBold.copyWith(color: primaryBlue)),
+                              tableCell('Semester', sSemiBold.copyWith(color: primaryBlue)),
                               tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
                               tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
                             ],
