@@ -1085,6 +1085,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           DataColumn(label: Text('S NO.')),
           DataColumn(label: Text('PAY NO')),
           DataColumn(label: Text('STUDENT')),
+          DataColumn(label: Text('COURSE')),
+          DataColumn(label: Text('CLASS')),
           DataColumn(label: Text('AMOUNT')),
           DataColumn(label: Text('CURRENCY')),
           DataColumn(label: Text('METHOD')),
@@ -1096,6 +1098,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         rows: List.generate(transactions.length, (i) {
           final t = transactions[i];
           final stuName = _getStudentName(t);
+          final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
           final isPaid = t.isSuccess;
           final statusColor = isPaid ? Colors.green : Colors.red;
           final statusText = isPaid ? 'Paid' : 'Failed';
@@ -1106,6 +1109,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               DataCell(Text('${i + 1}')),
               DataCell(Text(t.paynumber ?? '${t.payId}')),
               DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
+              DataCell(Text(stu?.courname ?? '-')),
+              DataCell(Text(stu?.stuclass ?? '-')),
               DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
               DataCell(Text(t.transcurrency)),
               DataCell(Text(t.paymethod ?? '-')),
@@ -1175,6 +1180,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           DataColumn(label: Text('S NO.')),
           DataColumn(label: Text('PAY NO')),
           DataColumn(label: Text('STUDENT')),
+          DataColumn(label: Text('COURSE')),
+          DataColumn(label: Text('CLASS')),
           DataColumn(label: Text('AMOUNT')),
           DataColumn(label: Text('CURRENCY')),
           DataColumn(label: Text('METHOD')),
@@ -1186,6 +1193,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         rows: List.generate(transactions.length, (i) {
           final t = transactions[i];
           final stuName = _getStudentName(t);
+          final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
           final statusColor = isPaid ? Colors.green : Colors.red;
           final statusText = isPaid ? 'Paid' : 'Failed';
           final date = isPaid ? t.paydate : t.createdat;
@@ -1195,6 +1203,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               DataCell(Text('${i + 1}')),
               DataCell(Text(t.paynumber ?? '${t.payId}')),
               DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
+              DataCell(Text(stu?.courname ?? '-')),
+              DataCell(Text(stu?.stuclass ?? '-')),
               DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
               DataCell(Text(t.transcurrency)),
               DataCell(Text(t.paymethod ?? '-')),

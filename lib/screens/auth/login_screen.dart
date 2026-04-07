@@ -25,6 +25,9 @@ class _LoginScreenState extends State<LoginScreen> {
   int? _selectedInsId;
   bool _loadingInstitutions = true;
   bool _isSuperAdmin = false;
+  List<Map<String, dynamic>> _availableYears = [];
+  String? _selectedYear;
+  bool _loadingYears = false;
 
   @override
   void initState() {
@@ -59,6 +62,28 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _loadYears(int insId) async {
+    setState(() => _loadingYears = true);
+    try {
+      final result = await SupabaseService.client
+          .from('institutionyear')
+          .select('yrlabel, iyrstadate, iyrenddate')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('iyr_id', ascending: false);
+      final years = List<Map<String, dynamic>>.from(result);
+      if (mounted) {
+        setState(() {
+          _availableYears = years;
+          _selectedYear = years.isNotEmpty ? years.first['yrlabel']?.toString() : null;
+          _loadingYears = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingYears = false);
+    }
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -75,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
       insId: _isSuperAdmin ? null : _selectedInsId,
       isSuperAdmin: _isSuperAdmin,
+      yearLabel: _selectedYear,
     );
 
     if (success && mounted) {
@@ -366,7 +392,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                     );
                                   }).toList(),
                                   onChanged: (value) {
-                                    setState(() => _selectedInsId = value);
+                                    setState(() {
+                                      _selectedInsId = value;
+                                      _selectedYear = null;
+                                      _availableYears = [];
+                                    });
+                                    if (value != null) _loadYears(value);
                                   },
                                   validator: (value) {
                                     if (value == null) {
@@ -379,6 +410,34 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     SizedBox(height: 20.h),
+                    // Year dropdown (shows after institution selected)
+                    if (_availableYears.isNotEmpty)
+                      FadeInDown(
+                        delay: const Duration(milliseconds: 300),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Academic Year', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 13.sp)),
+                            SizedBox(height: 8.h),
+                            _loadingYears
+                                ? const LinearProgressIndicator()
+                                : DropdownButtonFormField<String>(
+                                    value: _selectedYear,
+                                    decoration: InputDecoration(
+                                      hintText: 'Select academic year',
+                                      prefixIcon: Icon(Icons.calendar_today_outlined, size: 20.sp, color: AppColors.textLight),
+                                      prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+                                    ),
+                                    items: _availableYears.map((y) {
+                                      final label = y['yrlabel']?.toString() ?? '';
+                                      return DropdownMenuItem<String>(value: label, child: Text(label));
+                                    }).toList(),
+                                    onChanged: (value) => setState(() => _selectedYear = value),
+                                  ),
+                          ],
+                        ),
+                      ),
+                    if (_availableYears.isNotEmpty) SizedBox(height: 20.h),
                   ],
 
                   // Email / Username field

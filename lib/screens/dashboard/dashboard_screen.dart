@@ -81,7 +81,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStudentsForSearch();
     _loadUnreadNotifCount();
     _loadAcademicYear();
     _searchFocusNode.addListener(() {
@@ -108,9 +107,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .order('iyr_id', ascending: false);
       final years = List<Map<String, dynamic>>.from(result);
       if (years.isNotEmpty && mounted) {
+        // Detect current year from active schema
+        String currentYear = years.first['yrlabel']?.toString() ?? '';
+        final schema = SupabaseService.currentSchema ?? '';
+        for (final y in years) {
+          final label = y['yrlabel']?.toString() ?? '';
+          if (schema.endsWith(label.replaceAll('-', ''))) {
+            currentYear = label;
+            break;
+          }
+        }
         setState(() {
           _availableYears = years;
-          _academicYear = years.first['yrlabel']?.toString() ?? '';
+          _academicYear = currentYear;
         });
       }
     } catch (_) {}
@@ -143,10 +152,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _selectedNavIndex = 0);
   }
 
-  Future<void> _loadStudentsForSearch() async {
+  void _showCreateYearDialog() {
+    // Auto-calculate next year from current
+    final currentParts = _academicYear.split('-');
+    final nextStart = currentParts.length == 2 ? int.tryParse(currentParts[1]) ?? (DateTime.now().year + 1) : DateTime.now().year + 1;
+    final nextEnd = nextStart + 1;
+    final nextLabel = '$nextStart-$nextEnd';
+
+    final startDateCtrl = TextEditingController(text: '$nextStart-06-01');
+    final endDateCtrl = TextEditingController(text: '$nextEnd-05-31');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+        title: Text('Create New Academic Year', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('New Year: $nextLabel', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            SizedBox(height: 16.h),
+            TextField(
+              controller: startDateCtrl,
+              decoration: InputDecoration(
+                labelText: 'Start Date (YYYY-MM-DD)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                isDense: true,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            TextField(
+              controller: endDateCtrl,
+              decoration: InputDecoration(
+                labelText: 'End Date (YYYY-MM-DD)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                isDense: true,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text('This will create a new empty schema with all tables.', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _createNewYear(nextLabel, startDateCtrl.text.trim(), endDateCtrl.text.trim());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createNewYear(String yearLabel, String startDate, String endDate) async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
     if (insId == null) return;
+
+    try {
+      // Get institution short name
+      final insRow = await SupabaseService.client
+          .from('institution')
+          .select('inshortname')
+          .eq('ins_id', insId)
+          .maybeSingle();
+      if (insRow == null || insRow['inshortname'] == null) return;
+
+      final shortName = (insRow['inshortname'] as String).toLowerCase();
+      final schemaName = '$shortName${yearLabel.replaceAll('-', '')}';
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Creating schema $schemaName...'), backgroundColor: AppColors.accent),
+        );
+      }
+
+      await SupabaseService.client.rpc('create_institution_schema', params: {
+        'p_schema_name': schemaName,
+        'p_ins_id': insId,
+        'p_year_label': yearLabel,
+        'p_start_date': startDate,
+        'p_end_date': endDate,
+      });
+
+      // Reload years and switch
+      await _loadAcademicYear();
+      await _switchYear(yearLabel);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Academic year $yearLabel created successfully!'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  bool _studentsLoaded = false;
+  Future<void> _loadStudentsForSearch() async {
+    if (_studentsLoaded) return;
+    _studentsLoaded = true;
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) { _studentsLoaded = false; return; }
     _allStudents = await SupabaseService.getStudents(insId);
   }
 
@@ -164,12 +282,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {}
   }
 
-  void _onSearchChanged(String query) {
+  void _onSearchChanged(String query) async {
     if (query.trim().isEmpty) {
       _removeSearchOverlay();
       _searchResults = [];
       return;
     }
+    // Lazy load students on first search
+    if (!_studentsLoaded) await _loadStudentsForSearch();
     final q = query.toLowerCase();
     _searchResults = _allStudents.where((s) =>
       s.stuname.toLowerCase().contains(q) ||
@@ -487,54 +607,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _navItems[_selectedNavIndex].label,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              if (_availableYears.length > 1)
-                PopupMenuButton<String>(
-                  tooltip: 'Switch academic year',
-                  position: PopupMenuPosition.under,
-                  offset: Offset(0, 4.h),
-                  color: Colors.white,
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  onSelected: (year) => _switchYear(year),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_today_rounded, size: 14.sp, color: AppColors.accent),
-                      SizedBox(width: 6.w),
-                      Text(
-                        'Academic Year $_academicYear',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      Icon(Icons.arrow_drop_down_rounded, size: 18.sp, color: AppColors.accent),
-                    ],
-                  ),
-                  itemBuilder: (context) => _availableYears.map((y) {
-                    final label = y['yrlabel']?.toString() ?? '';
-                    final isActive = label == _academicYear;
-                    return PopupMenuItem<String>(
-                      value: label,
-                      child: Row(
-                        children: [
-                          Icon(
-                            isActive ? Icons.radio_button_checked : Icons.radio_button_off,
-                            size: 16.sp,
-                            color: isActive ? AppColors.accent : AppColors.textSecondary,
+              if (_academicYear.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today_rounded, size: 14.sp, color: AppColors.accent),
+                    SizedBox(width: 6.w),
+                    Text(
+                      'Academic Year $_academicYear',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600,
                           ),
-                          SizedBox(width: 8.w),
-                          Text(label, style: TextStyle(fontWeight: isActive ? FontWeight.w700 : FontWeight.w400)),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                )
-              else
-                Text(
-                  _academicYear.isNotEmpty ? 'Academic Year $_academicYear' : '',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontSize: 13.sp,
-                      ),
+                    ),
+                  ],
                 ),
             ],
           ),

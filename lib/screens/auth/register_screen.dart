@@ -215,29 +215,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
             .eq('ins_id', regResult['ins_id']);
         debugPrint('Short name updated');
 
-        // Create institution schema (shortname+year)
+        // Create institution schema + year records in one call
         await SupabaseService.client.rpc('create_institution_schema', params: {
           'p_schema_name': schemaName,
+          'p_ins_id': regResult['ins_id'],
+          'p_year_label': yrLabel,
+          'p_start_date': yrStaDate.toIso8601String().split('T').first,
+          'p_end_date': yrEndDate.toIso8601String().split('T').first,
         });
-        debugPrint('Schema "$schemaName" created successfully');
+        debugPrint('Schema "$schemaName" created with year records');
 
-        // Insert year into institution schema
-        try {
-          SupabaseService.setSchema(schemaName);
-          await SupabaseService.fromSchema('year').insert({
-            'ins_id': regResult['ins_id'],
-            'yrlabel': yrLabel,
-            'yrstadate': yrStaDate.toIso8601String().split('T').first,
-            'yrenddate': yrEndDate.toIso8601String().split('T').first,
-            'activestatus': 1,
-          });
-          SupabaseService.setSchema(null);
-          debugPrint('Year inserted into schema');
-        } catch (e) {
-          SupabaseService.setSchema(null);
-          debugPrint('Year insert failed: $e');
-        }
-
+        // institutionusers stays in public schema - no need to move
         // Expose schema to API (try, but don't fail if permission denied)
         try {
           await SupabaseService.client.rpc('expose_schema', params: {

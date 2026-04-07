@@ -44,7 +44,7 @@ class AuthProvider extends ChangeNotifier {
   String? get yearLabel => _yearLabel;
   InstitutionUserModel? get currentUser => _currentUser;
 
-  Future<bool> login(String email, String password, {int? insId, bool isSuperAdmin = false}) async {
+  Future<bool> login(String email, String password, {int? insId, bool isSuperAdmin = false, String? yearLabel}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -55,6 +55,7 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         insId: insId,
         isSuperAdmin: isSuperAdmin,
+        selectedYearLabel: yearLabel,
       );
 
       if (user != null) {
@@ -84,10 +85,13 @@ class AuthProvider extends ChangeNotifier {
               .maybeSingle();
           if (insRow != null && insRow['inshortname'] != null) {
             // Build schema name: shortname + year (e.g. kcet20262027)
-            final yearLabel = await _fetchYearLabel(user.insId!);
+            final selectedYear = yearLabel ?? await _fetchYearLabel(user.insId!);
             final shortName = (insRow['inshortname'] as String).toLowerCase();
-            _schema = '$shortName${yearLabel.replaceAll('-', '')}';
+            _schema = '$shortName${selectedYear.replaceAll('-', '')}';
             SupabaseService.setSchema(_schema);
+
+            // Auto-expose all schemas (handles DB restarts)
+            try { await SupabaseService.client.rpc('expose_all_schemas'); } catch (_) {}
           }
           notifyListeners();
         }
