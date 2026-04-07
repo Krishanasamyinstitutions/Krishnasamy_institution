@@ -411,8 +411,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildDashboardHome(BuildContext context) {
     final cards = ['KCET', 'KA', 'KP'];
+    final screenHeight = MediaQuery.of(context).size.height;
+    final smallCardHeight = screenHeight * 0.07;
     return Padding(
-      padding: EdgeInsets.all(20.w),
+      padding: EdgeInsets.all(16.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -433,7 +435,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 6.h),
           GestureDetector(
             onTap: () async {
               final picked = await showDatePicker(
@@ -477,11 +479,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ),
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 8.h),
           ...cards.map((name) {
             return Expanded(
               child: Padding(
-              padding: EdgeInsets.only(bottom: 10.h),
+              padding: EdgeInsets.only(bottom: 8.h),
               child: GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
@@ -562,7 +564,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8.w),
                   child: Container(
-                    height: 60,
+                    height: smallCardHeight,
                     padding: EdgeInsets.all(10.w),
                     decoration: BoxDecoration(
                       color: Colors.white,

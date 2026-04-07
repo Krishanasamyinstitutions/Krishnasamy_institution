@@ -74,6 +74,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   final _searchController = TextEditingController();
+  final _globalSearchController = TextEditingController();
+  List<StudentModel> _globalSearchResults = [];
+  bool _isGlobalSearching = false;
   int _studentPage = 0;
   static const int _studentsPerPage = 20;
 
@@ -198,7 +201,39 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _payNameController.dispose();
     _payMobileController.dispose();
     _searchController.dispose();
+    _globalSearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _performGlobalSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _globalSearchResults = [];
+        _isGlobalSearching = false;
+      });
+      return;
+    }
+    setState(() => _isGlobalSearching = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final insId = auth.insId ?? 1;
+      final q = query.trim().toLowerCase();
+      final result = await SupabaseService.client
+          .from('student')
+          .select()
+          .eq('ins_id', insId)
+          .or('stuname.ilike.%$q%,stuadmno.ilike.%$q%,stumobile.ilike.%$q%')
+          .limit(20);
+      final students = (result as List).map((e) => StudentModel.fromJson(e)).toList();
+      if (mounted) {
+        setState(() {
+          _globalSearchResults = students;
+          _isGlobalSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isGlobalSearching = false);
+    }
   }
 
   Future<void> _loadDropdowns() async {
@@ -1073,6 +1108,46 @@ class _StudentsScreenState extends State<StudentsScreen> {
             SizedBox(width: 10.w),
             Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
+            SizedBox(
+              width: 280.w,
+              height: 40.h,
+              child: TextField(
+                controller: _globalSearchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, adm no, mobile...',
+                  hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                  prefixIcon: Icon(Icons.search_rounded, size: 18.sp, color: AppColors.textSecondary),
+                  suffixIcon: _globalSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.close, size: 16.sp),
+                          onPressed: () {
+                            _globalSearchController.clear();
+                            _performGlobalSearch('');
+                          },
+                        )
+                      : null,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                    borderSide: BorderSide(color: AppColors.primary),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                ),
+                style: TextStyle(fontSize: 14.sp),
+                onChanged: (val) => _performGlobalSearch(val),
+              ),
+            ),
+            SizedBox(width: 12.w),
             OutlinedButton.icon(
               onPressed: () => setState(() {
                 _showImport = !_showImport;
@@ -1091,6 +1166,66 @@ class _StudentsScreenState extends State<StudentsScreen> {
           ],
         ),
         SizedBox(height: 16.h),
+
+        // Global search results
+        if (_globalSearchController.text.isNotEmpty) ...[
+          Container(
+            constraints: BoxConstraints(maxHeight: 300.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: _isGlobalSearching
+                ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+                : _globalSearchResults.isEmpty
+                    ? Padding(
+                        padding: EdgeInsets.all(16.w),
+                        child: Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp))),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _globalSearchResults.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                        itemBuilder: (context, index) {
+                          final s = _globalSearchResults[index];
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16.r,
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              child: Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12.sp)),
+                            ),
+                            title: Text(s.stuname, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp)),
+                            subtitle: Text('Adm No: ${s.stuadmno} | Mobile: ${s.stumobile} | Class: ${s.stuclass}', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                            onTap: () async {
+                              _globalSearchController.clear();
+                              setState(() {
+                                _globalSearchResults = [];
+                                _selectedClassFilter = s.stuclass;
+                                _selectedStudent = s;
+                                _studentPage = 0;
+                                _searchController.clear();
+                              });
+                              if (_cachedClassStudents[s.stuclass] == null) {
+                                setState(() => _loadingClassStudents = true);
+                                final auth = context.read<AuthProvider>();
+                                final insId = auth.insId ?? 1;
+                                final classStudents = await SupabaseService.getStudentsByClass(insId, s.stuclass);
+                                if (mounted) {
+                                  setState(() {
+                                    _cachedClassStudents[s.stuclass] = classStudents;
+                                    _loadingClassStudents = false;
+                                  });
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+          ),
+          SizedBox(height: 12.h),
+        ],
 
         Expanded(
           child: _showImport ? _buildStudentImportSection() : Form(
