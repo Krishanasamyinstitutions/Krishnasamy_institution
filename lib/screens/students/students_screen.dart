@@ -733,7 +733,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onTap: () async {
               setState(() {
                 _selectedClassFilter = className;
-                _selectedCourseFilter = courseName;
+                _selectedCourseFilter = null;
                 _selectedStudent = null;
                 _studentPage = 0;
                 _searchController.clear();
@@ -793,8 +793,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
               ),
             ),
           ),
-        );
-          }).toList(),
         );
       },
     );

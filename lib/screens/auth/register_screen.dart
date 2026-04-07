@@ -6,7 +6,8 @@ import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  final VoidCallback? onRegistered;
+  const RegisterScreen({super.key, this.onRegistered});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -270,6 +271,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Institution created successfully!'), backgroundColor: Colors.green),
         );
+        widget.onRegistered?.call();
       }
     } catch (e) {
       debugPrint('Registration error: $e');
