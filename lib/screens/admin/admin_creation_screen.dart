@@ -272,13 +272,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Left: Creation Form
-              SizedBox(
-                width: isCompact ? 260.w : 340.w,
+              Expanded(
+                flex: 3,
                 child: _buildCreationForm(),
               ),
               SizedBox(width: isCompact ? 12.w : 24.w),
               // Right: Existing Users List
               Expanded(
+                flex: 7,
                 child: _buildUserList(),
               ),
             ],
@@ -323,6 +324,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
+              isExpanded: true,
               decoration: _inputDecoration('Select designation'),
               style: _inputStyle,
               items: [
@@ -368,6 +370,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
+              isExpanded: true,
               decoration: _inputDecoration('Select reporting person'),
               style: _inputStyle,
               items: [
@@ -390,6 +393,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedRole,
+              isExpanded: true,
               decoration: _inputDecoration('Select role'),
               style: _inputStyle,
               items: _rolesList
@@ -592,7 +596,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             color: const Color(0xFF6C8EEF),
             child: Row(
               children: [
-                SizedBox(width: 36.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 16.w),
                 Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                 Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                 Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
@@ -616,7 +621,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   color: i.isEven ? Colors.white : AppColors.surface,
                   child: Row(
                     children: [
-                      SizedBox(width: 36.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 16.w),
                       Expanded(
                         flex: 3,
                         child: Text(u.usename, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),

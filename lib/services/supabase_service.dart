@@ -847,7 +847,7 @@ class SupabaseService {
       final List<Map<String, dynamic>> allResults = [];
       while (true) {
         final batch = await fromSchema('feedemand')
-            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id, activestatus')
             .eq('ins_id', insId)
             .range(offset, offset + batchSize - 1);
         final list = batch as List;
@@ -875,7 +875,7 @@ class SupabaseService {
       int offset = 0;
       while (true) {
         final demands = await fromSchema('feedemand')
-            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, pay_id')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
             .eq('ins_id', insId)
             .inFilter('paidstatus', ['P', 'U'])
             .eq('activestatus', 1)

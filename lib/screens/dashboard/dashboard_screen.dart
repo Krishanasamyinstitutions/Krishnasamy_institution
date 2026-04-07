@@ -19,7 +19,6 @@ import '../fees/fee_demand_approval_screen.dart';
 import '../admin/master_import_screen.dart';
 import '../admin/settings_screen.dart';
 import '../fees/bank_reconciliation_screen.dart';
-import '../fees/reports_screen.dart';
 
 
 
@@ -60,7 +59,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
     _NavItem(Icons.settings_rounded, 'Sequence Creation', adminOnly: true),
     _NavItem(Icons.account_balance_rounded, 'Bank Reconciliation', accountantOnly: true),
-    _NavItem(Icons.assessment_rounded, 'Reports', accountantOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
@@ -295,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (isDesktop || isTablet)
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
-              width: _sidebarCollapsed ? 78 : (isDesktop ? (size.width < 1400 ? 210 : 260) : 78),
+              width: _sidebarCollapsed ? 78 : (isDesktop ? (size.width < 1100 ? 170 : size.width < 1400 ? 200 : 240) : 78),
               child: _buildSidebar(
                   context, _sidebarCollapsed || isTablet),
             ),
@@ -311,11 +309,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _isFullHeightScreen()
                       ? Padding(
-                          padding: EdgeInsets.all(isDesktop ? (size.width < 1400 ? 16 : 28) : 16),
+                          padding: EdgeInsets.all(isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16),
                           child: _buildDashboardContent(context, isDesktop),
                         )
                       : SingleChildScrollView(
-                          padding: EdgeInsets.all(isDesktop ? (size.width < 1400 ? 16 : 28) : 16),
+                          padding: EdgeInsets.all(isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16),
                           child: _buildDashboardContent(context, isDesktop),
                         ),
                 ),
@@ -335,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Logo area
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 16.w : 24.w,
+              horizontal: collapsed ? 16.w : (MediaQuery.of(context).size.width < 1100 ? 14.w : 24.w),
               vertical: 24.h,
             ),
             child: Row(
@@ -372,7 +370,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Nav items
           Expanded(
             child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: collapsed ? 12.w : 16.w),
+              padding: EdgeInsets.symmetric(horizontal: collapsed ? 12.w : (MediaQuery.of(context).size.width < 1100 ? 10.w : 16.w)),
               itemCount: _navItems.length,
               itemBuilder: (context, index) {
                 final item = _navItems[index];
@@ -392,7 +390,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         duration: const Duration(milliseconds: 200),
                         clipBehavior: Clip.hardEdge,
                         padding: EdgeInsets.symmetric(
-                          horizontal: collapsed ? 12.w : 16.w,
+                          horizontal: collapsed ? 12.w : (MediaQuery.of(context).size.width < 1100 ? 10.w : 16.w),
                           vertical: 12.h,
                         ),
                         decoration: BoxDecoration(
@@ -451,7 +449,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final auth = context.watch<AuthProvider>();
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1400 ? 16 : 28) : 16,
+        horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1100 ? 12 : MediaQuery.of(context).size.width < 1400 ? 16 : 28) : 16,
         vertical: 12,
       ),
       decoration: BoxDecoration(
@@ -718,7 +716,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Reports';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -765,9 +763,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Bank Reconciliation') {
       return const BankReconciliationScreen();
-    }
-    if (selectedMenu == 'Reports') {
-      return const ReportsScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();

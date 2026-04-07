@@ -19,6 +19,9 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
+  DateTime _fromDate = DateTime.now();
+  DateTime _toDate = DateTime.now();
+  String _activeFilter = 'Today';
 
   static const List<_SANavItem> _navItems = [
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -409,109 +412,178 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildDashboardHome(BuildContext context) {
-    final activeCount = _institutions.where((i) => i['activestatus'] == 1).length;
-    final totalCollected = _institutionSummaries.fold<double>(
-      0,
-      (sum, item) => sum + item.totalCollected,
-    );
-    final totalPending = _institutionSummaries.fold<double>(
-      0,
-      (sum, item) => sum + item.totalPending,
-    );
-    final totalTransactions = _institutionSummaries.fold<int>(
-      0,
-      (sum, item) => sum + item.transactionCount,
-    );
+    final cards = ['KCET', 'KA', 'KP'];
     return Padding(
-      padding: EdgeInsets.all(28.w),
-      child: _loadingInstitutions
-          ? const Center(child: CircularProgressIndicator())
-          : _institutions.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.business_outlined, size: 48.sp, color: AppColors.textLight),
-                      SizedBox(height: 12.h),
-                      Text('No institutions registered yet', style: Theme.of(context).textTheme.bodyLarge),
-                      SizedBox(height: 12.h),
-                      ElevatedButton.icon(
-                        onPressed: () => setState(() => _selectedNavIndex = 1),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Register Institution'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Overview', style: Theme.of(context).textTheme.headlineSmall),
-                      SizedBox(height: 24.h),
-                      Row(
-                        children: [
-                          _buildStatCard(context, 'Total Institutions', '${_institutions.length}', Icons.business_rounded, AppColors.primary),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Active Institutions', '$activeCount', Icons.check_circle_rounded, AppColors.success),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Inactive', '${_institutions.length - activeCount}', Icons.pause_circle_rounded, AppColors.error),
-                        ],
-                      ),
-                      SizedBox(height: 20.h),
-                      Row(
-                        children: [
-                          _buildStatCard(context, 'Fee Collection', _formatCurrency(totalCollected), Icons.payments_rounded, AppColors.accent),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Pending Fees', _formatCurrency(totalPending), Icons.pending_actions_rounded, const Color(0xFFF59E0B)),
-                          SizedBox(width: 20.w),
-                          _buildStatCard(context, 'Transactions', '$totalTransactions', Icons.receipt_long_rounded, const Color(0xFF7C3AED)),
-                        ],
-                      ),
-                      SizedBox(height: 32.h),
-                      _buildInstitutionFinanceSection(context),
-                      SizedBox(height: 24.h),
-                      _buildRecentTransactionsSection(context),
-                      SizedBox(height: 24.h),
-                      Text('Recent Institutions', style: Theme.of(context).textTheme.titleMedium),
-                      SizedBox(height: 12.h),
-                      ..._institutions.take(5).map((ins) {
-                        return Card(
-                          margin: EdgeInsets.only(bottom: 8.h),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                              child: Text(
-                                (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
-                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text('${ins['inscode'] ?? ''} - ${ins['inscity'] ?? ''}'),
-                            trailing: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                              decoration: BoxDecoration(
-                                color: ins['activestatus'] == 1
-                                    ? AppColors.success.withValues(alpha: 0.1)
-                                    : AppColors.error.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20.r),
-                              ),
-                              child: Text(
-                                ins['activestatus'] == 1 ? 'Active' : 'Inactive',
-                                style: TextStyle(
-                                  color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
-                                  fontSize: 12.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
+      padding: EdgeInsets.all(20.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
+                SizedBox(width: 8.w),
+                Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+                SizedBox(width: 8.w),
+                _buildDateChip(_fromDate, () => _pickDate(true)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                _buildDateChip(_toDate, () => _pickDate(false)),
+                SizedBox(width: 12.w),
+                _buildQuickFilter('Today', () {
+                  setState(() {
+                    _fromDate = DateTime.now();
+                    _toDate = DateTime.now();
+                    _activeFilter = 'Today';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('7 Days', () {
+                  setState(() {
+                    _toDate = DateTime.now();
+                    _fromDate = DateTime.now().subtract(const Duration(days: 7));
+                    _activeFilter = '7 Days';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('30 Days', () {
+                  setState(() {
+                    _toDate = DateTime.now();
+                    _fromDate = DateTime.now().subtract(const Duration(days: 30));
+                    _activeFilter = '30 Days';
+                  });
+                }),
+                SizedBox(width: 6.w),
+                _buildQuickFilter('This Month', () {
+                  final now = DateTime.now();
+                  setState(() {
+                    _fromDate = DateTime(now.year, now.month, 1);
+                    _toDate = now;
+                    _activeFilter = 'This Month';
+                  });
+                }),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _loadInstitutions,
+                  icon: Icon(Icons.refresh_rounded, size: 16.sp),
+                  label: const Text('Refresh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
                   ),
                 ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ...cards.map((name) {
+            return Expanded(
+              child: Padding(
+              padding: EdgeInsets.only(bottom: 10.h),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => _InstitutionDetailPage(institutionName: name),
+                    ),
+                  );
+                },
+                child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Stack(
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            const Expanded(child: SizedBox()),
+                            ...['Total Demand', 'Total Collection', 'Total Pending'].map((label) {
+                              return Expanded(
+                                child: Center(
+                                  child: Text(
+                                    label,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: AppColors.textSecondary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: Icon(
+                          Icons.chevron_right_rounded,
+                          size: 28.sp,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ),
+            ),
+            );
+          }),
+          Row(
+            children: ['Active Institutes', 'Total Demand', 'Total Collection', 'Total Pending'].map((label) {
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  child: Container(
+                    height: 60,
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Center(
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -746,6 +818,72 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: isFrom ? _fromDate : _toDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+        _activeFilter = '';
+      });
+    }
+  }
+
+  Widget _buildDateChip(DateTime date, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
+            SizedBox(width: 6.w),
+            Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilter(String label, VoidCallback onTap) {
+    final isActive = _activeFilter == label;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13.sp,
+            color: isActive ? Colors.white : AppColors.textSecondary,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatCurrency(double value) {
     final fixed = value.toStringAsFixed(2);
     final parts = fixed.split('.');
@@ -789,33 +927,67 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         itemBuilder: (context, index) {
                           final ins = _institutions[index];
                           return Card(
-                            margin: EdgeInsets.only(bottom: 8.h),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
-                                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              title: Text(ins['insname'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text('Code: ${ins['inscode'] ?? ''} | ${ins['insmail'] ?? ''} | ${ins['inscity'] ?? ''}, ${ins['insstate'] ?? ''}'),
-                              trailing: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: ins['activestatus'] == 1
-                                      ? AppColors.success.withValues(alpha: 0.1)
-                                      : AppColors.error.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20.r),
-                                ),
-                                child: Text(
-                                  ins['activestatus'] == 1 ? 'Active' : 'Inactive',
-                                  style: TextStyle(
-                                    color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w600,
+                            margin: EdgeInsets.only(bottom: 10.h),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22.r,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                    child: Text(
+                                      (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
+                                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 16.sp),
+                                    ),
                                   ),
-                                ),
+                                  SizedBox(width: 14.w),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          ins['insname'] ?? '',
+                                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15.sp, color: AppColors.textPrimary),
+                                        ),
+                                        SizedBox(height: 6.h),
+                                        Text(
+                                          'Code: ${ins['inscode'] ?? ''}',
+                                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${ins['insmail'] ?? ''}',
+                                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                        ),
+                                        if ((ins['inscity'] ?? '').toString().isNotEmpty || (ins['insstate'] ?? '').toString().isNotEmpty) ...[
+                                          SizedBox(height: 2.h),
+                                          Text(
+                                            '${ins['inscity'] ?? ''}${(ins['inscity'] ?? '').toString().isNotEmpty && (ins['insstate'] ?? '').toString().isNotEmpty ? ', ' : ''}${ins['insstate'] ?? ''}',
+                                            style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(width: 12.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                    decoration: BoxDecoration(
+                                      color: ins['activestatus'] == 1
+                                          ? AppColors.success.withValues(alpha: 0.1)
+                                          : AppColors.error.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      ins['activestatus'] == 1 ? 'Active' : 'Inactive',
+                                      style: TextStyle(
+                                        color: ins['activestatus'] == 1 ? AppColors.success : AppColors.error,
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           );
@@ -864,4 +1036,30 @@ class _SuperAdminTransactionRow {
     required this.institutionCode,
     required this.payment,
   });
+}
+
+class _InstitutionDetailPage extends StatelessWidget {
+  final String institutionName;
+  const _InstitutionDetailPage({required this.institutionName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: Text(institutionName),
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Text(
+          '$institutionName - Details Coming Soon',
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+      ),
+    );
+  }
 }

@@ -511,7 +511,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   Widget _avatarPlaceholder() {
     final name = _nameController.text.trim();
-    if (name.isEmpty) return const Icon(Icons.person_rounded, size: 36, color: AppColors.accent);
+    if (name.isEmpty) return Icon(Icons.person_rounded, size: 36.sp, color: AppColors.accent);
     return Center(
       child: Text(
         name[0].toUpperCase(),
@@ -591,13 +591,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
     if (s.stuphoto != null && s.stuphoto!.startsWith('http')) {
       return CircleAvatar(
-        radius: 16,
+        radius: 16.r,
         backgroundColor: bgColor,
         child: ClipOval(
           child: Image.network(
             s.stuphoto!,
-            width: 32,
-            height: 32,
+            width: 32.w,
+            height: 32.h,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => letter,
           ),
@@ -606,7 +606,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     }
 
     return CircleAvatar(
-      radius: 16,
+      radius: 16.r,
       backgroundColor: bgColor,
       child: letter,
     );
@@ -684,24 +684,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final courseNames = courseClassCounts.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: courseNames.length,
-      itemBuilder: (context, courseIndex) {
-        final courseName = courseNames[courseIndex];
-        final classCounts = courseClassCounts[courseName]!;
-        final courseStudentCount = classCounts.values.fold<int>(0, (sum, c) => sum + c);
-
-        return ExpansionTile(
-          initiallyExpanded: false,
-          tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
-          title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          trailing: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
-            child: Text('$courseStudentCount', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          ),
-          children: classCounts.keys.toList().map((className) {
-            final count = classCounts[className] ?? 0;
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      itemCount: _classes.length,
+      itemBuilder: (context, index) {
+        final className = _classes[index];
+        // Use background-loaded count if available, else RPC count
+        final count = _groupedStudents[className]?.length ?? _classCounts[className] ?? 0;
         final classColor = _getClassColor(className);
         final isSelected = _selectedClassFilter == className;
         return Material(
@@ -730,7 +718,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
               decoration: BoxDecoration(
                 border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
                 color: isSelected ? classColor.withValues(alpha: 0.08) : null,
@@ -738,13 +726,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 36.w,
+                    height: 36.h,
                     decoration: BoxDecoration(
                       color: isSelected ? classColor.withValues(alpha: 0.2) : classColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10.r),
                     ),
-                    child: Center(child: Icon(Icons.class_rounded, size: 18, color: classColor)),
+                    child: Center(child: Icon(Icons.class_rounded, size: 18.sp, color: classColor)),
                   ),
                   SizedBox(width: 10.w),
                   Expanded(
@@ -752,12 +740,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
-                        Text('$count students', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                        Text('$count students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                     decoration: BoxDecoration(
                       color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
                       borderRadius: BorderRadius.circular(10.r),
@@ -765,7 +753,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
                   ),
                   SizedBox(width: 8.w),
-                  Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, size: 18, color: isSelected ? classColor : AppColors.textSecondary),
+                  Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, size: 18.sp, color: isSelected ? classColor : AppColors.textSecondary),
                 ],
               ),
             ),
@@ -800,7 +788,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       children: [
         // Back button + class header
         Container(
-          padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+          padding: EdgeInsets.fromLTRB(6.w, 6.h, 14.w, 6.h),
           decoration: BoxDecoration(
             color: classColor.withValues(alpha: 0.06),
           ),
@@ -812,33 +800,33 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   _selectedStudent = null;
                   _searchController.clear();
                 }),
-                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
                 color: classColor,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              Icon(Icons.class_rounded, size: 14, color: classColor.withValues(alpha: 0.7)),
+              Icon(Icons.class_rounded, size: 14.sp, color: classColor.withValues(alpha: 0.7)),
               SizedBox(width: 6.w),
               Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
               SizedBox(width: 6.w),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 1.h),
                 decoration: BoxDecoration(
                   color: classColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8.r),
                 ),
-                child: Text('${allStudents.length}', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
+                child: Text('${allStudents.length}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
               ),
             ],
           ),
         ),
-        const Divider(height: 1, color: AppColors.border),
+        Divider(height: 1.h, color: AppColors.border),
         // Student list
         Expanded(
           child: students.isEmpty
               ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: EdgeInsets.symmetric(vertical: 4.h),
                   itemCount: students.length,
                   itemBuilder: (context, index) {
                     final s = students[index];
@@ -851,7 +839,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           _populateStudentForm(s);
                         },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                           child: Row(
                             children: [
                               _buildStudentAvatar(s, classColor, isSelected),
@@ -861,12 +849,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
-                                    Text(s.stuadmno, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                                    Text(s.stuadmno, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                                   ],
                                 ),
                               ),
                               if (isSelected)
-                                const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.accent),
+                                Icon(Icons.check_circle_rounded, size: 16.sp, color: AppColors.accent),
                             ],
                           ),
                         ),
@@ -1021,7 +1009,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         children: [
           // Header with back button
           Container(
-            padding: const EdgeInsets.fromLTRB(10, 10, 20, 10),
+            padding: EdgeInsets.fromLTRB(10.w, 10.h, 20.w, 10.h),
             decoration: BoxDecoration(
               color: classColor.withValues(alpha: 0.04),
               borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
@@ -1035,18 +1023,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     _studentPage = 0;
                     _searchController.clear();
                   }),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
                   color: classColor,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   tooltip: 'Back to classes',
                 ),
-                Icon(Icons.class_rounded, size: 20, color: classColor),
+                Icon(Icons.class_rounded, size: 20.sp, color: classColor),
                 SizedBox(width: 8.w),
                 Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
                 SizedBox(width: 8.w),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                   decoration: BoxDecoration(
                     color: classColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10.r),
@@ -1056,15 +1044,15 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 const Spacer(),
                 // Search
                 SizedBox(
-                  width: 200,
-                  height: 34,
+                  width: 200.w,
+                  height: 34.h,
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search...',
                       hintStyle: TextStyle(fontSize: 13.sp),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 16),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      prefixIcon: Icon(Icons.search_rounded, size: 16.sp),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
                       isDense: true,
                     ),
@@ -1079,7 +1067,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     onTap: () => _exportClassStudents(className, allStudents),
                     borderRadius: BorderRadius.circular(6.r),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
                       decoration: BoxDecoration(
                         color: AppColors.success.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6.r),
@@ -1105,12 +1093,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   children: [
                     // Table header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                       color: const Color(0xFF6C8EEF),
                       child: Row(
                         children: [
-                          SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 16.w),
+                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                           SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
@@ -1135,14 +1124,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     _populateStudentForm(s);
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 50.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 16.w),
                                         SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
                                         Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
                                         SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
@@ -1156,7 +1145,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     // Pagination footer
                     if (totalStudents > _studentsPerPage)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                         decoration: const BoxDecoration(
                           border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
                           borderRadius: BorderRadius.only(
@@ -1172,27 +1161,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ),
                             const Spacer(),
                             IconButton(
-                              icon: const Icon(Icons.first_page_rounded, size: 20),
+                              icon: Icon(Icons.first_page_rounded, size: 20.sp),
                               onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null,
                               tooltip: 'First page', splashRadius: 18,
                             ),
                             IconButton(
-                              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                              icon: Icon(Icons.chevron_left_rounded, size: 20.sp),
                               onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null,
                               tooltip: 'Previous', splashRadius: 18,
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
                               decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
                               child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                              icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
                               onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null,
                               tooltip: 'Next', splashRadius: 18,
                             ),
                             IconButton(
-                              icon: const Icon(Icons.last_page_rounded, size: 20),
+                              icon: Icon(Icons.last_page_rounded, size: 20.sp),
                               onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null,
                               tooltip: 'Last page', splashRadius: 18,
                             ),
@@ -1216,7 +1205,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         // Header
         Row(
           children: [
-            Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22),
+            Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22.sp),
             SizedBox(width: 10.w),
             Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
@@ -1225,12 +1214,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 _showImport = !_showImport;
                 if (!_showImport) _resetImport();
               }),
-              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18),
+              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18.sp),
               label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _showImport ? AppColors.error : AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                 textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
@@ -1247,7 +1236,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               children: [
                 // LEFT — Student List
                 SizedBox(
-                  width: 260,
+                  width: 260.w,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -1258,18 +1247,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 children: [
                   // Header
                   Container(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                    padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 10.h),
                     child: Column(
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20),
+                            Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20.sp),
                             SizedBox(width: 8.w),
                             Expanded(
                               child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                               decoration: BoxDecoration(
                                 color: AppColors.accent.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10.r),
@@ -1278,11 +1267,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 0),
+                        SizedBox(height: 0.h),
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: AppColors.border),
+                  Divider(height: 1.h, color: AppColors.border),
                   // Class list (always visible)
                   Expanded(
                     child: _buildClassList(),
@@ -1303,8 +1292,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       // Back breadcrumb
                       if (_selectedStudent != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          margin: EdgeInsets.only(bottom: 8.h),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(10.r),
@@ -1313,10 +1302,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           child: Row(
                             children: [
                               InkWell(
-                                onTap: () => setState(() { _selectedStudent = null; _selectedClassFilter = null; }),
+                                onTap: () => setState(() { _selectedStudent = null; }),
                                 borderRadius: BorderRadius.circular(6.r),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                                   decoration: BoxDecoration(
                                     color: AppColors.accent.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(6.r),
@@ -1332,7 +1321,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 ),
                               ),
                               SizedBox(width: 8.w),
-                              const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textSecondary),
+                              Icon(Icons.chevron_right_rounded, size: 16.sp, color: AppColors.textSecondary),
                               SizedBox(width: 4.w),
                               Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                               SizedBox(width: 6.w),
@@ -1347,7 +1336,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             // Student Information panel
                             Expanded(
                               child: Container(
-                                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12.r),
@@ -1374,11 +1363,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                   if (_insLogo != null)
                                                     Image.network(
                                                       _insLogo!,
-                                                      width: 48, height: 48, fit: BoxFit.contain,
-                                                      errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
+                                                      width: 48.w, height: 48.h, fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
                                                     )
                                                   else
-                                                    const Icon(Icons.school_rounded, color: AppColors.accent, size: 44),
+                                                    Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
                                                   SizedBox(width: 8.w),
                                                   Flexible(
                                                     child: Text(
@@ -1394,7 +1383,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                           Column(
                                             children: [
                                               Container(
-                                                width: 72, height: 72,
+                                                width: 72.w, height: 72.h,
                                                 decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accent.withValues(alpha: 0.1)),
                                                 child: ClipOval(
                                                   child: _photoUrl != null
@@ -1416,7 +1405,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     const Divider(color: AppColors.border),
                                     Expanded(
                                       child: SingleChildScrollView(
-                                        padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
+                                        padding: EdgeInsets.fromLTRB(0, 4.h, 0, 20.h),
                                         child: IgnorePointer(
                                           ignoring: !_isFormEnabled,
                                           child: _buildStudentFields(),
@@ -1445,11 +1434,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                             Expanded(
                                               child: TextButton.icon(
                                                 onPressed: _isSaving ? null : _clearForm,
-                                                icon: const Icon(Icons.close_rounded, size: 16),
-                                                label: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
+                                                icon: Icon(Icons.close_rounded, size: 16.sp),
+                                                label: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
                                                 style: TextButton.styleFrom(
                                                   foregroundColor: AppColors.textSecondary,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                                                 ),
                                               ),
                                             ),
@@ -1464,7 +1453,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: AppColors.accent,
                                                   foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                                                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                                                 ),
                                               ),
@@ -1545,7 +1534,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               },
               child: InputDecorator(
                 decoration: _dec('Select admission date').copyWith(
-                  suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: AppColors.textSecondary),
+                  suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary),
                 ),
                 child: Text(
                   _admDate != null
@@ -1703,19 +1692,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 8.h,
           children: ['Father', 'Mother', 'Guardian'].map((tab) {
             final selected = _selectedParentTab == tab;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(tab),
-                selected: selected,
-                onSelected: (_) => setState(() => _selectedParentTab = tab),
-                selectedColor: AppColors.accent,
-                labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600),
-                backgroundColor: AppColors.border.withValues(alpha: 0.3),
-              ),
+            return ChoiceChip(
+              label: Text(tab),
+              selected: selected,
+              onSelected: (_) => setState(() => _selectedParentTab = tab),
+              selectedColor: AppColors.accent,
+              labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600),
+              backgroundColor: AppColors.border.withValues(alpha: 0.3),
             );
           }).toList(),
         ),
@@ -2313,7 +2301,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     if (_importStep == 3) return _buildImportDoneStep();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10.r),
@@ -2325,21 +2313,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // Title bar
           Row(
             children: [
-              Icon(Icons.upload_file_rounded, size: 20, color: AppColors.accent),
+              Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
               SizedBox(width: 8.w),
-              Text('Import Students', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+              Text('Import Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
               if (_importFileName != null)
                 Text(_importFileName!, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickImportFile,
-                icon: const Icon(Icons.folder_open_rounded, size: 16),
+                icon: Icon(Icons.folder_open_rounded, size: 16.sp),
                 label: const Text('Browse'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2347,12 +2335,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportStudentTemplate,
-                icon: const Icon(Icons.table_chart_rounded, size: 16),
+                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
                 label: const Text('Format to Excel'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2360,12 +2348,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportSampleData,
-                icon: const Icon(Icons.download_rounded, size: 16),
+                icon: Icon(Icons.download_rounded, size: 16.sp),
                 label: const Text('Sample Data'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE65100),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2407,7 +2395,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           ),
                           child: Row(
                             children: [
-                              _gridHeaderCell('S.No', width: 50, center: true),
+                              _gridHeaderCell('S.No', width: 50.w, center: true),
                               _gridHeaderDivider(),
                               for (final key in _importGridKeys) ...[
                                 _gridHeaderCell(_importGridLabels[key] ?? key, width: _gridColWidth(key)),
@@ -2423,7 +2411,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.grid_on_rounded, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                      Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
                                       SizedBox(height: 8.h),
                                       Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                       SizedBox(height: 4.h),
@@ -2441,18 +2429,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                       message: hasError ? _rowErrors[index]! : '',
                                       child: Container(
                                         color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
-                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        padding: EdgeInsets.symmetric(vertical: 6.h),
                                         child: Row(
                                           children: [
-                                            _gridDataCell('${index + 1}', width: 50, center: true),
+                                            _gridDataCell('${index + 1}', width: 50.w, center: true),
                                             for (final key in _importGridKeys)
                                               _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
                                             if (hasError)
                                               Padding(
-                                                padding: const EdgeInsets.only(right: 8),
+                                                padding: EdgeInsets.only(right: 8.w),
                                                 child: Tooltip(
                                                   message: _rowErrors[index]!,
-                                                  child: const Icon(Icons.error_outline, color: AppColors.error, size: 16),
+                                                  child: Icon(Icons.error_outline, color: AppColors.error, size: 16.sp),
                                                 ),
                                               ),
                                           ],
@@ -2482,12 +2470,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
               const Spacer(),
               ElevatedButton.icon(
                 onPressed: _importRows.isEmpty || _importValidated ? null : _validateImportData,
-                icon: Icon(_importValidated ? Icons.check_circle : Icons.check_circle_outline, size: 16),
+                icon: Icon(_importValidated ? Icons.check_circle : Icons.check_circle_outline, size: 16.sp),
                 label: Text(_importValidated ? 'Validated' : 'Validate'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _importRows.isNotEmpty && !_importValidated ? Colors.orange : (_importValidated ? AppColors.success : Colors.grey),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2495,12 +2483,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _importValidated ? _startStudentImport : null,
-                icon: const Icon(Icons.save_rounded, size: 16),
+                icon: Icon(Icons.save_rounded, size: 16.sp),
                 label: const Text('Save'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2509,7 +2497,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               OutlinedButton(
                 onPressed: _resetImport,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
@@ -2526,8 +2514,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final progress = _totalCount > 0 ? (_importedCount + _skippedCount) / _totalCount : 0.0;
     return Center(
       child: Container(
-        width: 400,
-        padding: const EdgeInsets.all(32),
+        width: 400.w,
+        padding: EdgeInsets.all(32.w),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10.r),
@@ -2538,7 +2526,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           children: [
             const CircularProgressIndicator(),
             SizedBox(height: 20.h),
-            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
             SizedBox(height: 12.h),
             LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
             SizedBox(height: 8.h),
@@ -2552,8 +2540,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
   Widget _buildImportDoneStep() {
     return Center(
       child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(32),
+        width: 500.w,
+        padding: EdgeInsets.all(32.w),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10.r),
@@ -2562,23 +2550,23 @@ class _StudentsScreenState extends State<StudentsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, size: 64, color: AppColors.success),
+            Icon(Icons.check_circle_rounded, size: 64.sp, color: AppColors.success),
             SizedBox(height: 16.h),
-            const Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             SizedBox(height: 12.h),
             Text('$_importedCount imported successfully, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp)),
             if (_importErrors.isNotEmpty) ...[
               SizedBox(height: 16.h),
               Container(
-                height: 150,
-                padding: const EdgeInsets.all(12),
+                height: 150.h,
+                padding: EdgeInsets.all(12.w),
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8.r),
                 ),
                 child: ListView(
                   children: _importErrors.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
+                    padding: EdgeInsets.only(bottom: 4.h),
                     child: Text(e, style: TextStyle(fontSize: 13.sp, color: AppColors.error)),
                   )).toList(),
                 ),
@@ -2590,7 +2578,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
               ),
               child: const Text('Done'),
@@ -2629,7 +2617,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
     final child = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
       child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
     );
@@ -2637,12 +2625,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   Widget _gridHeaderDivider() {
-    return Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.15));
+    return Container(width: 1.w, height: 36.h, color: Colors.white.withValues(alpha: 0.15));
   }
 
   Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
     final child = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
       decoration: BoxDecoration(
         border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
@@ -2658,7 +2646,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   Widget _panel({required String title, required IconData icon, required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12.r),
@@ -2668,7 +2656,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(icon, color: AppColors.accent, size: 20),
+            Icon(icon, color: AppColors.accent, size: 20.sp),
             SizedBox(width: 8.w),
             Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
@@ -2708,7 +2696,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   InputDecoration _dec(String hint) => InputDecoration(
     hintText: hint,
     hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),

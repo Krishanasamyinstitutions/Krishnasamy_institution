@@ -775,172 +775,146 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary),
-              ),
-              SizedBox(width: 16.w),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Payment Sequence', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  SizedBox(height: 2.h),
-                  Text('Configure receipt number prefix per fee group', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
-                ],
-              ),
-            ],
-          ),
-
-          SizedBox(height: 16.h),
-
-          // Global width setting
-          Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Row(
-              children: [
-                Text('Number Width:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                SizedBox(width: 12.w),
-                SizedBox(
-                  width: 80.w,
-                  child: TextFormField(
-                    controller: _widthController,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: '4',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 10.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                      isDense: true,
-                    ),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                Text('(e.g. 4 = 0001)', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 24.h),
-
-          if (_feeGroups.isEmpty)
+      padding: EdgeInsets.zero,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
             Container(
-              padding: EdgeInsets.all(24.w),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12.r),
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
-              child: Center(
-                child: Text('No fee groups found. Import fee groups first in Master Data.', style: TextStyle(color: AppColors.textSecondary)),
-              ),
-            )
-          else
-            // Fee group sequence table
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
+              child: Row(
                 children: [
-                  // Header
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.only(topLeft: Radius.circular(11.r), topRight: Radius.circular(11.r)),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 40.w, child: Text('S.No', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                        Expanded(flex: 3, child: Text('FEE GROUP', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                        Expanded(flex: 2, child: Text('PREFIX', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                        Expanded(flex: 2, child: Text('PREVIEW', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                        Expanded(flex: 1, child: Text('CURRENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                        SizedBox(width: 80.w, child: Text('ACTION', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white), textAlign: TextAlign.center)),
-                      ],
-                    ),
-                  ),
-                  // Rows
-                  ..._feeGroups.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final fg = entry.value;
-                    final fgId = fg['fg_id'] as int;
-                    final fgDesc = fg['fgdesc']?.toString() ?? '';
-                    final seq = _getSequenceForFg(fgId);
-                    final hasSeq = seq != null;
-                    final width = int.tryParse(_widthController.text.trim()) ?? 4;
-
-                    // Auto-generate prefix from first letters of each word
-                    final autoPrefix = fgDesc.split(' ').map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase().substring(0, fgDesc.split(' ').map((w) => w.isNotEmpty ? w[0] : '').join().length.clamp(0, 3));
-
-                    final prefix = hasSeq ? (seq['seqprefix']?.toString() ?? '') : autoPrefix;
-                    final curNo = hasSeq ? (seq['seqcurno'] ?? 0) : 0;
-                    final preview = '$prefix${'1'.padLeft(width, '0')}';
-
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                      color: idx.isEven ? Colors.white : AppColors.surface,
-                      child: Row(
-                        children: [
-                          SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                          Expanded(flex: 3, child: Text(fgDesc, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
-                          Expanded(
-                            flex: 2,
-                            child: hasSeq
-                                ? Text(prefix, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary))
-                                : SizedBox(
-                                    height: 36.h,
-                                    child: TextFormField(
-                                      initialValue: autoPrefix,
-                                      textCapitalization: TextCapitalization.characters,
-                                      decoration: InputDecoration(
-                                        hintText: 'Prefix',
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r)),
-                                        isDense: true,
-                                      ),
-                                      style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
-                                      onChanged: (v) => _editedPrefixes[fgId] = v.trim().toUpperCase(),
-                                    ),
-                                  ),
-                          ),
-                          Expanded(flex: 2, child: Text(preview, style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600))),
-                          Expanded(flex: 1, child: Text('$curNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                          SizedBox(
-                            width: 80.w,
-                            child: hasSeq
-                                ? Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20.sp)
-                                : ElevatedButton(
-                                    onPressed: _isSaving
-                                        ? null
-                                        : () => _saveSequenceForFg(fgId, fgDesc, _editedPrefixes[fgId] ?? autoPrefix),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-                                      minimumSize: Size.zero,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.r)),
-                                    ),
-                                    child: Text('Create', style: TextStyle(fontSize: 11.sp)),
-                                  ),
-                          ),
-                        ],
+                  Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20.sp),
+                  SizedBox(width: 8.w),
+                  Text('Payment Sequence', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  Text('Number Width:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(width: 8.w),
+                  SizedBox(
+                    width: 60.w,
+                    height: 34,
+                    child: TextFormField(
+                      controller: _widthController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        hintText: '4',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                        isDense: true,
                       ),
-                    );
-                  }),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  SizedBox(width: 6.w),
+                  Text('(e.g. 4 = 0001)', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
                 ],
               ),
             ),
-        ],
+            // Table
+            if (_feeGroups.isEmpty)
+              Padding(
+                padding: EdgeInsets.all(24.w),
+                child: Center(
+                  child: Text('No fee groups found. Import fee groups first in Master Data.', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: DataTable(
+                dividerThickness: 0,
+                headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
+                dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                columnSpacing: 20,
+                horizontalMargin: 16,
+                headingRowHeight: 42,
+                columns: const [
+                  DataColumn(label: Text('S.No')),
+                  DataColumn(label: Text('FEE GROUP')),
+                  DataColumn(label: Text('PREFIX')),
+                  DataColumn(label: Text('PREVIEW')),
+                  DataColumn(label: Text('CURRENT')),
+                  DataColumn(label: Text('ACTION')),
+                ],
+                rows: List.generate(_feeGroups.length, (idx) {
+                  final fg = _feeGroups[idx];
+                  final fgId = fg['fg_id'] as int;
+                  final fgDesc = fg['fgdesc']?.toString() ?? '';
+                  final seq = _getSequenceForFg(fgId);
+                  final hasSeq = seq != null;
+                  final width = int.tryParse(_widthController.text.trim()) ?? 4;
+
+                  final autoPrefix = fgDesc.split(' ').map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase().substring(0, fgDesc.split(' ').map((w) => w.isNotEmpty ? w[0] : '').join().length.clamp(0, 3));
+
+                  final prefix = hasSeq ? (seq['seqprefix']?.toString() ?? '') : autoPrefix;
+                  final curNo = hasSeq ? (seq['seqcurno'] ?? 0) : 0;
+                  final preview = '$prefix${'1'.padLeft(width, '0')}';
+
+                  return DataRow(
+                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF2F6FA)),
+                    cells: [
+                      DataCell(Text('${idx + 1}')),
+                      DataCell(Text(fgDesc, style: const TextStyle(fontWeight: FontWeight.w500))),
+                      DataCell(
+                        hasSeq
+                            ? Text(prefix, style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary))
+                            : SizedBox(
+                                width: 100.w,
+                                height: 32.h,
+                                child: TextFormField(
+                                  initialValue: autoPrefix,
+                                  textCapitalization: TextCapitalization.characters,
+                                  decoration: InputDecoration(
+                                    hintText: 'Prefix',
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: AppColors.border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: AppColors.border)),
+                                    isDense: true,
+                                  ),
+                                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                                  onChanged: (v) => _editedPrefixes[fgId] = v.trim().toUpperCase(),
+                                ),
+                              ),
+                      ),
+                      DataCell(Text(preview, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600))),
+                      DataCell(Text('$curNo')),
+                      DataCell(
+                        hasSeq
+                            ? Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20.sp)
+                            : ElevatedButton(
+                                onPressed: _isSaving
+                                    ? null
+                                    : () => _saveSequenceForFg(fgId, fgDesc, _editedPrefixes[fgId] ?? autoPrefix),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                                  minimumSize: Size.zero,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.r)),
+                                ),
+                                child: Text('Create', style: TextStyle(fontSize: 11.sp)),
+                              ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

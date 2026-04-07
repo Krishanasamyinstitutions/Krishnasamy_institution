@@ -237,47 +237,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           debugPrint('Year insert failed: $e');
         }
 
-        // Move admin user from public to institution schema
-        try {
-          SupabaseService.setSchema(schemaName);
-          // Fetch the admin user from public table
-          final adminRow = await SupabaseService.client
-              .from('institutionusers')
-              .select()
-              .eq('use_id', regResult['use_id'])
-              .maybeSingle();
-          if (adminRow != null) {
-            // Insert into schema table
-            await SupabaseService.fromSchema('institutionusers').insert({
-              'ins_id': adminRow['ins_id'],
-              'inscode': adminRow['inscode'],
-              'usename': adminRow['usename'],
-              'usemail': adminRow['usemail'],
-              'usephone': adminRow['usephone'],
-              'usepassword': adminRow['usepassword'], // already hashed
-              'usestadate': adminRow['usestadate'],
-              'useotpstatus': adminRow['useotpstatus'] ?? 0,
-              'usedob': adminRow['usedob'],
-              'ur_id': adminRow['ur_id'],
-              'urname': adminRow['urname'],
-              'des_id': adminRow['des_id'],
-              'desname': adminRow['desname'],
-              'userepto': adminRow['userepto'] ?? 0,
-              'activestatus': 1,
-            });
-            // Delete from public table (only super admin stays in public)
-            await SupabaseService.client
-                .from('institutionusers')
-                .delete()
-                .eq('use_id', regResult['use_id']);
-            debugPrint('Admin user moved to schema');
-          }
-          SupabaseService.setSchema(null);
-        } catch (e) {
-          SupabaseService.setSchema(null);
-          debugPrint('Admin user move to schema failed: $e');
-        }
-
         // Expose schema to API (try, but don't fail if permission denied)
         try {
           await SupabaseService.client.rpc('expose_schema', params: {
@@ -508,7 +467,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Step 1: Institution Information
   Widget _buildStep1() {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
       child: Container(
         padding: EdgeInsets.all(28.w),
         decoration: BoxDecoration(
@@ -609,20 +568,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               SizedBox(height: 16.h),
 
-              _fieldLabel('Institution Start Date'),
-              InkWell(
-                onTap: _pickInstitutionStartDate,
-                child: InputDecorator(
-                  decoration: _inputDec('Select date').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
-                  child: Text(
-                    _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
-                    style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
-                  ),
-                ),
-              ),
-              SizedBox(height: 16.h),
-
               Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _fieldLabel('Institution Start Date'),
+                  InkWell(
+                    onTap: _pickInstitutionStartDate,
+                    child: InputDecorator(
+                      decoration: _inputDec('Select date').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                      child: Text(
+                        _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
+                        style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
+                      ),
+                    ),
+                  ),
+                ])),
+                SizedBox(width: 14.w),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Authorized Username'),
                   TextFormField(controller: _authorizedUsernameController, decoration: _inputDec('Enter authorized username'), style: _fieldStyle()),
@@ -651,16 +611,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onChanged: (v) { if (v != null) setState(() => _institutionRecognized = v); },
                   ),
                 ])),
+                SizedBox(width: 14.w),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _fieldLabel('Email *'),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: _inputDec('Enter email address'),
+                    style: _fieldStyle(),
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                  ),
+                ])),
               ]),
-              SizedBox(height: 14.h),
-              _fieldLabel('Email *'),
-              TextFormField(
-                controller: _emailController,
-                decoration: _inputDec('Enter email address'),
-                style: _fieldStyle(),
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
-              ),
             ],
           ),
         ),
@@ -671,7 +633,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Step 2: Affiliation & Address
   Widget _buildStep2() {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
       child: Column(
         children: [
           // Affiliation card
@@ -706,20 +668,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _fieldLabel('Affiliation Number'),
                       TextFormField(controller: _affiliationNumberController, decoration: _inputDec('Enter affiliation number'), style: _fieldStyle()),
                     ])),
-                  ]),
-                  SizedBox(height: 16.h),
-
-                  _fieldLabel('Affiliation Start Year'),
-                  InkWell(
-                    onTap: _pickAffiliationStartYear,
-                    child: InputDecorator(
-                      decoration: _inputDec('Select year').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
-                      child: Text(
-                        _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
-                        style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
+                    SizedBox(width: 14.w),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      _fieldLabel('Affiliation Start Year'),
+                      InkWell(
+                        onTap: _pickAffiliationStartYear,
+                        child: InputDecorator(
+                          decoration: _inputDec('Select year').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                          child: Text(
+                            _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
+                            style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    ])),
+                  ]),
                 ],
               ),
             ),
@@ -746,27 +709,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Text('Enter the institution address details', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
-                _fieldLabel('Address Line 1 *'),
-                TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle()),
-                SizedBox(height: 16.h),
-
-                _fieldLabel('Address Line 2'),
-                TextFormField(controller: _address2Controller, decoration: _inputDec('Enter address line 2'), style: _fieldStyle()),
-                SizedBox(height: 16.h),
-
                 Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Address Line 1 *'),
+                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle()),
+                  ])),
+                  SizedBox(width: 14.w),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Address Line 2'),
+                    TextFormField(controller: _address2Controller, decoration: _inputDec('Enter address line 2'), style: _fieldStyle()),
+                  ])),
+                  SizedBox(width: 14.w),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 3'),
                     TextFormField(controller: _address3Controller, decoration: _inputDec('Enter address line 3'), style: _fieldStyle()),
                   ])),
-                  SizedBox(width: 14.w),
+                ]),
+                SizedBox(height: 14.h),
+                Row(children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Pin Code'),
                     TextFormField(controller: _pinCodeController, decoration: _inputDec('Enter pin code'), style: _fieldStyle(), keyboardType: TextInputType.number),
                   ])),
-                ]),
-                SizedBox(height: 14.h),
-                Row(children: [
+                  SizedBox(width: 14.w),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('City'),
                     TextFormField(controller: _cityController, decoration: _inputDec('Enter city'), style: _fieldStyle()),
@@ -807,16 +772,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Text('Set up the academic year for your institution', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 const Divider(height: 28, color: AppColors.border),
 
-                _fieldLabel('Year Label *'),
-                TextFormField(
-                  controller: _yearLabelController,
-                  decoration: _inputDec('e.g. 2025-2026'),
-                  style: _fieldStyle(),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                ),
-                SizedBox(height: 16.h),
-
                 Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _fieldLabel('Year Label *'),
+                    TextFormField(
+                      controller: _yearLabelController,
+                      decoration: _inputDec('e.g. 2025-2026'),
+                      style: _fieldStyle(),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                  ])),
+                  SizedBox(width: 14.w),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Start Date *'),
                     InkWell(
@@ -863,7 +829,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Step 3: Account Setup
   Widget _buildStep3() {
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 500),

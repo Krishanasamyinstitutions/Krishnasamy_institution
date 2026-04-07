@@ -115,8 +115,8 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      var query = SupabaseService.fromSchema('students')
-          .select('stu_id, stuname, stuadmno, stuclass, courname')
+      final rows = await SupabaseService.fromSchema('students')
+          .select('stu_id, stuname, stuadmno, stuclass')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .eq('stuclass', className);
@@ -1110,11 +1110,22 @@ class _StudentFeeCollectionScreenState
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 36,
-                    offset: const Offset(0, 18),
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 60,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 24),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 16,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
@@ -1123,9 +1134,18 @@ class _StudentFeeCollectionScreenState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Proceed to Pay',
-                      style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Proceed to Pay',
+                          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Icon(Icons.close, size: 22.sp, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
                     SizedBox(height: 14.h),
                     Text(
