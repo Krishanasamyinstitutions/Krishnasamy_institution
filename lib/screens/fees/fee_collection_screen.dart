@@ -110,6 +110,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   List<Map<String, dynamic>> _payments = [];
   List<_DateGroup> _dateGroups = [];
   String? _selectedDate; // null = date list, non-null = drilldown
+  Map<int, double> _payFineMap = {}; // pay_id -> fine amount (for drilldown display)
   int? _selectedPayId; // null = payment list, non-null = fee detail drilldown
   Map<String, dynamic>? _selectedPayment; // selected payment data
   List<Map<String, dynamic>>? _feeDetails;
@@ -390,12 +391,39 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       grouped.putIfAbsent(dateStr, () => []).add(p);
     }
 
+    // Fetch fine amount per pay_id so each date group can display fine separately
+    final Map<int, double> payFineMap = {};
+    final payIds = payments
+        .map((p) => p['pay_id'] as int?)
+        .where((id) => id != null)
+        .cast<int>()
+        .toSet()
+        .toList();
+    for (var i = 0; i < payIds.length; i += 500) {
+      final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
+      try {
+        final rows = await SupabaseService.fromSchema('feedemand')
+            .select('pay_id, fineamount')
+            .eq('ins_id', insId)
+            .inFilter('pay_id', chunk)
+            .gt('fineamount', 0);
+        for (final r in (rows as List)) {
+          final pid = r['pay_id'] as int?;
+          final amt = (r['fineamount'] as num?)?.toDouble() ?? 0;
+          if (pid != null) payFineMap[pid] = (payFineMap[pid] ?? 0) + amt;
+        }
+      } catch (_) {}
+    }
+
     final dateGroups = grouped.entries.map((e) {
       double total = 0;
+      double fine = 0;
       for (final p in e.value) {
         total += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+        final pid = p['pay_id'] as int?;
+        if (pid != null) fine += payFineMap[pid] ?? 0;
       }
-      return _DateGroup(date: e.key, payments: e.value, totalAmount: total);
+      return _DateGroup(date: e.key, payments: e.value, totalAmount: total, totalFine: fine);
     }).toList();
     dateGroups.sort((a, b) => b.date.compareTo(a.date));
 
@@ -403,10 +431,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       setState(() {
         _payments = payments;
         _dateGroups = dateGroups;
+        _payFineMap = payFineMap;
         _todayCollection = todayCollection;
         _feeGroupById = Map<int, String>.from(feeGroupMaps['byId'] ?? {});
         _feeGroupByName = Map<String, String>.from(feeGroupMaps['byName'] ?? {});
-        _totalCollection = feeTotals['totalPaid'] ?? 0;
+        // Total Collection excludes fine (RPC already subtracts fineamount from totalPaid)
+        _totalCollection = (feeTotals['totalPaid'] ?? 0).toDouble();
+        _totalFine = feeTotals['totalFine'] ?? 0;
         _pendingFees = feeTotals['totalPending'] ?? 0;
         _isLoading = false;
       });
@@ -530,6 +561,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   double _pendingFees = 0;
   double _todayCollection = 0;
   double _totalCollection = 0;
+  double _totalFine = 0;
 
   Widget _buildDateChip(String label, DateTime date, VoidCallback onTap) {
     return InkWell(
@@ -1230,7 +1262,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final allStuIds = <String>{};
     for (final d in filtered) {
       totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-      totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      totalPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
       totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
       if (((d['balancedue'] as num?)?.toDouble() ?? 0) > 0) {
         final stuId = d['stu_id']?.toString();
@@ -1393,7 +1427,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final gStuIds = <String>{};
                   for (final d in items) {
                     gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    gPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
+                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                    gPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                     gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                     if (((d['balancedue'] as num?)?.toDouble() ?? 0) > 0) {
                       final sid = d['stu_id']?.toString();
@@ -1459,7 +1495,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     double totalDemand = 0, totalPaid = 0, totalBalance = 0;
     for (final d in demands) {
       totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-      totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      totalPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
       totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
     }
 
@@ -1531,7 +1569,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       ? _feeGroupById[dFeeId]!
                       : (_feeGroupByName[dFeeType] ?? dFeeType);
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final paid = ((d['paidamount'] as num?)?.toDouble() ?? 0);
+                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                  final paid = pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
                   final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : Colors.red;
@@ -1609,7 +1649,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     for (final key in studentKeys) {
       for (final d in byStudent[key]!) {
         totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-        totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+        totalPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
         totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
       }
     }
@@ -1784,7 +1826,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   double sDemand = 0, sPaid = 0, sBalance = 0;
                   for (final d in demands) {
                     sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    sPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
+                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                    sPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                     sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
                   final statusLabel = sBalance <= 0 ? 'Paid' : sPaid > 0 ? 'Partial' : 'Unpaid';
@@ -1896,6 +1940,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
   Widget _buildDateList() {
     final double grandTotal = _dateGroups.fold(0.0, (s, g) => s + g.totalAmount);
+    final double grandFine = _dateGroups.fold(0.0, (s, g) => s + g.totalFine);
     final int grandTransactions = _dateGroups.fold(0, (s, g) => s + g.payments.length);
 
     return Container(
@@ -1971,7 +2016,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DataColumn(label: Text('S No.')),
                             DataColumn(label: Text('DATE')),
                             DataColumn(label: Text('TRANSACTIONS'), numeric: true),
-                            DataColumn(label: Text('AMOUNT'), numeric: true),
+                            DataColumn(label: Text('COLLECTION'), numeric: true),
+                            DataColumn(label: Text('FINE'), numeric: true),
+                            DataColumn(label: Text('TOTAL'), numeric: true),
                             DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
                           ],
                           rows: [
@@ -1987,7 +2034,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                   DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
                                   DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600))),
                                   DataCell(Text('${group.payments.length}', textAlign: TextAlign.right)),
-                                  DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
+                                  DataCell(Text(_formatCurrency(group.totalAmount - group.totalFine), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
+                                  DataCell(Text(group.totalFine > 0 ? _formatCurrency(group.totalFine) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: group.totalFine > 0 ? Colors.orange : AppColors.textSecondary))),
+                                  DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.success))),
                                   DataCell(Align(
                                     alignment: Alignment.centerRight,
                                     child: Container(
@@ -2010,6 +2059,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 const DataCell(Text('')),
                                 DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                                 DataCell(Text('$grandTransactions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                                DataCell(Text(_formatCurrency(grandTotal - grandFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                                DataCell(Text(_formatCurrency(grandFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                                 DataCell(Text(_formatCurrency(grandTotal), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                                 const DataCell(Text('')),
                               ],
@@ -2209,6 +2260,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     return true;
                   }).toList();
                   final double grandTotal = allFiltered.fold(0.0, (s, p) => s + ((p['transtotalamount'] as num?)?.toDouble() ?? 0));
+                  final double grandFine = allFiltered.fold(0.0, (s, p) => s + (_payFineMap[p['pay_id'] as int?] ?? 0.0));
+                  final double grandCollection = grandTotal - grandFine;
                   final ddTotalItems = allFiltered.length;
                   final ddTotalPages = (ddTotalItems / _dateDrilldownPageSize).ceil();
                   if (_dateDrilldownPage >= ddTotalPages && ddTotalPages > 0) _dateDrilldownPage = ddTotalPages - 1;
@@ -2236,6 +2289,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           DataColumn(label: Text('COURSE')),
                           DataColumn(label: Text('CLASS')),
                           DataColumn(label: Text('METHOD')),
+                          DataColumn(label: Text('COLLECTION'), numeric: true),
+                          DataColumn(label: Text('FINE'), numeric: true),
                           DataColumn(label: Text('TOTAL'), numeric: true),
                           DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
                         ],
@@ -2245,6 +2300,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             final student = p['students'] as Map<String, dynamic>?;
                             final timeStr = _formatTime(p['createdat'] ?? p['paydate']);
                             final totalAmt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                            final fine = _payFineMap[p['pay_id'] as int?] ?? 0.0;
+                            final collection = totalAmt - fine;
                             return DataRow(
                               color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
                               onSelectChanged: (_) => _onPaymentTap(p),
@@ -2257,6 +2314,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 DataCell(Text(student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : (_stuIdToCourse[p['stu_id'] as int?] ?? '-'))),
                                 DataCell(Text(student?['stuclass']?.toString() ?? '-')),
                                 DataCell(Text(p['paymethod'] ?? '-')),
+                                DataCell(Text(_formatCurrency(collection), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
+                                DataCell(Text(fine > 0 ? _formatCurrency(fine) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: fine > 0 ? Colors.orange : AppColors.textSecondary))),
                                 DataCell(Text(_formatCurrency(totalAmt), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.success))),
                                 DataCell(Align(
                                   alignment: Alignment.centerRight,
@@ -2282,6 +2341,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             const DataCell(Text('')),
                             const DataCell(Text('')),
                             const DataCell(Text('')),
+                            DataCell(Text(_formatCurrency(grandCollection), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(grandFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             DataCell(Text(_formatCurrency(grandTotal), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                           ]),
@@ -2896,7 +2957,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       rows: [
                         ...List.generate(_feeDetails!.length, (i) {
                           final fd = _feeDetails![i];
-                          final paid = (fd['paidamount'] as num?)?.toDouble() ?? 0;
+                          final pa = (fd['paidamount'] as num?)?.toDouble() ?? 0;
+                          final fa = (fd['fineamount'] as num?)?.toDouble() ?? 0;
+                          final paid = pa - ((pa > 0 || fd['paidstatus'] == 'P') ? fa : 0);
                           final balance = (fd['balancedue'] as num?)?.toDouble() ?? 0;
                           final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Due';
                           final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : AppColors.warning;
@@ -2919,7 +2982,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DataCell(Text(term)),
                             DataCell(Text(fd['demfeetype']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w500))),
                             DataCell(Text(_formatCurrency((fd['feeamount'] as num?)?.toDouble() ?? 0))),
-                            DataCell(Text(_formatCurrency((fd['paidamount'] as num?)?.toDouble() ?? 0), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
+                            DataCell(Text(_formatCurrency(paid), style: const TextStyle(fontWeight: FontWeight.w500, color: AppColors.success))),
                             DataCell(Text(_formatCurrency(balance), style: TextStyle(fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                             DataCell(Container(
                               padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
@@ -2939,7 +3002,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             DataCell(Text('${_feeDetails!.length} items', style: TextStyle(fontSize: 14.sp, color: Colors.white))),
                             DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
-                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                            DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) {
+                              final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                              final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                              return s + pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
+                            })), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             DataCell(Text(_formatCurrency(_feeDetails!.fold<double>(0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0))), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                             const DataCell(Text('')),
                           ],
@@ -3720,13 +3787,17 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
       final List<String> feeTypes = rawFeeTypes is List
           ? List<String>.from(rawFeeTypes.whereType<String>())
           : [];
+      final rawPaid = (r['total_paid'] as num?)?.toDouble() ?? 0;
+      final rawFine = (r['total_fine'] as num?)?.toDouble() ?? 0;
       return _ClassGroup(
         className: r['stuclass']?.toString() ?? '',
         courseName: r['courname']?.toString(),
         demands: const [],
         totalDemand: (r['total_demand'] as num?)?.toDouble() ?? 0,
         totalConcession: (r['total_concession'] as num?)?.toDouble() ?? 0,
-        totalPaid: (r['total_paid'] as num?)?.toDouble() ?? 0,
+        // RPC already subtracts fine from total_paid (fee-only collection)
+        totalPaid: rawPaid,
+        totalFine: rawFine,
         totalPending: (r['total_pending'] as num?)?.toDouble() ?? 0,
         studentCount: (r['student_count'] as num?)?.toInt() ?? 0,
         feeTypes: feeTypes,
@@ -4266,7 +4337,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           double totalDemand = 0, totalPaid = 0, totalBalance = 0;
           for (final d in demands) {
             totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-            totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+            final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+            final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+            final isPaid = pa > 0 || d['paidstatus'] == 'P';
+            totalPaid += pa - (isPaid ? fa : 0);
             totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
           }
           return SingleChildScrollView(child: Scrollbar(controller: _drilldownFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _drilldownFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
@@ -4293,7 +4367,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   final term = d['demfeeterm']?.toString() ?? '-';
                   final feeType = d['demfeetype']?.toString() ?? '-';
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                  final paid = pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
                   final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : AppColors.warning;
@@ -4489,7 +4565,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 for (final key in studentKeys) {
                   for (final d in byStudent[key]!) {
                     gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    gPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
+                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                    gPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                     gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
                 }
@@ -4572,7 +4650,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     double sDemand = 0, sPaid = 0, sBalance = 0;
                     for (final d in studentDemands) {
                       sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                      sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                      sPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                       sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                     }
                     final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
@@ -5081,7 +5161,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       final Set<String> students = {};
       for (final d in e.value) {
         totalDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-        totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+        totalPaid += pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
         totalPending += (d['balancedue'] as num?)?.toDouble() ?? 0;
         final admNo = d['stuadmno']?.toString() ?? '';
         if (admNo.isNotEmpty) students.add(admNo);
@@ -5204,7 +5286,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       double total = 0;
       for (final d in studentDemands) {
         final ft = d['demfeetype']?.toString() ?? '';
-        final amt = (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+        final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+        final amt = pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
         if (ft.isNotEmpty) {
           feeAmounts[ft] = (feeAmounts[ft] ?? 0) + amt;
           total += amt;
@@ -6052,11 +6136,13 @@ class _DateGroup {
   final String date;
   final List<Map<String, dynamic>> payments;
   final double totalAmount;
+  final double totalFine;
 
   _DateGroup({
     required this.date,
     required this.payments,
     required this.totalAmount,
+    this.totalFine = 0,
   });
 }
 
@@ -6066,7 +6152,8 @@ class _ClassGroup {
   final List<Map<String, dynamic>> demands;
   final double totalDemand;
   final double totalConcession;
-  final double totalPaid;
+  final double totalPaid; // Fee-only collection (already excludes fine)
+  final double totalFine;
   final double totalPending;
   final int studentCount;
   final List<String> feeTypes; // "FeeGroup > FeeType" list
@@ -6078,6 +6165,7 @@ class _ClassGroup {
     required this.totalDemand,
     required this.totalConcession,
     required this.totalPaid,
+    this.totalFine = 0,
     required this.totalPending,
     required this.studentCount,
     this.feeTypes = const [],
@@ -6139,7 +6227,11 @@ class _StudentAccordionState extends State<_StudentAccordion> {
     final demands = widget.demands;
     final stuName = demands.first['_stuname']?.toString() ?? '-';
     final totalFee = demands.fold<double>(0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0));
-    final totalPaid = demands.fold<double>(0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0));
+    final totalPaid = demands.fold<double>(0, (s, d) {
+      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      return s + pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
+    });
     final totalBalance = demands.fold<double>(0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0));
     final allPaid = demands.every((d) => d['paidstatus'] == 'P');
     final anyPaid = demands.any((d) => d['paidstatus'] == 'P');
@@ -6232,7 +6324,9 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                     if (db == null) return -1;
                     return da.compareTo(db);
                   })).map((d) {
-                  final paidAmt = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                  final paidAmt = pa - ((pa > 0 || d['paidstatus'] == 'P') ? fa : 0);
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final statusLabel = balance <= 0 ? 'Paid' : paidAmt > 0 ? 'Partial' : 'Due';
                   final statusColor = balance <= 0 ? AppColors.success : paidAmt > 0 ? AppColors.warning : AppColors.warning;
@@ -6247,7 +6341,7 @@ class _StudentAccordionState extends State<_StudentAccordion> {
                         Expanded(flex: 3, child: Text(d['demfeetype']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
                         Expanded(flex: 2, child: Text(_formatDueDate(d['duedate']), textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                         Expanded(flex: 2, child: Text(widget.formatCurrency((d['feeamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp))),
-                        Expanded(flex: 2, child: Text(widget.formatCurrency((d['paidamount'] as num?)?.toDouble() ?? 0), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success))),
+                        Expanded(flex: 2, child: Text(widget.formatCurrency(paidAmt), textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.success))),
                         Expanded(flex: 2, child: Text(widget.formatCurrency(balance), textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: balance > 0 ? AppColors.warning : AppColors.textSecondary))),
                         SizedBox(
                           width: 50,

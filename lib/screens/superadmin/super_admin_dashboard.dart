@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -49,8 +50,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Future<void> _loadInstitutions() async {
     try {
       // Single RPC call for all institution data with finance summary
+      debugPrint('[SuperAdmin] Calling get_super_admin_dashboard RPC...');
       final rpcResult = await SupabaseService.client.rpc('get_super_admin_dashboard');
-      final dashboardData = rpcResult != null ? List<Map<String, dynamic>>.from(rpcResult as List) : <Map<String, dynamic>>[];
+      debugPrint('[SuperAdmin] RPC raw result type=${rpcResult.runtimeType} value=$rpcResult');
+      // Supabase returns json RPC results sometimes as List, sometimes as a
+      // JSON-encoded String — handle both safely.
+      List rawList;
+      if (rpcResult == null) {
+        rawList = const [];
+      } else if (rpcResult is List) {
+        rawList = rpcResult;
+      } else if (rpcResult is String) {
+        final decoded = rpcResult.isEmpty ? null : jsonDecode(rpcResult);
+        rawList = decoded is List ? decoded : const [];
+      } else {
+        rawList = const [];
+      }
+      final dashboardData =
+          rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
 
       final institutions = <Map<String, dynamic>>[];
       final summaries = <_InstitutionFinanceSummary>[];
@@ -80,17 +97,40 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _loadingFinanceData = false;
         });
       }
-    } catch (e) {
-      debugPrint('Error loading super admin dashboard: $e');
+    } catch (e, st) {
+      debugPrint('[SuperAdmin] RPC FAILED: $e');
+      debugPrint('[SuperAdmin] Stack: $st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Dashboard RPC failed: $e', style: const TextStyle(fontSize: 12)),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
       // Fallback: load institutions without finance data
       try {
         final result = await SupabaseService.client
             .from('institution')
             .select('ins_id, insname, inscode, inshortname, inslogo, insmail, insmobno, inscity, insstate, activestatus')
             .order('ins_id');
+        final insList = List<Map<String, dynamic>>.from(result);
+        final fallbackSummaries = insList.map((row) => _InstitutionFinanceSummary(
+              insId: row['ins_id'] as int? ?? 0,
+              insName: row['insname']?.toString() ?? 'Institution',
+              insCode: row['inscode']?.toString() ?? '',
+              insLogo: row['inslogo']?.toString(),
+              totalDemand: 0,
+              totalCollected: 0,
+              totalPending: 0,
+              transactionCount: 0,
+              activeStatus: row['activestatus'] == 1,
+            )).toList();
         if (mounted) {
           setState(() {
-            _institutions = List<Map<String, dynamic>>.from(result);
+            _institutions = insList;
+            _institutionSummaries = fallbackSummaries;
             _loadingInstitutions = false;
             _loadingFinanceData = false;
           });
