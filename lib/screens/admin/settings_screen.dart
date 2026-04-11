@@ -12,10 +12,50 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const _PaymentSequenceTab();
+    return Column(
+      children: [
+        Container(
+          color: Colors.white,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.accent,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.accent,
+            labelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+            tabs: const [
+              Tab(text: 'Payment Sequence'),
+              Tab(text: 'Fine Rules'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              _PaymentSequenceTab(),
+              _FineRulesTab(),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -919,4 +959,395 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
     );
   }
 
+}
+
+// ==================== Fine Rules Tab ====================
+
+class _FineRulesTab extends StatefulWidget {
+  const _FineRulesTab();
+
+  @override
+  State<_FineRulesTab> createState() => _FineRulesTabState();
+}
+
+class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  List<Map<String, dynamic>> _rules = [];
+  bool _loading = true;
+
+  final _ruleNameCtrl = TextEditingController();
+  final _fromDaysCtrl = TextEditingController();
+  final _toDaysCtrl = TextEditingController();
+  final _fineValueCtrl = TextEditingController();
+  String _fineType = 'FIXED';
+  String _feeType = '';
+  List<String> _feeTypes = [];
+  int? _editingId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRules();
+    _loadFeeTypes();
+  }
+
+  @override
+  void dispose() {
+    _ruleNameCtrl.dispose();
+    _fromDaysCtrl.dispose();
+    _toDaysCtrl.dispose();
+    _fineValueCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRules() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final result = await SupabaseService.fromSchema('finerule')
+          .select('*')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('from_days');
+      if (mounted) setState(() { _rules = List<Map<String, dynamic>>.from(result); _loading = false; });
+    } catch (e) {
+      debugPrint('Error loading fine rules: $e');
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadFeeTypes() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      // Only show fee types where fines are applicable (feefineapplicable = 1)
+      final response = await SupabaseService.fromSchema('feetype')
+          .select('feedesc')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('feefineapplicable', 1)
+          .order('fee_id', ascending: true);
+      final types = (response as List)
+          .map((e) => e['feedesc']?.toString() ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+      if (mounted) {
+        setState(() {
+          _feeTypes = types;
+          if (types.isNotEmpty && (_feeType == 'ALL' || !types.contains(_feeType))) {
+            _feeType = types.first;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading fine-applicable fee types: $e');
+    }
+  }
+
+  void _clearForm() {
+    _ruleNameCtrl.clear();
+    _fromDaysCtrl.clear();
+    _toDaysCtrl.clear();
+    _fineValueCtrl.clear();
+    _fineType = 'FIXED';
+    _feeType = _feeTypes.isNotEmpty ? _feeTypes.first : '';
+    _editingId = null;
+  }
+
+  void _editRule(Map<String, dynamic> rule) {
+    setState(() {
+      _editingId = rule['fr_id'] as int?;
+      _ruleNameCtrl.text = rule['rulename']?.toString() ?? '';
+      _fromDaysCtrl.text = rule['from_days']?.toString() ?? '';
+      _toDaysCtrl.text = rule['to_days']?.toString() ?? '';
+      _fineValueCtrl.text = rule['fine_value']?.toString() ?? '';
+      _fineType = rule['fine_type']?.toString() ?? 'FIXED';
+      final ruleFeeType = rule['feetype']?.toString() ?? '';
+      _feeType = (ruleFeeType.isNotEmpty && _feeTypes.contains(ruleFeeType))
+          ? ruleFeeType
+          : (_feeTypes.isNotEmpty ? _feeTypes.first : '');
+    });
+  }
+
+  Future<void> _saveRule() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+
+    final ruleName = _ruleNameCtrl.text.trim();
+    final fromDays = int.tryParse(_fromDaysCtrl.text.trim());
+    final toDays = _toDaysCtrl.text.trim().isEmpty ? null : int.tryParse(_toDaysCtrl.text.trim());
+    final fineValue = double.tryParse(_fineValueCtrl.text.trim());
+
+    if (ruleName.isEmpty || fromDays == null || fineValue == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill Rule Name, From Days, and Fine Value'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final data = {
+      'ins_id': insId,
+      'rulename': ruleName,
+      'feetype': _feeType,
+      'from_days': fromDays,
+      'to_days': toDays,
+      'fine_type': _fineType,
+      'fine_value': fineValue,
+      'activestatus': 1,
+      'createdby': auth.userName ?? 'Admin',
+    };
+
+    try {
+      if (_editingId != null) {
+        await SupabaseService.fromSchema('finerule').update(data).eq('fr_id', _editingId!);
+      } else {
+        await SupabaseService.fromSchema('finerule').insert(data);
+      }
+      _clearForm();
+      _loadRules();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_editingId != null ? 'Rule updated' : 'Rule created'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _deleteRule(int frId) async {
+    try {
+      await SupabaseService.fromSchema('finerule').update({'activestatus': 0}).eq('fr_id', frId);
+      _loadRules();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rule deleted'), backgroundColor: AppColors.success));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: Form
+        SizedBox(
+          width: 350.w,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(16.w),
+            child: Container(
+              padding: EdgeInsets.all(20.w),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.gavel_rounded, size: 20.sp, color: AppColors.accent),
+                      SizedBox(width: 8.w),
+                      Text(_editingId != null ? 'Edit Fine Rule' : 'Add Fine Rule',
+                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: _ruleNameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Rule Name *',
+                      hintText: 'e.g., 1 Week Overdue',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      isDense: true,
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  DropdownButtonFormField<String>(
+                    value: _feeType,
+                    decoration: InputDecoration(
+                      labelText: 'Fee Type',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      isDense: true,
+                    ),
+                    items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp)))).toList(),
+                    onChanged: (v) => setState(() => _feeType = v ?? 'ALL'),
+                  ),
+                  SizedBox(height: 12.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _fromDaysCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'From Days *',
+                            hintText: '1',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: TextField(
+                          controller: _toDaysCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'To Days',
+                            hintText: '7 (empty = no limit)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12.h),
+                  DropdownButtonFormField<String>(
+                    value: _fineType,
+                    decoration: InputDecoration(
+                      labelText: 'Fine Type',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'FIXED', child: Text('Fixed Amount (Rs.)')),
+                      DropdownMenuItem(value: 'PERCENT', child: Text('Percentage (%)')),
+                    ],
+                    onChanged: (v) => setState(() => _fineType = v ?? 'FIXED'),
+                  ),
+                  SizedBox(height: 12.h),
+                  TextField(
+                    controller: _fineValueCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: _fineType == 'FIXED' ? 'Fine Amount (Rs.) *' : 'Fine Percentage (%) *',
+                      hintText: _fineType == 'FIXED' ? '50' : '2',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      isDense: true,
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _saveRule,
+                          icon: Icon(_editingId != null ? Icons.save_rounded : Icons.add_rounded, size: 18.sp),
+                          label: Text(_editingId != null ? 'Update' : 'Add Rule'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 14.h),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                          ),
+                        ),
+                      ),
+                      if (_editingId != null) ...[
+                        SizedBox(width: 8.w),
+                        TextButton(
+                          onPressed: () => setState(() => _clearForm()),
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Right: Rules list
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.all(16.w),
+                    child: Row(
+                      children: [
+                        Icon(Icons.list_rounded, size: 20.sp, color: AppColors.accent),
+                        SizedBox(width: 8.w),
+                        Text('Fine Rules', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                        const Spacer(),
+                        Text('${_rules.length} rules', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        SizedBox(width: 8.w),
+                        IconButton(onPressed: _loadRules, icon: Icon(Icons.refresh_rounded, size: 18.sp), tooltip: 'Refresh'),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  if (_loading)
+                    const Expanded(child: Center(child: CircularProgressIndicator()))
+                  else if (_rules.isEmpty)
+                    Expanded(child: Center(child: Text('No fine rules configured', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp))))
+                  else
+                    Expanded(
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
+                        headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                        dataTextStyle: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
+                        columnSpacing: 16, horizontalMargin: 16, headingRowHeight: 40,
+                        columns: const [
+                          DataColumn(label: Text('Rule Name')),
+                          DataColumn(label: Text('Fee Type')),
+                          DataColumn(label: Text('From Days')),
+                          DataColumn(label: Text('To Days')),
+                          DataColumn(label: Text('Type')),
+                          DataColumn(label: Text('Value')),
+                          DataColumn(label: Text('Actions')),
+                        ],
+                        rows: _rules.map((r) {
+                          final fineType = r['fine_type']?.toString() ?? 'FIXED';
+                          final fineValue = (r['fine_value'] as num?)?.toDouble() ?? 0;
+                          return DataRow(cells: [
+                            DataCell(Text(r['rulename']?.toString() ?? '')),
+                            DataCell(Text(r['feetype']?.toString() ?? 'ALL')),
+                            DataCell(Text('${r['from_days'] ?? 0}')),
+                            DataCell(Text(r['to_days'] != null ? '${r['to_days']}' : '∞')),
+                            DataCell(Text(fineType == 'FIXED' ? 'Fixed' : 'Percent')),
+                            DataCell(Text(fineType == 'FIXED' ? '₹${fineValue.toStringAsFixed(0)}' : '${fineValue.toStringAsFixed(1)}%')),
+                            DataCell(Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit_rounded, size: 16.sp, color: AppColors.accent),
+                                  onPressed: () => _editRule(r),
+                                  tooltip: 'Edit',
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete_rounded, size: 16.sp, color: AppColors.error),
+                                  onPressed: () => _deleteRule(r['fr_id'] as int),
+                                  tooltip: 'Delete',
+                                ),
+                              ],
+                            )),
+                          ]);
+                        }).toList(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
