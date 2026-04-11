@@ -720,79 +720,89 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
     return ListView.builder(
       padding: EdgeInsets.symmetric(vertical: 4.h),
-      itemCount: _classes.length,
-      itemBuilder: (context, index) {
-        final className = _classes[index];
-        // Use background-loaded count if available, else RPC count
-        final count = _groupedStudents[className]?.length ?? _classCounts[className] ?? 0;
-        final classColor = _getClassColor(className);
-        final isSelected = _selectedClassFilter == className;
-        return Material(
-          color: isSelected ? classColor.withValues(alpha: 0.1) : Colors.transparent,
-          child: InkWell(
-            onTap: () async {
-              setState(() {
-                _selectedClassFilter = className;
-                _selectedCourseFilter = null;
-                _selectedStudent = null;
-                _studentPage = 0;
-                _searchController.clear();
-              });
-              // Lazy-load if background load hasn't provided this class yet
-              if ((_groupedStudents[className]?.isEmpty ?? true) && _cachedClassStudents[className] == null) {
-                setState(() => _loadingClassStudents = true);
-                final auth = context.read<AuthProvider>();
-                final insId = auth.insId ?? 1;
-                final classStudents = await SupabaseService.getStudentsByClass(insId, className);
-                if (mounted) {
-                  setState(() {
-                    _cachedClassStudents[className] = classStudents;
-                    _loadingClassStudents = false;
-                  });
-                }
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-              decoration: BoxDecoration(
-                border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
-                color: isSelected ? classColor.withValues(alpha: 0.08) : null,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36.w,
-                    height: 36.h,
-                    decoration: BoxDecoration(
-                      color: isSelected ? classColor.withValues(alpha: 0.2) : classColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Center(child: Icon(Icons.class_rounded, size: 18.sp, color: classColor)),
-                  ),
-                  SizedBox(width: 10.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? classColor : AppColors.textPrimary)),
-                        Text('$count students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                    decoration: BoxDecoration(
-                      color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
-                  ),
-                  SizedBox(width: 8.w),
-                  Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded, size: 18.sp, color: isSelected ? classColor : AppColors.textSecondary),
-                ],
-              ),
-            ),
+      itemCount: courseNames.length,
+      itemBuilder: (context, courseIndex) {
+        final courseName = courseNames[courseIndex];
+        final classCounts = courseClassCounts[courseName]!;
+        final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
+
+        return ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
+          title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          trailing: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+            child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
           ),
+          children: classCounts.keys.map((className) {
+            final count = classCounts[className] ?? 0;
+            final classColor = _getClassColor(className);
+            final isSelected = _selectedClassFilter == className && _selectedCourseFilter == courseName;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  setState(() {
+                    _selectedClassFilter = className;
+                    _selectedCourseFilter = courseName;
+                    _selectedStudent = null;
+                    _studentPage = 0;
+                    _searchController.clear();
+                  });
+                  if ((_groupedStudents[className]?.isEmpty ?? true) && _cachedClassStudents[className] == null) {
+                    setState(() => _loadingClassStudents = true);
+                    final auth = context.read<AuthProvider>();
+                    final insId = auth.insId ?? 1;
+                    final classStudents = await SupabaseService.getStudentsByClass(insId, className);
+                    if (mounted) {
+                      setState(() {
+                        _cachedClassStudents[className] = classStudents;
+                        _loadingClassStudents = false;
+                      });
+                    }
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+                  decoration: BoxDecoration(
+                    color: isSelected ? classColor.withValues(alpha: 0.08) : null,
+                    border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34.w, height: 34.h,
+                        decoration: BoxDecoration(
+                          color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
+                          borderRadius: BorderRadius.circular(9.r),
+                        ),
+                        child: Center(child: Icon(Icons.class_rounded, size: 16.sp, color: classColor)),
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(className, style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? classColor : AppColors.textPrimary)),
+                            Text('$count students', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Text('$count', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: classColor)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         );
       },
     );
@@ -1242,45 +1252,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
             SizedBox(width: 10.w),
             Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
-            SizedBox(
-              width: 280.w,
-              height: 40.h,
-              child: TextField(
-                controller: _globalSearchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by name, adm no, mobile...',
-                  hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
-                  prefixIcon: Icon(Icons.search_rounded, size: 18.sp, color: AppColors.textSecondary),
-                  suffixIcon: _globalSearchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.close, size: 16.sp),
-                          onPressed: () {
-                            _globalSearchController.clear();
-                            _performGlobalSearch('');
-                          },
-                        )
-                      : null,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                    borderSide: BorderSide(color: AppColors.primary),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  isDense: true,
-                ),
-                style: TextStyle(fontSize: 14.sp),
-                onChanged: (val) => _performGlobalSearch(val),
-              ),
-            ),
             SizedBox(width: 12.w),
             OutlinedButton.icon(
               onPressed: () => setState(() {

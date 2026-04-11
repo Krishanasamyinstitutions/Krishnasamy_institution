@@ -19,9 +19,6 @@ class SuperAdminDashboard extends StatefulWidget {
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
-  DateTime _fromDate = DateTime.now();
-  DateTime _toDate = DateTime.now();
-  String _activeFilter = 'Today';
 
   static const List<_SANavItem> _navItems = [
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
@@ -51,119 +48,62 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Future<void> _loadInstitutions() async {
     try {
-      final result = await SupabaseService.client
-          .from('institution')
-          .select('ins_id, insname, inscode, inshortname, inslogo, insmail, insmobno, inscity, insstate, activestatus')
-          .order('insname');
-      final institutions = List<Map<String, dynamic>>.from(result);
-      await _loadFinanceData(institutions);
+      // Single RPC call for all institution data with finance summary
+      final rpcResult = await SupabaseService.client.rpc('get_super_admin_dashboard');
+      final dashboardData = rpcResult != null ? List<Map<String, dynamic>>.from(rpcResult as List) : <Map<String, dynamic>>[];
+
+      final institutions = <Map<String, dynamic>>[];
+      final summaries = <_InstitutionFinanceSummary>[];
+
+      for (final row in dashboardData) {
+        institutions.add(row);
+        summaries.add(
+          _InstitutionFinanceSummary(
+            insId: row['ins_id'] as int? ?? 0,
+            insName: row['insname']?.toString() ?? 'Institution',
+            insCode: row['inscode']?.toString() ?? '',
+            insLogo: row['inslogo']?.toString(),
+            totalDemand: (row['total_demand'] as num?)?.toDouble() ?? 0,
+            totalCollected: (row['total_collected'] as num?)?.toDouble() ?? 0,
+            totalPending: (row['total_pending'] as num?)?.toDouble() ?? 0,
+            transactionCount: (row['transaction_count'] as num?)?.toInt() ?? 0,
+            activeStatus: row['activestatus'] == 1,
+          ),
+        );
+      }
+
       if (mounted) {
         setState(() {
           _institutions = institutions;
-          _loadingInstitutions = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
+          _institutionSummaries = summaries;
           _loadingInstitutions = false;
           _loadingFinanceData = false;
         });
       }
-    }
-  }
-
-  Future<void> _loadFinanceData(List<Map<String, dynamic>> institutions) async {
-    final previousSchema = SupabaseService.currentSchema;
-    final summaries = <_InstitutionFinanceSummary>[];
-    final allTransactions = <_SuperAdminTransactionRow>[];
-
-    try {
-      for (final ins in institutions) {
-        final insId = ins['ins_id'] as int?;
-        final insName = ins['insname']?.toString() ?? 'Institution';
-        final insCode = ins['inscode']?.toString() ?? '';
-        final shortName = ins['inshortname']?.toString().toLowerCase();
-        final insLogo = ins['inslogo']?.toString();
-
-        if (insId == null || shortName == null || shortName.isEmpty) {
-          summaries.add(
-            _InstitutionFinanceSummary(
-              insId: insId ?? 0,
-              insName: insName,
-              insCode: insCode,
-              insLogo: insLogo,
-              totalDemand: 0,
-              totalCollected: 0,
-              totalPending: 0,
-              transactionCount: 0,
-              activeStatus: ins['activestatus'] == 1,
-            ),
-          );
-          continue;
-        }
-
-        final yearLabel = await _fetchLatestYearLabel(insId);
-        final schemaName = '$shortName${yearLabel.replaceAll('-', '')}';
-
-        SupabaseService.setSchema(schemaName);
-
-        final results = await Future.wait([
-          SupabaseService.getFeeSummary(insId),
-          SupabaseService.getAllTransactions(insId),
-        ]);
-
-        final feeSummary = results[0] as FeeSummary;
-        final transactionMaps = results[1] as List<Map<String, dynamic>>;
-        final payments = transactionMaps.map(PaymentModel.fromJson).toList()
-          ..sort((a, b) {
-            final aDate = a.paydate ?? a.createdat;
-            final bDate = b.paydate ?? b.createdat;
-            return bDate.compareTo(aDate);
-          });
-
-        summaries.add(
-          _InstitutionFinanceSummary(
-            insId: insId,
-            insName: insName,
-            insCode: insCode,
-            insLogo: insLogo,
-            totalDemand: feeSummary.totalDue,
-            totalCollected: feeSummary.totalPaid,
-            totalPending: feeSummary.totalPending,
-            transactionCount: payments.length,
-            activeStatus: ins['activestatus'] == 1,
-          ),
-        );
-
-        allTransactions.addAll(
-          payments.take(10).map(
-            (payment) => _SuperAdminTransactionRow(
-              institutionName: insName,
-              institutionCode: insCode,
-              payment: payment,
-            ),
-          ),
-        );
-      }
     } catch (e) {
-      debugPrint('Error loading super admin finance data: $e');
-    } finally {
-      SupabaseService.setSchema(previousSchema);
+      debugPrint('Error loading super admin dashboard: $e');
+      // Fallback: load institutions without finance data
+      try {
+        final result = await SupabaseService.client
+            .from('institution')
+            .select('ins_id, insname, inscode, inshortname, inslogo, insmail, insmobno, inscity, insstate, activestatus')
+            .order('ins_id');
+        if (mounted) {
+          setState(() {
+            _institutions = List<Map<String, dynamic>>.from(result);
+            _loadingInstitutions = false;
+            _loadingFinanceData = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _loadingInstitutions = false;
+            _loadingFinanceData = false;
+          });
+        }
+      }
     }
-
-    allTransactions.sort((a, b) {
-      final aDate = a.payment.paydate ?? a.payment.createdat;
-      final bDate = b.payment.paydate ?? b.payment.createdat;
-      return bDate.compareTo(aDate);
-    });
-
-    if (!mounted) return;
-    setState(() {
-      _institutionSummaries = summaries;
-      _recentTransactions = allTransactions.take(20).toList();
-      _loadingFinanceData = false;
-    });
   }
 
   Future<String> _fetchLatestYearLabel(int insId) async {
@@ -436,73 +376,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.filter_alt_rounded, size: 18.sp, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
-                SizedBox(width: 8.w),
-                _buildDateChip(_fromDate, () => _pickDate(true)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                _buildDateChip(_toDate, () => _pickDate(false)),
-                SizedBox(width: 12.w),
-                _buildQuickFilter('Today', () {
-                  setState(() {
-                    _fromDate = DateTime.now();
-                    _toDate = DateTime.now();
-                    _activeFilter = 'Today';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('7 Days', () {
-                  setState(() {
-                    _toDate = DateTime.now();
-                    _fromDate = DateTime.now().subtract(const Duration(days: 7));
-                    _activeFilter = '7 Days';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('30 Days', () {
-                  setState(() {
-                    _toDate = DateTime.now();
-                    _fromDate = DateTime.now().subtract(const Duration(days: 30));
-                    _activeFilter = '30 Days';
-                  });
-                }),
-                SizedBox(width: 6.w),
-                _buildQuickFilter('This Month', () {
-                  final now = DateTime.now();
-                  setState(() {
-                    _fromDate = DateTime(now.year, now.month, 1);
-                    _toDate = now;
-                    _activeFilter = 'This Month';
-                  });
-                }),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: _loadInstitutions,
-                  icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                  label: const Text('Refresh'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 16.h),
           if (_loadingFinanceData)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_institutionSummaries.isEmpty)
@@ -926,72 +799,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Future<void> _pickDate(bool isFrom) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: isFrom ? _fromDate : _toDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isFrom) {
-          _fromDate = picked;
-        } else {
-          _toDate = picked;
-        }
-        _activeFilter = '';
-      });
-    }
-  }
-
-  Widget _buildDateChip(DateTime date, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8.r),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.calendar_today, size: 14.sp, color: AppColors.accent),
-            SizedBox(width: 6.w),
-            Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickFilter(String label, VoidCallback onTap) {
-    final isActive = _activeFilter == label;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.sp,
-            color: isActive ? Colors.white : AppColors.textSecondary,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
   String _formatCurrency(double value) {
     final fixed = value.toStringAsFixed(2);
     final parts = fixed.split('.');
@@ -1171,83 +978,18 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
 
   Future<void> _loadDetails() async {
     final s = widget.summary;
-    final previousSchema = SupabaseService.currentSchema;
     try {
-      final insResult = await SupabaseService.client
-          .from('institution')
-          .select('inshortname')
-          .eq('ins_id', s.insId)
-          .maybeSingle();
-      final shortName = insResult?['inshortname']?.toString().toLowerCase();
-      if (shortName == null || shortName.isEmpty) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
+      // Single RPC call for course-wise breakdown
+      final rpcResult = await SupabaseService.client.rpc('get_institution_course_summary', params: {
+        'p_ins_id': s.insId,
+      });
+      final courseData = rpcResult != null ? List<Map<String, dynamic>>.from(rpcResult as List) : <Map<String, dynamic>>[];
 
-      final yrResult = await SupabaseService.client
-          .from('institutionyear')
-          .select('yrlabel')
-          .eq('ins_id', s.insId)
-          .eq('activestatus', 1)
-          .order('iyr_id', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      final year = DateTime.now().year;
-      final yrLabel = yrResult?['yrlabel']?.toString() ?? '$year-${year + 1}';
-      final schemaName = '$shortName${yrLabel.replaceAll('-', '')}';
-
-      SupabaseService.setSchema(schemaName);
-
-      // Fetch feedemand with stu_id, paidamount, balancedue (paginated)
-      final feedemandList = <Map<String, dynamic>>[];
-      const batchSize = 1000;
-      int offset = 0;
-      while (true) {
-        final batch = await SupabaseService.fromSchema('feedemand')
-            .select('stu_id, paidamount, balancedue')
-            .eq('ins_id', s.insId)
-            .range(offset, offset + batchSize - 1);
-        final list = List<Map<String, dynamic>>.from(batch);
-        feedemandList.addAll(list);
-        if (list.length < batchSize) break;
-        offset += batchSize;
-      }
-
-      // Fetch students with courname (paginated) - table is 'students' (plural)
-      final stuCourseMap = <int, String>{};
-      offset = 0;
-      while (true) {
-        final batch = await SupabaseService.fromSchema('students')
-            .select('stu_id, courname')
-            .eq('ins_id', s.insId)
-            .range(offset, offset + batchSize - 1);
-        final list = List<Map<String, dynamic>>.from(batch);
-        for (final sr in list) {
-          final sid = sr['stu_id'] as int?;
-          final course = sr['courname']?.toString() ?? 'Other';
-          if (sid != null) stuCourseMap[sid] = course;
-        }
-        if (list.length < batchSize) break;
-        offset += batchSize;
-      }
-
-      // Group feedemand by student's course
-      final collectionMap = <String, double>{};
-      final pendingMap = <String, double>{};
-      for (final row in feedemandList) {
-        final stuId = row['stu_id'] as int?;
-        final course = stuCourseMap[stuId ?? 0] ?? 'Other';
-        final paid = (row['paidamount'] as num?)?.toDouble() ?? 0;
-        final balance = (row['balancedue'] as num?)?.toDouble() ?? 0;
-        collectionMap[course] = (collectionMap[course] ?? 0) + paid;
-        pendingMap[course] = (pendingMap[course] ?? 0) + balance;
-      }
-
-      final allCourses = {...collectionMap.keys, ...pendingMap.keys}.toList()..sort();
-      final classWise = allCourses.map((course) => {
-        'class': course,
-        'collection': collectionMap[course] ?? 0.0,
-        'pending': pendingMap[course] ?? 0.0,
+      final classWise = courseData.map((row) => {
+        'class': '${row['course'] ?? 'Other'} - ${row['class'] ?? ''}',
+        'collection': (row['collection'] as num?)?.toDouble() ?? 0.0,
+        'pending': (row['pending'] as num?)?.toDouble() ?? 0.0,
+        'students': (row['students'] as num?)?.toInt() ?? 0,
       }).toList();
 
       if (mounted) {
@@ -1259,8 +1001,6 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
     } catch (e) {
       debugPrint('Error loading institution details: $e');
       if (mounted) setState(() => _loading = false);
-    } finally {
-      SupabaseService.setSchema(previousSchema);
     }
   }
 
@@ -1346,7 +1086,8 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(flex: 2, child: Text('Course', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+                        Expanded(flex: 3, child: Text('Course - Class', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+                        Expanded(child: Text('Students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent), textAlign: TextAlign.right)),
                         Expanded(child: Text('Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: collectionColor), textAlign: TextAlign.right)),
                         Expanded(child: Text('Pending', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: pendingColor), textAlign: TextAlign.right)),
                       ],
@@ -1378,7 +1119,8 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                                   child: Row(
                                     children: [
-                                      Expanded(flex: 2, child: Text(cls, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                                      Expanded(flex: 3, child: Text(cls, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                                      Expanded(child: Text('${row['students'] ?? 0}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent), textAlign: TextAlign.right)),
                                       Expanded(child: Text(_fmt(collection), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: collectionColor), textAlign: TextAlign.right)),
                                       Expanded(child: Text(_fmt(pending), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: pendingColor), textAlign: TextAlign.right)),
                                     ],

@@ -45,48 +45,46 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
 
     setState(() => _isLoading = true);
     try {
-      // Fetch pending and reconciled in parallel
-      final results = await Future.wait([
-        SupabaseService.fromSchema('payment')
-            .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, paychequeno, payorderid, stu_id, createdby, recon_status')
-            .eq('ins_id', insId)
-            .eq('paystatus', 'C')
-            .eq('recon_status', 'P')
-            .eq('activestatus', 1)
-            .order('paydate', ascending: false),
-        SupabaseService.fromSchema('payment')
-            .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, stu_id, createdby, recon_status, reconciled_by, reconciled_date, bank_reference')
-            .eq('ins_id', insId)
-            .eq('paystatus', 'C')
-            .eq('recon_status', 'R')
-            .eq('activestatus', 1)
-            .order('reconciled_date', ascending: false)
-            .limit(100),
-      ]);
-      final pending = results[0];
-      final reconciled = results[1];
-
-      // Fetch student names for display
-      final allPayments = [...pending, ...reconciled];
-      final stuIds = allPayments.map((p) => p['stu_id']).toSet().toList();
-      Map<int, String> stuNames = {};
-      if (stuIds.isNotEmpty) {
-        try {
-          final students = await SupabaseService.fromSchema('students')
-              .select('stu_id, stuname, stuadmno')
-              .inFilter('stu_id', stuIds);
-          for (final s in students) {
-            stuNames[s['stu_id'] as int] = '${s['stuname']} (${s['stuadmno']})';
-          }
-        } catch (_) {}
-      }
-
-      // Attach student names
-      for (final p in pending) {
-        p['student_display'] = stuNames[p['stu_id']] ?? 'Student #${p['stu_id']}';
-      }
-      for (final p in reconciled) {
-        p['student_display'] = stuNames[p['stu_id']] ?? 'Student #${p['stu_id']}';
+      // Single RPC call for all bank recon data
+      List pending;
+      List reconciled;
+      try {
+        final rpcResult = await SupabaseService.client.rpc('get_bank_recon_data', params: {'p_ins_id': insId});
+        final data = rpcResult as Map<String, dynamic>? ?? {};
+        pending = List<Map<String, dynamic>>.from(data['pending'] ?? []);
+        reconciled = List<Map<String, dynamic>>.from(data['reconciled'] ?? []);
+        // Build student_display from RPC data (already has stuname, stuadmno)
+        for (final p in pending) {
+          p['student_display'] = '${p['stuname'] ?? ''} (${p['stuadmno'] ?? ''})'.trim();
+          if (p['student_display'] == '()') p['student_display'] = 'Student #${p['stu_id']}';
+        }
+        for (final p in reconciled) {
+          p['student_display'] = '${p['stuname'] ?? ''} (${p['stuadmno'] ?? ''})'.trim();
+          if (p['student_display'] == '()') p['student_display'] = 'Student #${p['stu_id']}';
+        }
+      } catch (e) {
+        debugPrint('RPC get_bank_recon_data failed, using fallback: $e');
+        // Fallback to direct queries
+        final results = await Future.wait([
+          SupabaseService.fromSchema('payment')
+              .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, paychequeno, payorderid, stu_id, createdby, recon_status')
+              .eq('ins_id', insId).eq('paystatus', 'C').eq('recon_status', 'P').eq('activestatus', 1).order('paydate', ascending: false),
+          SupabaseService.fromSchema('payment')
+              .select('pay_id, paynumber, transtotalamount, paydate, paymethod, payreference, stu_id, createdby, recon_status, reconciled_by, reconciled_date, bank_reference')
+              .eq('ins_id', insId).eq('paystatus', 'C').eq('recon_status', 'R').eq('activestatus', 1).order('reconciled_date', ascending: false).limit(100),
+        ]);
+        pending = results[0]; reconciled = results[1];
+        final allPayments = [...pending, ...reconciled];
+        final stuIds = allPayments.map((p) => p['stu_id']).toSet().toList();
+        Map<int, String> stuNames = {};
+        if (stuIds.isNotEmpty) {
+          try {
+            final students = await SupabaseService.fromSchema('students').select('stu_id, stuname, stuadmno').inFilter('stu_id', stuIds);
+            for (final s in students) { stuNames[s['stu_id'] as int] = '${s['stuname']} (${s['stuadmno']})'; }
+          } catch (_) {}
+        }
+        for (final p in pending) { p['student_display'] = stuNames[p['stu_id']] ?? 'Student #${p['stu_id']}'; }
+        for (final p in reconciled) { p['student_display'] = stuNames[p['stu_id']] ?? 'Student #${p['stu_id']}'; }
       }
 
       if (mounted) {

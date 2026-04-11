@@ -399,7 +399,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }).toList();
     dateGroups.sort((a, b) => b.date.compareTo(a.date));
 
-    // Show table immediately — no waiting for heavy data
     if (mounted) {
       setState(() {
         _payments = payments;
@@ -1075,11 +1074,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             final idx = entry.key;
                             final p = entry.value;
                             final stuId = p['stu_id'] as int?;
-                            final stuName = (stuId != null && _stuIdToName.containsKey(stuId))
-                                ? _stuIdToName[stuId]!
+                            final stuName = p['stuname']?.toString().isNotEmpty == true ? p['stuname'].toString()
+                                : (stuId != null && _stuIdToName.containsKey(stuId)) ? _stuIdToName[stuId]!
                                 : (p['stuadmno']?.toString() ?? '-');
-                            final stuCourse = (stuId != null && _stuIdToCourse.containsKey(stuId)) ? _stuIdToCourse[stuId]! : '-';
-                            final stuClass = (stuId != null && _stuIdToClass.containsKey(stuId)) ? _stuIdToClass[stuId]! : '-';
+                            final stuCourse = p['courname']?.toString().isNotEmpty == true ? p['courname'].toString()
+                                : (stuId != null && _stuIdToCourse.containsKey(stuId)) ? _stuIdToCourse[stuId]! : '-';
+                            final stuClass = p['stuclass']?.toString().isNotEmpty == true ? p['stuclass'].toString()
+                                : (stuId != null && _stuIdToClass.containsKey(stuId)) ? _stuIdToClass[stuId]! : '-';
                             final amount = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
                             return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)), cells: [
                               DataCell(Text('${idx + 1}', style: const TextStyle(color: AppColors.textSecondary))),
@@ -1125,7 +1126,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }
   }
 
-  Widget _buildClickableSummaryCard(IconData icon, Color iconColor, String value, String label, VoidCallback onTap) {
+  Widget _buildClickableSummaryCard(IconData icon, Color iconColor, String value, String label, VoidCallback onTap, {String? subtitle}) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -1154,6 +1155,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   children: [
                     Text(value, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                     Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                    if (subtitle != null) Text(subtitle, style: TextStyle(fontSize: 9.sp, color: Colors.orange, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -1391,7 +1393,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final gStuIds = <String>{};
                   for (final d in items) {
                     gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    gPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    gPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
                     gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                     if (((d['balancedue'] as num?)?.toDouble() ?? 0) > 0) {
                       final sid = d['stu_id']?.toString();
@@ -1529,7 +1531,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       ? _feeGroupById[dFeeId]!
                       : (_feeGroupByName[dFeeType] ?? dFeeType);
                   final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final paid = ((d['paidamount'] as num?)?.toDouble() ?? 0);
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
                   final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : Colors.red;
@@ -1782,7 +1784,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   double sDemand = 0, sPaid = 0, sBalance = 0;
                   for (final d in demands) {
                     sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    sPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    sPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
                     sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
                   final statusLabel = sBalance <= 0 ? 'Paid' : sPaid > 0 ? 'Partial' : 'Unpaid';
@@ -1978,7 +1980,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               final group = entry.value;
                               return DataRow(
                                 color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
-                                onSelectChanged: (_) => setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; }),
+                                onSelectChanged: (_) {
+                                  setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; });
+                                },
                                 cells: [
                                   DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
                                   DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600))),
@@ -2232,7 +2236,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           DataColumn(label: Text('COURSE')),
                           DataColumn(label: Text('CLASS')),
                           DataColumn(label: Text('METHOD')),
-                          DataColumn(label: Text('AMOUNT'), numeric: true),
+                          DataColumn(label: Text('TOTAL'), numeric: true),
                           DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
                         ],
                         rows: [
@@ -2240,6 +2244,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             final p = filtered[i];
                             final student = p['students'] as Map<String, dynamic>?;
                             final timeStr = _formatTime(p['createdat'] ?? p['paydate']);
+                            final totalAmt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
                             return DataRow(
                               color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
                               onSelectChanged: (_) => _onPaymentTap(p),
@@ -2252,7 +2257,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 DataCell(Text(student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : (_stuIdToCourse[p['stu_id'] as int?] ?? '-'))),
                                 DataCell(Text(student?['stuclass']?.toString() ?? '-')),
                                 DataCell(Text(p['paymethod'] ?? '-')),
-                                DataCell(Text(_formatCurrency((p['transtotalamount'] as num?)?.toDouble() ?? 0), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
+                                DataCell(Text(_formatCurrency(totalAmt), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.success))),
                                 DataCell(Align(
                                   alignment: Alignment.centerRight,
                                   child: Container(
@@ -2335,7 +2340,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       }
     }
 
-    // Build fee details grouped by term
+    // Build fee details grouped by term — fine is shown as a separate line item
     List<ReceiptTermDetail> termDetails = [];
     if (feeDetails != null && feeDetails.isNotEmpty) {
       const monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
@@ -2344,6 +2349,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         String term = d['demfeeterm']?.toString() ?? '-';
         final feeType = d['demfeetype']?.toString() ?? 'Fee';
         final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
+        final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
         if (monthFeeTypes.contains(feeType.toUpperCase())) {
           final duedate = d['duedate'];
           if (duedate != null) {
@@ -2355,6 +2361,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         }
         termMap.putIfAbsent(term, () => []);
         termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: amount));
+        if (fine > 0) {
+          termMap[term]!.add(ReceiptFeeItem(type: '  Fine', amount: fine));
+        }
       }
       termDetails = termMap.entries.map((e) => ReceiptTermDetail(term: e.key, fees: e.value)).toList();
     }
@@ -3191,28 +3200,22 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     // Fetch fresh data directly from feedemand table for accurate export
     // First page to estimate total, then fetch remaining pages in parallel
-    final allFresh = <Map<String, dynamic>>[];
-    const pageSize = 1000;
-    final firstBatch = await SupabaseService.fromSchema('feedemand')
-        .select('stu_id, stuadmno, stuclass, courname, demfeetype, demfeeterm, feeamount, conamount, balancedue, reconbalancedue, paidstatus')
-        .eq('ins_id', insId)
-        .eq('activestatus', 1)
-        .range(0, pageSize - 1);
-    allFresh.addAll(List<Map<String, dynamic>>.from(firstBatch));
-    if (firstBatch.length == pageSize) {
-      final pageFutures = <Future>[];
-      for (int p = 1; p <= 20; p++) {
-        pageFutures.add(SupabaseService.fromSchema('feedemand')
+    // Single RPC call for all feedemand data with student names
+    var allFresh = <Map<String, dynamic>>[];
+    try {
+      final rpcResult = await SupabaseService.client.rpc('get_pending_export_data', params: {'p_ins_id': insId});
+      if (rpcResult != null) allFresh = List<Map<String, dynamic>>.from(rpcResult as List);
+    } catch (e) {
+      debugPrint('RPC get_pending_export_data failed, using fallback: $e');
+      const pageSize = 1000;
+      int offset = 0;
+      while (true) {
+        final batch = await SupabaseService.fromSchema('feedemand')
             .select('stu_id, stuadmno, stuclass, courname, demfeetype, demfeeterm, feeamount, conamount, balancedue, reconbalancedue, paidstatus')
-            .eq('ins_id', insId)
-            .eq('activestatus', 1)
-            .range(p * pageSize, (p + 1) * pageSize - 1));
-      }
-      final results = await Future.wait(pageFutures);
-      for (final batch in results) {
-        final rows = List<Map<String, dynamic>>.from(batch);
-        allFresh.addAll(rows);
-        if (rows.length < pageSize) break;
+            .eq('ins_id', insId).eq('activestatus', 1).range(offset, offset + pageSize - 1);
+        allFresh.addAll(List<Map<String, dynamic>>.from(batch));
+        if (batch.length < pageSize) break;
+        offset += pageSize;
       }
     }
     demands = allFresh;
@@ -3420,10 +3423,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       });
     }
 
-    // Sort by course+class then admNo
+    // Sort by course, then class (I Year, II Year, III Year), then admNo
     studentRows.sort((a, b) {
-      final groupCmp = (a['groupKey'] as String).compareTo(b['groupKey'] as String);
-      if (groupCmp != 0) return groupCmp;
+      final courseCmp = (a['courname'] as String).compareTo(b['courname'] as String);
+      if (courseCmp != 0) return courseCmp;
+      final classCmp = _compareClass(a['class'] as String, b['class'] as String);
+      if (classCmp != 0) return classCmp;
       return (a['admNo'] as String).compareTo(b['admNo'] as String);
     });
 
@@ -4484,7 +4489,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 for (final key in studentKeys) {
                   for (final d in byStudent[key]!) {
                     gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    gPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    gPaid += ((d['paidamount'] as num?)?.toDouble() ?? 0);
                     gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
                   }
                 }
@@ -5057,7 +5062,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
       return dateStr.compareTo(fromStr) >= 0 && dateStr.compareTo(toStr) <= 0;
     }).toList();
 
-    // Collect all fee types from paid demands
+    // Collect all fee types from paid demands (FINE rows treated as normal fee type)
     final Set<String> feeTypeSet = {};
     for (final d in filtered) {
       final ft = d['demfeetype']?.toString() ?? '';
@@ -5202,8 +5207,8 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         final amt = (d['paidamount'] as num?)?.toDouble() ?? 0;
         if (ft.isNotEmpty) {
           feeAmounts[ft] = (feeAmounts[ft] ?? 0) + amt;
+          total += amt;
         }
-        total += amt;
       }
 
       rows.add({
@@ -5852,7 +5857,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     // Filter fee types to only those with actual payments
     final activeFeeTypes = feeTypes.where((ft) => (grandFeeTypeTotals[ft] ?? 0) > 0).toList();
 
-    final totalCols = 6 + activeFeeTypes.length + 1;
+    final totalCols = 6 + activeFeeTypes.length + 1; // +1 for TOTAL
     int row = 0;
 
     // Institution name

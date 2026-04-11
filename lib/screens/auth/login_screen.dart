@@ -71,7 +71,18 @@ class _LoginScreenState extends State<LoginScreen> {
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .order('iyr_id', ascending: false);
-      final years = List<Map<String, dynamic>>.from(result);
+      final rawYears = List<Map<String, dynamic>>.from(result);
+      // Deduplicate by yrlabel — the Material DropdownButton crashes if two
+      // items share the same value. Defensive against duplicate rows in
+      // public.institutionyear.
+      final seen = <String>{};
+      final years = <Map<String, dynamic>>[];
+      for (final y in rawYears) {
+        final label = y['yrlabel']?.toString() ?? '';
+        if (label.isEmpty || seen.contains(label)) continue;
+        seen.add(label);
+        years.add(y);
+      }
       if (mounted) {
         setState(() {
           _availableYears = years;

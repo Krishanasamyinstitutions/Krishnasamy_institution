@@ -79,14 +79,21 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  /// Query feedemand table directly to get actual demfeeterm values
+  /// Fetch fee report data via RPC (single call, no pagination needed)
   Future<List<Map<String, dynamic>>> _fetchFeeDemandsDirectly(int insId) async {
+    try {
+      final result = await SupabaseService.client.rpc('get_fee_report_data', params: {'p_ins_id': insId});
+      if (result != null) return List<Map<String, dynamic>>.from(result as List);
+    } catch (e) {
+      debugPrint('RPC get_fee_report_data failed, using fallback: $e');
+    }
+    // Fallback: direct query
     const batchSize = 1000;
     int offset = 0;
-    final List<Map<String, dynamic>> allResults = [];
+    final allResults = <Map<String, dynamic>>[];
     while (true) {
       final batch = await SupabaseService.fromSchema('feedemand')
-          .select('fee_id, stu_id, feeamount, conamount, paidamount, balancedue, reconbalancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, activestatus')
+          .select('fee_id, stu_id, feeamount, conamount, paidamount, fineamount, balancedue, reconbalancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, activestatus')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .range(offset, offset + batchSize - 1);
@@ -95,28 +102,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       if (list.length < batchSize) break;
       offset += batchSize;
     }
-    // Enrich with student names — fetch all chunks in parallel
+    // Enrich with student names
     final stuIds = allResults.map((d) => d['stu_id']).where((id) => id != null).toSet().toList();
     final Map<int, String> stuNameMap = {};
-    if (stuIds.isNotEmpty) {
-      final chunks = <List>[];
-      for (int i = 0; i < stuIds.length; i += 200) {
-        chunks.add(stuIds.sublist(i, (i + 200).clamp(0, stuIds.length)));
-      }
-      final results = await Future.wait(chunks.map((chunk) =>
-        SupabaseService.fromSchema('students')
-            .select('stu_id, stuname')
-            .inFilter('stu_id', chunk)
-      ));
-      for (final students in results) {
-        for (final s in students) {
-          stuNameMap[s['stu_id'] as int] = s['stuname']?.toString() ?? '';
-        }
-      }
+    for (int i = 0; i < stuIds.length; i += 200) {
+      final chunk = stuIds.sublist(i, (i + 200).clamp(0, stuIds.length));
+      final students = await SupabaseService.fromSchema('students').select('stu_id, stuname').inFilter('stu_id', chunk);
+      for (final s in students) { stuNameMap[s['stu_id'] as int] = s['stuname']?.toString() ?? ''; }
     }
-    for (final d in allResults) {
-      d['stuname'] = stuNameMap[d['stu_id'] as int?] ?? d['stuadmno']?.toString() ?? '';
-    }
+    for (final d in allResults) { d['stuname'] = stuNameMap[d['stu_id'] as int?] ?? d['stuadmno']?.toString() ?? ''; }
     return allResults;
   }
 
@@ -191,6 +185,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final admNo = d['stuadmno']?.toString() ?? '';
       if (admNo.isEmpty) continue;
       final term = d['demfeeterm']?.toString() ?? '';
+      final feeType = d['demfeetype']?.toString() ?? '';
       final amount = showPending
           ? (d['reconbalancedue'] as num?)?.toDouble() ?? (d['balancedue'] as num?)?.toDouble() ?? 0
           : (d['feeamount'] as num?)?.toDouble() ?? 0;
@@ -206,12 +201,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         studentMap[admNo]![term] = (studentMap[admNo]![term] as double? ?? 0) + amount;
       }
 
+      // Accumulate fine from the fineamount column
+      final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      studentMap[admNo]!['_fine'] = ((studentMap[admNo]!['_fine'] as double?) ?? 0) + fine;
+
       // Collect fee type remarks for pending amounts
-      if (amount > 0) {
-        final feeType = d['demfeetype']?.toString() ?? '';
-        if (feeType.isNotEmpty) {
-          studentRemarks.putIfAbsent(admNo, () => <String>{}).add(feeType);
-        }
+      if (amount > 0 && feeType.isNotEmpty) {
+        studentRemarks.putIfAbsent(admNo, () => <String>{}).add(feeType);
       }
     }
 
@@ -668,11 +664,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final classStudents = entry.value;
       final Map<String, double> classTotals = {};
       double classGrandTotal = 0;
+      double classTotalFine = 0;
 
       for (final row in classStudents) {
         sno++;
         final rowTotal = (row['_total'] as double?) ?? 0;
+        final rowFine = (row['_fine'] as double?) ?? 0;
         classGrandTotal += rowTotal;
+        classTotalFine += rowFine;
         allRows.add(DataRow(
           cells: [
             DataCell(Text('$sno', style: TextStyle(fontSize: 11.sp))),
@@ -684,6 +683,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
               return DataCell(Text(val > 0 ? _formatNumber(val) : '', style: TextStyle(fontSize: 11.sp)));
             }),
+            DataCell(Text(rowFine > 0 ? _formatNumber(rowFine) : '', style: TextStyle(fontSize: 11.sp, color: Colors.orange))),
             DataCell(Text(rowTotal > 0 ? _formatNumber(rowTotal) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600))),
             DataCell(Text(row['_remarks']?.toString() ?? '', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary))),
           ],
@@ -702,6 +702,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             (classTotals[t] ?? 0) > 0 ? _formatNumber(classTotals[t]!) : '',
             style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700),
           ))),
+          DataCell(Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.orange))),
           DataCell(Text(classGrandTotal > 0 ? _formatNumber(classGrandTotal) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700))),
           DataCell(Text('', style: TextStyle(fontSize: 11.sp))),
         ],
@@ -722,6 +723,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             const DataColumn(label: Text('Admn. No')),
             const DataColumn(label: Text('Student Name')),
             ...terms.map((t) => DataColumn(label: Text(t), numeric: true)),
+            const DataColumn(label: Text('Fine'), numeric: true),
             const DataColumn(label: Text('Total'), numeric: true),
             const DataColumn(label: Text('Remarks')),
           ],
@@ -769,7 +771,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
 
       // Columns: Sno, Class, Admn. No, Student Name, [terms], Total, Remarks
-      final totalCols = 4 + terms.length + 2;
+      final totalCols = 4 + terms.length + 3;
 
       // Institution header
       int row = 0;
@@ -797,7 +799,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       row++; // blank row
 
       // Column headers: Sno, Class, Admn. No, Student Name, [terms], Total, Remarks
-      final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...terms, 'Total', 'Remarks'];
+      final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...terms, 'Fine', 'Total', 'Remarks'];
       for (int c = 0; c < headers.length; c++) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = colHeader;
@@ -837,10 +839,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             }
           }
           if (rowTotal > 0) {
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowTotal.toInt());
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowTotal.toInt());
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).cellStyle = numStyle;
+          }
+          final rowFine = (student['_fine'] as double?) ?? 0;
+          if (rowFine > 0) {
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowFine.toInt());
             sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).cellStyle = numStyle;
           }
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.TextCellValue(student['_remarks']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + terms.length, rowIndex: row)).value = xl.TextCellValue(student['_remarks']?.toString() ?? '');
           row++;
         }
 
@@ -855,8 +862,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           }
         }
         if (classGrandTotal > 0) {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(classGrandTotal.toInt());
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).cellStyle = totalStyle;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.IntCellValue(classGrandTotal.toInt());
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).cellStyle = totalStyle;
         }
         row++;
       }
@@ -869,8 +876,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (int c = 0; c < terms.length; c++) {
         sheet.setColumnWidth(4 + c, 12);
       }
-      sheet.setColumnWidth(4 + terms.length, 10);
-      sheet.setColumnWidth(5 + terms.length, 25);
+      sheet.setColumnWidth(4 + terms.length, 8);
+      sheet.setColumnWidth(5 + terms.length, 10);
+      sheet.setColumnWidth(6 + terms.length, 25);
 
       await _saveExcel(excel, 'Pending_Fee_Report_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
@@ -903,7 +911,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
 
       // Columns: Sno, Class, Admn. No, Student Name, [terms], Total, Remarks
-      final totalCols = 4 + terms.length + 2;
+      final totalCols = 4 + terms.length + 3;
       int row = 0;
 
       // Institution header
@@ -931,7 +939,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       row++; // blank row
 
       // Column headers
-      final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...terms, 'Total', 'Remarks'];
+      final headers = ['Sno', 'Class', 'Admn. No', 'Student Name', ...terms, 'Fine', 'Total', 'Remarks'];
       for (int c = 0; c < headers.length; c++) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = colHeader;
@@ -972,10 +980,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             }
           }
           if (rowTotal > 0) {
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowTotal.toInt());
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowTotal.toInt());
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).cellStyle = numStyle;
+          }
+          final rowFine = (student['_fine'] as double?) ?? 0;
+          if (rowFine > 0) {
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(rowFine.toInt());
             sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).cellStyle = numStyle;
           }
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.TextCellValue(student['_remarks']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6 + terms.length, rowIndex: row)).value = xl.TextCellValue(student['_remarks']?.toString() ?? '');
           row++;
         }
 
@@ -990,8 +1003,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           }
         }
         if (classGrandTotal > 0) {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).value = xl.IntCellValue(classGrandTotal.toInt());
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + terms.length, rowIndex: row)).cellStyle = totalStyle;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).value = xl.IntCellValue(classGrandTotal.toInt());
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + terms.length, rowIndex: row)).cellStyle = totalStyle;
         }
         row++;
       }
@@ -1004,8 +1017,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (int c = 0; c < terms.length; c++) {
         sheet.setColumnWidth(4 + c, 12);
       }
-      sheet.setColumnWidth(4 + terms.length, 10);
-      sheet.setColumnWidth(5 + terms.length, 25);
+      sheet.setColumnWidth(4 + terms.length, 8);
+      sheet.setColumnWidth(5 + terms.length, 10);
+      sheet.setColumnWidth(6 + terms.length, 25);
 
       await _saveExcel(excel, 'Pending_${groupBy}_${_formatDateCompact(DateTime.now())}');
     } catch (e) {

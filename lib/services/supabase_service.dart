@@ -179,6 +179,22 @@ class SupabaseService {
       }
 
       if (response == null) return null;
+
+      // Generate FINE demand rows for any overdue unpaid demands.
+      // Runs once per login; safe to call repeatedly (idempotent — only inserts
+      // FINE rows that don't already exist).
+      if (!isSuperAdminUser && insId != null) {
+        try {
+          final inserted = await client.rpc(
+            'generate_overdue_fines',
+            params: {'p_ins_id': insId},
+          );
+          debugPrint('LOGIN: generate_overdue_fines inserted=$inserted rows');
+        } catch (e) {
+          debugPrint('LOGIN: generate_overdue_fines failed: $e');
+        }
+      }
+
       return InstitutionUserModel.fromJson(response);
     } catch (e) {
       debugPrint('Login error: $e');
@@ -884,7 +900,7 @@ class SupabaseService {
       int offset = 0;
       while (true) {
         final demands = await fromSchema('feedemand')
-            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, balancedue, paidstatus, stuclass, stuadmno, demfeetype, demfeeterm, pay_id')
+            .select('fee_id, ins_id, stu_id, feeamount, conamount, paidamount, fineamount, balancedue, paidstatus, stuclass, courname, stuadmno, demfeetype, demfeeterm, pay_id')
             .eq('ins_id', insId)
             .inFilter('paidstatus', ['P', 'U'])
             .eq('activestatus', 1)
@@ -996,6 +1012,7 @@ class SupabaseService {
         'totalDemand': (result['total_demand'] as num?)?.toDouble() ?? 0,
         'totalPaid': (result['total_paid'] as num?)?.toDouble() ?? 0,
         'totalPending': (result['total_pending'] as num?)?.toDouble() ?? 0,
+        'totalFine': (result['total_fine'] as num?)?.toDouble() ?? 0,
       };
     } catch (e) {
       debugPrint('RPC get_fee_totals failed, using fallback: $e');
@@ -1003,12 +1020,12 @@ class SupabaseService {
 
     // Fallback: paginate through all rows to avoid 1000-row cap
     try {
-      double totalDemand = 0, totalPaid = 0, totalPending = 0;
+      double totalDemand = 0, totalPaid = 0, totalPending = 0, totalFine = 0;
       const batchSize = 1000;
       int offset = 0;
       while (true) {
         final demandRes = await fromSchema('feedemand')
-            .select('feeamount, paidamount, balancedue')
+            .select('feeamount, paidamount, balancedue, fineamount')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
             .range(offset, offset + batchSize - 1);
@@ -1017,15 +1034,16 @@ class SupabaseService {
           totalDemand += (row['feeamount'] as num?)?.toDouble() ?? 0;
           totalPaid += (row['paidamount'] as num?)?.toDouble() ?? 0;
           totalPending += (row['balancedue'] as num?)?.toDouble() ?? 0;
+          totalFine += (row['fineamount'] as num?)?.toDouble() ?? 0;
         }
         if (rows.length < batchSize) break;
         offset += batchSize;
       }
 
-      return {'totalDemand': totalDemand, 'totalPaid': totalPaid, 'totalPending': totalPending};
+      return {'totalDemand': totalDemand, 'totalPaid': totalPaid, 'totalPending': totalPending, 'totalFine': totalFine};
     } catch (e) {
       debugPrint('Error fetching fee totals: $e');
-      return {'totalDemand': 0, 'totalPaid': 0, 'totalPending': 0};
+      return {'totalDemand': 0, 'totalPaid': 0, 'totalPending': 0, 'totalFine': 0};
     }
   }
 
@@ -1221,7 +1239,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getFeeDetailsByPayId(int payId, {int? insId}) async {
     try {
       final response = await fromSchema('feedemand')
-          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, balancedue, paidstatus, duedate')
+          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, fineamount, balancedue, paidstatus, duedate')
           .eq('pay_id', payId)
           .eq('activestatus', 1);
       final details = List<Map<String, dynamic>>.from(response as List);
