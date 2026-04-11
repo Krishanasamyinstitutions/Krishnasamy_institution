@@ -19,6 +19,7 @@ import '../fees/fee_demand_approval_screen.dart';
 import '../admin/master_import_screen.dart';
 import '../admin/settings_screen.dart';
 import '../fees/bank_reconciliation_screen.dart';
+import '../fees/reports_screen.dart';
 
 
 
@@ -801,7 +802,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Reports';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -848,6 +849,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Bank Reconciliation') {
       return const BankReconciliationScreen();
+    }
+    if (selectedMenu == 'Reports') {
+      return const ReportsScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();

@@ -134,7 +134,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       final parentFuture = SupabaseService.getStudentParent(student.stuId, stuadmno: student.stuadmno);
 
       // Try stuadmno first (primary key used in feedemand)
-      const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, balancedue, duedate, paidstatus, pay_id';
+      const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, fineamount, balancedue, duedate, paidstatus, pay_id';
       final demandsByAdmno = await SupabaseService.fromSchema('feedemand')
           .select(selectFields)
           .eq('ins_id', insId)
@@ -238,6 +238,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           'reference': d['demno']?.toString() ?? d['dem_id']?.toString() ?? '-',
           'debit': balance,
           'credit': paidAmount,
+          'fine': (d['fineamount'] as num?)?.toDouble() ?? 0,
           'type': 'payment',
         });
       }

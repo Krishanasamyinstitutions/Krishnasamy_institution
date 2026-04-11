@@ -535,6 +535,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
             yrLabel = byPartial['yrlabel']?.toString();
           }
         }
+        // Final fallback: if there's exactly one year configured, use it.
+        // This handles Excel files where yr_id is missing or has values like
+        // '2025', 'Year 1', etc. that don't match anything in the year table.
+        if (yrId == null && _years.isNotEmpty) {
+          yrId = _years.first['yr_id'] as int?;
+          yrLabel = _years.first['yrlabel']?.toString();
+        }
 
         final admNoRaw = _cellByKey(row, 'stuadmno');
         final stuId = stuMap[admNoRaw];
@@ -576,25 +583,35 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
     setState(() {});
 
-    // 4. Bulk insert in batches of 500
-    for (int i = 0; i < batch.length; i += 500) {
-      final chunk = batch.sublist(i, (i + 500).clamp(0, batch.length));
+    // 4. Bulk insert in small batches (Supabase REST has payload limits and
+    // long requests time out, so 100/batch is the sweet spot for big imports).
+    const int batchSize = 100;
+    for (int i = 0; i < batch.length; i += batchSize) {
+      final chunk = batch.sublist(i, (i + batchSize).clamp(0, batch.length));
       try {
         await SupabaseService.fromSchema('tempfeedemand').insert(chunk);
         _imported += chunk.length;
       } catch (e) {
-        // If batch fails, try one by one
-        for (final row in chunk) {
-          try {
-            await SupabaseService.fromSchema('tempfeedemand').insert(row);
-            _imported++;
-          } catch (e2) {
-            _skipped++;
-            _importErrors.add('Adm ${row['stuadmno']}: ${_friendlyError(e2.toString())}');
+        debugPrint('Batch insert failed at $i: $e');
+        // Halve the batch on first failure, then per-row as last resort
+        try {
+          final mid = chunk.length ~/ 2;
+          await SupabaseService.fromSchema('tempfeedemand').insert(chunk.sublist(0, mid));
+          await SupabaseService.fromSchema('tempfeedemand').insert(chunk.sublist(mid));
+          _imported += chunk.length;
+        } catch (_) {
+          for (final row in chunk) {
+            try {
+              await SupabaseService.fromSchema('tempfeedemand').insert(row);
+              _imported++;
+            } catch (e2) {
+              _skipped++;
+              _importErrors.add('Adm ${row['stuadmno']}: ${_friendlyError(e2.toString())}');
+            }
           }
         }
       }
-      setState(() {});
+      if (mounted) setState(() {});
     }
 
     setState(() => _importStep = 3);

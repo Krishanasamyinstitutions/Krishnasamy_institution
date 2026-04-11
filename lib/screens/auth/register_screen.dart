@@ -159,10 +159,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final yrStaDate = _yearStartDate ?? DateTime(DateTime.now().year, 6, 1);
       final yrEndDate = _yearEndDate ?? DateTime(DateTime.now().year + 1, 5, 31);
 
-      // Single atomic RPC call — if anything fails, nothing is created
+      // Single atomic RPC call — creates institution rows AND schema in one transaction.
+      // If validation fails or schema creation errors out, the database rolls back
+      // every insert so no partial data is left behind.
       final result = await SupabaseService.client.rpc('register_institution', params: {
         'p_insname': _institutionNameController.text.trim(),
         'p_inscode': _institutionCodeController.text.trim(),
+        'p_inshortname': _institutionShortNameController.text.trim(),
         'p_insstadate': (_institutionStartDate ?? DateTime.now()).toIso8601String().split('T').first,
         'p_insautusername': _authorizedUsernameController.text.trim(),
         'p_insdesignation': _designationController.text.trim().isNotEmpty ? _designationController.text.trim() : 'Principal',
@@ -202,31 +205,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // Save short name and create institution schema
-      final shortName = _institutionShortNameController.text.trim().toLowerCase();
-      final schemaName = '$shortName${yrLabel.replaceAll('-', '')}';
+      final schemaName = regResult['schema']?.toString() ?? '';
+      debugPrint('Registered ins_id=${regResult['ins_id']}, schema="$schemaName"');
 
-      debugPrint('Schema creation: ins_id=${regResult['ins_id']}, shortName="$shortName", schemaName="$schemaName"');
-
-      if (regResult['ins_id'] != null && shortName.isNotEmpty) {
-        // Update short name on institution table
-        await SupabaseService.client.from('institution')
-            .update({'inshortname': _institutionShortNameController.text.trim()})
-            .eq('ins_id', regResult['ins_id']);
-        debugPrint('Short name updated');
-
-        // Create institution schema + year records in one call
-        await SupabaseService.client.rpc('create_institution_schema', params: {
-          'p_schema_name': schemaName,
-          'p_ins_id': regResult['ins_id'],
-          'p_year_label': yrLabel,
-          'p_start_date': yrStaDate.toIso8601String().split('T').first,
-          'p_end_date': yrEndDate.toIso8601String().split('T').first,
-        });
-        debugPrint('Schema "$schemaName" created with year records');
-
-        // institutionusers stays in public schema - no need to move
-        // Expose schema to API (try, but don't fail if permission denied)
+      // Try to expose schema to API (best-effort — fails silently on free tier)
+      if (schemaName.isNotEmpty) {
         try {
           await SupabaseService.client.rpc('expose_schema', params: {
             'p_schema': schemaName,
@@ -235,8 +218,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } catch (e) {
           debugPrint('expose_schema skipped (run manually in SQL Editor): $e');
         }
-      } else {
-        debugPrint('Schema NOT created: ins_id=${regResult['ins_id']}, shortName="$shortName"');
       }
 
       // Upload logo if selected

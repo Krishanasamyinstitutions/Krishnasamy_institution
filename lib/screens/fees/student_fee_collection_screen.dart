@@ -73,11 +73,69 @@ class _StudentFeeCollectionScreenState
   final Map<String, TextEditingController> _fineCtrl = {};
   final Map<String, TextEditingController> _conCtrl = {};
   final Set<String> _selected = {};
+  List<Map<String, dynamic>> _fineRules = [];
 
   @override
   void initState() {
     super.initState();
     _fetchClasses();
+    _loadFineRules();
+  }
+
+  Future<void> _loadFineRules() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    debugPrint('FINE: Loading fine rules for insId=$insId, schema=${SupabaseService.currentSchema}');
+    if (insId == null) return;
+    try {
+      final result = await SupabaseService.fromSchema('finerule')
+          .select('*')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('from_days');
+      _fineRules = List<Map<String, dynamic>>.from(result);
+      debugPrint('FINE: Loaded ${_fineRules.length} rules: $_fineRules');
+    } catch (e) {
+      debugPrint('FINE: Error loading fine rules: $e');
+    }
+  }
+
+  double _calculateFine(Map<String, dynamic> demand) {
+    if (_fineRules.isEmpty) return 0;
+    final dueDateStr = demand['duedate']?.toString();
+    if (dueDateStr == null || dueDateStr.isEmpty) return 0;
+
+    DateTime dueDate;
+    try { dueDate = DateTime.parse(dueDateStr); } catch (_) { return 0; }
+
+    final today = DateTime.now();
+    if (!today.isAfter(dueDate)) return 0; // Not overdue
+
+    final overdueDays = today.difference(dueDate).inDays;
+    final feeType = demand['demfeetype']?.toString() ?? '';
+    final feeAmount = (demand['feeamount'] as num?)?.toDouble() ?? 0;
+
+    // Find matching rule (fee-type specific first, then ALL)
+    Map<String, dynamic>? matchedRule;
+    for (final rule in _fineRules) {
+      final ruleType = rule['feetype']?.toString() ?? 'ALL';
+      final fromDays = (rule['from_days'] as num?)?.toInt() ?? 0;
+      final toDays = rule['to_days'] as num?;
+
+      final daysMatch = overdueDays >= fromDays && (toDays == null || overdueDays <= toDays.toInt());
+      if (!daysMatch) continue;
+
+      if (ruleType == feeType) { matchedRule = rule; break; } // Exact match
+      if (ruleType == 'ALL' && matchedRule == null) matchedRule = rule; // ALL fallback
+    }
+
+    if (matchedRule == null) return 0;
+
+    final fineType = matchedRule['fine_type']?.toString() ?? 'FIXED';
+    final fineValue = (matchedRule['fine_value'] as num?)?.toDouble() ?? 0;
+
+    if (fineType == 'PERCENT') return (feeAmount * fineValue / 100);
+    return fineValue;
   }
 
   Future<void> _fetchClasses() async {
@@ -116,7 +174,7 @@ class _StudentFeeCollectionScreenState
     if (insId == null) return;
     try {
       var query = SupabaseService.fromSchema('students')
-          .select('stu_id, stuname, stuadmno, stuclass')
+          .select('stu_id, stuname, stuadmno, stuclass, courname')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .eq('stuclass', className);
@@ -262,7 +320,7 @@ class _StudentFeeCollectionScreenState
       final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: admNo);
       final demandsFuture = SupabaseService.fromSchema('feedemand')
           .select(
-              'dem_id, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, duedate, paidstatus, stuclass')
+              'dem_id, demno, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, fineamount, duedate, paidstatus, stuclass')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
           .eq('paidstatus', 'U')
@@ -277,18 +335,22 @@ class _StudentFeeCollectionScreenState
       demandList.sort((a, b) => _termIndex(a['demfeeterm']?.toString() ?? '')
           .compareTo(_termIndex(b['demfeeterm']?.toString() ?? '')));
 
-      // Create per-row controllers
+      _allDemands = demandList;
+
+      // Per-row controllers: prefer the server-computed fineamount column;
+      // fall back to client-side rule calculation if server hasn't populated it.
       for (final d in demandList) {
         final key = d['dem_id']?.toString() ?? '';
         if (key.isNotEmpty) {
-          _fineCtrl[key] = TextEditingController();
+          final serverFine = (d['fineamount'] as num?)?.toDouble() ?? 0;
+          final fine = serverFine > 0 ? serverFine : _calculateFine(d);
+          _fineCtrl[key] = TextEditingController(text: fine > 0 ? fine.toStringAsFixed(0) : '');
           _conCtrl[key] = TextEditingController();
         }
       }
 
       setState(() {
         _parent = parent;
-        _allDemands = demandList;
         _loadingDemands = false;
       });
     } catch (e) {
@@ -1539,13 +1601,14 @@ class _StudentFeeCollectionScreenState
         final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
         final fine = _fine(key);
         final col = _con(key);
-        final net = (col > 0 ? col : bal) + fine;
+        final net = (col > 0 ? col : bal) + fine; // Total including fine
         items.add({
           'dem_id': d['dem_id'] as int,
           'yr_id': d['yr_id'],
           'yrlabel': d['demfeeyear']?.toString() ?? '',
           'ins_id': insId,
           'amount': net,
+          'fine': fine,
           'demfeetype': d['demfeetype']?.toString() ?? '',
         });
       }
@@ -1566,6 +1629,7 @@ class _StudentFeeCollectionScreenState
       }
 
       // Call grouped payment RPC — creates one payment per fee group
+      // totalNet includes fine — paidamount will include fine (old approach)
       final result = await SupabaseService.client.rpc('process_grouped_payment', params: {
         'p_ins_id': insId,
         'p_inscode': inscode,
@@ -1595,6 +1659,26 @@ class _StudentFeeCollectionScreenState
                   : null,
               'paybankname': _bankNameController.text.trim(),
             }).eq('pay_id', payId).eq('ins_id', insId!);
+          }
+        }
+      }
+
+      // Update fineamount column on each paid demand so reports/totals reflect
+      // the fine separately. The RPC already added (bal + fine) into paidamount
+      // for the row, so we just need to record how much of that was fine.
+      for (final item in items) {
+        final fine = (item['fine'] as num?)?.toDouble() ?? 0;
+        if (fine > 0) {
+          final demId = item['dem_id'];
+          if (demId != null) {
+            try {
+              await SupabaseService.fromSchema('feedemand')
+                  .update({'fineamount': fine})
+                  .eq('dem_id', demId)
+                  .eq('ins_id', insId!);
+            } catch (e) {
+              debugPrint('Fine column update error for dem_id=$demId: $e');
+            }
           }
         }
       }

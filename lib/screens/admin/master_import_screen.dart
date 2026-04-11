@@ -976,7 +976,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *'];
+  static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1001,8 +1001,17 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
       final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id');
       if (mounted) setState(() {
+        const fineLabels = {'1': 'Yes', '0': 'No'};
         _existingRows = (types as List).map((t) {
-          return [t['feedesc'] ?? '', t['feeshort'] ?? '', fgNameMap[t['fg_id']] ?? '', t['yrlabel'] ?? '', t['feeoptional'] ?? '', t['feecategory'] ?? ''];
+          return [
+            t['feedesc'] ?? '',
+            t['feeshort'] ?? '',
+            fgNameMap[t['fg_id']] ?? '',
+            t['yrlabel'] ?? '',
+            t['feeoptional'] ?? '',
+            t['feecategory'] ?? '',
+            fineLabels['${t['feefineapplicable'] ?? 0}'] ?? 'No',
+          ];
         }).toList();
         _isLoadingExisting = false;
       });
@@ -1046,7 +1055,17 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      final result = await _stagingImport(insId: insId, impType: 'FEETYPE', rows: _rows, colCount: 6);
+      const fineMap = {'yes': '1', 'y': '1', 'true': '1', '1': '1', 'no': '0', 'n': '0', 'false': '0', '0': '0', '': '0'};
+      final mappedRows = _rows.map((row) {
+        final mapped = List<dynamic>.from(row);
+        while (mapped.length < 7) {
+          mapped.add('');
+        }
+        final fine = mapped[6].toString().trim().toLowerCase();
+        mapped[6] = fineMap[fine] ?? mapped[6];
+        return mapped;
+      }).toList();
+      final result = await _stagingImport(insId: insId, impType: 'FEETYPE', rows: mappedRows, colCount: 7);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEETYPE');
@@ -1070,10 +1089,10 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Type', _headers),
       onSampleDownload: () => _exportSampleData('Fee Type', _headers, [
-        ['SCHOOL FEES', 'SCH', 'SCHOOL FEES', '2025-2026', '0', '1'],
-        ['VAN FEES', 'VAN', 'VAN FEES', '2025-2026', '1', '1'],
-        ['TUITION FEES', 'TUI', 'SCHOOL FEES', '2025-2026', '0', '1'],
-        ['BOOK FEES', 'BK', 'SCHOOL FEES', '2025-2026', '0', '1'],
+        ['SCHOOL FEES', 'SCH', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
+        ['VAN FEES', 'VAN', 'VAN FEES', '2025-2026', '1', '1', 'No'],
+        ['TUITION FEES', 'TUI', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
+        ['BOOK FEES', 'BK', 'SCHOOL FEES', '2025-2026', '0', '1', 'No'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -1081,7 +1100,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Optional', 'Category'],
+      existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Optional', 'Category', 'Fine Applicable'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1215,7 +1234,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
 
 // ═══════════════════════════════════════════════
 // 4. CLASS FEE DEMAND TAB
-// Columns: Class *, Term, Fee Type *, Amount, Due Date, NOB, BGB, DHB
+// Columns: Class *, Term, Fee Type *, Amount, Due Date, Admission Type
 // ═══════════════════════════════════════════════
 
 class _ClassFeeDemandTab extends StatefulWidget {
@@ -1232,7 +1251,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'New/Old *', 'Boys/Girls *', 'Dayscholar/Hostel *'];
+  static const _headers = ['Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'Admission Type *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1261,18 +1280,14 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
           if (ca != cb) return ca.compareTo(cb);
           return (a['cfterm']?.toString() ?? '').compareTo(b['cfterm']?.toString() ?? '');
         });
-        const nobLabels = {'1': 'New', '2': 'Old', '3': 'Both'};
-        const bgbLabels = {'1': 'Boys', '2': 'Girls', '3': 'Both'};
-        const dhbLabels = {'1': 'Dayscholar', '2': 'Hostel', '3': 'Both'};
+        const admTypeLabels = {'1': 'New', '2': 'Old', '3': 'Both'};
         _existingRows = sorted.map((r) => [
           r['cfclass'] ?? '',
           r['cfterm'] ?? '',
           r['cffeetype'] ?? '',
           r['cfamount'] ?? '',
           r['cfdduedate'] ?? '',
-          nobLabels['${r['cfnob'] ?? ''}'] ?? '${r['cfnob'] ?? ''}',
-          bgbLabels['${r['cfbgb'] ?? ''}'] ?? '${r['cfbgb'] ?? ''}',
-          dhbLabels['${r['cfdhb'] ?? ''}'] ?? '${r['cfdhb'] ?? ''}',
+          admTypeLabels['${r['admissiontype'] ?? ''}'] ?? '${r['admissiontype'] ?? ''}',
         ]).toList();
         _isLoadingExisting = false;
       });
@@ -1291,7 +1306,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
 
   void _validate() {
     final rowErrs = <int, String>{};
-    final labels = ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'];
+    final labels = ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'];
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
       for (int j = 0; j < labels.length; j++) {
@@ -1316,21 +1331,15 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      const nobMap = {'new': '1', 'old': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
-      const bgbMap = {'boys': '1', 'girls': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
-      const dhbMap = {'dayscholar': '1', 'hostel': '2', 'both': '3', 'day scholar': '1', '1': '1', '2': '2', '3': '3'};
+      const admTypeMap = {'new': '1', 'old': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
       final mappedRows = _rows.map((row) {
         final mapped = List<dynamic>.from(row);
-        while (mapped.length < 8) mapped.add('');
-        final nob = mapped[5].toString().trim().toLowerCase();
-        final bgb = mapped[6].toString().trim().toLowerCase();
-        final dhb = mapped[7].toString().trim().toLowerCase();
-        mapped[5] = nobMap[nob] ?? mapped[5];
-        mapped[6] = bgbMap[bgb] ?? mapped[6];
-        mapped[7] = dhbMap[dhb] ?? mapped[7];
+        while (mapped.length < 6) mapped.add('');
+        final adm = mapped[5].toString().trim().toLowerCase();
+        mapped[5] = admTypeMap[adm] ?? mapped[5];
         return mapped;
       }).toList();
-      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: mappedRows, colCount: 8);
+      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: mappedRows, colCount: 6);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CLASSFEEDEMAND');
@@ -1354,10 +1363,10 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Class Fee Demand', _headers),
       onSampleDownload: () => _exportSampleData('Class Fee Demand', _headers, [
-        ['I', 'I TERM', 'SCHOOL FEES', '10080', '2025-05-31', 'Both', 'Both', 'Both'],
-        ['I', 'JUNE', 'TUITION FEES', '700', '2025-06-30', 'Both', 'Both', 'Both'],
-        ['XII', 'I TERM', 'SCHOOL FEES', '15410', '2025-05-31', 'Both', 'Both', 'Both'],
-        ['XII', 'JUNE', 'VAN FEES', '810', '2025-06-30', 'Both', 'Both', 'Both'],
+        ['I', 'I TERM', 'SCHOOL FEES', '10080', '2025-05-31', 'Both'],
+        ['I', 'JUNE', 'TUITION FEES', '700', '2025-06-30', 'Both'],
+        ['XII', 'I TERM', 'SCHOOL FEES', '15410', '2025-05-31', 'Both'],
+        ['XII', 'JUNE', 'VAN FEES', '810', '2025-06-30', 'Both'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -1365,7 +1374,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'New/Old', 'Boys/Girls', 'Dayscholar/Hostel'],
+      existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
