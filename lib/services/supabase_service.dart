@@ -1020,27 +1020,33 @@ class SupabaseService {
 
     // Fallback: paginate through all rows to avoid 1000-row cap
     try {
-      double totalDemand = 0, totalPaid = 0, totalPending = 0, totalFine = 0;
+      double totalDemand = 0, totalPaidRaw = 0, totalPending = 0, totalFine = 0;
       const batchSize = 1000;
       int offset = 0;
       while (true) {
         final demandRes = await fromSchema('feedemand')
-            .select('feeamount, paidamount, balancedue, fineamount')
+            .select('feeamount, paidamount, balancedue, fineamount, paidstatus')
             .eq('ins_id', insId)
             .eq('activestatus', 1)
             .range(offset, offset + batchSize - 1);
         final rows = demandRes as List;
         for (final row in rows) {
           totalDemand += (row['feeamount'] as num?)?.toDouble() ?? 0;
-          totalPaid += (row['paidamount'] as num?)?.toDouble() ?? 0;
+          totalPaidRaw += (row['paidamount'] as num?)?.toDouble() ?? 0;
           totalPending += (row['balancedue'] as num?)?.toDouble() ?? 0;
-          totalFine += (row['fineamount'] as num?)?.toDouble() ?? 0;
+          // Count fine on demands that are paid OR partially paid
+          final paid = (row['paidamount'] as num?)?.toDouble() ?? 0;
+          final isPaid = (row['paidstatus']?.toString() ?? '') == 'P';
+          if (isPaid || paid > 0) {
+            totalFine += (row['fineamount'] as num?)?.toDouble() ?? 0;
+          }
         }
         if (rows.length < batchSize) break;
         offset += batchSize;
       }
 
-      return {'totalDemand': totalDemand, 'totalPaid': totalPaid, 'totalPending': totalPending, 'totalFine': totalFine};
+      // Match RPC: totalPaid is fee-only collection (excludes fine portion of paid rows)
+      return {'totalDemand': totalDemand, 'totalPaid': totalPaidRaw - totalFine, 'totalPending': totalPending, 'totalFine': totalFine};
     } catch (e) {
       debugPrint('Error fetching fee totals: $e');
       return {'totalDemand': 0, 'totalPaid': 0, 'totalPending': 0, 'totalFine': 0};
