@@ -188,6 +188,11 @@ class _StudentFeeCollectionScreenState
 
   @override
   void dispose() {
+    // If the cashier is leaving without a completed payment, reset fineamount
+    // to 0 on every unpaid demand currently loaded. Fine should only persist
+    // on the DB after a successful payment, not just because a cashier viewed
+    // the student.
+    _resetFinesOnExit();
     _admNoController.dispose();
     _nameController.dispose();
     _classController.dispose();
@@ -199,6 +204,24 @@ class _StudentFeeCollectionScreenState
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
     super.dispose();
+  }
+
+  void _resetFinesOnExit() {
+    if (_allDemands.isEmpty) return;
+    final insId = context.read<AuthProvider>().insId;
+    if (insId == null) return;
+    // Fire-and-forget — dispose can't await.
+    for (final d in _allDemands) {
+      final demId = d['dem_id'];
+      final paidStatus = d['paidstatus']?.toString() ?? 'U';
+      if (demId == null) continue;
+      if (paidStatus == 'P') continue; // don't wipe historical paid fines
+      SupabaseService.fromSchema('feedemand')
+          .update({'fineamount': 0})
+          .eq('dem_id', demId)
+          .eq('ins_id', insId)
+          .then((_) {}, onError: (e) => debugPrint('Fine reset on exit failed for dem_id=$demId: $e'));
+    }
   }
 
   void _clear() {
@@ -315,6 +338,11 @@ class _StudentFeeCollectionScreenState
           _selectedClass = stuClass;
         }
       });
+
+      // Fine is NOT persisted to feedemand.fineamount at search time — it is
+      // only written after a successful payment (see _processPayment). The
+      // cashier sees the calculated fine via _calculateFine below; if they
+      // abandon without paying, the DB column stays empty.
 
       // Fetch parent and demands in parallel
       final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: admNo);
@@ -1389,7 +1417,27 @@ class _StudentFeeCollectionScreenState
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: () => Navigator.pop(ctx),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            // Reset fineamount to 0 on all selected demands
+                            // so no stale fine stays in the DB.
+                            final auth = context.read<AuthProvider>();
+                            final insId = auth.insId;
+                            if (insId == null) return;
+                            for (final key in _selected) {
+                              final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+                              final demId = d['dem_id'];
+                              if (demId == null) continue;
+                              try {
+                                await SupabaseService.fromSchema('feedemand')
+                                    .update({'fineamount': 0})
+                                    .eq('dem_id', demId)
+                                    .eq('ins_id', insId);
+                              } catch (e) {
+                                debugPrint('Fine reset error for dem_id=$demId: $e');
+                              }
+                            }
+                          },
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.error,
                             backgroundColor: const Color(0xFFF3F6FD),
@@ -1588,13 +1636,15 @@ class _StudentFeeCollectionScreenState
     final stuId = _student!['stu_id'] as int;
     final totalNet = _totalNetSelected;
 
+    // Declared outside try so the catch block can reset fineamount on failure.
+    final items = <Map<String, dynamic>>[];
+
     try {
       final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
       final yrId = firstDemand['yr_id'] as int?;
       final yrlabel = firstDemand['demfeeyear']?.toString() ?? '';
 
       // Build items list with fee type info
-      final items = <Map<String, dynamic>>[];
       for (final key in _selected) {
         final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
         if (d.isEmpty) continue;
@@ -1692,6 +1742,22 @@ class _StudentFeeCollectionScreenState
         errorMsg = 'These fees are already being processed. Please wait and try again.';
       } else if (errorMsg.contains('not found or inactive')) {
         errorMsg = 'One or more fees are no longer available. Please refresh.';
+      }
+
+      // Payment failed — reset fineamount to 0 on attempted demands so no
+      // stale fine is left in the DB.
+      for (final item in items) {
+        final demId = item['dem_id'];
+        if (demId != null) {
+          try {
+            await SupabaseService.fromSchema('feedemand')
+                .update({'fineamount': 0})
+                .eq('dem_id', demId)
+                .eq('ins_id', insId!);
+          } catch (e2) {
+            debugPrint('Fine reset error for dem_id=$demId: $e2');
+          }
+        }
       }
 
       if (mounted) {
@@ -2050,6 +2116,24 @@ class _StudentFeeCollectionScreenState
 
         final receipts = rpResult is List ? rpResult : [rpResult];
         final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+
+        // On cancel/fail, explicitly reset fineamount to 0 on the attempted
+        // demands so no stale fine value is left in the DB.
+        if (status != 'C') {
+          for (final item in items) {
+            final demId = item['dem_id'];
+            if (demId != null) {
+              try {
+                await SupabaseService.fromSchema('feedemand')
+                    .update({'fineamount': 0})
+                    .eq('dem_id', demId)
+                    .eq('ins_id', insId!);
+              } catch (e) {
+                debugPrint('Fine reset error for dem_id=$demId: $e');
+              }
+            }
+          }
+        }
 
         if (mounted) {
           if (status == 'C') {
