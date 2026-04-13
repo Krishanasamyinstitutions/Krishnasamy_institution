@@ -1098,6 +1098,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           'total_concession': 0.0,
           'total_paid': 0.0,
           'total_pending': 0.0,
+          'total_fine': 0.0,
           'demand_count': 0,
           'paid_count': 0,
           'unpaid_count': 0,
@@ -1107,11 +1108,15 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
       final con = (d['conamount'] as num?)?.toDouble() ?? 0;
       final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-      final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
       final status = d['paidstatus']?.toString() ?? 'U';
+      final isPaid = pa > 0 || status == 'P' || status == 'Paid';
+      final paid = pa - (isPaid ? fa : 0);
       g['total_demand'] = (g['total_demand'] as double) + amt;
       g['total_concession'] = (g['total_concession'] as double) + con;
       g['total_paid'] = (g['total_paid'] as double) + paid;
+      g['total_fine'] = (g['total_fine'] as double) + (isPaid ? fa : 0);
       g['total_pending'] = (g['total_pending'] as double) + bal;
       g['demand_count'] = (g['demand_count'] as int) + 1;
       if (status == 'Paid' || status == 'P') {
@@ -1300,6 +1305,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     Expanded(flex: 1, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
                     Expanded(flex: 1, child: Text('DEMAND', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                     Expanded(flex: 1, child: Text('PAID', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
+                    Expanded(flex: 1, child: Text('FINE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                     Expanded(flex: 1, child: Text('PENDING', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.right)),
                     Expanded(flex: 1, child: Text('STATUS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white), textAlign: TextAlign.center)),
                     SizedBox(width: 28.w),
@@ -1317,6 +1323,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     final name = s['stuname']?.toString() ?? '';
                     final totalDemand = (s['total_demand'] as double?) ?? 0;
                     final totalPaid = (s['total_paid'] as double?) ?? 0;
+                    final totalFine = (s['total_fine'] as double?) ?? 0;
                     final totalPending = (s['total_pending'] as double?) ?? 0;
                     final unpaidCount = (s['unpaid_count'] as int?) ?? 0;
                     final allPaid = unpaidCount == 0;
@@ -1355,6 +1362,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                             Expanded(
                               flex: 1,
                               child: Text('₹${_formatAmount(totalPaid)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right),
+                            ),
+                            Expanded(
+                              flex: 1,
+                              child: Text(totalFine > 0 ? '₹${_formatAmount(totalFine)}' : '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: totalFine > 0 ? Colors.orange : AppColors.textSecondary), textAlign: TextAlign.right),
                             ),
                             Expanded(
                               flex: 1,
@@ -1428,10 +1439,15 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       );
     }
 
-    double totalAmt = 0, totalPaid = 0, totalBal = 0;
+    double totalAmt = 0, totalPaid = 0, totalFine = 0, totalBal = 0;
     for (final d in demands) {
       totalAmt += (d['feeamount'] as num?)?.toDouble() ?? 0;
-      totalPaid += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      final status = d['paidstatus']?.toString() ?? 'U';
+      final isPaid = pa > 0 || status == 'P' || status == 'Paid';
+      totalPaid += pa - (isPaid ? fa : 0);
+      totalFine += isPaid ? fa : 0;
       totalBal += (d['balancedue'] as num?)?.toDouble() ?? 0;
     }
 
@@ -1458,6 +1474,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 DataColumn(label: Text('FEE TYPE')),
                 DataColumn(label: Text('AMOUNT'), numeric: true),
                 DataColumn(label: Text('PAID'), numeric: true),
+                DataColumn(label: Text('FINE'), numeric: true),
                 DataColumn(label: Text('BALANCE'), numeric: true),
                 DataColumn(label: Text('DUE DATE')),
                 DataColumn(label: Text('STATUS')),
@@ -1469,10 +1486,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   final term = d['demfeeterm']?.toString() ?? '-';
                   final feeType = d['demfeetype']?.toString() ?? '-';
                   final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                  final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
                   final status = d['paidstatus']?.toString() ?? 'U';
-                  final isPaid = status == 'Paid' || status == 'P';
+                  final isPaid = pa > 0 || status == 'P' || status == 'Paid';
+                  final paid = pa - (isPaid ? fa : 0);
+                  final fineDisplay = isPaid ? fa : 0.0;
+                  final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final dueDate = d['duedate']?.toString() ?? '-';
                   final formattedDueDate = _formatDueDate(dueDate);
                   return DataRow(cells: [
@@ -1481,6 +1501,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     DataCell(Text(feeType, style: const TextStyle(fontWeight: FontWeight.w500))),
                     DataCell(Text('₹${_formatAmount(amt)}')),
                     DataCell(Text('₹${_formatAmount(paid)}', style: TextStyle(color: paid > 0 ? AppColors.success : AppColors.textPrimary))),
+                    DataCell(Text(fineDisplay > 0 ? '₹${_formatAmount(fineDisplay)}' : '-', style: TextStyle(color: fineDisplay > 0 ? Colors.orange : AppColors.textSecondary))),
                     DataCell(Text('₹${_formatAmount(bal)}', style: TextStyle(fontWeight: FontWeight.w500, color: bal > 0 ? AppColors.warning : AppColors.success))),
                     DataCell(Text(formattedDueDate, style: TextStyle(fontSize: 13.sp))),
                     DataCell(Container(
@@ -1502,6 +1523,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     DataCell(Text('₹${_formatAmount(totalAmt)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     DataCell(Text('₹${_formatAmount(totalPaid)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
+                    DataCell(Text('₹${_formatAmount(totalFine)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     DataCell(Text('₹${_formatAmount(totalBal)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: Colors.white))),
                     const DataCell(Text('')),
                     const DataCell(Text('')),

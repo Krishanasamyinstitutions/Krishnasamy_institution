@@ -220,6 +220,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         'reference': '-',
         'debit': (d['feeamount'] as num?)?.toDouble() ?? 0.0,
         'credit': 0.0,
+        'fine': 0.0,
         'type': 'demand',
       });
 
@@ -702,6 +703,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     final rows = _ledgerRows;
     final totalDebit   = rows.fold(0.0, (s, r) => s + (r['debit']  as double));
     final totalCredit  = rows.fold(0.0, (s, r) => s + (r['credit'] as double));
+    final totalFine    = rows.fold(0.0, (s, r) => s + ((r['fine'] as num?)?.toDouble() ?? 0));
     final closingBalance = totalDebit - totalCredit;
 
     return Column(
@@ -719,6 +721,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
               SizedBox(width: 110.w, child: const _TH('REFERENCE')),
               SizedBox(width: 100.w, child: const _TH('DUE', align: TextAlign.right)),
               SizedBox(width: 100.w, child: const _TH('RECEIVED', align: TextAlign.right)),
+              SizedBox(width: 80.w, child: const _TH('FINE', align: TextAlign.right)),
             ],
           ),
         ),
@@ -821,6 +824,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                   color: credit > 0 ? Colors.green.shade700 : AppColors.textSecondary),
                             ),
                           ),
+                          SizedBox(
+                            width: 80.w,
+                            child: Text(
+                              ((r['fine'] as num?)?.toDouble() ?? 0) > 0
+                                  ? '₹${((r['fine'] as num).toDouble()).toStringAsFixed(0)}'
+                                  : '-',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: ((r['fine'] as num?)?.toDouble() ?? 0) > 0
+                                      ? Colors.orange.shade800
+                                      : AppColors.textSecondary),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -863,6 +881,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
                               color: Colors.white)),
                     ),
+                    SizedBox(
+                      width: 80.w,
+                      child: Text(
+                          totalFine > 0 ? '₹${totalFine.toStringAsFixed(0)}' : '-',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                    ),
                   ],
                 ),
               ),
@@ -882,7 +908,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     ),
                     SizedBox(width: 110.w),
                     SizedBox(
-                      width: 200.w,
+                      width: 280.w,
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Container(

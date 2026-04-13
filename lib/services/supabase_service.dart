@@ -180,20 +180,9 @@ class SupabaseService {
 
       if (response == null) return null;
 
-      // Generate FINE demand rows for any overdue unpaid demands.
-      // Runs once per login; safe to call repeatedly (idempotent — only inserts
-      // FINE rows that don't already exist).
-      if (!isSuperAdminUser && insId != null) {
-        try {
-          final inserted = await client.rpc(
-            'generate_overdue_fines',
-            params: {'p_ins_id': insId},
-          );
-          debugPrint('LOGIN: generate_overdue_fines inserted=$inserted rows');
-        } catch (e) {
-          debugPrint('LOGIN: generate_overdue_fines failed: $e');
-        }
-      }
+      // Fine generation is no longer triggered at login — fines are now
+      // refreshed per-student at the moment a cashier opens their fee
+      // collection form (see student_fee_collection_screen._searchStudent).
 
       return InstitutionUserModel.fromJson(response);
     } catch (e) {
@@ -1245,10 +1234,39 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> getFeeDetailsByPayId(int payId, {int? insId}) async {
     try {
       final response = await fromSchema('feedemand')
-          .select('demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, fineamount, balancedue, paidstatus, duedate')
+          .select('dem_id, demfeeterm, demfeetype, fee_id, feeamount, conamount, paidamount, fineamount, balancedue, paidstatus, duedate')
           .eq('pay_id', payId)
           .eq('activestatus', 1);
       final details = List<Map<String, dynamic>>.from(response as List);
+
+      // Fetch per-demand amount paid in THIS payment from paymentdetails.
+      // Needed for receipts to show the line amount actually collected (not
+      // the full feeamount), which matters for partial payments.
+      if (details.isNotEmpty) {
+        try {
+          final pd = await fromSchema('paymentdetails')
+              .select('dem_id, transtotalamount')
+              .eq('pay_id', payId);
+          final paidMap = <int, double>{};
+          for (final p in (pd as List)) {
+            final demId = (p['dem_id'] as num?)?.toInt();
+            if (demId != null) {
+              paidMap[demId] = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+            }
+          }
+          debugPrint('RECEIPT: pay_id=$payId paymentdetails=${paidMap.length} rows=${paidMap.entries.map((e) => '${e.key}:${e.value}').join(", ")}');
+          for (final d in details) {
+            final demId = (d['dem_id'] as num?)?.toInt();
+            if (demId != null && paidMap.containsKey(demId)) {
+              d['collectedamount'] = paidMap[demId];
+            } else {
+              debugPrint('RECEIPT: no paymentdetails row for dem_id=$demId (feeamount=${d['feeamount']})');
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching paymentdetails for pay_id $payId: $e');
+        }
+      }
 
       // Fetch fee group names via fee_id → feetype → feegroup
       if (details.isNotEmpty) {
