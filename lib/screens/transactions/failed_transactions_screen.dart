@@ -180,7 +180,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         for (final d in details) {
           String term = d['demfeeterm']?.toString() ?? '-';
           final feeType = d['demfeetype']?.toString() ?? d['feegroupname']?.toString() ?? 'Fee';
-          final amount = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
+          // Line amount = actually collected in THIS payment (fee portion).
+          // collectedamount comes from paymentdetails.transtotalamount; subtract
+          // fineamount to isolate the fee portion and show Fine separately.
+          final fine = (d['fineamount'] as num?)?.toDouble() ?? 0.0;
+          final collected = (d['collectedamount'] as num?)?.toDouble()
+              ?? (d['feeamount'] as num?)?.toDouble() ?? 0.0;
+          final feeOnly = (collected - fine).clamp(0, double.infinity).toDouble();
           if (monthFeeTypes.contains(feeType.toUpperCase())) {
             final duedate = d['duedate'];
             if (duedate != null) {
@@ -191,7 +197,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             }
           }
           termMap.putIfAbsent(term, () => []);
-          termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: amount));
+          termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: feeOnly));
+          if (fine > 0) {
+            termMap[term]!.add(ReceiptFeeItem(type: '  Fine', amount: fine));
+          }
         }
         feeDetails = termMap.entries
             .map((e) => ReceiptTermDetail(term: e.key, fees: e.value))
