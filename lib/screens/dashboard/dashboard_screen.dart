@@ -50,16 +50,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.people_alt_rounded, 'Students', adminOnly: true),
-    _NavItem(Icons.request_page_rounded, 'Fee Demand', accountantOnly: true),
-    _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
-    _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
-    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
-    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
-    _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
     _NavItem(Icons.settings_rounded, 'Sequence Creation', adminOnly: true),
+    _NavItem(Icons.people_alt_rounded, 'Students', adminOnly: true),
+    _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
+    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
+    _NavItem(Icons.request_page_rounded, 'Fee Demand'),
+    _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
     _NavItem(Icons.account_balance_rounded, 'Bank Reconciliation', accountantOnly: true),
+    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
+    _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
   ];
@@ -430,11 +430,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _isFullHeightScreen()
                       ? Padding(
-                          padding: EdgeInsets.all(isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16),
+                          padding: EdgeInsets.fromLTRB(
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                            4,
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                          ),
                           child: _buildDashboardContent(context, isDesktop),
                         )
                       : SingleChildScrollView(
-                          padding: EdgeInsets.all(isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16),
+                          padding: EdgeInsets.fromLTRB(
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                            4,
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
+                          ),
                           child: _buildDashboardContent(context, isDesktop),
                         ),
                 ),

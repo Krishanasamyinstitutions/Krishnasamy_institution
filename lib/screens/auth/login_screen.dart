@@ -389,6 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ? const LinearProgressIndicator()
                               : DropdownButtonFormField<int>(
                                   value: _selectedInsId,
+                                  isExpanded: true,
                                   decoration: InputDecoration(
                                     hintText: 'Select your institution',
                                     prefixIcon: Icon(Icons.school_outlined,
@@ -399,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   items: _institutions.map((ins) {
                                     return DropdownMenuItem<int>(
                                       value: ins['ins_id'] as int,
-                                      child: Text(ins['insname'] ?? ''),
+                                      child: Text(ins['insname'] ?? '', overflow: TextOverflow.ellipsis),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -434,6 +435,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ? const LinearProgressIndicator()
                                 : DropdownButtonFormField<String>(
                                     value: _selectedYear,
+                                    isExpanded: true,
                                     decoration: InputDecoration(
                                       hintText: 'Select academic year',
                                       prefixIcon: Icon(Icons.calendar_today_outlined, size: 20.sp, color: AppColors.textLight),
@@ -441,7 +443,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     items: _availableYears.map((y) {
                                       final label = y['yrlabel']?.toString() ?? '';
-                                      return DropdownMenuItem<String>(value: label, child: Text(label));
+                                      return DropdownMenuItem<String>(value: label, child: Text(label, overflow: TextOverflow.ellipsis));
                                     }).toList(),
                                     onChanged: (value) => setState(() => _selectedYear = value),
                                   ),

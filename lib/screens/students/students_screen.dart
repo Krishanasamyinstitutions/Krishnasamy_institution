@@ -1390,7 +1390,15 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // RIGHT — Student Details or Class Table
           Expanded(
             child: _selectedStudent == null
-                ? (_selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : _buildAllStudentsTable())
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : _buildAllStudentsTable(),
+                  )
                 : Column(
                     children: [
                       // Back breadcrumb

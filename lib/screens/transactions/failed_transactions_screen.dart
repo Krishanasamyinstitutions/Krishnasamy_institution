@@ -228,6 +228,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       address: student?.stuaddress ?? '-',
       admissionNo: student?.stuadmno ?? '-',
       className: student?.stuclass ?? '-',
+      courseName: student?.courname ?? '-',
       schoolName: _insName ?? auth.inscode ?? 'Institution',
       schoolAddress: _insAddress ?? '-',
       schoolLogoUrl: _insLogoUrl,
@@ -452,7 +453,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                           children: [
                             pw.Text('Address:', style: sSemiBold),
                             pw.SizedBox(width: 6),
-                            pw.Expanded(child: pw.Text(data.address, style: sMedium)),
+                            pw.Expanded(child: pw.Text(
+                              (data.address.trim().isNotEmpty && data.address.trim() != '-' && data.address.trim().toLowerCase() != 'null') ? data.address : 'NA',
+                              style: sMedium,
+                            )),
                           ],
                         ),
                       ],
