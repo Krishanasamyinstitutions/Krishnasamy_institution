@@ -1299,47 +1299,100 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                     Expanded(child: Center(child: Text('No fine rules configured', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp))))
                   else
                     Expanded(
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-                        headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.white),
-                        dataTextStyle: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
-                        columnSpacing: 16, horizontalMargin: 16, headingRowHeight: 40,
-                        columns: const [
-                          DataColumn(label: Text('Rule Name')),
-                          DataColumn(label: Text('Fee Type')),
-                          DataColumn(label: Text('From Days')),
-                          DataColumn(label: Text('To Days')),
-                          DataColumn(label: Text('Type')),
-                          DataColumn(label: Text('Value')),
-                          DataColumn(label: Text('Actions')),
-                        ],
-                        rows: _rules.map((r) {
-                          final fineType = r['fine_type']?.toString() ?? 'FIXED';
-                          final fineValue = (r['fine_value'] as num?)?.toDouble() ?? 0;
-                          return DataRow(cells: [
-                            DataCell(Text(r['rulename']?.toString() ?? '')),
-                            DataCell(Text(r['feetype']?.toString() ?? 'ALL')),
-                            DataCell(Text('${r['from_days'] ?? 0}')),
-                            DataCell(Text(r['to_days'] != null ? '${r['to_days']}' : '∞')),
-                            DataCell(Text(fineType == 'FIXED' ? 'Fixed' : 'Percent')),
-                            DataCell(Text(fineType == 'FIXED' ? '₹${fineValue.toStringAsFixed(0)}' : '${fineValue.toStringAsFixed(1)}%')),
-                            DataCell(Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.edit_rounded, size: 16.sp, color: AppColors.accent),
-                                  onPressed: () => _editRule(r),
-                                  tooltip: 'Edit',
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.w),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10.r),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.border),
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: SingleChildScrollView(
+                                child: DataTable(
+                                  headingRowColor: WidgetStateProperty.all(AppColors.primary),
+                                  headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3),
+                                  dataTextStyle: TextStyle(fontSize: 12.5.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                                  dataRowColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                    if (states.contains(WidgetState.hovered)) return AppColors.primaryLight.withValues(alpha: 0.4);
+                                    return null;
+                                  }),
+                                  columnSpacing: 48.w,
+                                  horizontalMargin: 24.w,
+                                  headingRowHeight: 48,
+                                  dataRowMinHeight: 52,
+                                  dataRowMaxHeight: 52,
+                                  dividerThickness: 0.6,
+                                  columns: const [
+                                    DataColumn(label: Text('RULE NAME')),
+                                    DataColumn(label: Text('FEE TYPE')),
+                                    DataColumn(label: Text('FROM'), numeric: true),
+                                    DataColumn(label: Text('TO'), numeric: true),
+                                    DataColumn(label: Text('TYPE')),
+                                    DataColumn(label: Text('VALUE'), numeric: true),
+                                    DataColumn(label: Text('ACTIONS')),
+                                  ],
+                                  rows: List<DataRow>.generate(_rules.length, (i) {
+                                    final r = _rules[i];
+                                    final fineType = r['fine_type']?.toString() ?? 'FIXED';
+                                    final fineValue = (r['fine_value'] as num?)?.toDouble() ?? 0;
+                                    final isFixed = fineType == 'FIXED';
+                                    final zebra = i.isOdd ? const Color(0xFFF8FAFF) : Colors.white;
+                                    return DataRow(
+                                      color: WidgetStateProperty.resolveWith<Color?>((states) {
+                                        if (states.contains(WidgetState.hovered)) return AppColors.primaryLight.withValues(alpha: 0.35);
+                                        return zebra;
+                                      }),
+                                      cells: [
+                                        DataCell(Text(
+                                          r['rulename']?.toString() ?? '',
+                                          style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                        )),
+                                        DataCell(_chip(
+                                          label: r['feetype']?.toString() ?? 'ALL',
+                                          color: AppColors.accent,
+                                        )),
+                                        DataCell(Text('${r['from_days'] ?? 0}')),
+                                        DataCell(Text(
+                                          r['to_days'] != null ? '${r['to_days']}' : '∞',
+                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: r['to_days'] == null ? AppColors.textSecondary : AppColors.textPrimary),
+                                        )),
+                                        DataCell(_chip(
+                                          label: isFixed ? 'Fixed' : 'Percent',
+                                          color: isFixed ? AppColors.success : AppColors.warning,
+                                        )),
+                                        DataCell(Text(
+                                          isFixed ? '₹${fineValue.toStringAsFixed(0)}' : '${fineValue.toStringAsFixed(1)}%',
+                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                        )),
+                                        DataCell(Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _actionBtn(
+                                              icon: Icons.edit_rounded,
+                                              color: AppColors.accent,
+                                              tooltip: 'Edit',
+                                              onTap: () => _editRule(r),
+                                            ),
+                                            SizedBox(width: 6.w),
+                                            _actionBtn(
+                                              icon: Icons.delete_rounded,
+                                              color: AppColors.error,
+                                              tooltip: 'Delete',
+                                              onTap: () => _deleteRule(r['fr_id'] as int),
+                                            ),
+                                          ],
+                                        )),
+                                      ],
+                                    );
+                                  }),
                                 ),
-                                IconButton(
-                                  icon: Icon(Icons.delete_rounded, size: 16.sp, color: AppColors.error),
-                                  onPressed: () => _deleteRule(r['fr_id'] as int),
-                                  tooltip: 'Delete',
-                                ),
-                              ],
-                            )),
-                          ]);
-                        }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -1348,6 +1401,39 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
           ),
         ),
       ],
+    );
+  }
+
+  Widget _chip({required String label, required Color color}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.2),
+      ),
+    );
+  }
+
+  Widget _actionBtn({required IconData icon, required Color color, required String tooltip, required VoidCallback onTap}) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8.r),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8.r),
+          child: Padding(
+            padding: EdgeInsets.all(7.w),
+            child: Icon(icon, size: 15.sp, color: color),
+          ),
+        ),
+      ),
     );
   }
 }
