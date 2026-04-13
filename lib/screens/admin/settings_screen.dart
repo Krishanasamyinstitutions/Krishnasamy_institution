@@ -1308,9 +1308,12 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                               border: Border.all(color: AppColors.border),
                               borderRadius: BorderRadius.circular(10.r),
                             ),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: SingleChildScrollView(
+                            child: LayoutBuilder(
+                              builder: (ctx, constraints) => SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                                  child: SingleChildScrollView(
                                 child: DataTable(
                                   headingRowColor: WidgetStateProperty.all(AppColors.primary),
                                   headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3),
@@ -1389,6 +1392,8 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                     );
                                   }),
                                 ),
+                                ),
+                              ),
                               ),
                             ),
                           ),

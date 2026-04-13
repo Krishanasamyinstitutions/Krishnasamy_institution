@@ -77,7 +77,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
             ],
           ),
         ),
-        SizedBox(height: 16.h),
+        SizedBox(height: 6.h),
         // Tab content
         Expanded(
           child: TabBarView(
@@ -738,7 +738,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ],
               ),
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 6.h),
             // Summary cards — IntrinsicHeight makes all 3 cards the same height
             // so the Pending card stretches to match the breakdown cards.
             IntrinsicHeight(
@@ -762,7 +762,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   feeAmount: _formatCurrency(_totalCollection - _totalFine),
                   fineAmount: _formatCurrency(_totalFine),
                 ),
-                SizedBox(width: 16.w),
                 _buildClickableSummaryCard(
                   Icons.today_rounded,
                   Colors.blue,
@@ -780,7 +779,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   feeAmount: _formatCurrency(_todayCollection - _todayFine),
                   fineAmount: _formatCurrency(_todayFine),
                 ),
-                SizedBox(width: 16.w),
                 _buildClickableSummaryCard(Icons.pending_actions_rounded, Colors.orange, _isLoadingDemands ? 'Loading...' : _formatCurrency(_pendingFees), 'Pending Fees', () {
                   _loadDemandsIfNeeded();
                   setState(() {
@@ -796,7 +794,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               ],
             ),
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 6.h),
             // Show drilldown or date list based on selection
             if (_showTotalCollection)
               _buildCollectionDrilldown(false)
@@ -1216,104 +1214,79 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 16.h),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 16.h),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: iconColor.withValues(alpha: 0.3)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              Row(
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Icon(icon, color: iconColor, size: 20.sp),
+              ),
+              SizedBox(width: 10.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: iconColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 20.sp),
-                  ),
-                  SizedBox(width: 10.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(value, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                        SizedBox(height: 2.h),
-                        Text(label, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 6.w),
-                  Container(
-                    padding: EdgeInsets.all(4.w),
-                    decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6.r)),
-                    child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: iconColor),
-                  ),
+                  Text(value, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                  SizedBox(height: 2.h),
+                  Text(label, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                  if (!showBreakdown && subtitle != null) ...[
+                    SizedBox(height: 4.h),
+                    Text(subtitle, style: TextStyle(fontSize: 10.sp, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                  ],
                 ],
               ),
+              const Spacer(),
+              const Spacer(),
               if (showBreakdown) ...[
-                SizedBox(height: 10.h),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6.r),
-                          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('FEE', style: TextStyle(fontSize: 9.sp, color: AppColors.success, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                            SizedBox(height: 2.h),
-                            Text(
-                              feeAmount ?? '-',
-                              style: TextStyle(fontSize: 13.sp, color: AppColors.success, fontWeight: FontWeight.w700),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6.r),
-                          border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('FINE', style: TextStyle(fontSize: 9.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                            SizedBox(height: 2.h),
-                            Text(
-                              fineAmount ?? '-',
-                              style: TextStyle(fontSize: 13.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                SizedBox(width: 8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6.r),
+                    border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('FEE', style: TextStyle(fontSize: 11.sp, color: AppColors.success, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                      SizedBox(height: 3.h),
+                      Text(feeAmount ?? '-', style: TextStyle(fontSize: 15.sp, color: AppColors.success, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
                 ),
-              ] else if (subtitle != null) ...[
-                SizedBox(height: 4.h),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 10.sp, color: Colors.orange.shade700, fontWeight: FontWeight.w600),
+                SizedBox(width: 6.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6.r),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('FINE', style: TextStyle(fontSize: 11.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                      SizedBox(height: 3.h),
+                      Text(fineAmount ?? '-', style: TextStyle(fontSize: 15.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w800)),
+                    ],
+                  ),
                 ),
               ],
+              const Spacer(),
+              Container(
+                padding: EdgeInsets.all(4.w),
+                decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6.r)),
+                child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: iconColor),
+              ),
             ],
           ),
         ),
@@ -2515,8 +2488,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final stuName = student?['stuname']?.toString() ?? '-';
     final admNo = student?['stuadmno']?.toString() ?? '-';
     final stuClass = student?['stuclass']?.toString() ?? '-';
-    final stuMobile = student?['stumobile']?.toString() ?? '-';
     final stuAddress = student?['stuaddress']?.toString() ?? '-';
+    // Payment in-charge mobile from parents.payinchargemob
+    final stuMobile = payment['payinchargemob']?.toString().isNotEmpty == true
+        ? payment['payinchargemob'].toString()
+        : '-';
     final payMethod = payment['paymethod']?.toString() ?? '-';
     final totalAmount = (payment['transtotalamount'] as num?)?.toDouble() ?? 0;
     final auth = context.read<AuthProvider>();
@@ -2578,6 +2554,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       address: stuAddress,
       admissionNo: admNo,
       className: stuClass,
+      courseName: (student?['courname']?.toString().isNotEmpty == true)
+          ? student!['courname'].toString()
+          : (_stuIdToCourse[student?['stu_id'] as int?] ?? '-'),
       schoolName: _insName ?? auth.insName ?? 'Institution',
       schoolAddress: _insAddress ?? '-',
       schoolLogoUrl: _insLogoUrl,
@@ -2733,7 +2712,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               children: [
                                 pw.Text('Address:', style: sSemiBold),
                                 pw.SizedBox(width: 6),
-                                pw.Expanded(child: pw.Text(data.address, style: sMedium)),
+                                pw.Expanded(child: pw.Text(
+                                  (data.address.trim().isNotEmpty && data.address.trim() != '-' && data.address.trim().toLowerCase() != 'null') ? data.address : 'NA',
+                                  style: sMedium,
+                                )),
                               ],
                             ),
                           ],
@@ -2908,7 +2890,40 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return pdf;
   }
 
-  void _showReceiptDialog(Map<String, dynamic> payment, List<Map<String, dynamic>>? feeDetails) {
+  void _showReceiptDialog(Map<String, dynamic> payment, List<Map<String, dynamic>>? feeDetails) async {
+    // Enrich student address + fetch parent's payinchargemob for receipt
+    final students = payment['students'] as Map<String, dynamic>?;
+    final stuId = payment['stu_id'] as int?;
+    if (stuId != null) {
+      try {
+        if (students == null || students['stuaddress'] == null) {
+          final result = await SupabaseService.fromSchema('students')
+              .select('stumobile, stuaddress, stuadmno')
+              .eq('stu_id', stuId)
+              .maybeSingle();
+          if (result != null) {
+            payment['students'] = {
+              ...?students,
+              'stumobile': result['stumobile'],
+              'stuaddress': result['stuaddress'],
+              'stuadmno': result['stuadmno'] ?? students?['stuadmno'],
+            };
+          }
+        }
+        // Fetch parent's payinchargemob — used as Mobile No on receipt
+        final stuadmno = (payment['students'] as Map<String, dynamic>?)?['stuadmno']?.toString();
+        final parent = await SupabaseService.getStudentParent(stuId, stuadmno: stuadmno);
+        if (parent != null) {
+          final payMob = parent['payinchargemob']?.toString();
+          if (payMob != null && payMob.isNotEmpty) {
+            payment['payinchargemob'] = payMob;
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to enrich receipt data: $e');
+      }
+    }
+    if (!mounted) return;
     final receiptData = _buildReceiptData(payment, feeDetails);
     showDialog(
       context: context,
@@ -4186,7 +4201,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         child: Container(
                           color: i.isEven ? Colors.white : const Color(0xFFF7FAFC),
                           padding: EdgeInsets.symmetric(horizontal: cHMargin),
-                          constraints: BoxConstraints(minHeight: 44),
+                          constraints: BoxConstraints(minHeight: 50),
                           child: Row(
                             children: [
                               SizedBox(width: cAdj[0], child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp))),
@@ -4205,7 +4220,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                     ...g.feeTypes.map((ft) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6.r)),
-                                      child: Text(ft, style: TextStyle(fontSize: 9.sp, color: AppColors.accent)),
+                                      child: Text(ft, style: TextStyle(fontSize: 11.sp, color: AppColors.accent, fontWeight: FontWeight.w700)),
                                     )),
                                   ],
                                 ),

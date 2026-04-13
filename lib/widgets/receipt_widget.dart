@@ -11,6 +11,7 @@ class ReceiptData {
   final String address;
   final String admissionNo;
   final String className;
+  final String courseName;
   final String schoolName;
   final String schoolAddress;
   final String? schoolLogoUrl;
@@ -31,6 +32,7 @@ class ReceiptData {
     required this.address,
     required this.admissionNo,
     required this.className,
+    this.courseName = '-',
     required this.schoolName,
     required this.schoolAddress,
     this.schoolLogoUrl,
@@ -177,16 +179,6 @@ class ReceiptWidget extends StatelessWidget {
                 _buildFeeTable(chunk),
                 if (chunk.isLast) ...[
                   const Spacer(),
-                  // Payment info
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
-                      const SizedBox(height: 6),
-                      _labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
-                    ],
-                  ),
-                  const Spacer(),
                   // Footer
                   Center(
                     child: Text(
@@ -313,8 +305,19 @@ class ReceiptWidget extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            if (totalPages > 1)
-              Text('Page $pageNum of $totalPages', style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (totalPages > 1) ...[
+                  Text('Page $pageNum of $totalPages', style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
+                  const SizedBox(height: 6),
+                ] else
+                  const SizedBox(height: 22),
+                _labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
+                const SizedBox(height: 3),
+                _labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
+              ],
+            ),
           ],
         ),
       ],
@@ -338,7 +341,7 @@ class ReceiptWidget extends StatelessWidget {
                   const SizedBox(height: 6),
                   _labelValue('Mobile No:', data.mobileNo),
                   const SizedBox(height: 6),
-                  _wrappedLabelValue('Address:', data.address),
+                  _wrappedLabelValue('Address:', _hasValue(data.address) ? data.address : 'NA'),
                 ],
               ),
             ),
@@ -347,6 +350,8 @@ class ReceiptWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 _labelValue('Roll No:', data.admissionNo),
+                const SizedBox(height: 6),
+                _labelValue('Course:', data.courseName),
                 const SizedBox(height: 6),
                 _labelValue('Class:', data.className),
               ],
@@ -491,6 +496,7 @@ class ReceiptWidget extends StatelessWidget {
               width: 119,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var fee in term.fees)
                     Padding(
@@ -516,6 +522,14 @@ class ReceiptWidget extends StatelessWidget {
         child: Text(text, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
       ),
     );
+  }
+
+  static bool _hasValue(String? s) {
+    if (s == null) return false;
+    final t = s.trim();
+    if (t.isEmpty) return false;
+    final lower = t.toLowerCase();
+    return t != '-' && lower != 'null' && lower != 'n/a';
   }
 
   String _formatAmount(double amount) {

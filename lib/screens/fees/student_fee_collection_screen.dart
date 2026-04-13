@@ -308,7 +308,7 @@ class _StudentFeeCollectionScreenState
 
     try {
       final studentRows = await SupabaseService.fromSchema('students')
-          .select('stu_id, stuname, stuadmno, stuclass, stugender, stumobile, stuphoto')
+          .select('stu_id, stuname, stuadmno, stuclass, stugender, stumobile, stuphoto, courname')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
           .eq('activestatus', 1)
@@ -328,12 +328,20 @@ class _StudentFeeCollectionScreenState
       _nameController.text = student['stuname']?.toString() ?? '';
       _classController.text = student['stuclass']?.toString() ?? '';
       final stuClass = student['stuclass']?.toString();
+      final stuCourse = student['courname']?.toString();
 
       setState(() {
         _student = student;
         _searching = false;
         _loadingDemands = true;
         _studentSuggestions = [];
+        if (stuCourse != null && stuCourse.isNotEmpty && _courseList.contains(stuCourse)) {
+          _selectedCourse = stuCourse;
+          if (_courseClassMap.containsKey(stuCourse)) {
+            _classList = List<String>.from(_courseClassMap[stuCourse]!)
+              ..sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+          }
+        }
         if (stuClass != null && _classList.contains(stuClass)) {
           _selectedClass = stuClass;
         }
@@ -480,44 +488,33 @@ class _StudentFeeCollectionScreenState
 
         // Body
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── Left Panel (Single Card) ──
-              SizedBox(
-                width: 240.w,
-                child: Container(
+              // ── Top: Student Lookup (horizontal) ──
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppColors.border),
+                ),
+                padding: EdgeInsets.all(12.w),
+                child: _buildStudentLookupContent(),
+              ),
+              SizedBox(height: 12.h),
+              if (_student != null) ...[
+                Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12.r),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Student Lookup section
-                        Padding(
-                          padding: EdgeInsets.all(12.w),
-                          child: _buildStudentLookupContent(),
-                        ),
-                        if (_student != null) ...[
-                          const Divider(height: 1),
-                          // Student Info section
-                          Padding(
-                            padding: EdgeInsets.all(12.w),
-                            child: _buildStudentCardContent(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                  padding: EdgeInsets.all(12.w),
+                  child: _buildStudentCardContent(),
                 ),
-              ),
-
-              SizedBox(width: 12.w),
-
-              // ── Right Panel ──
+                SizedBox(height: 12.h),
+              ],
+              // ── Demands ──
               Expanded(child: _buildDemandsPanel()),
             ],
           ),
@@ -538,46 +535,107 @@ class _StudentFeeCollectionScreenState
                   )),
           SizedBox(height: 12.h),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextField(
-                  controller: _admNoController,
-                  onSubmitted: (_) => _search(),
-                  decoration: _inputDec('Roll No'),
-                  style: TextStyle(fontSize: 13.sp),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _admNoController,
+                        onSubmitted: (_) => _search(),
+                        decoration: _inputDec('Roll No'),
+                        style: TextStyle(fontSize: 13.sp),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    SizedBox(
+                      height: 42.h,
+                      width: 42.w,
+                      child: ElevatedButton(
+                        onPressed: _searching ? null : _search,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.r)),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: _searching
+                            ? SizedBox(
+                                width: 18.w,
+                                height: 18.h,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : Icon(Icons.search_rounded, size: 20.sp),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(width: 8.w),
-              SizedBox(
-                height: 42.h,
-                width: 42.w,
-                child: ElevatedButton(
-                  onPressed: _searching ? null : _search,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.r)),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: _searching
-                      ? SizedBox(
-                          width: 18.w,
-                          height: 18.h,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : Icon(Icons.search_rounded, size: 20.sp),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: TextField(
+                  controller: _nameController,
+                  decoration: _inputDec('Student Name'),
+                  style: TextStyle(fontSize: 13.sp),
+                  onChanged: _searchByName,
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedCourse,
+                  decoration: _inputDec('Course'),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  isExpanded: true,
+                  items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedCourse = val;
+                      _selectedClass = null;
+                      _classSuggestions = [];
+                      if (val != null && _courseClassMap.containsKey(val)) {
+                        _classList = List<String>.from(_courseClassMap[val]!);
+                      } else if (val != null) {
+                        _classList = List<String>.from(_allClasses);
+                      } else {
+                        _classList = List<String>.from(_allClasses);
+                      }
+                      _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+                      if (val != null && val.startsWith('M') && _classList.length > 2) {
+                        _classList = _classList.sublist(0, 2);
+                      }
+                    });
+                  },
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey(_selectedCourse),
+                  value: _selectedClass,
+                  decoration: _inputDec('Class'),
+                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                  isExpanded: true,
+                  items: _classList.map((c) {
+                    final label = _selectedCourse != null && c.contains('-')
+                        ? '${c.split('-').first} Year'
+                        : c;
+                    return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp)));
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedClass = val;
+                      _classController.text = val ?? '';
+                      _classSuggestions = [];
+                    });
+                    if (val != null) _searchByClass(val);
+                  },
                 ),
               ),
             ],
-          ),
-          SizedBox(height: 10.h),
-          TextField(
-            controller: _nameController,
-            decoration: _inputDec('Student Name'),
-            style: TextStyle(fontSize: 13.sp),
-            onChanged: _searchByName,
           ),
           if (_studentSuggestions.isNotEmpty)
             Container(
@@ -604,56 +662,6 @@ class _StudentFeeCollectionScreenState
                 },
               ),
             ),
-          SizedBox(height: 10.h),
-          DropdownButtonFormField<String>(
-            value: _selectedCourse,
-            decoration: _inputDec('Course'),
-            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-            isExpanded: true,
-            items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
-            onChanged: (val) {
-              setState(() {
-                _selectedCourse = val;
-                _selectedClass = null;
-                _classSuggestions = [];
-                if (val != null && _courseClassMap.containsKey(val)) {
-                  _classList = List<String>.from(_courseClassMap[val]!);
-                } else if (val != null) {
-                  // Fallback: use allClasses, limit to 2 years for M-courses
-                  _classList = List<String>.from(_allClasses);
-                } else {
-                  _classList = List<String>.from(_allClasses);
-                }
-                _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
-                // M-courses (MBA, MCA, MCOM, etc.) have only 2 years
-                if (val != null && val.startsWith('M') && _classList.length > 2) {
-                  _classList = _classList.sublist(0, 2);
-                }
-              });
-            },
-          ),
-          SizedBox(height: 10.h),
-          DropdownButtonFormField<String>(
-            key: ValueKey(_selectedCourse),
-            value: _selectedClass,
-            decoration: _inputDec('Class'),
-            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-            isExpanded: true,
-            items: _classList.map((c) {
-              final label = _selectedCourse != null && c.contains('-')
-                  ? '${c.split('-').first} Year'
-                  : c;
-              return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp)));
-            }).toList(),
-            onChanged: (val) {
-              setState(() {
-                _selectedClass = val;
-                _classController.text = val ?? '';
-                _classSuggestions = [];
-              });
-              if (val != null) _searchByClass(val);
-            },
-          ),
           if (_classSuggestions.isNotEmpty)
             Container(
               margin: EdgeInsets.only(top: 4.h),
@@ -704,51 +712,50 @@ class _StudentFeeCollectionScreenState
     final admNo = _student!['stuadmno']?.toString() ?? '-';
     final className = _student!['stuclass']?.toString() ?? '-';
     final fatherName = _parent?['fathername']?.toString() ?? '-';
+    final courseName = _student!['courname']?.toString() ?? '-';
 
-    return Column(
-        children: [
-          Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: AppColors.accent.withValues(alpha: 0.12),
+          child: Text(
+            name.isNotEmpty ? name[0].toUpperCase() : '?',
+            style: TextStyle(
+                color: AppColors.accent,
+                fontWeight: FontWeight.w700,
+                fontSize: 18.sp),
+          ),
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppColors.accent.withValues(alpha: 0.12),
-                child: Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: TextStyle(
-                            color: AppColors.accent,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 18.sp),
-                      ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary),
-                        overflow: TextOverflow.ellipsis),
-                    SizedBox(height: 2.h),
-                    Text('Roll No: $admNo',
-                        style: TextStyle(
-                            fontSize: 13.sp,
-                            color: AppColors.textSecondary)),
-                  ],
-                ),
-              ),
+              Text(name,
+                  style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis),
+              SizedBox(height: 2.h),
+              Text('Roll No: $admNo',
+                  style: TextStyle(
+                      fontSize: 13.sp, color: AppColors.textSecondary)),
             ],
           ),
-          SizedBox(height: 14.h),
-          const Divider(height: 1),
-          SizedBox(height: 12.h),
-          _detailRow(Icons.person_outline_rounded, 'Father', fatherName),
-          SizedBox(height: 8.h),
-          _detailRow(Icons.school_outlined, 'Class', className),
-        ],
-      );
+        ),
+        SizedBox(width: 16.w),
+        Container(width: 1, height: 36.h, color: AppColors.border),
+        SizedBox(width: 16.w),
+        Expanded(child: _detailRow(Icons.person_outline_rounded, 'Father', fatherName)),
+        SizedBox(width: 16.w),
+        Expanded(child: _detailRow(Icons.menu_book_outlined, 'Course', courseName)),
+        SizedBox(width: 16.w),
+        Expanded(child: _detailRow(Icons.school_outlined, 'Class', className)),
+      ],
+    );
   }
 
   // ── Term Filter ──
