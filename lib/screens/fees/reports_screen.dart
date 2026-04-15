@@ -75,6 +75,72 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   bool _dailyLoading = false;
   List<Map<String, dynamic>> _dailyRows = [];
   List<String> _dailyFeeTypes = [];
+  final ScrollController _dailyHScroll = ScrollController();
+  String? _selectedMode; // null = all, 'cash', 'bank'
+  String? _selectedPrefix;
+
+  // Student Ledger tab state
+  String? _ledgerStuAdmNo;
+  bool _ledgerLoading = false;
+  List<Map<String, dynamic>> _ledgerDemands = [];
+  Map<int, Map<String, dynamic>> _ledgerPayments = {};
+  Map<String, dynamic>? _ledgerStudent;
+  final TextEditingController _ledgerSearchCtrl = TextEditingController();
+
+  bool _isCashMode(String paymethod) {
+    final m = paymethod.toUpperCase();
+    return m.contains('CASH') || m.contains('CHEQUE') || m.contains('DD');
+  }
+
+  List<String> _dailyPrefixes() {
+    final set = <String>{};
+    for (final r in _dailyRows) {
+      final n = r['paynumber']?.toString() ?? '';
+      final idx = n.indexOf('/');
+      final p = idx > 0 ? n.substring(0, idx) : n;
+      if (p.isNotEmpty) set.add(p);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  String _paymentBucket(String paymethod) {
+    final m = paymethod.toUpperCase();
+    if (m.contains('CASH')) return 'cash';
+    if (m.contains('CHEQUE') || m.contains('DD')) return 'cheque';
+    return 'bank';
+  }
+
+  List<Widget> _dailyModeChips() {
+    Widget chip(String label, String? key) {
+      final active = _selectedMode == key;
+      return Padding(
+        padding: EdgeInsets.only(right: 4.w),
+        child: InkWell(
+          onTap: () => setState(() => _selectedMode = key),
+          borderRadius: BorderRadius.circular(6.r),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+            decoration: BoxDecoration(
+              color: active ? AppColors.accent.withValues(alpha: 0.15) : AppColors.surface,
+              borderRadius: BorderRadius.circular(6.r),
+              border: Border.all(color: active ? AppColors.accent : AppColors.border),
+            ),
+            child: Text(label, style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: active ? AppColors.accent : null,
+            )),
+          ),
+        ),
+      );
+    }
+    return [
+      chip('All', null),
+      chip('Cash', 'cash'),
+      chip('Bank', 'bank'),
+    ];
+  }
 
   @override
   void initState() {
@@ -173,95 +239,45 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   Future<void> _loadDailyCollection() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
-    if (insId == null || _dailyFrom == null || _dailyTo == null) return;
-    setState(() => _dailyLoading = true);
+    final schema = SupabaseService.currentSchema;
+    if (insId == null || schema == null || _dailyFrom == null || _dailyTo == null) return;
+    setState(() {
+      _dailyLoading = true;
+      _dailyRows = [];
+      _dailyFeeTypes = [];
+    });
     try {
       String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
-      final payments = await SupabaseService.fromSchema('payment')
-          .select('pay_id, paynumber, stu_id, transtotalamount, paymethod, paydate')
-          .eq('ins_id', insId)
-          .eq('paystatus', 'C')
-          .eq('activestatus', 1)
-          .gte('paydate', d(_dailyFrom!))
-          .lte('paydate', d(_dailyTo!))
-          .order('paynumber');
-      final payList = List<Map<String, dynamic>>.from(payments as List);
-      if (payList.isEmpty) {
-        setState(() {
-          _dailyRows = [];
-          _dailyFeeTypes = [];
-          _dailyLoading = false;
-        });
-        return;
-      }
-
-      final payIds = payList.map((p) => p['pay_id']).whereType<int>().toList();
-      final stuIds = payList.map((p) => p['stu_id']).whereType<int>().toSet().toList();
-
-      final stuRows = await SupabaseService.fromSchema('students')
-          .select('stu_id, stuname, stuadmno, stuclass, courname')
-          .inFilter('stu_id', stuIds);
-      final stuMap = <int, Map<String, dynamic>>{};
-      for (final s in (stuRows as List)) {
-        stuMap[s['stu_id'] as int] = Map<String, dynamic>.from(s as Map);
-      }
-
-      final details = <Map<String, dynamic>>[];
-      for (int i = 0; i < payIds.length; i += 200) {
-        final chunk = payIds.sublist(i, (i + 200).clamp(0, payIds.length));
-        final pd = await SupabaseService.fromSchema('paymentdetails')
-            .select('pay_id, dem_id, transtotalamount')
-            .inFilter('pay_id', chunk);
-        details.addAll(List<Map<String, dynamic>>.from(pd as List));
-      }
-      final demIds = details.map((pd) => pd['dem_id']).whereType<int>().toSet().toList();
-      final demTypeMap = <int, String>{};
-      final demFineMap = <int, double>{};
-      for (int i = 0; i < demIds.length; i += 200) {
-        final chunk = demIds.sublist(i, (i + 200).clamp(0, demIds.length));
-        final fd = await SupabaseService.fromSchema('feedemand')
-            .select('dem_id, demfeetype, fineamount')
-            .inFilter('dem_id', chunk);
-        for (final r in (fd as List)) {
-          demTypeMap[r['dem_id'] as int] = r['demfeetype']?.toString() ?? '';
-          demFineMap[r['dem_id'] as int] = (r['fineamount'] as num?)?.toDouble() ?? 0;
-        }
-      }
-
-      final byPay = <int, Map<String, double>>{};
-      final fineByPay = <int, double>{};
-      for (final pd in details) {
-        final pid = pd['pay_id'] as int?;
-        final did = pd['dem_id'] as int?;
-        if (pid == null) continue;
-        final ft = did != null ? (demTypeMap[did] ?? '') : '';
-        final amt = (pd['transtotalamount'] as num?)?.toDouble() ?? 0;
-        if (ft.isNotEmpty) {
-          byPay.putIfAbsent(pid, () => {});
-          byPay[pid]![ft] = (byPay[pid]![ft] ?? 0) + amt;
-        }
-        if (did != null) {
-          fineByPay[pid] = (fineByPay[pid] ?? 0) + (demFineMap[did] ?? 0);
-        }
-      }
+      final result = await SupabaseService.client.rpc('get_daily_collection_report', params: {
+        'p_schema': schema,
+        'p_ins_id': insId,
+        'p_from': d(_dailyFrom!),
+        'p_to': d(_dailyTo!),
+      });
+      final list = result is List ? List<Map<String, dynamic>>.from(result) : <Map<String, dynamic>>[];
 
       final feeTypeSet = <String>{};
       final rows = <Map<String, dynamic>>[];
-      for (final p in payList) {
-        final pid = p['pay_id'] as int?;
-        final stu = stuMap[p['stu_id'] as int?] ?? {};
-        final feeMap = byPay[pid] ?? {};
-        feeTypeSet.addAll(feeMap.keys);
+      for (final r in list) {
+        final feesJson = r['fees_json'];
+        final fees = <String, double>{};
+        if (feesJson is Map) {
+          feesJson.forEach((k, v) {
+            final amt = (v as num?)?.toDouble() ?? 0;
+            fees[k.toString()] = amt;
+            feeTypeSet.add(k.toString());
+          });
+        }
         rows.add({
-          'paynumber': p['paynumber']?.toString() ?? '',
-          'stuadmno': stu['stuadmno']?.toString() ?? '',
-          'stuname': stu['stuname']?.toString() ?? '',
-          'courname': stu['courname']?.toString() ?? '',
-          'stuclass': stu['stuclass']?.toString() ?? '',
-          'total': (p['transtotalamount'] as num?)?.toDouble() ?? 0,
-          'fine': fineByPay[pid] ?? 0,
-          'paymethod': p['paymethod']?.toString() ?? '',
-          'fees': feeMap,
+          'paynumber': r['paynumber']?.toString() ?? '',
+          'stuadmno': r['stuadmno']?.toString() ?? '',
+          'stuname': r['stuname']?.toString() ?? '',
+          'courname': r['courname']?.toString() ?? '',
+          'stuclass': r['stuclass']?.toString() ?? '',
+          'total': (r['total'] as num?)?.toDouble() ?? 0,
+          'fine': (r['fine'] as num?)?.toDouble() ?? 0,
+          'paymethod': r['paymethod']?.toString() ?? '',
+          'fees': fees,
         });
       }
 
@@ -357,7 +373,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           listenable: _tabController,
           builder: (context, _) {
             final selected = _tabController.index;
-            final tabLabels = ['Daily Collection', 'Collection Statement', 'Pending - Course wise', 'Pending - Year wise'];
+            final tabLabels = ['Daily Collection', 'Student Ledger', 'Pending Payment', 'Consolidated Status'];
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -393,7 +409,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           },
         ),
         // Filters
-        _buildFilters(),
+        ListenableBuilder(listenable: _tabController, builder: (_, __) => _buildFilters()),
         // Content
         Expanded(
           child: _loading
@@ -404,9 +420,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       controller: _tabController,
                       children: [
                         _buildDailyCollection(),
-                        _buildCollectionStatement(),
-                        _buildPendingCourseWise(),
-                        _buildPendingYearWise(),
+                        _buildStudentLedger(),
+                        _buildPendingPayment(),
+                        _buildConsolidatedStatus(),
                       ],
                     ),
         ),
@@ -468,37 +484,1067 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               onChanged: (v) => setState(() => _selectedClass = v),
             ),
           ),
-          SizedBox(width: 12.w),
-          // Fee Type filter
-          SizedBox(
-            width: 160.w,
-            child: DropdownButtonFormField<String?>(
-              value: _selectedFeeType,
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Fee Type',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          if (_tabController.index == 0) ...[
+            SizedBox(width: 12.w),
+            SizedBox(
+              width: 160.w,
+              child: DropdownButtonFormField<String?>(
+                value: _selectedFeeType,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Fee Type',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                items: [
+                  DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
+                  ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp)))),
+                ],
+                onChanged: (v) => setState(() => _selectedFeeType = v),
               ),
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-              items: [
-                DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
-                ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp)))),
-              ],
-              onChanged: (v) => setState(() => _selectedFeeType = v),
             ),
-          ),
+            SizedBox(width: 12.w),
+            SizedBox(
+              width: 140.w,
+              child: DropdownButtonFormField<String?>(
+                value: _selectedPrefix,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'Prefix',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                ),
+                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                items: [
+                  DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp))),
+                  ..._dailyPrefixes().map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp)))),
+                ],
+                onChanged: (v) => setState(() => _selectedPrefix = v),
+              ),
+            ),
+          ],
           const Spacer(),
           // Reset
           TextButton.icon(
-            onPressed: () => setState(() { _selectedCourse = null; _selectedClass = null; _selectedFeeType = null; }),
+            onPressed: () => setState(() { _selectedCourse = null; _selectedClass = null; _selectedFeeType = null; _selectedPrefix = null; }),
             icon: Icon(Icons.refresh_rounded, size: 16.sp),
             label: Text('Reset', style: TextStyle(fontSize: 13.sp)),
           ),
         ],
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════════
+  // TAB: CONSOLIDATED FEE COLLECTION STATUS
+  // ═══════════════════════════════════════════════
+  List<Map<String, dynamic>> _consolidatedRows() {
+    return _consolidatedRowsCache.where((r) {
+      if (_selectedCourse != null && r['course'] != _selectedCourse) return false;
+      if (_selectedClass != null && r['class'] != _selectedClass) return false;
+      return true;
+    }).toList();
+  }
+
+  Widget _buildConsolidatedStatus() {
+    if (!_pendingMetaLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadPendingMeta());
+    }
+    final rows = _consolidatedRows();
+    if (rows.isEmpty) return _emptyState('No data');
+
+    final byClass = <String, List<Map<String, dynamic>>>{};
+    for (final r in rows) {
+      byClass.putIfAbsent('${r['course']}|${r['class']}', () => []).add(r);
+    }
+
+    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700);
+    final cellStyle = TextStyle(fontSize: 11.sp);
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
+          child: Row(children: [
+            Text('Consolidated Fee Collection Status — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: () => _exportConsolidatedExcel(rows, byClass),
+              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+              label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+            ),
+            SizedBox(width: 6.w),
+            ElevatedButton.icon(
+              onPressed: () => _exportConsolidatedPdf(rows, byClass),
+              icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
+              label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+            ),
+          ]),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                columns: [
+                  DataColumn(label: Text('Course', style: headerStyle)),
+                  DataColumn(label: Text('Class', style: headerStyle)),
+                  DataColumn(label: Text('Strength', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Semester', style: headerStyle)),
+                  DataColumn(label: Text('Category', style: headerStyle)),
+                  DataColumn(label: Text('Stud Count', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Type', style: headerStyle)),
+                  DataColumn(label: Text('Due', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Concess', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Net Demand', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Paid', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Balance', style: headerStyle), numeric: true),
+                ],
+                rows: [
+                  for (final entry in byClass.entries) ...[
+                    ...entry.value.map((r) => DataRow(cells: [
+                      DataCell(Text(r['course']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['class']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text('${r['strength'] ?? 0}', style: cellStyle)),
+                      DataCell(Text(r['semester']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['category']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text('${r['stud_count'] ?? 0}', style: cellStyle)),
+                      DataCell(Text(r['type']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['due'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['concession'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['net_demand'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['paid'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['balance'] as double?) ?? 0), style: cellStyle)),
+                    ])),
+                    DataRow(
+                      color: WidgetStateProperty.all(AppColors.surface),
+                      cells: [
+                        DataCell(Text(entry.value.first['course']?.toString() ?? '', style: headerStyle)),
+                        DataCell(Text('Class Total', style: headerStyle)),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['due'] as double))), style: headerStyle)),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle)),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['net_demand'] as double))), style: headerStyle)),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['paid'] as double))), style: headerStyle)),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['balance'] as double))), style: headerStyle)),
+                      ],
+                    ),
+                  ],
+                  DataRow(
+                    color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.12)),
+                    cells: [
+                      DataCell(Text('GRAND TOTAL', style: headerStyle.copyWith(color: AppColors.accent))),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['due'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
+                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
+                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['net_demand'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
+                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['paid'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
+                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['balance'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _exportConsolidatedExcel(List<Map<String, dynamic>> rows, Map<String, List<Map<String, dynamic>>> byClass) async {
+    try {
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['Consolidated Status'];
+      excel.delete('Sheet1');
+      final boldStyle = xl.CellStyle(bold: true, fontSize: 11);
+      final headerStyle = xl.CellStyle(bold: true, fontSize: 10);
+      final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final totalStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      int row = 0;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insName);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      row++;
+      if (_insAddress.isNotEmpty) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insAddress);
+        row++;
+      }
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Consolidated Fee Collection Status Report as on ${_formatDate(DateTime.now())}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue('Date: ${_formatDate(DateTime.now())}');
+      row += 2;
+
+      const headers = ['Course', 'Class', 'Strength', 'Semester', 'Category', 'Stud Count', 'Type', 'Due', 'Concess', 'Net Demand', 'Paid', 'Balance'];
+      for (int c = 0; c < headers.length; c++) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
+      }
+      row++;
+
+      void writeRow(Map<String, dynamic> r, {bool isTotal = false, String? labelOverride}) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['course']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(labelOverride ?? r['class']?.toString() ?? '');
+        if (labelOverride != null) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldStyle;
+        }
+        if (!isTotal) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.IntCellValue((r['strength'] as int?) ?? 0);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['semester']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['category']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.IntCellValue((r['stud_count'] as int?) ?? 0);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue(r['type']?.toString() ?? '');
+        }
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.DoubleCellValue((r['due'] as double?) ?? 0);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.DoubleCellValue((r['concession'] as double?) ?? 0);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = xl.DoubleCellValue((r['net_demand'] as double?) ?? 0);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = xl.DoubleCellValue((r['paid'] as double?) ?? 0);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = xl.DoubleCellValue((r['balance'] as double?) ?? 0);
+        for (int c = 7; c <= 11; c++) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = isTotal ? totalStyle : numStyle;
+        }
+        row++;
+      }
+
+      for (final entry in byClass.entries) {
+        for (final r in entry.value) writeRow(r);
+        final cls = entry.value.first;
+        writeRow({
+          'course': cls['course'],
+          'due': entry.value.fold<double>(0, (s, r) => s + (r['due'] as double)),
+          'concession': entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double)),
+          'net_demand': entry.value.fold<double>(0, (s, r) => s + (r['net_demand'] as double)),
+          'paid': entry.value.fold<double>(0, (s, r) => s + (r['paid'] as double)),
+          'balance': entry.value.fold<double>(0, (s, r) => s + (r['balance'] as double)),
+        }, isTotal: true, labelOverride: 'Class Total');
+      }
+      writeRow({
+        'course': '',
+        'due': rows.fold<double>(0, (s, r) => s + (r['due'] as double)),
+        'concession': rows.fold<double>(0, (s, r) => s + (r['concession'] as double)),
+        'net_demand': rows.fold<double>(0, (s, r) => s + (r['net_demand'] as double)),
+        'paid': rows.fold<double>(0, (s, r) => s + (r['paid'] as double)),
+        'balance': rows.fold<double>(0, (s, r) => s + (r['balance'] as double)),
+      }, isTotal: true, labelOverride: 'GRAND TOTAL');
+
+      for (int c = 0; c < headers.length; c++) sheet.setColumnWidth(c, c <= 1 ? 18 : 13);
+      await _saveExcel(excel, 'Consolidated_Status_${_formatDateCompact(DateTime.now())}');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _exportConsolidatedPdf(List<Map<String, dynamic>> rows, Map<String, List<Map<String, dynamic>>> byClass) async {
+    try {
+      final pdf = pw.Document();
+      final data = <List<String>>[];
+      for (final entry in byClass.entries) {
+        for (final r in entry.value) {
+          data.add([
+            r['course']?.toString() ?? '',
+            r['class']?.toString() ?? '',
+            '${r['strength'] ?? 0}',
+            r['semester']?.toString() ?? '',
+            r['category']?.toString() ?? '',
+            '${r['stud_count'] ?? 0}',
+            r['type']?.toString() ?? '',
+            _formatNumber((r['due'] as double?) ?? 0),
+            _formatNumber((r['concession'] as double?) ?? 0),
+            _formatNumber((r['net_demand'] as double?) ?? 0),
+            _formatNumber((r['paid'] as double?) ?? 0),
+            _formatNumber((r['balance'] as double?) ?? 0),
+          ]);
+        }
+        data.add([
+          entry.value.first['course']?.toString() ?? '', 'Class Total', '', '', '', '', '',
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['due'] as double))),
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))),
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['net_demand'] as double))),
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['paid'] as double))),
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['balance'] as double))),
+        ]);
+      }
+      data.add([
+        '', 'GRAND TOTAL', '', '', '', '', '',
+        _formatNumber(rows.fold<double>(0, (s, r) => s + (r['due'] as double))),
+        _formatNumber(rows.fold<double>(0, (s, r) => s + (r['concession'] as double))),
+        _formatNumber(rows.fold<double>(0, (s, r) => s + (r['net_demand'] as double))),
+        _formatNumber(rows.fold<double>(0, (s, r) => s + (r['paid'] as double))),
+        _formatNumber(rows.fold<double>(0, (s, r) => s + (r['balance'] as double))),
+      ]);
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(20),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(_insName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
+            pw.SizedBox(height: 4),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('Consolidated Fee Collection Status Report as on ${_formatDate(DateTime.now())}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Date: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+            ]),
+            pw.SizedBox(height: 6),
+          ],
+        ),
+        build: (ctx) => [
+          pw.Table.fromTextArray(
+            headers: const ['Course', 'Class', 'Strength', 'Semester', 'Category', 'Stud Count', 'Type', 'Due', 'Concess', 'Net Demand', 'Paid', 'Balance'],
+            data: data,
+            headerStyle: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+            cellStyle: const pw.TextStyle(fontSize: 7),
+            cellAlignments: {for (int i = 7; i <= 11; i++) i: pw.Alignment.centerRight, 2: pw.Alignment.centerRight, 5: pw.Alignment.centerRight},
+            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.3),
+          ),
+        ],
+      ));
+      await Printing.sharePdf(bytes: await pdf.save(), filename: 'Consolidated_Status_${_formatDateCompact(DateTime.now())}.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  // TAB: PENDING PAYMENT REPORT (course-class-semester)
+  // ═══════════════════════════════════════════════
+  bool _pendingMetaLoaded = false;
+  List<Map<String, dynamic>> _pendingRowsCache = [];
+  List<Map<String, dynamic>> _consolidatedRowsCache = [];
+
+  Future<void> _loadPendingMeta() async {
+    if (_pendingMetaLoaded) return;
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final schema = SupabaseService.currentSchema;
+    if (insId == null || schema == null) return;
+    try {
+      final pendingFut = SupabaseService.client.rpc('get_pending_payment_report', params: {
+        'p_schema': schema, 'p_ins_id': insId,
+      });
+      final consoFut = SupabaseService.client.rpc('get_consolidated_status_report', params: {
+        'p_schema': schema, 'p_ins_id': insId,
+      });
+      final results = await Future.wait([pendingFut, consoFut]);
+      final pending = results[0] is List
+          ? List<Map<String, dynamic>>.from(results[0] as List).map((r) => {
+              'course': r['courname']?.toString() ?? '',
+              'class': r['stuclass']?.toString() ?? '',
+              'semester': r['semester']?.toString() ?? '',
+              'admname': r['admname']?.toString() ?? '',
+              'stuadmno': r['stuadmno']?.toString() ?? '',
+              'stuname': r['stuname']?.toString() ?? '',
+              'pending': (r['pending'] as num?)?.toDouble() ?? 0,
+              'concession': (r['concession'] as num?)?.toDouble() ?? 0,
+              'quoname': r['quoname']?.toString() ?? '',
+              'stumobile': r['stumobile']?.toString() ?? '',
+            }).toList()
+          : <Map<String, dynamic>>[];
+      final conso = results[1] is List
+          ? List<Map<String, dynamic>>.from(results[1] as List).map((r) => {
+              'course': r['courname']?.toString() ?? '',
+              'class': r['stuclass']?.toString() ?? '',
+              'strength': (r['strength'] as num?)?.toInt() ?? 0,
+              'semester': r['semester']?.toString() ?? '',
+              'category': r['category']?.toString() ?? 'GENERAL',
+              'stud_count': (r['stud_count'] as num?)?.toInt() ?? 0,
+              'type': r['type']?.toString() ?? 'Regular',
+              'due': (r['due'] as num?)?.toDouble() ?? 0,
+              'concession': (r['concession'] as num?)?.toDouble() ?? 0,
+              'net_demand': (r['net_demand'] as num?)?.toDouble() ?? 0,
+              'paid': (r['paid'] as num?)?.toDouble() ?? 0,
+              'balance': (r['balance'] as num?)?.toDouble() ?? 0,
+            }).toList()
+          : <Map<String, dynamic>>[];
+      if (mounted) setState(() {
+        _pendingRowsCache = pending;
+        _consolidatedRowsCache = conso;
+        _pendingMetaLoaded = true;
+      });
+    } catch (e) {
+      debugPrint('pending/consolidated load: $e');
+    }
+  }
+
+  List<Map<String, dynamic>> _pendingRows() {
+    return _pendingRowsCache.where((r) {
+      if (_selectedCourse != null && r['course'] != _selectedCourse) return false;
+      if (_selectedClass != null && r['class'] != _selectedClass) return false;
+      return true;
+    }).toList();
+  }
+
+  Widget _buildPendingPayment() {
+    if (!_pendingMetaLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadPendingMeta());
+    }
+    final rows = _pendingRows();
+    if (rows.isEmpty) return _emptyState('No pending dues');
+
+    final byClass = <String, List<Map<String, dynamic>>>{};
+    for (final r in rows) {
+      final key = '${r['course']}|${r['class']}';
+      byClass.putIfAbsent(key, () => []).add(r);
+    }
+    double grandPending = 0, grandConcess = 0;
+    for (final r in rows) {
+      grandPending += (r['pending'] as double);
+      grandConcess += (r['concession'] as double);
+    }
+
+    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700);
+    final cellStyle = TextStyle(fontSize: 11.sp);
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
+          child: Row(children: [
+            Text('Pending Payment Report — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: () => _exportPendingPaymentExcel(rows, byClass, grandPending, grandConcess),
+              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+              label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+            ),
+            SizedBox(width: 6.w),
+            ElevatedButton.icon(
+              onPressed: () => _exportPendingPaymentPdf(rows, byClass, grandPending, grandConcess),
+              icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
+              label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+            ),
+          ]),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                columns: [
+                  DataColumn(label: Text('Course', style: headerStyle)),
+                  DataColumn(label: Text('Class', style: headerStyle)),
+                  DataColumn(label: Text('Semester', style: headerStyle)),
+                  DataColumn(label: Text('Admn Type', style: headerStyle)),
+                  DataColumn(label: Text('Reg. No', style: headerStyle)),
+                  DataColumn(label: Text('Name', style: headerStyle)),
+                  DataColumn(label: Text('Pending Amt', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Con. Amt', style: headerStyle), numeric: true),
+                  DataColumn(label: Text('Quota', style: headerStyle)),
+                  DataColumn(label: Text('Mobile No', style: headerStyle)),
+                ],
+                rows: [
+                  for (final entry in byClass.entries) ...[
+                    ...entry.value.map((r) => DataRow(cells: [
+                      DataCell(Text(r['course']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['class']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['semester']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['admname']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['stuadmno']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['stuname']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['pending'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(_formatNumber((r['concession'] as double?) ?? 0), style: cellStyle)),
+                      DataCell(Text(r['quoname']?.toString() ?? '', style: cellStyle)),
+                      DataCell(Text(r['stumobile']?.toString() ?? '', style: cellStyle)),
+                    ])),
+                    DataRow(
+                      color: WidgetStateProperty.all(AppColors.surface),
+                      cells: [
+                        const DataCell(Text('')),
+                        DataCell(Text('Sub Total', style: headerStyle)),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['pending'] as double))), style: headerStyle)),
+                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle)),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                      ],
+                    ),
+                  ],
+                  DataRow(
+                    color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.1)),
+                    cells: [
+                      DataCell(Text('G.Tot', style: headerStyle)),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                      DataCell(Text(_formatNumber(grandPending), style: headerStyle.copyWith(color: AppColors.accent))),
+                      DataCell(Text(_formatNumber(grandConcess), style: headerStyle)),
+                      const DataCell(Text('')),
+                      const DataCell(Text('')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _exportPendingPaymentExcel(List<Map<String, dynamic>> rows, Map<String, List<Map<String, dynamic>>> byClass, double grandPending, double grandConcess) async {
+    try {
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['Pending Payment'];
+      excel.delete('Sheet1');
+      final boldStyle = xl.CellStyle(bold: true, fontSize: 11);
+      final headerStyle = xl.CellStyle(bold: true, fontSize: 10);
+      final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final totalStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      int row = 0;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insName);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      row++;
+      if (_insAddress.isNotEmpty) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insAddress);
+        row++;
+      }
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('PENDING PAYMENT REPORT AS ON ${_formatDate(DateTime.now())}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue('Date: ${_formatDate(DateTime.now())}');
+      row += 2;
+
+      const headers = ['Course', 'Class', 'Semester', 'Admn Type', 'Reg. No', 'Name', 'Pending Amount', 'Con. Amount', 'Quota', 'Mobile No'];
+      for (int c = 0; c < headers.length; c++) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
+      }
+      row++;
+
+      for (final entry in byClass.entries) {
+        for (final r in entry.value) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['course']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['class']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['semester']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['admname']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['stuadmno']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue(r['stuname']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue((r['pending'] as double?) ?? 0);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = numStyle;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.DoubleCellValue((r['concession'] as double?) ?? 0);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).cellStyle = numStyle;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.TextCellValue(r['quoname']?.toString() ?? '');
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = xl.TextCellValue(r['stumobile']?.toString() ?? '');
+          row++;
+        }
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('Sub Total');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(entry.value.fold<double>(0, (s, r) => s + (r['pending'] as double)));
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = totalStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.DoubleCellValue(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double)));
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).cellStyle = totalStyle;
+        row++;
+      }
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('G.Tot');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(grandPending);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.DoubleCellValue(grandConcess);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).cellStyle = totalStyle;
+
+      for (int c = 0; c < headers.length; c++) sheet.setColumnWidth(c, c == 5 ? 22 : (c == 3 ? 18 : 14));
+
+      await _saveExcel(excel, 'Pending_Payment_${_formatDateCompact(DateTime.now())}');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _exportPendingPaymentPdf(List<Map<String, dynamic>> rows, Map<String, List<Map<String, dynamic>>> byClass, double grandPending, double grandConcess) async {
+    try {
+      final pdf = pw.Document();
+      final data = <List<String>>[];
+      for (final entry in byClass.entries) {
+        for (final r in entry.value) {
+          data.add([
+            r['course']?.toString() ?? '',
+            r['class']?.toString() ?? '',
+            r['semester']?.toString() ?? '',
+            r['admname']?.toString() ?? '',
+            r['stuadmno']?.toString() ?? '',
+            r['stuname']?.toString() ?? '',
+            _formatNumber((r['pending'] as double?) ?? 0),
+            _formatNumber((r['concession'] as double?) ?? 0),
+            r['quoname']?.toString() ?? '',
+            r['stumobile']?.toString() ?? '',
+          ]);
+        }
+        data.add(['', 'Sub Total', '', '', '', '',
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['pending'] as double))),
+          _formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))),
+          '', '']);
+      }
+      data.add(['', 'G.Tot', '', '', '', '', _formatNumber(grandPending), _formatNumber(grandConcess), '', '']);
+
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(20),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(_insName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
+            pw.SizedBox(height: 4),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('PENDING PAYMENT REPORT AS ON ${_formatDate(DateTime.now())}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Date: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+            ]),
+            pw.SizedBox(height: 6),
+          ],
+        ),
+        build: (ctx) => [
+          pw.Table.fromTextArray(
+            headers: const ['Course', 'Class', 'Semester', 'Admn Type', 'Reg. No', 'Name', 'Pending Amt', 'Con. Amt', 'Quota', 'Mobile'],
+            data: data,
+            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignments: {6: pw.Alignment.centerRight, 7: pw.Alignment.centerRight},
+            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.3),
+          ),
+        ],
+      ));
+      await Printing.sharePdf(bytes: await pdf.save(), filename: 'Pending_Payment_${_formatDateCompact(DateTime.now())}.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  // ═══════════════════════════════════════════════
+  // TAB: STUDENT LEDGER (per-student fee ledger)
+  // ═══════════════════════════════════════════════
+  List<Map<String, dynamic>> _studentsForLedger() {
+    final map = <String, Map<String, dynamic>>{};
+    for (final d in _allDemands) {
+      final admno = d['stuadmno']?.toString() ?? '';
+      if (admno.isEmpty || map.containsKey(admno)) continue;
+      map[admno] = {
+        'stuadmno': admno,
+        'stuname': d['stuname']?.toString() ?? '',
+        'courname': d['courname']?.toString() ?? '',
+        'stuclass': d['stuclass']?.toString() ?? '',
+      };
+    }
+    return map.values.toList()
+      ..sort((a, b) => (a['stuadmno'] as String).compareTo(b['stuadmno'] as String));
+  }
+
+  Future<void> _loadStudentLedger(String admno) async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final schema = SupabaseService.currentSchema;
+    if (insId == null || schema == null) return;
+    setState(() {
+      _ledgerStuAdmNo = admno;
+      _ledgerLoading = true;
+      _ledgerDemands = [];
+      _ledgerPayments = {};
+      _ledgerStudent = _studentsForLedger().firstWhere(
+        (s) => s['stuadmno'] == admno,
+        orElse: () => {'stuadmno': admno},
+      );
+    });
+    try {
+      final result = await SupabaseService.client.rpc('get_student_ledger_report', params: {
+        'p_schema': schema,
+        'p_ins_id': insId,
+        'p_stuadmno': admno,
+      });
+      final list = result is List ? List<Map<String, dynamic>>.from(result) : <Map<String, dynamic>>[];
+      // Synthesize a pseudo pay_id keyed by paynumber so the renderer's
+      // d['pay_id'] lookup against _ledgerPayments still works.
+      final payMap = <int, Map<String, dynamic>>{};
+      for (var i = 0; i < list.length; i++) {
+        final pn = list[i]['paynumber']?.toString();
+        if (pn == null || pn.isEmpty) continue;
+        final pid = pn.hashCode;
+        list[i]['pay_id'] = pid;
+        payMap[pid] = {'paynumber': pn, 'paydate': list[i]['paydate']};
+      }
+      if (mounted) {
+        setState(() {
+          _ledgerDemands = list;
+          _ledgerPayments = payMap;
+          _ledgerLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('student ledger error: $e');
+      if (mounted) setState(() => _ledgerLoading = false);
+    }
+  }
+
+  Widget _buildStudentLedger() {
+    final students = _studentsForLedger();
+    final headerStyle = TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700);
+    final cellStyle = TextStyle(fontSize: 12.sp);
+
+    // Build rows grouped by term (YEARLY / V SEM / VI SEM / Misc)
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final d in _ledgerDemands) {
+      final term = (d['demfeeterm']?.toString() ?? 'Misc');
+      grouped.putIfAbsent(term, () => []).add(d);
+    }
+
+    double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+    for (final d in _ledgerDemands) {
+      final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
+      final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
+      totDemand += demand;
+      totConcess += conc;
+      totNetDemand += demand - conc;
+      totCollection += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      totBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+    }
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 360.w,
+                child: Autocomplete<Map<String, dynamic>>(
+                  displayStringForOption: (o) => '${o['stuadmno']} - ${o['stuname']}',
+                  optionsBuilder: (value) {
+                    final q = value.text.toLowerCase();
+                    if (q.isEmpty) return students.take(20);
+                    return students.where((s) =>
+                        (s['stuadmno'] as String).toLowerCase().contains(q) ||
+                        (s['stuname'] as String).toLowerCase().contains(q)).take(20);
+                  },
+                  onSelected: (s) => _loadStudentLedger(s['stuadmno'] as String),
+                  fieldViewBuilder: (ctx, ctrl, focus, onSubmit) {
+                    _ledgerSearchCtrl.value = ctrl.value;
+                    return TextField(
+                      controller: ctrl,
+                      focusNode: focus,
+                      decoration: InputDecoration(
+                        labelText: 'Search Student (Adm No / Name)',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      ),
+                      style: TextStyle(fontSize: 13.sp),
+                    );
+                  },
+                ),
+              ),
+              const Spacer(),
+              if (_ledgerLoading) SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _ledgerDemands.isEmpty ? null : _exportStudentLedgerExcel,
+                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+                label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+              ),
+              SizedBox(width: 6.w),
+              ElevatedButton.icon(
+                onPressed: _ledgerDemands.isEmpty ? null : _exportStudentLedgerPdf,
+                icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
+                label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+              ),
+            ],
+          ),
+        ),
+        if (_ledgerStudent != null && _ledgerDemands.isNotEmpty) ...[
+          Padding(
+            padding: EdgeInsets.all(12.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_insName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+                if (_insAddress.isNotEmpty) Text(_insAddress, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                SizedBox(height: 6.h),
+                Text('STUDENT LEDGER — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700)),
+                SizedBox(height: 8.h),
+                Row(children: [
+                  Expanded(child: Text('Name: ${_ledgerStudent!['stuname'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                  Expanded(child: Text('Reg No: ${_ledgerStudent!['stuadmno'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                ]),
+                SizedBox(height: 4.h),
+                Row(children: [
+                  Expanded(child: Text('Course: ${_ledgerStudent!['courname'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                  Expanded(child: Text('Class: ${_ledgerStudent!['stuclass'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                ]),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                  columns: [
+                    DataColumn(label: Text('Details', style: headerStyle)),
+                    DataColumn(label: Text('Fee Type', style: headerStyle)),
+                    DataColumn(label: Text('Demand', style: headerStyle), numeric: true),
+                    DataColumn(label: Text('Concess.', style: headerStyle), numeric: true),
+                    DataColumn(label: Text('Net Demand', style: headerStyle), numeric: true),
+                    DataColumn(label: Text('Collection', style: headerStyle), numeric: true),
+                    DataColumn(label: Text('Doc. No', style: headerStyle)),
+                    DataColumn(label: Text('Doc. Date', style: headerStyle)),
+                    DataColumn(label: Text('Balance', style: headerStyle), numeric: true),
+                  ],
+                  rows: [
+                    for (final entry in grouped.entries) ...[
+                      DataRow(cells: [
+                        DataCell(Text(entry.key, style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                      ]),
+                      ...entry.value.map((d) {
+                        final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
+                        final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
+                        final net = demand - conc;
+                        final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                        final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
+                        final docNo = pay?['paynumber']?.toString() ?? '';
+                        final docDate = pay?['paydate']?.toString() ?? '';
+                        return DataRow(cells: [
+                          const DataCell(Text('')),
+                          DataCell(Text(d['demfeetype']?.toString() ?? '', style: cellStyle)),
+                          DataCell(Text(demand > 0 ? _formatNumber(demand) : '', style: cellStyle)),
+                          DataCell(Text(conc > 0 ? _formatNumber(conc) : '', style: cellStyle)),
+                          DataCell(Text(net > 0 ? _formatNumber(net) : '', style: cellStyle)),
+                          DataCell(Text(paid > 0 ? _formatNumber(paid) : '', style: cellStyle)),
+                          DataCell(Text(docNo, style: cellStyle)),
+                          DataCell(Text(docDate.length >= 10 ? docDate.substring(0, 10) : docDate, style: cellStyle)),
+                          DataCell(Text(bal > 0 ? _formatNumber(bal) : '0', style: cellStyle)),
+                        ]);
+                      }),
+                    ],
+                    DataRow(
+                      color: WidgetStateProperty.all(AppColors.surface),
+                      cells: [
+                        DataCell(Text('Total', style: headerStyle)),
+                        const DataCell(Text('')),
+                        DataCell(Text(_formatNumber(totDemand), style: headerStyle)),
+                        DataCell(Text(_formatNumber(totConcess), style: headerStyle)),
+                        DataCell(Text(_formatNumber(totNetDemand), style: headerStyle)),
+                        DataCell(Text(_formatNumber(totCollection), style: headerStyle.copyWith(color: AppColors.accent))),
+                        const DataCell(Text('')),
+                        const DataCell(Text('')),
+                        DataCell(Text(_formatNumber(totBalance), style: headerStyle)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ] else
+          Expanded(child: _emptyState('Select a student to view ledger')),
+      ],
+    );
+  }
+
+  Future<void> _exportStudentLedgerExcel() async {
+    try {
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['Student Ledger'];
+      excel.delete('Sheet1');
+
+      final boldStyle = xl.CellStyle(bold: true, fontSize: 11);
+      final headerStyle = xl.CellStyle(bold: true, fontSize: 10);
+      final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final totalStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      int row = 0;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insName);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      row++;
+      if (_insAddress.isNotEmpty) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(_insAddress);
+        row++;
+      }
+      row++;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue('STUDENT LEDGER');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue('DATE: ${_formatDate(DateTime.now())}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = boldStyle;
+      row++;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Student Name : ${_ledgerStudent?['stuname'] ?? ''}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue('Reg. No : ${_ledgerStudent?['stuadmno'] ?? ''}');
+      row++;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Course : ${_ledgerStudent?['courname'] ?? ''}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue('Class : ${_ledgerStudent?['stuclass'] ?? ''}');
+      row++;
+      row++;
+
+      final headers = ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Doc. No', 'Doc. Date', 'Balance'];
+      for (int c = 0; c < headers.length; c++) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
+      }
+      row++;
+
+      final grouped = <String, List<Map<String, dynamic>>>{};
+      for (final d in _ledgerDemands) {
+        final term = (d['demfeeterm']?.toString() ?? 'Misc');
+        grouped.putIfAbsent(term, () => []).add(d);
+      }
+
+      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+
+      for (final entry in grouped.entries) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(entry.key);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+        row++;
+        for (final d in entry.value) {
+          final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
+          final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
+          final net = demand - conc;
+          final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+          final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+          final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
+          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += paid; totBalance += bal;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(d['demfeetype']?.toString() ?? '');
+          if (demand > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(demand); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = numStyle; }
+          if (conc > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(conc); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = numStyle; }
+          if (net > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.DoubleCellValue(net); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).cellStyle = numStyle; }
+          if (paid > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(paid); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = numStyle; }
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue(pay?['paynumber']?.toString() ?? '');
+          final pd = pay?['paydate']?.toString() ?? '';
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(pd.length >= 10 ? pd.substring(0, 10) : pd);
+          if (bal > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.DoubleCellValue(bal); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).cellStyle = numStyle; }
+          row++;
+        }
+      }
+
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('Total');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(totDemand);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(totConcess);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.DoubleCellValue(totNetDemand);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(totCollection);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.DoubleCellValue(totBalance);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).cellStyle = totalStyle;
+
+      sheet.setColumnWidth(0, 12);
+      sheet.setColumnWidth(1, 22);
+      for (int c = 2; c < 9; c++) sheet.setColumnWidth(c, 12);
+
+      await _saveExcel(excel, 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _exportStudentLedgerPdf() async {
+    try {
+      final pdf = pw.Document();
+      final grouped = <String, List<Map<String, dynamic>>>{};
+      for (final d in _ledgerDemands) {
+        grouped.putIfAbsent(d['demfeeterm']?.toString() ?? 'Misc', () => []).add(d);
+      }
+      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+      final rows = <List<String>>[];
+      for (final entry in grouped.entries) {
+        rows.add([entry.key, '', '', '', '', '', '', '', '']);
+        for (final d in entry.value) {
+          final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
+          final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
+          final net = demand - conc;
+          final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+          final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+          final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
+          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += paid; totBalance += bal;
+          final pd = pay?['paydate']?.toString() ?? '';
+          rows.add([
+            '',
+            d['demfeetype']?.toString() ?? '',
+            demand > 0 ? _formatNumber(demand) : '',
+            conc > 0 ? _formatNumber(conc) : '',
+            net > 0 ? _formatNumber(net) : '',
+            paid > 0 ? _formatNumber(paid) : '',
+            pay?['paynumber']?.toString() ?? '',
+            pd.length >= 10 ? pd.substring(0, 10) : pd,
+            bal > 0 ? _formatNumber(bal) : '0',
+          ]);
+        }
+      }
+      rows.add(['Total', '', _formatNumber(totDemand), _formatNumber(totConcess), _formatNumber(totNetDemand), _formatNumber(totCollection), '', '', _formatNumber(totBalance)]);
+
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(_insName, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+            if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
+            pw.SizedBox(height: 4),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('STUDENT LEDGER', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('DATE: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+            ]),
+            pw.SizedBox(height: 4),
+            pw.Text('Student Name: ${_ledgerStudent?['stuname'] ?? ''}    Reg. No: ${_ledgerStudent?['stuadmno'] ?? ''}', style: const pw.TextStyle(fontSize: 9)),
+            pw.Text('Course: ${_ledgerStudent?['courname'] ?? ''}    Class: ${_ledgerStudent?['stuclass'] ?? ''}', style: const pw.TextStyle(fontSize: 9)),
+            pw.SizedBox(height: 6),
+          ],
+        ),
+        build: (ctx) => [
+          pw.Table.fromTextArray(
+            headers: ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Doc. No', 'Doc. Date', 'Balance'],
+            data: rows,
+            headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignments: {for (int i = 2; i < 6; i++) i: pw.Alignment.centerRight, 8: pw.Alignment.centerRight},
+            border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.3),
+          ),
+        ],
+      ));
+      await Printing.sharePdf(bytes: await pdf.save(), filename: 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+    }
   }
 
   // ═══════════════════════════════════════════════
@@ -533,6 +1579,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       if (_selectedFeeType != null) {
         final fees = r['fees'] as Map<String, double>;
         if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+      }
+      if (_selectedMode != null) {
+        final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
+        if (_selectedMode == 'cash' && !isCash) return false;
+        if (_selectedMode == 'bank' && isCash) return false;
+      }
+      if (_selectedPrefix != null) {
+        final n = r['paynumber']?.toString() ?? '';
+        final idx = n.indexOf('/');
+        final p = idx > 0 ? n.substring(0, idx) : n;
+        if (p != _selectedPrefix) return false;
       }
       return true;
     }).toList();
@@ -636,6 +1693,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 });
                 _loadDailyCollection();
               }),
+              SizedBox(width: 16.w),
+              Text('Mode:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+              SizedBox(width: 6.w),
+              ..._dailyModeChips(),
               const Spacer(),
               if (_dailyLoading) SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               SizedBox(width: 8.w),
@@ -666,19 +1727,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               ? _emptyState('No collections in this range')
               : SingleChildScrollView(
                   scrollDirection: Axis.vertical,
-                  child: SingleChildScrollView(
+                  child: Scrollbar(
+                    controller: _dailyHScroll,
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    child: SingleChildScrollView(
+                    controller: _dailyHScroll,
                     scrollDirection: Axis.horizontal,
                     child: Builder(builder: (_) {
+                      final showCash = _selectedMode == null || _selectedMode == 'cash';
+                      final showCheque = _selectedMode == null || _selectedMode == 'cash';
+                      final showBank = _selectedMode == null || _selectedMode == 'bank';
                       double totalCash = 0;
                       double totalCheque = 0;
+                      double totalBank = 0;
                       for (final r in visibleRows) {
                         final total = (r['total'] as num?)?.toDouble() ?? 0;
-                        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
-                        if (mode.contains('CASH')) {
-                          totalCash += total;
-                        } else {
-                          totalCheque += total;
-                        }
+                        final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+                        if (bucket == 'cash') totalCash += total;
+                        else if (bucket == 'cheque') totalCheque += total;
+                        else totalBank += total;
                       }
                       return DataTable(
                         headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
@@ -690,8 +1758,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           for (final ft in visibleFeeTypes) DataColumn(label: Text(ft, style: headerStyle), numeric: true),
                           DataColumn(label: Text('Fine', style: headerStyle), numeric: true),
                           DataColumn(label: Text('Total', style: headerStyle), numeric: true),
-                          DataColumn(label: Text('Cash', style: headerStyle), numeric: true),
-                          DataColumn(label: Text('DD/Cheque', style: headerStyle), numeric: true),
+                          if (showCash) DataColumn(label: Text('Cash', style: headerStyle), numeric: true),
+                          if (showCheque) DataColumn(label: Text('Cheque', style: headerStyle), numeric: true),
+                          if (showBank) DataColumn(label: Text('Bank', style: headerStyle), numeric: true),
                           DataColumn(label: Text('Net Amt', style: headerStyle), numeric: true),
                         ],
                         rows: [
@@ -699,8 +1768,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             final fees = r['fees'] as Map<String, double>;
                             final fine = (r['fine'] as num?)?.toDouble() ?? 0;
                             final total = (r['total'] as num?)?.toDouble() ?? 0;
-                            final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
-                            final isCash = mode.contains('CASH');
+                            final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
                             return DataRow(cells: [
                               DataCell(Text(r['paynumber']?.toString() ?? '', style: cellStyle)),
                               DataCell(Text(r['stuadmno']?.toString() ?? '', style: cellStyle)),
@@ -710,8 +1778,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                                 DataCell(Text(fees[ft] != null && fees[ft] != 0 ? _formatNumber(fees[ft]!) : '', style: cellStyle)),
                               DataCell(Text(fine != 0 ? _formatNumber(fine) : '', style: cellStyle)),
                               DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
-                              DataCell(Text(isCash ? _formatNumber(total) : '', style: cellStyle)),
-                              DataCell(Text(!isCash ? _formatNumber(total) : '', style: cellStyle)),
+                              if (showCash) DataCell(Text(bucket == 'cash' ? _formatNumber(total) : '', style: cellStyle)),
+                              if (showCheque) DataCell(Text(bucket == 'cheque' ? _formatNumber(total) : '', style: cellStyle)),
+                              if (showBank) DataCell(Text(bucket == 'bank' ? _formatNumber(total) : '', style: cellStyle)),
                               DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
                             ]);
                           }),
@@ -726,14 +1795,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                                 DataCell(Text(_formatNumber(ftTotals[ft] ?? 0), style: headerStyle)),
                               DataCell(Text(_formatNumber(totalFine), style: headerStyle)),
                               DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
-                              DataCell(Text(_formatNumber(totalCash), style: headerStyle)),
-                              DataCell(Text(_formatNumber(totalCheque), style: headerStyle)),
+                              if (showCash) DataCell(Text(_formatNumber(totalCash), style: headerStyle)),
+                              if (showCheque) DataCell(Text(_formatNumber(totalCheque), style: headerStyle)),
+                              if (showBank) DataCell(Text(_formatNumber(totalBank), style: headerStyle)),
                               DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
                             ],
                           ),
                         ],
                       );
                     }),
+                  ),
                   ),
                 ),
         ),
@@ -1399,6 +2470,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final fees = r['fees'] as Map<String, double>;
           if ((fees[_selectedFeeType] ?? 0) == 0) return false;
         }
+        if (_selectedMode != null) {
+          final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
+          if (_selectedMode == 'cash' && !isCash) return false;
+          if (_selectedMode == 'bank' && isCash) return false;
+        }
+        if (_selectedPrefix != null) {
+          final n = r['paynumber']?.toString() ?? '';
+          final idx = n.indexOf('/');
+          final p = idx > 0 ? n.substring(0, idx) : n;
+          if (p != _selectedPrefix) return false;
+        }
         return true;
       }).toList();
       final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
@@ -1416,7 +2498,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
       final totalStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
 
-      final totalCols = 4 + feeTypes.length + 5; // receipt, reg, name, class, [fees], fine, total, cash, dd/cheque, net amt
+      final showCash = _selectedMode == null || _selectedMode == 'cash';
+      final showCheque = _selectedMode == null || _selectedMode == 'cash';
+      final showBank = _selectedMode == null || _selectedMode == 'bank';
+      final modeCols = (showCash ? 1 : 0) + (showCheque ? 1 : 0) + (showBank ? 1 : 0);
+      final totalCols = 4 + feeTypes.length + 2 + modeCols + 1; // +fine +total +(cash/cheque/bank) +net
 
       int row = 0;
       void merged(String text, xl.CellStyle style) {
@@ -1432,7 +2518,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       merged('Date: ${_formatDate(DateTime.now())}', xl.CellStyle(fontSize: 10));
       row++;
 
-      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', 'Cash', 'DD/Cheque', 'Net Amt'];
+      final modeHeaders = <String>[
+        if (showCash) 'Cash',
+        if (showCheque) 'Cheque',
+        if (showBank) 'Bank',
+      ];
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
       for (int c = 0; c < headers.length; c++) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
@@ -1444,22 +2535,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       double totalFine = 0;
       double totalCash = 0;
       double totalCheque = 0;
+      double totalBank = 0;
 
       final fineCol = 4 + feeTypes.length;
       final totalCol = 5 + feeTypes.length;
-      final cashCol = 6 + feeTypes.length;
-      final chequeCol = 7 + feeTypes.length;
-      final netCol = 8 + feeTypes.length;
+      int cursor = 6 + feeTypes.length;
+      final cashCol = showCash ? cursor++ : -1;
+      final chequeCol = showCheque ? cursor++ : -1;
+      final bankCol = showBank ? cursor++ : -1;
+      final netCol = cursor;
 
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
         final fine = (r['fine'] as num?)?.toDouble() ?? 0;
         final total = (r['total'] as num?)?.toDouble() ?? 0;
-        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
-        final isCash = mode.contains('CASH');
+        final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
         totalAmt += total;
         totalFine += fine;
-        if (isCash) { totalCash += total; } else { totalCheque += total; }
+        if (bucket == 'cash') { totalCash += total; }
+        else if (bucket == 'cheque') { totalCheque += total; }
+        else { totalBank += total; }
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['paynumber']?.toString() ?? '');
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['stuadmno']?.toString() ?? '');
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['stuname']?.toString() ?? '');
@@ -1478,12 +2573,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         }
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).value = xl.DoubleCellValue(total);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).cellStyle = totalStyle;
-        if (isCash) {
+        if (cashCol >= 0 && bucket == 'cash') {
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).value = xl.DoubleCellValue(total);
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).cellStyle = numStyle;
-        } else {
+        }
+        if (chequeCol >= 0 && bucket == 'cheque') {
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).value = xl.DoubleCellValue(total);
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).cellStyle = numStyle;
+        }
+        if (bankCol >= 0 && bucket == 'bank') {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: bankCol, rowIndex: row)).value = xl.DoubleCellValue(total);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: bankCol, rowIndex: row)).cellStyle = numStyle;
         }
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).value = xl.DoubleCellValue(total);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).cellStyle = totalStyle;
@@ -1506,10 +2606,18 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       }
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).value = xl.DoubleCellValue(totalAmt);
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).cellStyle = totalStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).value = xl.DoubleCellValue(totalCash);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).cellStyle = totalStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).value = xl.DoubleCellValue(totalCheque);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).cellStyle = totalStyle;
+      if (cashCol >= 0) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).value = xl.DoubleCellValue(totalCash);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).cellStyle = totalStyle;
+      }
+      if (chequeCol >= 0) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).value = xl.DoubleCellValue(totalCheque);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).cellStyle = totalStyle;
+      }
+      if (bankCol >= 0) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: bankCol, rowIndex: row)).value = xl.DoubleCellValue(totalBank);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: bankCol, rowIndex: row)).cellStyle = totalStyle;
+      }
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).value = xl.DoubleCellValue(totalAmt);
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).cellStyle = totalStyle;
 
@@ -1522,8 +2630,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       }
       sheet.setColumnWidth(fineCol, 8);
       sheet.setColumnWidth(totalCol, 10);
-      sheet.setColumnWidth(cashCol, 10);
-      sheet.setColumnWidth(chequeCol, 12);
+      if (cashCol >= 0) sheet.setColumnWidth(cashCol, 10);
+      if (chequeCol >= 0) sheet.setColumnWidth(chequeCol, 10);
+      if (bankCol >= 0) sheet.setColumnWidth(bankCol, 10);
       sheet.setColumnWidth(netCol, 10);
 
       await _saveExcel(excel, 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}');
@@ -1541,35 +2650,57 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final fees = r['fees'] as Map<String, double>;
           if ((fees[_selectedFeeType] ?? 0) == 0) return false;
         }
+        if (_selectedMode != null) {
+          final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
+          if (_selectedMode == 'cash' && !isCash) return false;
+          if (_selectedMode == 'bank' && isCash) return false;
+        }
+        if (_selectedPrefix != null) {
+          final n = r['paynumber']?.toString() ?? '';
+          final idx = n.indexOf('/');
+          final p = idx > 0 ? n.substring(0, idx) : n;
+          if (p != _selectedPrefix) return false;
+        }
         return true;
       }).toList();
       final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+
+      final showCash = _selectedMode == null || _selectedMode == 'cash';
+      final showCheque = _selectedMode == null || _selectedMode == 'cash';
+      final showBank = _selectedMode == null || _selectedMode == 'bank';
 
       final ftTotals = <String, double>{};
       double totalAmt = 0;
       double totalFine = 0;
       double totalCash = 0;
       double totalCheque = 0;
+      double totalBank = 0;
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
         final total = (r['total'] as num?)?.toDouble() ?? 0;
-        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
         totalAmt += total;
         totalFine += (r['fine'] as num?)?.toDouble() ?? 0;
-        if (mode.contains('CASH')) { totalCash += total; } else { totalCheque += total; }
+        final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+        if (bucket == 'cash') totalCash += total;
+        else if (bucket == 'cheque') totalCheque += total;
+        else totalBank += total;
         for (final ft in feeTypes) {
           ftTotals[ft] = (ftTotals[ft] ?? 0) + (fees[ft] ?? 0);
         }
       }
 
-      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', 'Cash', 'DD/Cheque', 'Net Amt'];
+      final modeHeaders = <String>[
+        if (showCash) 'Cash',
+        if (showCheque) 'Cheque',
+        if (showBank) 'Bank',
+      ];
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
       final rows = <List<String>>[];
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
         final fine = (r['fine'] as num?)?.toDouble() ?? 0;
         final total = (r['total'] as num?)?.toDouble() ?? 0;
-        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
-        final isCash = mode.contains('CASH');
+        final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
         rows.add([
           r['paynumber']?.toString() ?? '',
           r['stuadmno']?.toString() ?? '',
@@ -1578,8 +2709,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ...feeTypes.map((ft) => (fees[ft] ?? 0) > 0 ? _formatNumber(fees[ft]!) : ''),
           fine > 0 ? _formatNumber(fine) : '',
           _formatNumber(total),
-          isCash ? _formatNumber(total) : '',
-          !isCash ? _formatNumber(total) : '',
+          if (showCash) (bucket == 'cash' ? _formatNumber(total) : ''),
+          if (showCheque) (bucket == 'cheque' ? _formatNumber(total) : ''),
+          if (showBank) (bucket == 'bank' ? _formatNumber(total) : ''),
           _formatNumber(total),
         ]);
       }
@@ -1588,8 +2720,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ...feeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
         totalFine > 0 ? _formatNumber(totalFine) : '',
         _formatNumber(totalAmt),
-        _formatNumber(totalCash),
-        _formatNumber(totalCheque),
+        if (showCash) _formatNumber(totalCash),
+        if (showCheque) _formatNumber(totalCheque),
+        if (showBank) _formatNumber(totalBank),
         _formatNumber(totalAmt),
       ]);
 

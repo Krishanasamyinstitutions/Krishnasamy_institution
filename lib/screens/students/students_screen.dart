@@ -99,6 +99,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static const _importGridKeys = [
     'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
     'stumobile', 'stuemail', 'concession',
+    'admname', 'quoname',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
     'fathername', 'fathermobile', 'fatheroccupation',
@@ -118,6 +119,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'stumobile': 'Mobile *',
     'stuemail': 'Email',
     'concession': 'Concession *',
+    'admname': 'Admission Type',
+    'quoname': 'Quota',
     'stuaddress': 'Address',
     'stucity': 'City',
     'stustate': 'State',
@@ -1907,6 +1910,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'guardianoccupation': 'Guardian Occupation',
     'payincharge': 'Payment In Charge',
     'payinchargemob': 'Payment Mobile',
+    'admname': 'Admission Type',
+    'quoname': 'Quota',
   };
 
   /// Auto-map header text to field key (case-insensitive)
@@ -1940,6 +1945,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'concession': 'concession', 'concession category': 'concession',
       'payment in charge': 'payincharge', 'pay in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
       'payment mobile': 'payinchargemob', 'pay mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob',
+      'admission type': 'admname', 'admtype': 'admname', 'admname': 'admname',
+      'quota': 'quoname', 'quota name': 'quoname', 'quoname': 'quoname',
     };
     return map[h] ?? '';
   }

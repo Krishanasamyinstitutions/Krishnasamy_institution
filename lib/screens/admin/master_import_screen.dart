@@ -76,7 +76,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 6, vsync: this);
+    _tabCtrl = TabController(length: 8, vsync: this);
   }
 
   @override
@@ -93,7 +93,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
           listenable: _tabCtrl,
           builder: (context, _) {
             final selected = _tabCtrl.index;
-            final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand'];
+            final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand', 'Admission Type', 'Quota'];
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -143,6 +143,8 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
               _FeeTypeTab(),
               _ConcessionTab(),
               _ClassFeeDemandTab(),
+              _AdmissionTypeTab(),
+              _QuotaTab(),
             ],
           ),
         ),
@@ -1380,3 +1382,271 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     );
   }
 }
+
+// ═══════════════════════════════════════════════
+// ADMISSION TYPE / QUOTA — simple lookup tables
+// (ids are user-supplied; no auto-trigger)
+// ═══════════════════════════════════════════════
+
+Future<Map<String, int>> _directLookupImport({
+  required int insId,
+  required String table,
+  required String idCol,
+  required String nameCol,
+  required List<List<dynamic>> rows,
+  required bool hasInsId,
+  required List<String> errorsOut,
+}) async {
+  int imported = 0;
+  int skipped = 0;
+  for (int i = 0; i < rows.length; i++) {
+    try {
+      final row = rows[i];
+      final idRaw = row.isNotEmpty ? row[0].toString().trim() : '';
+      final name = row.length > 1 ? row[1].toString().trim() : '';
+      final id = int.tryParse(idRaw);
+      if (id == null || name.isEmpty) {
+        skipped++;
+        errorsOut.add('Row ${i + 2}: invalid id or name');
+        continue;
+      }
+      final record = <String, dynamic>{
+        idCol: id,
+        nameCol: name,
+        'activestatus': 1,
+      };
+      if (hasInsId) record['ins_id'] = insId;
+      await SupabaseService.fromSchema(table).upsert(record, onConflict: idCol);
+      imported++;
+    } catch (e) {
+      skipped++;
+      errorsOut.add('Row ${i + 2}: ${_friendlyError(e.toString())}');
+    }
+  }
+  return {'imported': imported, 'skipped': skipped};
+}
+
+class _AdmissionTypeTab extends StatefulWidget {
+  const _AdmissionTypeTab();
+  @override
+  State<_AdmissionTypeTab> createState() => _AdmissionTypeTabState();
+}
+
+class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeepAliveClientMixin {
+  List<List<dynamic>> _rows = [];
+  String? _fileName;
+  bool _saving = false;
+  bool _isValidated = false;
+  int _imported = 0, _skipped = 0;
+  List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
+  static const _headers = ['Adm ID *', 'Admission Name *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final rows = await SupabaseService.fromSchema('admissiontype').select('adm_id, admname').eq('activestatus', 1).order('adm_id');
+      if (mounted) setState(() {
+        _existingRows = (rows as List).map((r) => [r['adm_id']?.toString() ?? '', r['admname']?.toString() ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
+
+  Future<void> _browse() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
+    if (result == null) return;
+    final parsed = _parseExcel(result.files.single.path!);
+    if (parsed.length < 2) return;
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+  }
+
+  void _validate() {
+    final errs = <int, String>{};
+    for (int i = 0; i < _rows.length; i++) {
+      final idRaw = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final name = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      if (idRaw.isEmpty || int.tryParse(idRaw) == null) { errs[i] = 'Invalid Adm ID'; continue; }
+      if (name.isEmpty) { errs[i] = 'Missing Admission Name'; }
+    }
+    setState(() { _rowErrors = errs; _isValidated = errs.isEmpty; });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(errs.isEmpty ? 'Validation passed' : '${errs.length} row(s) have errors'),
+      backgroundColor: errs.isEmpty ? Colors.green : Colors.red,
+    ));
+  }
+
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+
+  Future<void> _save() async {
+    if (_rows.isEmpty) return;
+    setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 0;
+    final errs = <String>[];
+    final result = await _directLookupImport(
+      insId: insId, table: 'admissiontype', idCol: 'adm_id', nameCol: 'admname',
+      rows: _rows, hasInsId: true, errorsOut: errs,
+    );
+    _imported = result['imported'] ?? 0;
+    _skipped = result['skipped'] ?? 0;
+    _errors = errs;
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildImportCard(
+      title: 'Import Admission Types',
+      headers: _headers,
+      rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
+      onBrowse: _browse,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
+      onTemplate: () => _exportTemplate('Admission Type', _headers),
+      onSampleDownload: () => _exportSampleData('Admission Type', _headers, [
+        ['1', 'GOVERNMENT QUOTA'],
+        ['2', 'MANAGEMENT QUOTA'],
+        ['3', 'NRI QUOTA'],
+      ]),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Adm ID', 'Admission Name'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
+    );
+  }
+}
+
+class _QuotaTab extends StatefulWidget {
+  const _QuotaTab();
+  @override
+  State<_QuotaTab> createState() => _QuotaTabState();
+}
+
+class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin {
+  List<List<dynamic>> _rows = [];
+  String? _fileName;
+  bool _saving = false;
+  bool _isValidated = false;
+  int _imported = 0, _skipped = 0;
+  List<String> _errors = [];
+  Map<int, String> _rowErrors = {};
+  static const _headers = ['Quo ID *', 'Quota Name *'];
+  List<List<dynamic>> _existingRows = [];
+  bool _isLoadingExisting = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId;
+    if (insId == null) return;
+    setState(() => _isLoadingExisting = true);
+    try {
+      final rows = await SupabaseService.fromSchema('quota').select('quo_id, quoname').eq('ins_id', insId).eq('activestatus', 1).order('quo_id');
+      if (mounted) setState(() {
+        _existingRows = (rows as List).map((r) => [r['quo_id']?.toString() ?? '', r['quoname']?.toString() ?? '']).toList();
+        _isLoadingExisting = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingExisting = false);
+    }
+  }
+
+  Future<void> _browse() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
+    if (result == null) return;
+    final parsed = _parseExcel(result.files.single.path!);
+    if (parsed.length < 2) return;
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+  }
+
+  void _validate() {
+    final errs = <int, String>{};
+    for (int i = 0; i < _rows.length; i++) {
+      final idRaw = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final name = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      if (idRaw.isEmpty || int.tryParse(idRaw) == null) { errs[i] = 'Invalid Quo ID'; continue; }
+      if (name.isEmpty) { errs[i] = 'Missing Quota Name'; }
+    }
+    setState(() { _rowErrors = errs; _isValidated = errs.isEmpty; });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(errs.isEmpty ? 'Validation passed' : '${errs.length} row(s) have errors'),
+      backgroundColor: errs.isEmpty ? Colors.green : Colors.red,
+    ));
+  }
+
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+
+  Future<void> _save() async {
+    if (_rows.isEmpty) return;
+    setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final insId = auth.insId ?? 0;
+    final errs = <String>[];
+    final result = await _directLookupImport(
+      insId: insId, table: 'quota', idCol: 'quo_id', nameCol: 'quoname',
+      rows: _rows, hasInsId: true, errorsOut: errs,
+    );
+    _imported = result['imported'] ?? 0;
+    _skipped = result['skipped'] ?? 0;
+    _errors = errs;
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    if (mounted) {
+      _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return _buildImportCard(
+      title: 'Import Quota',
+      headers: _headers,
+      rows: _rows.map((r) => List.generate(_headers.length, (j) => j < r.length ? r[j] : '')).toList(),
+      onBrowse: _browse,
+      onSave: _rows.isNotEmpty && _isValidated ? _save : null,
+      onTemplate: () => _exportTemplate('Quota', _headers),
+      onSampleDownload: () => _exportSampleData('Quota', _headers, [
+        ['1', 'GENERAL'],
+        ['2', 'OBC'],
+        ['3', 'SC'],
+        ['4', 'ST'],
+      ]),
+      saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
+      onDismissResult: () {},
+      onValidate: _rows.isNotEmpty ? _validate : null,
+      onClose: _close,
+      isValidated: _isValidated,
+      existingRows: _existingRows,
+      existingHeaders: const ['Quo ID', 'Quota Name'],
+      isLoadingExisting: _isLoadingExisting,
+      rowErrors: _rowErrors,
+    );
+  }
+}
+

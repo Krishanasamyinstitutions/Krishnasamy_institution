@@ -92,7 +92,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             .from('payment')
             .select('transtotalamount')
             .eq('paydate', todayStr)
-            .eq('paystatus', 'C')
             .eq('activestatus', 1);
         final total = (rows as List).fold<double>(
             0,
