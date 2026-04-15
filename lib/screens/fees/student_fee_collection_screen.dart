@@ -367,9 +367,15 @@ class _StudentFeeCollectionScreenState
       final demandList =
           List<Map<String, dynamic>>.from((await demandsFuture) as List);
 
-      // Sort by term order
-      demandList.sort((a, b) => _termIndex(a['demfeeterm']?.toString() ?? '')
-          .compareTo(_termIndex(b['demfeeterm']?.toString() ?? '')));
+      // Sort by due date (oldest first) so cashiers collect overdue fees first.
+      demandList.sort((a, b) {
+        final da = a['duedate']?.toString() ?? '';
+        final db = b['duedate']?.toString() ?? '';
+        if (da.isEmpty && db.isEmpty) return 0;
+        if (da.isEmpty) return 1;
+        if (db.isEmpty) return -1;
+        return da.compareTo(db);
+      });
 
       _allDemands = demandList;
 
@@ -1033,13 +1039,34 @@ class _StudentFeeCollectionScreenState
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFFE87722))),
-                    // Col Amount editable
+                    // Col Amount editable — clamp to balance due
                     Expanded(
                       flex: 2,
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child:
-                            _numField(_conCtrl[key], () => setState(() {})),
+                        child: _numField(_conCtrl[key], () {
+                          final ctrl = _conCtrl[key];
+                          if (ctrl != null) {
+                            final entered = double.tryParse(ctrl.text) ?? 0;
+                            if (entered > bal) {
+                              final clamped = bal.toStringAsFixed(0);
+                              ctrl.value = TextEditingValue(
+                                text: clamped,
+                                selection: TextSelection.collapsed(offset: clamped.length),
+                              );
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Collection amount cannot exceed balance due (₹${bal.toStringAsFixed(0)})'),
+                                    backgroundColor: Colors.red,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                          setState(() {});
+                        }),
                       ),
                     ),
                     // Fine editable
