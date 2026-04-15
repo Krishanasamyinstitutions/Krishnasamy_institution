@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -66,11 +69,22 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   String _insPhone = '';
   String _insEmail = '';
 
+  // Daily collection tab state
+  DateTime? _dailyFrom;
+  DateTime? _dailyTo;
+  bool _dailyLoading = false;
+  List<Map<String, dynamic>> _dailyRows = [];
+  List<String> _dailyFeeTypes = [];
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    final now = DateTime.now();
+    _dailyFrom = DateTime(now.year, now.month, 1);
+    _dailyTo = DateTime(now.year, now.month, now.day);
     _loadData();
+    _loadDailyCollection();
   }
 
   @override
@@ -156,6 +170,114 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
   }
 
+  Future<void> _loadDailyCollection() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null || _dailyFrom == null || _dailyTo == null) return;
+    setState(() => _dailyLoading = true);
+    try {
+      String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
+      final payments = await SupabaseService.fromSchema('payment')
+          .select('pay_id, paynumber, stu_id, transtotalamount, paymethod, paydate')
+          .eq('ins_id', insId)
+          .eq('paystatus', 'C')
+          .eq('activestatus', 1)
+          .gte('paydate', d(_dailyFrom!))
+          .lte('paydate', d(_dailyTo!))
+          .order('paynumber');
+      final payList = List<Map<String, dynamic>>.from(payments as List);
+      if (payList.isEmpty) {
+        setState(() {
+          _dailyRows = [];
+          _dailyFeeTypes = [];
+          _dailyLoading = false;
+        });
+        return;
+      }
+
+      final payIds = payList.map((p) => p['pay_id']).whereType<int>().toList();
+      final stuIds = payList.map((p) => p['stu_id']).whereType<int>().toSet().toList();
+
+      final stuRows = await SupabaseService.fromSchema('students')
+          .select('stu_id, stuname, stuadmno, stuclass, courname')
+          .inFilter('stu_id', stuIds);
+      final stuMap = <int, Map<String, dynamic>>{};
+      for (final s in (stuRows as List)) {
+        stuMap[s['stu_id'] as int] = Map<String, dynamic>.from(s as Map);
+      }
+
+      final details = <Map<String, dynamic>>[];
+      for (int i = 0; i < payIds.length; i += 200) {
+        final chunk = payIds.sublist(i, (i + 200).clamp(0, payIds.length));
+        final pd = await SupabaseService.fromSchema('paymentdetails')
+            .select('pay_id, dem_id, transtotalamount')
+            .inFilter('pay_id', chunk);
+        details.addAll(List<Map<String, dynamic>>.from(pd as List));
+      }
+      final demIds = details.map((pd) => pd['dem_id']).whereType<int>().toSet().toList();
+      final demTypeMap = <int, String>{};
+      final demFineMap = <int, double>{};
+      for (int i = 0; i < demIds.length; i += 200) {
+        final chunk = demIds.sublist(i, (i + 200).clamp(0, demIds.length));
+        final fd = await SupabaseService.fromSchema('feedemand')
+            .select('dem_id, demfeetype, fineamount')
+            .inFilter('dem_id', chunk);
+        for (final r in (fd as List)) {
+          demTypeMap[r['dem_id'] as int] = r['demfeetype']?.toString() ?? '';
+          demFineMap[r['dem_id'] as int] = (r['fineamount'] as num?)?.toDouble() ?? 0;
+        }
+      }
+
+      final byPay = <int, Map<String, double>>{};
+      final fineByPay = <int, double>{};
+      for (final pd in details) {
+        final pid = pd['pay_id'] as int?;
+        final did = pd['dem_id'] as int?;
+        if (pid == null) continue;
+        final ft = did != null ? (demTypeMap[did] ?? '') : '';
+        final amt = (pd['transtotalamount'] as num?)?.toDouble() ?? 0;
+        if (ft.isNotEmpty) {
+          byPay.putIfAbsent(pid, () => {});
+          byPay[pid]![ft] = (byPay[pid]![ft] ?? 0) + amt;
+        }
+        if (did != null) {
+          fineByPay[pid] = (fineByPay[pid] ?? 0) + (demFineMap[did] ?? 0);
+        }
+      }
+
+      final feeTypeSet = <String>{};
+      final rows = <Map<String, dynamic>>[];
+      for (final p in payList) {
+        final pid = p['pay_id'] as int?;
+        final stu = stuMap[p['stu_id'] as int?] ?? {};
+        final feeMap = byPay[pid] ?? {};
+        feeTypeSet.addAll(feeMap.keys);
+        rows.add({
+          'paynumber': p['paynumber']?.toString() ?? '',
+          'stuadmno': stu['stuadmno']?.toString() ?? '',
+          'stuname': stu['stuname']?.toString() ?? '',
+          'courname': stu['courname']?.toString() ?? '',
+          'stuclass': stu['stuclass']?.toString() ?? '',
+          'total': (p['transtotalamount'] as num?)?.toDouble() ?? 0,
+          'fine': fineByPay[pid] ?? 0,
+          'paymethod': p['paymethod']?.toString() ?? '',
+          'fees': feeMap,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _dailyRows = rows;
+          _dailyFeeTypes = feeTypeSet.toList()..sort();
+          _dailyLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('daily collection load error: $e');
+      if (mounted) setState(() => _dailyLoading = false);
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredDemands {
     return _allDemands.where((d) {
       if (_selectedCourse != null && d['courname']?.toString() != _selectedCourse) return false;
@@ -235,7 +357,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           listenable: _tabController,
           builder: (context, _) {
             final selected = _tabController.index;
-            final tabLabels = ['Collection Statement', 'Pending - Course wise', 'Pending - Year wise'];
+            final tabLabels = ['Daily Collection', 'Collection Statement', 'Pending - Course wise', 'Pending - Year wise'];
             return Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -281,6 +403,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   : TabBarView(
                       controller: _tabController,
                       children: [
+                        _buildDailyCollection(),
                         _buildCollectionStatement(),
                         _buildPendingCourseWise(),
                         _buildPendingYearWise(),
@@ -375,6 +498,246 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ),
         ],
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // TAB: DAILY COLLECTION (receipt-wise pivot by fee type)
+  // ═══════════════════════════════════════════════
+  Widget _buildDailyCollection() {
+    String fmt(DateTime? d) => d == null ? '' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+    Widget quick(String label, VoidCallback onTap) => Padding(
+          padding: EdgeInsets.only(left: 4.w),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(6.r),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(6.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500)),
+            ),
+          ),
+        );
+
+    final headerStyle = TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700);
+    final cellStyle = TextStyle(fontSize: 12.sp);
+
+    final visibleRows = _dailyRows.where((r) {
+      if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
+      if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
+      if (_selectedFeeType != null) {
+        final fees = r['fees'] as Map<String, double>;
+        if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+      }
+      return true;
+    }).toList();
+
+    final visibleFeeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+
+    double totalAmt = 0;
+    double totalFine = 0;
+    final ftTotals = <String, double>{};
+    for (final r in visibleRows) {
+      totalAmt += (r['total'] as num?)?.toDouble() ?? 0;
+      totalFine += (r['fine'] as num?)?.toDouble() ?? 0;
+      final fees = r['fees'] as Map<String, double>;
+      for (final ft in visibleFeeTypes) {
+        final v = fees[ft] ?? 0;
+        ftTotals[ft] = (ftTotals[ft] ?? 0) + v;
+      }
+    }
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
+              SizedBox(width: 8.w),
+              Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+              SizedBox(width: 8.w),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(context: context, initialDate: _dailyFrom ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                  if (picked != null) {
+                    setState(() => _dailyFrom = picked);
+                    _loadDailyCollection();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                  decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(6.r)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    SizedBox(width: 6.w),
+                    Text(_dailyFrom != null ? fmt(_dailyFrom) : 'From', style: TextStyle(fontSize: 13.sp)),
+                  ]),
+                ),
+              ),
+              Padding(padding: EdgeInsets.symmetric(horizontal: 6.w), child: const Text('—', style: TextStyle(color: AppColors.textSecondary))),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(context: context, initialDate: _dailyTo ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
+                  if (picked != null) {
+                    setState(() => _dailyTo = picked);
+                    _loadDailyCollection();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                  decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(6.r)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    SizedBox(width: 6.w),
+                    Text(_dailyTo != null ? fmt(_dailyTo) : 'To', style: TextStyle(fontSize: 13.sp)),
+                  ]),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              quick('Today', () {
+                final now = DateTime.now();
+                setState(() {
+                  _dailyFrom = DateTime(now.year, now.month, now.day);
+                  _dailyTo = DateTime(now.year, now.month, now.day);
+                });
+                _loadDailyCollection();
+              }),
+              quick('7 Days', () {
+                final now = DateTime.now();
+                setState(() {
+                  _dailyFrom = now.subtract(const Duration(days: 7));
+                  _dailyTo = DateTime(now.year, now.month, now.day);
+                });
+                _loadDailyCollection();
+              }),
+              quick('30 Days', () {
+                final now = DateTime.now();
+                setState(() {
+                  _dailyFrom = now.subtract(const Duration(days: 30));
+                  _dailyTo = DateTime(now.year, now.month, now.day);
+                });
+                _loadDailyCollection();
+              }),
+              quick('This Month', () {
+                final now = DateTime.now();
+                setState(() {
+                  _dailyFrom = DateTime(now.year, now.month, 1);
+                  _dailyTo = DateTime(now.year, now.month, now.day);
+                });
+                _loadDailyCollection();
+              }),
+              const Spacer(),
+              if (_dailyLoading) SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _dailyRows.isEmpty ? null : () => _exportDailyCollectionExcel(),
+                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+                label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                ),
+              ),
+              SizedBox(width: 6.w),
+              ElevatedButton.icon(
+                onPressed: _dailyRows.isEmpty ? null : () => _exportDailyCollectionPdf(),
+                icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
+                label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: visibleRows.isEmpty
+              ? _emptyState('No collections in this range')
+              : SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Builder(builder: (_) {
+                      double totalCash = 0;
+                      double totalCheque = 0;
+                      for (final r in visibleRows) {
+                        final total = (r['total'] as num?)?.toDouble() ?? 0;
+                        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
+                        if (mode.contains('CASH')) {
+                          totalCash += total;
+                        } else {
+                          totalCheque += total;
+                        }
+                      }
+                      return DataTable(
+                        headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
+                        columns: [
+                          DataColumn(label: Text('Receipt No', style: headerStyle)),
+                          DataColumn(label: Text('Reg No', style: headerStyle)),
+                          DataColumn(label: Text('Student Name', style: headerStyle)),
+                          DataColumn(label: Text('Class', style: headerStyle)),
+                          for (final ft in visibleFeeTypes) DataColumn(label: Text(ft, style: headerStyle), numeric: true),
+                          DataColumn(label: Text('Fine', style: headerStyle), numeric: true),
+                          DataColumn(label: Text('Total', style: headerStyle), numeric: true),
+                          DataColumn(label: Text('Cash', style: headerStyle), numeric: true),
+                          DataColumn(label: Text('DD/Cheque', style: headerStyle), numeric: true),
+                          DataColumn(label: Text('Net Amt', style: headerStyle), numeric: true),
+                        ],
+                        rows: [
+                          ...visibleRows.map((r) {
+                            final fees = r['fees'] as Map<String, double>;
+                            final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+                            final total = (r['total'] as num?)?.toDouble() ?? 0;
+                            final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
+                            final isCash = mode.contains('CASH');
+                            return DataRow(cells: [
+                              DataCell(Text(r['paynumber']?.toString() ?? '', style: cellStyle)),
+                              DataCell(Text(r['stuadmno']?.toString() ?? '', style: cellStyle)),
+                              DataCell(Text(r['stuname']?.toString() ?? '', style: cellStyle)),
+                              DataCell(Text('${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(), style: cellStyle)),
+                              for (final ft in visibleFeeTypes)
+                                DataCell(Text(fees[ft] != null && fees[ft] != 0 ? _formatNumber(fees[ft]!) : '', style: cellStyle)),
+                              DataCell(Text(fine != 0 ? _formatNumber(fine) : '', style: cellStyle)),
+                              DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
+                              DataCell(Text(isCash ? _formatNumber(total) : '', style: cellStyle)),
+                              DataCell(Text(!isCash ? _formatNumber(total) : '', style: cellStyle)),
+                              DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
+                            ]);
+                          }),
+                          DataRow(
+                            color: WidgetStateProperty.all(AppColors.surface),
+                            cells: [
+                              DataCell(Text('TOTAL', style: headerStyle)),
+                              const DataCell(Text('')),
+                              const DataCell(Text('')),
+                              const DataCell(Text('')),
+                              for (final ft in visibleFeeTypes)
+                                DataCell(Text(_formatNumber(ftTotals[ft] ?? 0), style: headerStyle)),
+                              DataCell(Text(_formatNumber(totalFine), style: headerStyle)),
+                              DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
+                              DataCell(Text(_formatNumber(totalCash), style: headerStyle)),
+                              DataCell(Text(_formatNumber(totalCheque), style: headerStyle)),
+                              DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
+                            ],
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -1024,6 +1387,259 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       await _saveExcel(excel, 'Pending_${groupBy}_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _exportDailyCollectionExcel() async {
+    try {
+      final visibleRows = _dailyRows.where((r) {
+        if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
+        if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
+        if (_selectedFeeType != null) {
+          final fees = r['fees'] as Map<String, double>;
+          if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+        }
+        return true;
+      }).toList();
+      final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['Daily Collection'];
+      excel.delete('Sheet1');
+
+      final boldStyle = xl.CellStyle(bold: true, fontSize: 11);
+      final headerStyle = xl.CellStyle(
+        bold: true, fontSize: 10,
+        backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+        fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+      );
+      final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final totalStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      final totalCols = 4 + feeTypes.length + 5; // receipt, reg, name, class, [fees], fine, total, cash, dd/cheque, net amt
+
+      int row = 0;
+      void merged(String text, xl.CellStyle style) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(text);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = style;
+        sheet.merge(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row), xl.CellIndex.indexByColumnRow(columnIndex: totalCols - 1, rowIndex: row));
+        row++;
+      }
+
+      merged(_insName, boldStyle);
+      if (_insAddress.isNotEmpty) merged(_insAddress, xl.CellStyle(fontSize: 10));
+      merged('DAILY COLLECTION STATEMENT FROM ${_formatDate(_dailyFrom!)} TO ${_formatDate(_dailyTo!)}', boldStyle);
+      merged('Date: ${_formatDate(DateTime.now())}', xl.CellStyle(fontSize: 10));
+      row++;
+
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', 'Cash', 'DD/Cheque', 'Net Amt'];
+      for (int c = 0; c < headers.length; c++) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
+      }
+      row++;
+
+      final ftTotals = <String, double>{};
+      double totalAmt = 0;
+      double totalFine = 0;
+      double totalCash = 0;
+      double totalCheque = 0;
+
+      final fineCol = 4 + feeTypes.length;
+      final totalCol = 5 + feeTypes.length;
+      final cashCol = 6 + feeTypes.length;
+      final chequeCol = 7 + feeTypes.length;
+      final netCol = 8 + feeTypes.length;
+
+      for (final r in visibleRows) {
+        final fees = r['fees'] as Map<String, double>;
+        final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
+        final isCash = mode.contains('CASH');
+        totalAmt += total;
+        totalFine += fine;
+        if (isCash) { totalCash += total; } else { totalCheque += total; }
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['paynumber']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['stuadmno']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['stuname']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue('${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim());
+        for (int c = 0; c < feeTypes.length; c++) {
+          final v = fees[feeTypes[c]] ?? 0;
+          ftTotals[feeTypes[c]] = (ftTotals[feeTypes[c]] ?? 0) + v;
+          if (v > 0) {
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).cellStyle = numStyle;
+          }
+        }
+        if (fine > 0) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: fineCol, rowIndex: row)).value = xl.DoubleCellValue(fine);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: fineCol, rowIndex: row)).cellStyle = numStyle;
+        }
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).value = xl.DoubleCellValue(total);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).cellStyle = totalStyle;
+        if (isCash) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).value = xl.DoubleCellValue(total);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).cellStyle = numStyle;
+        } else {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).value = xl.DoubleCellValue(total);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).cellStyle = numStyle;
+        }
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).value = xl.DoubleCellValue(total);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).cellStyle = totalStyle;
+        row++;
+      }
+
+      // TOTAL row
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('TOTAL');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = boldStyle;
+      for (int c = 0; c < feeTypes.length; c++) {
+        final v = ftTotals[feeTypes[c]] ?? 0;
+        if (v > 0) {
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).cellStyle = totalStyle;
+        }
+      }
+      if (totalFine > 0) {
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: fineCol, rowIndex: row)).value = xl.DoubleCellValue(totalFine);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: fineCol, rowIndex: row)).cellStyle = totalStyle;
+      }
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).value = xl.DoubleCellValue(totalAmt);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: totalCol, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).value = xl.DoubleCellValue(totalCash);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: cashCol, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).value = xl.DoubleCellValue(totalCheque);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: chequeCol, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).value = xl.DoubleCellValue(totalAmt);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: netCol, rowIndex: row)).cellStyle = totalStyle;
+
+      sheet.setColumnWidth(0, 12);
+      sheet.setColumnWidth(1, 14);
+      sheet.setColumnWidth(2, 24);
+      sheet.setColumnWidth(3, 18);
+      for (int c = 0; c < feeTypes.length; c++) {
+        sheet.setColumnWidth(4 + c, 12);
+      }
+      sheet.setColumnWidth(fineCol, 8);
+      sheet.setColumnWidth(totalCol, 10);
+      sheet.setColumnWidth(cashCol, 10);
+      sheet.setColumnWidth(chequeCol, 12);
+      sheet.setColumnWidth(netCol, 10);
+
+      await _saveExcel(excel, 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _exportDailyCollectionPdf() async {
+    try {
+      final visibleRows = _dailyRows.where((r) {
+        if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
+        if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
+        if (_selectedFeeType != null) {
+          final fees = r['fees'] as Map<String, double>;
+          if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+        }
+        return true;
+      }).toList();
+      final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+
+      final ftTotals = <String, double>{};
+      double totalAmt = 0;
+      double totalFine = 0;
+      double totalCash = 0;
+      double totalCheque = 0;
+      for (final r in visibleRows) {
+        final fees = r['fees'] as Map<String, double>;
+        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
+        totalAmt += total;
+        totalFine += (r['fine'] as num?)?.toDouble() ?? 0;
+        if (mode.contains('CASH')) { totalCash += total; } else { totalCheque += total; }
+        for (final ft in feeTypes) {
+          ftTotals[ft] = (ftTotals[ft] ?? 0) + (fees[ft] ?? 0);
+        }
+      }
+
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', 'Cash', 'DD/Cheque', 'Net Amt'];
+      final rows = <List<String>>[];
+      for (final r in visibleRows) {
+        final fees = r['fees'] as Map<String, double>;
+        final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final mode = (r['paymethod']?.toString() ?? '').toUpperCase();
+        final isCash = mode.contains('CASH');
+        rows.add([
+          r['paynumber']?.toString() ?? '',
+          r['stuadmno']?.toString() ?? '',
+          r['stuname']?.toString() ?? '',
+          '${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(),
+          ...feeTypes.map((ft) => (fees[ft] ?? 0) > 0 ? _formatNumber(fees[ft]!) : ''),
+          fine > 0 ? _formatNumber(fine) : '',
+          _formatNumber(total),
+          isCash ? _formatNumber(total) : '',
+          !isCash ? _formatNumber(total) : '',
+          _formatNumber(total),
+        ]);
+      }
+      rows.add([
+        'TOTAL', '', '', '',
+        ...feeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
+        totalFine > 0 ? _formatNumber(totalFine) : '',
+        _formatNumber(totalAmt),
+        _formatNumber(totalCash),
+        _formatNumber(totalCheque),
+        _formatNumber(totalAmt),
+      ]);
+
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(24),
+          header: (_) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(_insName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+              if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
+              pw.SizedBox(height: 6),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('DAILY COLLECTION STATEMENT FROM ${_formatDate(_dailyFrom!)} TO ${_formatDate(_dailyTo!)}',
+                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Date: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+                ],
+              ),
+              pw.SizedBox(height: 6),
+            ],
+          ),
+          build: (ctx) => [
+            pw.Table.fromTextArray(
+              headers: headers,
+              data: rows,
+              headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                for (int i = 4; i < headers.length - 1; i++) i: pw.Alignment.centerRight,
+              },
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.3),
+              headerHeight: 22,
+              cellHeight: 16,
+            ),
+          ],
+        ),
+      );
+
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}.pdf',
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
     }
   }
 

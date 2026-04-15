@@ -62,6 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
     _NavItem(Icons.notifications_rounded, 'Notices'),
     _NavItem(Icons.notifications_active_rounded, 'Notifications'),
+    _NavItem(Icons.assessment_rounded, 'Reports'),
   ];
 
   late List<_NavItem> _navItems;
