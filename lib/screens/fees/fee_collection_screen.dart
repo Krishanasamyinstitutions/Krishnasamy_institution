@@ -378,13 +378,22 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    // Compute BOTH totals from the same source (payments table) so they tally.
+    // Only reconciled (approved) payments count toward Total Collection.
+    // Cash auto-reconciles (recon_status='R'); other methods stay 'P' until
+    // bank reconciliation. Pending-approval money is shown on its own card.
     double totalCollectionFromPayments = 0;
     double todayCollection = 0;
+    double pendingApprovalAmt = 0;
     final List<int> todayPayIds = [];
     final List<int> allPayIds = [];
     for (final p in payments) {
+      final reconStatus = p['recon_status']?.toString() ?? 'P';
       final amt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+      if (reconStatus == 'P') {
+        pendingApprovalAmt += amt;
+        continue;
+      }
+      if (reconStatus != 'R') continue; // skip any other non-approved
       totalCollectionFromPayments += amt;
       final pid = p['pay_id'] as int?;
       if (pid != null) allPayIds.add(pid);
@@ -460,6 +469,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         // breakdown comes from the same payFineMap for consistency.
         _totalCollection = totalCollectionFromPayments;
         _totalFine = totalFineFromPayments;
+        _pendingApproval = pendingApprovalAmt;
         _pendingFees = feeTotals['totalPending'] ?? 0;
         _isLoading = false;
       });
@@ -585,6 +595,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   double _todayFine = 0;
   double _totalCollection = 0;
   double _totalFine = 0;
+  double _pendingApproval = 0;
 
   Widget _buildDateChip(String label, DateTime date, VoidCallback onTap) {
     return InkWell(
@@ -780,6 +791,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   feeAmount: _formatCurrency(_todayCollection - _todayFine),
                   fineAmount: _formatCurrency(_todayFine),
                 ),
+                _buildClickableSummaryCard(
+                  Icons.hourglass_top_rounded,
+                  const Color(0xFFFB8C00),
+                  _formatCurrency(_pendingApproval),
+                  'Pending Approval',
+                  () {},
+                ),
                 _buildClickableSummaryCard(Icons.pending_actions_rounded, Colors.orange, _isLoadingDemands ? 'Loading...' : _formatCurrency(_pendingFees), 'Pending Fees', () {
                   _loadDemandsIfNeeded();
                   setState(() {
@@ -861,10 +879,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       return true;
     }).toList();
 
-    // Group by payment method
+    // Group by payment method — cash stays as 'cash', everything else (cheque,
+    // qr_upi, razorpay, …) is lumped under 'Bank' for the summary.
     final Map<String, List<Map<String, dynamic>>> byMethod = {};
     for (final p in filtered) {
-      final method = p['paymethod']?.toString() ?? 'Unknown';
+      final raw = (p['paymethod']?.toString() ?? 'Unknown').toLowerCase();
+      final method = raw == 'cash' ? 'Cash' : 'Bank';
       byMethod.putIfAbsent(method, () => []).add(p);
     }
     final methodKeys = byMethod.keys.toList()..sort();
@@ -1211,13 +1231,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   }) {
     final showBreakdown = feeAmount != null || fineAmount != null;
     return Expanded(
-      child: InkWell(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 4.w),
+        child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 16.h),
           decoration: BoxDecoration(
             color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
             border: Border.all(color: iconColor.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -1291,6 +1314,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             ],
           ),
         ),
+      ),
       ),
     );
   }

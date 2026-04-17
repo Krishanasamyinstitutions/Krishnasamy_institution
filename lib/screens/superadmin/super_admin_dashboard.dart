@@ -25,6 +25,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
     _SANavItem(Icons.domain_add_rounded, 'Register Institution'),
     _SANavItem(Icons.business_rounded, 'Manage Institutions'),
+    _SANavItem(Icons.settings_rounded, 'Settings'),
   ];
 
   List<Map<String, dynamic>> _institutions = [];
@@ -49,6 +50,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Future<void> _loadTodayCollections(
       List<_InstitutionFinanceSummary> summaries) async {
+    // Try the v2 RPC first — single round-trip aggregation for everything.
+    try {
+      final v2 = await SupabaseService.client.rpc('get_super_admin_dashboard_v2');
+      if (v2 is List) {
+        final byId = <int, Map<String, dynamic>>{};
+        for (final r in v2) {
+          if (r is Map && r['ins_id'] is int) {
+            byId[r['ins_id'] as int] = Map<String, dynamic>.from(r);
+          }
+        }
+        for (final s in summaries) {
+          final r = byId[s.insId];
+          if (r == null) continue;
+          s.totalPending = (r['total_pending'] as num?)?.toDouble() ?? s.totalPending;
+          s.totalCollected = (r['total_collected'] as num?)?.toDouble() ?? s.totalCollected;
+          s.pendingApproval = (r['pending_approval'] as num?)?.toDouble() ?? 0;
+        }
+        if (mounted) setState(() {});
+        return;
+      }
+    } catch (e) {
+      debugPrint('v2 dashboard RPC failed, falling back: $e');
+    }
+
     final now = DateTime.now();
     final todayStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -98,6 +123,60 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             (sum, r) =>
                 sum + ((r['transtotalamount'] as num?)?.toDouble() ?? 0));
         s.todayCollected = total;
+
+        // Pending Approval = sum of paymentdetails (per-fee allocation)
+        // for payments awaiting reconciliation, excluding any FINE rows.
+        final pendingPays = await SupabaseService.client
+            .schema(schema)
+            .from('payment')
+            .select('pay_id')
+            .eq('paystatus', 'C')
+            .eq('recon_status', 'P')
+            .eq('activestatus', 1);
+        final pendingPayIds = (pendingPays as List)
+            .map((r) => r['pay_id'])
+            .whereType<int>()
+            .toList();
+        double pendingApproval = 0;
+        for (int i = 0; i < pendingPayIds.length; i += 200) {
+          final chunk = pendingPayIds.sublist(
+              i, (i + 200).clamp(0, pendingPayIds.length));
+          final pd = await SupabaseService.client
+              .schema(schema)
+              .from('paymentdetails')
+              .select('dem_id, transtotalamount')
+              .inFilter('pay_id', chunk);
+          final demIds = (pd as List)
+              .map((r) => r['dem_id'])
+              .whereType<int>()
+              .toSet()
+              .toList();
+          final demFineMap = <int, double>{};
+          for (int j = 0; j < demIds.length; j += 200) {
+            final dchunk =
+                demIds.sublist(j, (j + 200).clamp(0, demIds.length));
+            final fd = await SupabaseService.client
+                .schema(schema)
+                .from('feedemand')
+                .select('dem_id, fineamount')
+                .inFilter('dem_id', dchunk);
+            for (final r in (fd as List)) {
+              demFineMap[r['dem_id'] as int] =
+                  (r['fineamount'] as num?)?.toDouble() ?? 0;
+            }
+          }
+          for (final r in pd) {
+            final did = r['dem_id'] as int?;
+            final amt = (r['transtotalamount'] as num?)?.toDouble() ?? 0;
+            final fine = did != null ? (demFineMap[did] ?? 0) : 0;
+            pendingApproval += (amt - fine).clamp(0, double.infinity).toDouble();
+          }
+        }
+        s.pendingApproval = pendingApproval;
+        // Total Collection and Total Pending are already set from
+        // get_super_admin_dashboard RPC (SUM(paidamount) / SUM(balancedue)).
+        // Don't override with (feeamount - reconbalancedue) — that formula
+        // drifts from the institution dashboard's figures.
       } catch (e) {
         debugPrint('today collection error for ${s.insName}: $e');
       }
@@ -342,7 +421,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                               item.icon,
                               color: isSelected
                                   ? AppColors.primary
-                                  : AppColors.textSecondary,
+                                  : Colors.black,
                               size: 20.sp,
                             ),
                             if (!collapsed) ...[
@@ -357,7 +436,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                       ?.copyWith(
                                         color: isSelected
                                             ? AppColors.primary
-                                            : AppColors.textSecondary,
+                                            : Colors.black,
                                         fontWeight: isSelected
                                             ? FontWeight.w600
                                             : FontWeight.w400,
@@ -445,7 +524,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
-                            ?.copyWith(color: AppColors.textSecondary)),
+                            ?.copyWith(color: Colors.black)),
                   ],
                 ),
                 PopupMenuButton<String>(
@@ -457,7 +536,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r)),
                   icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textSecondary),
+                      color: Colors.black),
                   onSelected: (value) async {
                     if (value == 'signout') {
                       await auth.logout();
@@ -494,6 +573,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         return RegisterScreen(onRegistered: _refreshDashboard);
       case 2:
         return _buildManageInstitutions(context);
+      case 3:
+        return const _SuperAdminSettings();
       default:
         return _buildDashboardHome(context);
     }
@@ -512,7 +593,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 child: Center(
                     child: Text('No institutions found',
                         style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14.sp))))
+                            color: Colors.black, fontSize: 14.sp))))
           else ...[
             _buildSummaryRow(),
             SizedBox(height: 12.h),
@@ -538,13 +619,16 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final totalDemand =
         _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalDemand);
     final totalCollection = _institutionSummaries.fold<double>(
-        0, (sum, s) => sum + s.todayCollected);
-    final totalPending =
-        _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalPending);
+        0, (sum, s) => sum + s.totalCollected);
+    final totalPendingApproval = _institutionSummaries.fold<double>(
+        0, (sum, s) => sum + s.pendingApproval);
+    final totalPending = _institutionSummaries.fold<double>(
+        0, (sum, s) => sum + s.totalPending);
 
     const demandColor = Color(0xFF5C6BC0);
     const collectionColor = Color(0xFF43A047);
     const pendingColor = Color(0xFFEF5350);
+    const approvalColor = Color(0xFFFB8C00);
 
     return Row(
       children: [
@@ -561,6 +645,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         Expanded(
             child: _buildSummaryTile('Total Collection',
                 _formatAmount(totalCollection), collectionColor)),
+        SizedBox(width: 12.w),
+        Expanded(
+            child: _buildSummaryTile('Pending Approval',
+                _formatAmount(totalPendingApproval), approvalColor)),
         SizedBox(width: 12.w),
         Expanded(
             child: _buildSummaryTile(
@@ -583,7 +671,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               style: TextStyle(
                   fontSize: 11.sp,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary)),
+                  color: Colors.black)),
           SizedBox(height: 6.h),
           Text(value,
               style: TextStyle(
@@ -646,7 +734,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     SizedBox(height: 2.h),
                     Text(s.insCode,
                         style: TextStyle(
-                            fontSize: 12.sp, color: AppColors.textSecondary)),
+                            fontSize: 12.sp, color: Colors.black)),
                   ],
                 ),
               ),
@@ -707,14 +795,55 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   onTap: () => _showCourseWiseDemand(context, s)),
               SizedBox(width: 12.w),
               _buildFinanceTile(
-                  'Total Collection / Today', s.todayCollected, collectionColor,
+                  'Total Collection', s.totalCollected, collectionColor,
                   onTap: () => _showCourseWiseCollection(context, s)),
+              SizedBox(width: 12.w),
+              _buildFinanceTile('Pending Approval', s.pendingApproval, const Color(0xFFFB8C00)),
               SizedBox(width: 12.w),
               _buildFinanceTile('Total Pending', s.totalPending, pendingColor,
                   onTap: () => _showCourseWisePending(context, s)),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionPendingTile(_InstitutionFinanceSummary s, Color collectionColor, Color pendingColor) {
+    final pending = (s.totalPending - s.pendingApproval).clamp(0, double.infinity).toDouble();
+    Widget half(String label, String value, Color color, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+            child: Column(
+              children: [
+                Text(label, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: Colors.black)),
+                SizedBox(height: 6.h),
+                Text(value, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: color)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Expanded(
+      flex: 2,
+      child: Container(
+        decoration: BoxDecoration(
+          color: collectionColor.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: collectionColor.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          children: [
+            half('Total Collection', _formatAmount(s.totalCollected), collectionColor, () => _showCourseWiseCollection(context, s)),
+            Container(width: 1, height: 38.h, color: AppColors.border),
+            half('Total Pending', _formatAmount(pending), pendingColor, () => _showCourseWisePending(context, s)),
+          ],
+        ),
       ),
     );
   }
@@ -732,9 +861,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Text(label,
               style: TextStyle(
-                  fontSize: 11.sp,
+                  fontSize: 14.sp,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary)),
+                  color: Colors.black)),
           SizedBox(height: 6.h),
           Text(_formatAmount(amount),
               style: TextStyle(
@@ -811,7 +940,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
-                        ?.copyWith(color: AppColors.textSecondary)),
+                        ?.copyWith(color: Colors.black)),
               ],
             ),
           ],
@@ -851,7 +980,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 child: Text(
                   'View Only',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: Colors.black,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -874,7 +1003,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: AppColors.textSecondary),
+                    ?.copyWith(color: Colors.black),
               ),
             )
           else
@@ -966,7 +1095,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: AppColors.textSecondary),
+                    ?.copyWith(color: Colors.black),
               ),
             )
           else
@@ -1118,14 +1247,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                           'Code: ${ins['inscode'] ?? ''}',
                                           style: TextStyle(
                                               fontSize: 13.sp,
-                                              color: AppColors.textSecondary),
+                                              color: Colors.black),
                                         ),
                                         SizedBox(height: 2.h),
                                         Text(
                                           '${ins['insmail'] ?? ''}',
                                           style: TextStyle(
                                               fontSize: 13.sp,
-                                              color: AppColors.textSecondary),
+                                              color: Colors.black),
                                         ),
                                         if ((ins['inscity'] ?? '')
                                                 .toString()
@@ -1138,7 +1267,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                             '${ins['inscity'] ?? ''}${(ins['inscity'] ?? '').toString().isNotEmpty && (ins['insstate'] ?? '').toString().isNotEmpty ? ', ' : ''}${ins['insstate'] ?? ''}',
                                             style: TextStyle(
                                                 fontSize: 13.sp,
-                                                color: AppColors.textSecondary),
+                                                color: Colors.black),
                                           ),
                                         ],
                                       ],
@@ -1194,11 +1323,12 @@ class _InstitutionFinanceSummary {
   final String insCode;
   final String? insLogo;
   final double totalDemand;
-  final double totalCollected;
-  final double totalPending;
+  double totalCollected;
+  double totalPending;
   final int transactionCount;
   final bool activeStatus;
   double todayCollected;
+  double pendingApproval;
 
   _InstitutionFinanceSummary({
     required this.insId,
@@ -1206,6 +1336,7 @@ class _InstitutionFinanceSummary {
     required this.insCode,
     this.insLogo,
     this.todayCollected = 0,
+    this.pendingApproval = 0,
     required this.totalDemand,
     required this.totalCollected,
     required this.totalPending,
@@ -1438,7 +1569,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                           ? Center(
                               child: Text('No data',
                                   style: TextStyle(
-                                      color: AppColors.textSecondary,
+                                      color: Colors.black,
                                       fontSize: 13.sp)))
                           : ListView.separated(
                               itemCount: _classWiseData.length,
@@ -1612,7 +1743,9 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
         .eq('paystatus', 'C')
         .eq('activestatus', 1);
     if (_filterFrom != null) q = q.gte('paydate', _dateStr(_filterFrom!));
-    if (_filterTo != null) q = q.lte('paydate', _dateStr(_filterTo!));
+    if (_filterTo != null) {
+      q = q.lt('paydate', _dateStr(_filterTo!.add(const Duration(days: 1))));
+    }
     final payments = await q;
     final paymentList = List<Map<String, dynamic>>.from(payments as List);
     final stuIds = paymentList
@@ -1707,27 +1840,32 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
       final isPending = widget.mode == 'pending';
       final fieldKey = isPending ? 'unpaid_students' : 'paid_students';
 
-      List<dynamic> stuIdRows;
-      if (isPending) {
-        stuIdRows = await SupabaseService.client
-            .schema(schema)
-            .from('feedemand')
-            .select('stu_id')
-            .gt('balancedue', 0)
-            .eq('activestatus', 1);
-      } else {
-        stuIdRows = await SupabaseService.client
-            .schema(schema)
-            .from('payment')
-            .select('stu_id')
-            .eq('paystatus', 'C')
-            .eq('activestatus', 1);
+      final stuIds = <dynamic>{};
+      const pageSize = 1000;
+      int offset = 0;
+      while (true) {
+        final List page = isPending
+            ? await SupabaseService.client
+                .schema(schema)
+                .from('feedemand')
+                .select('stu_id')
+                .gt('balancedue', 0)
+                .eq('activestatus', 1)
+                .range(offset, offset + pageSize - 1)
+            : await SupabaseService.client
+                .schema(schema)
+                .from('payment')
+                .select('stu_id')
+                .eq('paystatus', 'C')
+                .eq('activestatus', 1)
+                .range(offset, offset + pageSize - 1);
+        for (final r in page) {
+          if (r['stu_id'] != null) stuIds.add(r['stu_id']);
+        }
+        if (page.length < pageSize) break;
+        offset += pageSize;
       }
-      final stuIds = stuIdRows
-          .map((r) => r['stu_id'])
-          .where((id) => id != null)
-          .toSet()
-          .toList();
+      final stuIdsList = stuIds.toList();
       if (stuIds.isEmpty) {
         for (final r in _rows) {
           r[fieldKey] = 0;
@@ -1735,16 +1873,18 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
         return;
       }
 
-      final students = await SupabaseService.client
-          .schema(schema)
-          .from('students')
-          .select('stu_id, stuclass, courname')
-          .inFilter('stu_id', stuIds);
-
       final counts = <String, int>{};
-      for (final s in (students as List)) {
-        final key = '${s['courname'] ?? 'Other'}|${s['stuclass'] ?? ''}';
-        counts[key] = (counts[key] ?? 0) + 1;
+      for (int i = 0; i < stuIdsList.length; i += 200) {
+        final chunk = stuIdsList.sublist(i, (i + 200).clamp(0, stuIdsList.length));
+        final students = await SupabaseService.client
+            .schema(schema)
+            .from('students')
+            .select('stu_id, stuclass, courname')
+            .inFilter('stu_id', chunk);
+        for (final s in (students as List)) {
+          final key = '${s['courname'] ?? 'Other'}|${s['stuclass'] ?? ''}';
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
       }
       for (final r in _rows) {
         final key = '${r['course'] ?? 'Other'}|${r['class'] ?? ''}';
@@ -1796,13 +1936,13 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
       child: Row(
         children: [
           const Icon(Icons.filter_alt_rounded,
-              size: 16, color: AppColors.textSecondary),
+              size: 16, color: Colors.black),
           SizedBox(width: 8.w),
           Text('Date Range:',
               style: TextStyle(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary)),
+                  color: Colors.black)),
           SizedBox(width: 8.w),
           InkWell(
             onTap: () async {
@@ -1830,7 +1970,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.calendar_today,
-                      size: 14, color: AppColors.textSecondary),
+                      size: 14, color: Colors.black),
                   SizedBox(width: 6.w),
                   Text(_filterFrom != null ? fmt(_filterFrom) : 'From',
                       style: TextStyle(fontSize: 13.sp)),
@@ -1841,7 +1981,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
           Padding(
               padding: EdgeInsets.symmetric(horizontal: 6.w),
               child: const Text('—',
-                  style: TextStyle(color: AppColors.textSecondary))),
+                  style: TextStyle(color: Colors.black))),
           InkWell(
             onTap: () async {
               final picked = await showDatePicker(
@@ -1868,7 +2008,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.calendar_today,
-                      size: 14, color: AppColors.textSecondary),
+                      size: 14, color: Colors.black),
                   SizedBox(width: 6.w),
                   Text(_filterTo != null ? fmt(_filterTo) : 'To',
                       style: TextStyle(fontSize: 13.sp)),
@@ -1883,33 +2023,6 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
               _filterFrom = DateTime(now.year, now.month, now.day);
               _filterTo = DateTime(now.year, now.month, now.day);
               _activePreset = 'today';
-            });
-            _load();
-          }),
-          quick('7 Days', '7days', () {
-            final now = DateTime.now();
-            setState(() {
-              _filterFrom = now.subtract(const Duration(days: 7));
-              _filterTo = DateTime(now.year, now.month, now.day);
-              _activePreset = '7days';
-            });
-            _load();
-          }),
-          quick('30 Days', '30days', () {
-            final now = DateTime.now();
-            setState(() {
-              _filterFrom = now.subtract(const Duration(days: 30));
-              _filterTo = DateTime(now.year, now.month, now.day);
-              _activePreset = '30days';
-            });
-            _load();
-          }),
-          quick('This Month', 'month', () {
-            final now = DateTime.now();
-            setState(() {
-              _filterFrom = DateTime(now.year, now.month, 1);
-              _filterTo = DateTime(now.year, now.month, now.day);
-              _activePreset = 'month';
             });
             _load();
           }),
@@ -1979,10 +2092,10 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
     final collectionColor = accentColor;
     final double total;
     if (widget.mode == 'collection') {
-      total = _rows.fold<double>(
-          0, (sum, r) => sum + ((r['collection'] as num?)?.toDouble() ?? 0));
+      total = widget.summary.totalCollected;
     } else if (widget.mode == 'pending') {
-      total = widget.summary.totalPending;
+      total = _rows.fold<double>(
+          0, (sum, r) => sum + ((r['pending'] as num?)?.toDouble() ?? 0));
     } else {
       total = widget.summary.totalDemand;
     }
@@ -1998,7 +2111,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
             Text(widget.summary.insName,
                 style: TextStyle(
                     fontSize: 12.sp,
-                    color: AppColors.textSecondary,
+                    color: Colors.black,
                     fontWeight: FontWeight.w400)),
           ],
         ),
@@ -2057,11 +2170,20 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                         child: Row(
                           children: [
                             Expanded(
-                                flex: 3,
+                                flex: 2,
                                 child: Padding(
                                     padding:
-                                        EdgeInsets.fromLTRB(16.w, 0, 24.w, 0),
-                                    child: Text('Course - Class',
+                                        EdgeInsets.fromLTRB(16.w, 0, 12.w, 0),
+                                    child: Text('Course',
+                                        style: TextStyle(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w700)))),
+                            Expanded(
+                                flex: 2,
+                                child: Padding(
+                                    padding:
+                                        EdgeInsets.fromLTRB(0, 0, 24.w, 0),
+                                    child: Text('Class',
                                         style: TextStyle(
                                             fontSize: 13.sp,
                                             fontWeight: FontWeight.w700)))),
@@ -2103,7 +2225,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                               ? Center(
                                   child: Text('No data',
                                       style: TextStyle(
-                                          color: AppColors.textSecondary,
+                                          color: Colors.black,
                                           fontSize: 13.sp)))
                               : ListView.separated(
                                   itemCount: _rows.length,
@@ -2111,8 +2233,10 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                       height: 1, color: AppColors.border),
                                   itemBuilder: (context, i) {
                                     final r = _rows[i];
-                                    final label =
-                                        '${r['course'] ?? 'Other'} - ${r['class'] ?? ''}';
+                                    final courseLabel =
+                                        '${r['course'] ?? 'Other'}';
+                                    final classLabel =
+                                        '${r['class'] ?? ''}';
                                     final collection =
                                         (r[widget.mode] as num?)?.toDouble() ??
                                             0;
@@ -2135,11 +2259,21 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                       child: Row(
                                         children: [
                                           Expanded(
-                                              flex: 3,
+                                              flex: 2,
                                               child: Padding(
                                                   padding: EdgeInsets.fromLTRB(
-                                                      16.w, 0, 24.w, 0),
-                                                  child: Text(label,
+                                                      16.w, 0, 12.w, 0),
+                                                  child: Text(courseLabel,
+                                                      style: TextStyle(
+                                                          fontSize: 13.sp,
+                                                          fontWeight: FontWeight
+                                                              .w600)))),
+                                          Expanded(
+                                              flex: 2,
+                                              child: Padding(
+                                                  padding: EdgeInsets.fromLTRB(
+                                                      0, 0, 24.w, 0),
+                                                  child: Text(classLabel,
                                                       style: TextStyle(
                                                           fontSize: 13.sp,
                                                           fontWeight: FontWeight
@@ -2172,6 +2306,209 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// Super Admin Settings — reset username and password.
+class _SuperAdminSettings extends StatefulWidget {
+  const _SuperAdminSettings();
+  @override
+  State<_SuperAdminSettings> createState() => _SuperAdminSettingsState();
+}
+
+class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _currentPwdCtrl = TextEditingController();
+  final _newPwdCtrl = TextEditingController();
+  final _confirmPwdCtrl = TextEditingController();
+  bool _saving = false;
+  bool _showCurrent = false;
+  bool _showNew = false;
+  bool _showConfirm = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthProvider>();
+    _usernameCtrl.text = auth.currentUser?.usename ?? '';
+    _emailCtrl.text = auth.currentUser?.usemail ?? '';
+  }
+
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
+    _currentPwdCtrl.dispose();
+    _newPwdCtrl.dispose();
+    _confirmPwdCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthProvider>();
+    final useId = auth.currentUser?.useId;
+    // Super admin verifies by USERNAME, not email (see verify_user_login RPC).
+    final loginId = auth.currentUser?.usename;
+    if (useId == null || loginId == null || loginId.isEmpty) return;
+
+    setState(() => _saving = true);
+    try {
+      // Verify current password via the same login RPC.
+      final verify = await SupabaseService.client.rpc('verify_user_login', params: {
+        'p_email': loginId,
+        'p_plain_password': _currentPwdCtrl.text,
+        'p_is_super_admin': true,
+      });
+      final list = verify is List ? verify : const [];
+      final ok = list.isNotEmpty && (list.first as Map)['is_valid'] == true;
+      if (!ok) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Current password is incorrect'), backgroundColor: Colors.red),
+          );
+        }
+        setState(() => _saving = false);
+        return;
+      }
+
+      final updates = <String, dynamic>{
+        'usename': _usernameCtrl.text.trim(),
+        'usemail': _emailCtrl.text.trim(),
+      };
+      if (_newPwdCtrl.text.isNotEmpty) {
+        // DB trigger hashes plaintext on UPDATE.
+        updates['usepassword'] = _newPwdCtrl.text;
+      }
+      await SupabaseService.client
+          .from('institutionusers')
+          .update(updates)
+          .eq('use_id', useId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Settings updated successfully'), backgroundColor: Colors.green),
+        );
+        _currentPwdCtrl.clear();
+        _newPwdCtrl.clear();
+        _confirmPwdCtrl.clear();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    InputDecoration dec(String label, {Widget? suffix}) => InputDecoration(
+          labelText: label,
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          suffixIcon: suffix,
+        );
+
+    return Padding(
+      padding: EdgeInsets.all(28.w),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
+              SizedBox(height: 16.h),
+              Text('Account', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: _usernameCtrl,
+                decoration: dec('Username'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: _emailCtrl,
+                decoration: dec('Email'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+              ),
+              SizedBox(height: 24.h),
+              Text('Change Password', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: _currentPwdCtrl,
+                obscureText: !_showCurrent,
+                decoration: dec(
+                  'Current Password',
+                  suffix: IconButton(
+                    icon: Icon(_showCurrent ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    onPressed: () => setState(() => _showCurrent = !_showCurrent),
+                  ),
+                ),
+                validator: (v) => (v == null || v.isEmpty) ? 'Required to confirm changes' : null,
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: _newPwdCtrl,
+                obscureText: !_showNew,
+                decoration: dec(
+                  'New Password (leave blank to keep current)',
+                  suffix: IconButton(
+                    icon: Icon(_showNew ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    onPressed: () => setState(() => _showNew = !_showNew),
+                  ),
+                ),
+                validator: (v) {
+                  if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
+                  return null;
+                },
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: _confirmPwdCtrl,
+                obscureText: !_showConfirm,
+                decoration: dec(
+                  'Confirm New Password',
+                  suffix: IconButton(
+                    icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                  ),
+                ),
+                validator: (v) {
+                  if (_newPwdCtrl.text.isEmpty) return null;
+                  if (v != _newPwdCtrl.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+              SizedBox(height: 24.h),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: Text(_saving ? 'Saving...' : 'Save Changes'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

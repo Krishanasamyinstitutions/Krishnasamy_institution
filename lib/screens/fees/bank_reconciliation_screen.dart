@@ -267,37 +267,48 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     }
   }
 
-  Future<void> _reconcileSelected() async {
-    if (_selectedForRecon.isEmpty) return;
+  /// Batch reconcile via RPC; falls back to per-row updates if the RPC
+  /// is not yet deployed. Returns the number of payments marked.
+  Future<int> _reconcilePaymentsBatch({
+    required int insId,
+    required String userName,
+    required List<int> payIds,
+    String? bankRef,
+    String? bankDate,
+  }) async {
+    if (payIds.isEmpty) return 0;
+    final schema = SupabaseService.currentSchema;
+    try {
+      if (schema != null) {
+        final result = await SupabaseService.client.rpc('reconcile_payments_batch', params: {
+          'p_schema': schema,
+          'p_ins_id': insId,
+          'p_pay_ids': payIds,
+          'p_user': userName,
+          'p_bank_ref': bankRef,
+          'p_bank_date': bankDate,
+        });
+        return (result as num?)?.toInt() ?? payIds.length;
+      }
+    } catch (e) {
+      debugPrint('reconcile_payments_batch RPC failed, using fallback: $e');
+    }
 
-    final auth = context.read<AuthProvider>();
-    final insId = auth.insId;
-    final userName = auth.userName ?? 'Admin';
-    if (insId == null) return;
-
-    setState(() => _isLoading = true);
-    int count = 0;
-
-    // Batch update all selected payments in parallel
     final now = DateTime.now().toIso8601String();
-    final payIdList = _selectedForRecon.toList();
-
-    await Future.wait(payIdList.map((payId) =>
+    await Future.wait(payIds.map((payId) =>
       SupabaseService.fromSchema('payment').update({
         'recon_status': 'R',
         'reconciled_by': userName,
         'reconciled_date': now,
+        if (bankRef != null) 'bank_reference': bankRef,
+        if (bankDate != null) 'bank_date': bankDate,
       }).eq('pay_id', payId).eq('ins_id', insId)
     ));
-    count = payIdList.length;
-
-    // Fetch all demands and batch update reconbalancedue in parallel
     try {
       final demands = await SupabaseService.fromSchema('feedemand')
           .select('dem_id, balancedue')
           .eq('ins_id', insId)
-          .inFilter('pay_id', payIdList);
-
+          .inFilter('pay_id', payIds);
       if ((demands as List).isNotEmpty) {
         await Future.wait(demands.map((d) {
           final demId = d['dem_id'];
@@ -310,8 +321,26 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         }));
       }
     } catch (e) {
-      debugPrint('Reconcile feedemand update error: $e');
+      debugPrint('Fallback feedemand update error: $e');
     }
+    return payIds.length;
+  }
+
+  Future<void> _reconcileSelected() async {
+    if (_selectedForRecon.isEmpty) return;
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final userName = auth.userName ?? 'Admin';
+    if (insId == null) return;
+
+    setState(() => _isLoading = true);
+    final payIdList = _selectedForRecon.toList();
+    final count = await _reconcilePaymentsBatch(
+      insId: insId,
+      userName: userName,
+      payIds: payIdList,
+    );
 
     _selectedForRecon.clear();
     await _loadPayments();
@@ -340,50 +369,16 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     setState(() => _isLoading = true);
     int count = 0;
 
-    // Collect all pay IDs and update in parallel
-    final allPayIds = <int>[];
-    final payIdRefMap = <int, Map<String, String?>>{};
-    final now = DateTime.now().toIso8601String();
+    // One batch call per bank-statement row (may cover multiple pay_ids).
     for (final row in matched) {
       final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
-      for (final payId in payIds) {
-        allPayIds.add(payId);
-        payIdRefMap[payId] = {'reference': row['reference']?.toString(), 'date': row['date']?.toString()};
-      }
-    }
-
-    await Future.wait(allPayIds.map((payId) =>
-      SupabaseService.fromSchema('payment').update({
-        'recon_status': 'R',
-        'reconciled_by': userName,
-        'reconciled_date': now,
-        'bank_reference': payIdRefMap[payId]?['reference'] ?? '',
-        'bank_date': payIdRefMap[payId]?['date'],
-      }).eq('pay_id', payId).eq('ins_id', insId)
-    ));
-    count = allPayIds.length;
-
-    // Fetch all demands and batch update reconbalancedue in parallel
-    if (allPayIds.isNotEmpty) {
-      try {
-        final demands = await SupabaseService.fromSchema('feedemand')
-            .select('dem_id, balancedue')
-            .eq('ins_id', insId)
-            .inFilter('pay_id', allPayIds);
-        if ((demands as List).isNotEmpty) {
-          await Future.wait(demands.map((d) {
-            final demId = d['dem_id'];
-            return demId != null
-                ? SupabaseService.fromSchema('feedemand')
-                    .update({'reconbalancedue': d['balancedue']})
-                    .eq('dem_id', demId)
-                    .eq('ins_id', insId)
-                : Future.value();
-          }));
-        }
-      } catch (e) {
-        debugPrint('Bank reconcile feedemand update error: $e');
-      }
+      count += await _reconcilePaymentsBatch(
+        insId: insId,
+        userName: userName,
+        payIds: payIds,
+        bankRef: row['reference']?.toString(),
+        bankDate: row['date']?.toString(),
+      );
     }
 
     await _loadPayments();
@@ -472,36 +467,6 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             ],
           ),
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          child: Row(
-            children: [
-              Text('Method:', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-              SizedBox(width: 12.w),
-              ...['All', 'Cash', 'Bank', 'Razorpay'].map((filter) {
-                final isSelected = _methodFilter == filter;
-                return Padding(
-                  padding: EdgeInsets.only(right: 8.w),
-                  child: ChoiceChip(
-                    label: Text(filter),
-                    selected: isSelected,
-                    onSelected: (_) => setState(() => _methodFilter = filter),
-                    labelStyle: TextStyle(
-                      fontSize: 12.sp,
-                      color: isSelected ? Colors.white : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    selectedColor: AppColors.accent,
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: isSelected ? AppColors.accent : AppColors.border),
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-        SizedBox(height: 12.h),
-
         // Table
         Expanded(
           child: filteredPending.isEmpty
@@ -718,34 +683,6 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             padding: EdgeInsets.all(16.w),
             child: Column(
               children: [
-                Padding(
-                  padding: EdgeInsets.only(bottom: 12.h),
-                  child: Row(
-                    children: [
-                      Text('Method:', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-                      SizedBox(width: 12.w),
-                      ...['All', 'Cash', 'Bank', 'Razorpay'].map((filter) {
-                        final isSelected = _methodFilter == filter;
-                        return Padding(
-                          padding: EdgeInsets.only(right: 8.w),
-                          child: ChoiceChip(
-                            label: Text(filter),
-                            selected: isSelected,
-                            onSelected: (_) => setState(() => _methodFilter = filter),
-                            labelStyle: TextStyle(
-                              fontSize: 12.sp,
-                              color: isSelected ? Colors.white : AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            selectedColor: AppColors.accent,
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: isSelected ? AppColors.accent : AppColors.border),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   color: AppColors.primary,

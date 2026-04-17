@@ -76,6 +76,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   List<Map<String, dynamic>> _dailyRows = [];
   List<String> _dailyFeeTypes = [];
   final ScrollController _dailyHScroll = ScrollController();
+  final ScrollController _stickyHScroll = ScrollController();
   String? _selectedMode; // null = all, 'cash', 'bank'
   String? _selectedPrefix;
 
@@ -430,6 +431,30 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     );
   }
 
+  InputDecoration _filterDec(String hint, {IconData? icon}) => InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight),
+        isDense: true,
+        prefixIcon: icon != null
+            ? Icon(icon, size: 16.sp, color: AppColors.textSecondary)
+            : null,
+        prefixIconConstraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+        contentPadding:
+            EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        ),
+      );
+
   Widget _buildFilters() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
@@ -445,12 +470,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             child: DropdownButtonFormField<String?>(
               value: _selectedCourse,
               isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Course',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              ),
+              decoration: _filterDec('Course', icon: Icons.school_rounded),
               style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               items: [
                 DropdownMenuItem<String?>(value: null, child: Text('All Courses', style: TextStyle(fontSize: 13.sp))),
@@ -467,12 +487,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               key: ValueKey(_selectedCourse),
               value: _selectedClass,
               isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'Class',
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              ),
+              decoration: _filterDec('Class', icon: Icons.class_rounded),
               style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               items: [
                 DropdownMenuItem<String?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 13.sp))),
@@ -491,12 +506,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               child: DropdownButtonFormField<String?>(
                 value: _selectedFeeType,
                 isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: 'Fee Type',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
+                decoration: _filterDec('Fee Type', icon: Icons.payments_rounded),
                 style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                 items: [
                   DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
@@ -507,16 +517,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ),
             SizedBox(width: 12.w),
             SizedBox(
-              width: 140.w,
+              width: 170.w,
               child: DropdownButtonFormField<String?>(
                 value: _selectedPrefix,
                 isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: 'Prefix',
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
+                decoration: _filterDec('Prefix', icon: Icons.tag_rounded),
                 style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                 items: [
                   DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp))),
@@ -588,81 +593,44 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ]),
         ),
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
-                columns: [
-                  DataColumn(label: Text('Course', style: headerStyle)),
-                  DataColumn(label: Text('Class', style: headerStyle)),
-                  DataColumn(label: Text('Strength', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Semester', style: headerStyle)),
-                  DataColumn(label: Text('Category', style: headerStyle)),
-                  DataColumn(label: Text('Stud Count', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Type', style: headerStyle)),
-                  DataColumn(label: Text('Due', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Concess', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Net Demand', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Paid', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Balance', style: headerStyle), numeric: true),
+          child: _stickyTable(
+            columnWidths: const [90, 90, 80, 100, 110, 90, 80, 110, 100, 110, 100, 110],
+            headers: const ['Course', 'Class', 'Strength', 'Semester', 'Category', 'Stud Count', 'Type', 'Due', 'Concess', 'Net Demand', 'Paid', 'Balance'],
+            rows: [
+              for (final r in rows.skip(_consolidatedPage * _tablePageSize).take(_tablePageSize))
+                [
+                  r['course']?.toString() ?? '',
+                  r['class']?.toString() ?? '',
+                  '${r['strength'] ?? 0}',
+                  r['semester']?.toString() ?? '',
+                  r['category']?.toString() ?? '',
+                  '${r['stud_count'] ?? 0}',
+                  r['type']?.toString() ?? '',
+                  _formatNumber((r['due'] as double?) ?? 0),
+                  _formatNumber((r['concession'] as double?) ?? 0),
+                  _formatNumber((r['net_demand'] as double?) ?? 0),
+                  _formatNumber((r['paid'] as double?) ?? 0),
+                  _formatNumber((r['balance'] as double?) ?? 0),
                 ],
-                rows: [
-                  for (final entry in byClass.entries) ...[
-                    ...entry.value.map((r) => DataRow(cells: [
-                      DataCell(Text(r['course']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['class']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text('${r['strength'] ?? 0}', style: cellStyle)),
-                      DataCell(Text(r['semester']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['category']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text('${r['stud_count'] ?? 0}', style: cellStyle)),
-                      DataCell(Text(r['type']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['due'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['concession'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['net_demand'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['paid'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['balance'] as double?) ?? 0), style: cellStyle)),
-                    ])),
-                    DataRow(
-                      color: WidgetStateProperty.all(AppColors.surface),
-                      cells: [
-                        DataCell(Text(entry.value.first['course']?.toString() ?? '', style: headerStyle)),
-                        DataCell(Text('Class Total', style: headerStyle)),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['due'] as double))), style: headerStyle)),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle)),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['net_demand'] as double))), style: headerStyle)),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['paid'] as double))), style: headerStyle)),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['balance'] as double))), style: headerStyle)),
-                      ],
-                    ),
-                  ],
-                  DataRow(
-                    color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.12)),
-                    cells: [
-                      DataCell(Text('GRAND TOTAL', style: headerStyle.copyWith(color: AppColors.accent))),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['due'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
-                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
-                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['net_demand'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
-                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['paid'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
-                      DataCell(Text(_formatNumber(rows.fold<double>(0, (s, r) => s + (r['balance'] as double))), style: headerStyle.copyWith(color: AppColors.accent))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            ],
+            footer: [
+              'GRAND TOTAL', '', '', '', '', '', '',
+              _formatNumber(rows.fold<double>(0, (s, r) => s + (r['due'] as double))),
+              _formatNumber(rows.fold<double>(0, (s, r) => s + (r['concession'] as double))),
+              _formatNumber(rows.fold<double>(0, (s, r) => s + (r['net_demand'] as double))),
+              _formatNumber(rows.fold<double>(0, (s, r) => s + (r['paid'] as double))),
+              _formatNumber(rows.fold<double>(0, (s, r) => s + (r['balance'] as double))),
+            ],
+            numericCols: const {2, 5, 7, 8, 9, 10, 11},
           ),
+        ),
+        _pagerBar(
+          total: rows.length,
+          page: _consolidatedPage,
+          onPrev: _consolidatedPage > 0 ? () => setState(() => _consolidatedPage--) : null,
+          onNext: (_consolidatedPage + 1) * _tablePageSize < rows.length
+              ? () => setState(() => _consolidatedPage++)
+              : null,
         ),
       ],
     );
@@ -826,6 +794,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   // TAB: PENDING PAYMENT REPORT (course-class-semester)
   // ═══════════════════════════════════════════════
   bool _pendingMetaLoaded = false;
+  static const int _tablePageSize = 50;
+  int _pendingPage = 0;
+  int _consolidatedPage = 0;
+  int _dailyPage = 0;
   List<Map<String, dynamic>> _pendingRowsCache = [];
   List<Map<String, dynamic>> _consolidatedRowsCache = [];
 
@@ -936,75 +908,248 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ]),
         ),
         Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
-                columns: [
-                  DataColumn(label: Text('Course', style: headerStyle)),
-                  DataColumn(label: Text('Class', style: headerStyle)),
-                  DataColumn(label: Text('Semester', style: headerStyle)),
-                  DataColumn(label: Text('Admn Type', style: headerStyle)),
-                  DataColumn(label: Text('Reg. No', style: headerStyle)),
-                  DataColumn(label: Text('Name', style: headerStyle)),
-                  DataColumn(label: Text('Pending Amt', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Con. Amt', style: headerStyle), numeric: true),
-                  DataColumn(label: Text('Quota', style: headerStyle)),
-                  DataColumn(label: Text('Mobile No', style: headerStyle)),
+          child: _stickyTable(
+            columnWidths: const [90, 90, 100, 140, 90, 170, 110, 100, 90, 110],
+            headers: const ['Course', 'Class', 'Semester', 'Admn Type', 'Reg. No', 'Name', 'Pending Amt', 'Con. Amt', 'Quota', 'Mobile No'],
+            rows: [
+              for (final r in rows.skip(_pendingPage * _tablePageSize).take(_tablePageSize))
+                [
+                  r['course']?.toString() ?? '',
+                  r['class']?.toString() ?? '',
+                  r['semester']?.toString() ?? '',
+                  r['admname']?.toString() ?? '',
+                  r['stuadmno']?.toString() ?? '',
+                  r['stuname']?.toString() ?? '',
+                  _formatNumber((r['pending'] as double?) ?? 0),
+                  _formatNumber((r['concession'] as double?) ?? 0),
+                  r['quoname']?.toString() ?? '',
+                  r['stumobile']?.toString() ?? '',
                 ],
-                rows: [
-                  for (final entry in byClass.entries) ...[
-                    ...entry.value.map((r) => DataRow(cells: [
-                      DataCell(Text(r['course']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['class']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['semester']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['admname']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['stuadmno']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['stuname']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['pending'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(_formatNumber((r['concession'] as double?) ?? 0), style: cellStyle)),
-                      DataCell(Text(r['quoname']?.toString() ?? '', style: cellStyle)),
-                      DataCell(Text(r['stumobile']?.toString() ?? '', style: cellStyle)),
-                    ])),
-                    DataRow(
-                      color: WidgetStateProperty.all(AppColors.surface),
-                      cells: [
-                        const DataCell(Text('')),
-                        DataCell(Text('Sub Total', style: headerStyle)),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['pending'] as double))), style: headerStyle)),
-                        DataCell(Text(_formatNumber(entry.value.fold<double>(0, (s, r) => s + (r['concession'] as double))), style: headerStyle)),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                      ],
-                    ),
-                  ],
-                  DataRow(
-                    color: WidgetStateProperty.all(AppColors.accent.withValues(alpha: 0.1)),
-                    cells: [
-                      DataCell(Text('G.Tot', style: headerStyle)),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                      DataCell(Text(_formatNumber(grandPending), style: headerStyle.copyWith(color: AppColors.accent))),
-                      DataCell(Text(_formatNumber(grandConcess), style: headerStyle)),
-                      const DataCell(Text('')),
-                      const DataCell(Text('')),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            ],
+            footer: [
+              'G.Tot', '', '', '', '', '',
+              _formatNumber(grandPending),
+              _formatNumber(grandConcess),
+              '', '',
+            ],
+            numericCols: const {6, 7},
           ),
         ),
+        _pagerBar(
+          total: rows.length,
+          page: _pendingPage,
+          onPrev: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
+          onNext: (_pendingPage + 1) * _tablePageSize < rows.length
+              ? () => setState(() => _pendingPage++)
+              : null,
+        ),
       ],
+    );
+  }
+
+  /// Sticky-header/footer table: shared horizontal scroll, only the body
+  /// rows scroll vertically. Used by the Pending Payment report.
+  Widget _stickyTable({
+    required List<double> columnWidths,
+    required List<String> headers,
+    required List<List<String>> rows,
+    required List<String> footer,
+    Set<int> numericCols = const {},
+  }) {
+    assert(columnWidths.length == headers.length);
+    final baseTotal = columnWidths.fold<double>(0, (a, b) => a + b.w);
+    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.white);
+    final cellStyle = TextStyle(fontSize: 11.sp, color: AppColors.textPrimary);
+
+    Widget rowWidget(List<String> values, List<double> widths, {Color? bg, TextStyle? style}) {
+      return Container(
+        width: double.infinity,
+        color: bg,
+        padding: EdgeInsets.symmetric(vertical: 10.h),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            for (int i = 0; i < values.length; i++)
+              SizedBox(
+                width: widths[i],
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w),
+                  child: Text(
+                    values[i],
+                    textAlign: numericCols.contains(i) ? TextAlign.right : TextAlign.left,
+                    style: style ?? cellStyle,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // NOTE: both Pending Payment and Consolidated Status tabs call _stickyTable
+    // and are kept alive at once, so a shared controller would attach to two
+    // scroll views. Use a fresh one per invocation instead.
+    final hController = ScrollController();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final needsScroll = baseTotal > constraints.maxWidth;
+        final scale = needsScroll ? 1.0 : (constraints.maxWidth / baseTotal);
+        final widths = [for (final c in columnWidths) c.w * scale];
+        final width = needsScroll ? baseTotal : constraints.maxWidth;
+        final scrollbarHeight = needsScroll ? 20.0 : 0.0;
+        return Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                controller: hController,
+                scrollDirection: Axis.horizontal,
+                physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                child: SizedBox(
+                  width: width,
+                  height: constraints.maxHeight - scrollbarHeight,
+                  child: Column(
+                    children: [
+                      rowWidget(headers, widths, bg: const Color(0xFF6C8EEF), style: headerStyle),
+                      Expanded(
+                        child: ListView.separated(
+                          itemCount: rows.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                          itemBuilder: (_, i) => rowWidget(rows[i], widths, bg: i.isEven ? Colors.white : const Color(0xFFF9FAFB)),
+                        ),
+                      ),
+                      rowWidget(footer, widths, bg: const Color(0xFF6C8EEF), style: headerStyle),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (needsScroll) _classicHScrollbar(hController),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _classicHScrollbar(ScrollController ctrl) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (context, _) {
+        return Container(
+          height: 20,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF0F0F0),
+            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () {
+                  if (!ctrl.hasClients) return;
+                  ctrl.animateTo(
+                    (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0E0E0),
+                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                  ),
+                  child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final hasClients = ctrl.hasClients && ctrl.positions.isNotEmpty && ctrl.position.hasContentDimensions;
+                    final maxExtent = hasClients ? ctrl.position.maxScrollExtent : 1.0;
+                    final viewportWidth = hasClients ? ctrl.position.viewportDimension : c.maxWidth;
+                    final totalContentWidth = maxExtent + viewportWidth;
+                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
+                    final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
+                    final trackSpace = c.maxWidth - thumbWidth;
+                    final scrollRatio = maxExtent > 0 ? (ctrl.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+                    final thumbOffset = trackSpace * scrollRatio;
+                    return GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        if (trackSpace > 0 && hasClients) {
+                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                          ctrl.jumpTo(newRatio * maxExtent);
+                        }
+                      },
+                      child: Container(
+                        color: const Color(0xFFF0F0F0),
+                        height: 20,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: thumbOffset,
+                              top: 2,
+                              child: Container(
+                                width: thumbWidth,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFC0C0C0),
+                                  borderRadius: BorderRadius.circular(2),
+                                  border: Border.all(color: const Color(0xFFB0B0B0)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  if (!ctrl.hasClients) return;
+                  ctrl.animateTo(
+                    (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0E0E0),
+                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                  ),
+                  child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pagerBar({required int total, required int page, VoidCallback? onPrev, VoidCallback? onNext}) {
+    if (total <= _tablePageSize) return const SizedBox.shrink();
+    final start = total == 0 ? 0 : page * _tablePageSize + 1;
+    final end = ((page + 1) * _tablePageSize).clamp(0, total);
+    final pages = ((total + _tablePageSize - 1) ~/ _tablePageSize).clamp(1, 9999);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
+      child: Row(
+        children: [
+          Text('$start–$end of $total', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+          const Spacer(),
+          IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Previous'),
+          Text('Page ${page + 1} of $pages', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600)),
+          IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right_rounded), tooltip: 'Next'),
+        ],
+      ),
     );
   }
 
@@ -1145,11 +1290,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     for (final d in _allDemands) {
       final admno = d['stuadmno']?.toString() ?? '';
       if (admno.isEmpty || map.containsKey(admno)) continue;
+      final course = d['courname']?.toString() ?? '';
+      final cls = d['stuclass']?.toString() ?? '';
+      // Respect the All Courses / All Classes dropdowns at the top.
+      if (_selectedCourse != null && course != _selectedCourse) continue;
+      if (_selectedClass != null && cls != _selectedClass) continue;
       map[admno] = {
         'stuadmno': admno,
         'stuname': d['stuname']?.toString() ?? '',
-        'courname': d['courname']?.toString() ?? '',
-        'stuclass': d['stuclass']?.toString() ?? '',
+        'courname': course,
+        'stuclass': cls,
       };
     }
     return map.values.toList()
@@ -1213,14 +1363,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       grouped.putIfAbsent(term, () => []).add(d);
     }
 
-    double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+    double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totFine = 0, totBalance = 0;
     for (final d in _ledgerDemands) {
       final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
       final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
       totDemand += demand;
       totConcess += conc;
       totNetDemand += demand - conc;
-      totCollection += (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+      final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      totCollection += paid - fine;
+      totFine += fine;
       totBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
     }
 
@@ -1302,75 +1455,49 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
-                  columns: [
-                    DataColumn(label: Text('Details', style: headerStyle)),
-                    DataColumn(label: Text('Fee Type', style: headerStyle)),
-                    DataColumn(label: Text('Demand', style: headerStyle), numeric: true),
-                    DataColumn(label: Text('Concess.', style: headerStyle), numeric: true),
-                    DataColumn(label: Text('Net Demand', style: headerStyle), numeric: true),
-                    DataColumn(label: Text('Collection', style: headerStyle), numeric: true),
-                    DataColumn(label: Text('Doc. No', style: headerStyle)),
-                    DataColumn(label: Text('Doc. Date', style: headerStyle)),
-                    DataColumn(label: Text('Balance', style: headerStyle), numeric: true),
-                  ],
-                  rows: [
-                    for (final entry in grouped.entries) ...[
-                      DataRow(cells: [
-                        DataCell(Text(entry.key, style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                      ]),
-                      ...entry.value.map((d) {
-                        final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                        final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
-                        final net = demand - conc;
-                        final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                        final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-                        final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-                        final docNo = pay?['paynumber']?.toString() ?? '';
-                        final docDate = pay?['paydate']?.toString() ?? '';
-                        return DataRow(cells: [
-                          const DataCell(Text('')),
-                          DataCell(Text(d['demfeetype']?.toString() ?? '', style: cellStyle)),
-                          DataCell(Text(demand > 0 ? _formatNumber(demand) : '', style: cellStyle)),
-                          DataCell(Text(conc > 0 ? _formatNumber(conc) : '', style: cellStyle)),
-                          DataCell(Text(net > 0 ? _formatNumber(net) : '', style: cellStyle)),
-                          DataCell(Text(paid > 0 ? _formatNumber(paid) : '', style: cellStyle)),
-                          DataCell(Text(docNo, style: cellStyle)),
-                          DataCell(Text(docDate.length >= 10 ? docDate.substring(0, 10) : docDate, style: cellStyle)),
-                          DataCell(Text(bal > 0 ? _formatNumber(bal) : '0', style: cellStyle)),
-                        ]);
-                      }),
-                    ],
-                    DataRow(
-                      color: WidgetStateProperty.all(AppColors.surface),
-                      cells: [
-                        DataCell(Text('Total', style: headerStyle)),
-                        const DataCell(Text('')),
-                        DataCell(Text(_formatNumber(totDemand), style: headerStyle)),
-                        DataCell(Text(_formatNumber(totConcess), style: headerStyle)),
-                        DataCell(Text(_formatNumber(totNetDemand), style: headerStyle)),
-                        DataCell(Text(_formatNumber(totCollection), style: headerStyle.copyWith(color: AppColors.accent))),
-                        const DataCell(Text('')),
-                        const DataCell(Text('')),
-                        DataCell(Text(_formatNumber(totBalance), style: headerStyle)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            child: _stickyTable(
+              columnWidths: const [100, 200, 100, 110, 110, 110, 80, 120, 110, 110],
+              headers: const ['Details', 'Fee Type', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Fine', 'Doc. No', 'Doc. Date', 'Balance'],
+              rows: [
+                for (final entry in grouped.entries) ...[
+                  [entry.key, '', '', '', '', '', '', '', '', ''],
+                  ...entry.value.map((d) {
+                    final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
+                    final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
+                    final net = demand - conc;
+                    final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                    final collection = paid - fine;
+                    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                    final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
+                    final docNo = pay?['paynumber']?.toString() ?? '';
+                    final docDate = pay?['paydate']?.toString() ?? '';
+                    return [
+                      '',
+                      d['demfeetype']?.toString() ?? '',
+                      demand > 0 ? _formatNumber(demand) : '',
+                      conc > 0 ? _formatNumber(conc) : '',
+                      net > 0 ? _formatNumber(net) : '',
+                      collection > 0 ? _formatNumber(collection) : '',
+                      fine > 0 ? _formatNumber(fine) : '',
+                      docNo,
+                      docDate.length >= 10 ? docDate.substring(0, 10) : docDate,
+                      bal > 0 ? _formatNumber(bal) : '0',
+                    ];
+                  }),
+                ],
+              ],
+              footer: [
+                'Total', '',
+                _formatNumber(totDemand),
+                _formatNumber(totConcess),
+                _formatNumber(totNetDemand),
+                _formatNumber(totCollection),
+                _formatNumber(totFine),
+                '', '',
+                _formatNumber(totBalance),
+              ],
+              numericCols: const {2, 3, 4, 5, 6, 9},
             ),
           ),
         ] else
@@ -1412,7 +1539,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       row++;
       row++;
 
-      final headers = ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Doc. No', 'Doc. Date', 'Balance'];
+      final headers = ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Fine', 'Doc. No', 'Doc. Date', 'Balance'];
       for (int c = 0; c < headers.length; c++) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
@@ -1425,7 +1552,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         grouped.putIfAbsent(term, () => []).add(d);
       }
 
-      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totFine = 0, totBalance = 0;
 
       for (final entry in grouped.entries) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(entry.key);
@@ -1436,18 +1563,21 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
           final net = demand - conc;
           final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+          final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
           final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
           final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += paid; totBalance += bal;
+          final collection = paid - fine;
+          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += collection; totFine += fine; totBalance += bal;
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(d['demfeetype']?.toString() ?? '');
           if (demand > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(demand); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = numStyle; }
           if (conc > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.DoubleCellValue(conc); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).cellStyle = numStyle; }
           if (net > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.DoubleCellValue(net); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).cellStyle = numStyle; }
-          if (paid > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(paid); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = numStyle; }
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue(pay?['paynumber']?.toString() ?? '');
+          if (collection > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(collection); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = numStyle; }
+          if (fine > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(fine); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = numStyle; }
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(pay?['paynumber']?.toString() ?? '');
           final pd = pay?['paydate']?.toString() ?? '';
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(pd.length >= 10 ? pd.substring(0, 10) : pd);
-          if (bal > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.DoubleCellValue(bal); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).cellStyle = numStyle; }
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.TextCellValue(pd.length >= 10 ? pd.substring(0, 10) : pd);
+          if (bal > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = xl.DoubleCellValue(bal); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).cellStyle = numStyle; }
           row++;
         }
       }
@@ -1462,12 +1592,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).cellStyle = totalStyle;
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(totCollection);
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = totalStyle;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.DoubleCellValue(totBalance);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(totFine);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = totalStyle;
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = xl.DoubleCellValue(totBalance);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).cellStyle = totalStyle;
 
       sheet.setColumnWidth(0, 12);
       sheet.setColumnWidth(1, 22);
-      for (int c = 2; c < 9; c++) sheet.setColumnWidth(c, 12);
+      for (int c = 2; c < 10; c++) sheet.setColumnWidth(c, 12);
 
       await _saveExcel(excel, 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}');
     } catch (e) {
@@ -1482,18 +1614,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (final d in _ledgerDemands) {
         grouped.putIfAbsent(d['demfeeterm']?.toString() ?? 'Misc', () => []).add(d);
       }
-      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totBalance = 0;
+      double totDemand = 0, totConcess = 0, totNetDemand = 0, totCollection = 0, totFine = 0, totBalance = 0;
       final rows = <List<String>>[];
       for (final entry in grouped.entries) {
-        rows.add([entry.key, '', '', '', '', '', '', '', '']);
+        rows.add([entry.key, '', '', '', '', '', '', '', '', '']);
         for (final d in entry.value) {
           final demand = (d['feeamount'] as num?)?.toDouble() ?? 0;
           final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
           final net = demand - conc;
           final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
+          final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
           final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
           final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += paid; totBalance += bal;
+          final collection = paid - fine;
+          totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += collection; totFine += fine; totBalance += bal;
           final pd = pay?['paydate']?.toString() ?? '';
           rows.add([
             '',
@@ -1501,14 +1635,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             demand > 0 ? _formatNumber(demand) : '',
             conc > 0 ? _formatNumber(conc) : '',
             net > 0 ? _formatNumber(net) : '',
-            paid > 0 ? _formatNumber(paid) : '',
+            collection > 0 ? _formatNumber(collection) : '',
+            fine > 0 ? _formatNumber(fine) : '',
             pay?['paynumber']?.toString() ?? '',
             pd.length >= 10 ? pd.substring(0, 10) : pd,
             bal > 0 ? _formatNumber(bal) : '0',
           ]);
         }
       }
-      rows.add(['Total', '', _formatNumber(totDemand), _formatNumber(totConcess), _formatNumber(totNetDemand), _formatNumber(totCollection), '', '', _formatNumber(totBalance)]);
+      rows.add(['Total', '', _formatNumber(totDemand), _formatNumber(totConcess), _formatNumber(totNetDemand), _formatNumber(totCollection), _formatNumber(totFine), '', '', _formatNumber(totBalance)]);
 
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -1531,12 +1666,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
         build: (ctx) => [
           pw.Table.fromTextArray(
-            headers: ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Doc. No', 'Doc. Date', 'Balance'],
+            headers: ['Details', 'FeeType', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Fine', 'Doc. No', 'Doc. Date', 'Balance'],
             data: rows,
             headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
             cellStyle: const pw.TextStyle(fontSize: 8),
-            cellAlignments: {for (int i = 2; i < 6; i++) i: pw.Alignment.centerRight, 8: pw.Alignment.centerRight},
+            cellAlignments: {for (int i = 2; i < 7; i++) i: pw.Alignment.centerRight, 9: pw.Alignment.centerRight},
             border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.3),
           ),
         ],
@@ -1725,88 +1860,95 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         Expanded(
           child: visibleRows.isEmpty
               ? _emptyState('No collections in this range')
-              : SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: Scrollbar(
-                    controller: _dailyHScroll,
-                    thumbVisibility: true,
-                    trackVisibility: true,
-                    child: SingleChildScrollView(
-                    controller: _dailyHScroll,
-                    scrollDirection: Axis.horizontal,
-                    child: Builder(builder: (_) {
-                      final showCash = _selectedMode == null || _selectedMode == 'cash';
-                      final showCheque = _selectedMode == null || _selectedMode == 'cash';
-                      final showBank = _selectedMode == null || _selectedMode == 'bank';
-                      double totalCash = 0;
-                      double totalCheque = 0;
-                      double totalBank = 0;
-                      for (final r in visibleRows) {
-                        final total = (r['total'] as num?)?.toDouble() ?? 0;
-                        final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
-                        if (bucket == 'cash') totalCash += total;
-                        else if (bucket == 'cheque') totalCheque += total;
-                        else totalBank += total;
-                      }
-                      return DataTable(
-                        headingRowColor: WidgetStateProperty.all(AppColors.primary.withValues(alpha: 0.08)),
-                        columns: [
-                          DataColumn(label: Text('Receipt No', style: headerStyle)),
-                          DataColumn(label: Text('Reg No', style: headerStyle)),
-                          DataColumn(label: Text('Student Name', style: headerStyle)),
-                          DataColumn(label: Text('Class', style: headerStyle)),
-                          for (final ft in visibleFeeTypes) DataColumn(label: Text(ft, style: headerStyle), numeric: true),
-                          DataColumn(label: Text('Fine', style: headerStyle), numeric: true),
-                          DataColumn(label: Text('Total', style: headerStyle), numeric: true),
-                          if (showCash) DataColumn(label: Text('Cash', style: headerStyle), numeric: true),
-                          if (showCheque) DataColumn(label: Text('Cheque', style: headerStyle), numeric: true),
-                          if (showBank) DataColumn(label: Text('Bank', style: headerStyle), numeric: true),
-                          DataColumn(label: Text('Net Amt', style: headerStyle), numeric: true),
-                        ],
-                        rows: [
-                          ...visibleRows.map((r) {
-                            final fees = r['fees'] as Map<String, double>;
-                            final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-                            final total = (r['total'] as num?)?.toDouble() ?? 0;
-                            final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
-                            return DataRow(cells: [
-                              DataCell(Text(r['paynumber']?.toString() ?? '', style: cellStyle)),
-                              DataCell(Text(r['stuadmno']?.toString() ?? '', style: cellStyle)),
-                              DataCell(Text(r['stuname']?.toString() ?? '', style: cellStyle)),
-                              DataCell(Text('${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(), style: cellStyle)),
-                              for (final ft in visibleFeeTypes)
-                                DataCell(Text(fees[ft] != null && fees[ft] != 0 ? _formatNumber(fees[ft]!) : '', style: cellStyle)),
-                              DataCell(Text(fine != 0 ? _formatNumber(fine) : '', style: cellStyle)),
-                              DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
-                              if (showCash) DataCell(Text(bucket == 'cash' ? _formatNumber(total) : '', style: cellStyle)),
-                              if (showCheque) DataCell(Text(bucket == 'cheque' ? _formatNumber(total) : '', style: cellStyle)),
-                              if (showBank) DataCell(Text(bucket == 'bank' ? _formatNumber(total) : '', style: cellStyle)),
-                              DataCell(Text(_formatNumber(total), style: cellStyle.copyWith(fontWeight: FontWeight.w700))),
-                            ]);
-                          }),
-                          DataRow(
-                            color: WidgetStateProperty.all(AppColors.surface),
-                            cells: [
-                              DataCell(Text('TOTAL', style: headerStyle)),
-                              const DataCell(Text('')),
-                              const DataCell(Text('')),
-                              const DataCell(Text('')),
-                              for (final ft in visibleFeeTypes)
-                                DataCell(Text(_formatNumber(ftTotals[ft] ?? 0), style: headerStyle)),
-                              DataCell(Text(_formatNumber(totalFine), style: headerStyle)),
-                              DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
-                              if (showCash) DataCell(Text(_formatNumber(totalCash), style: headerStyle)),
-                              if (showCheque) DataCell(Text(_formatNumber(totalCheque), style: headerStyle)),
-                              if (showBank) DataCell(Text(_formatNumber(totalBank), style: headerStyle)),
-                              DataCell(Text(_formatNumber(totalAmt), style: headerStyle.copyWith(color: AppColors.accent))),
-                            ],
-                          ),
-                        ],
-                      );
-                    }),
-                  ),
-                  ),
-                ),
+              : Builder(builder: (_) {
+                  final showCash = _selectedMode == null || _selectedMode == 'cash';
+                  final showCheque = _selectedMode == null || _selectedMode == 'cash';
+                  final showBank = _selectedMode == null || _selectedMode == 'bank';
+                  double totalCash = 0;
+                  double totalCheque = 0;
+                  double totalBank = 0;
+                  for (final r in visibleRows) {
+                    final total = (r['total'] as num?)?.toDouble() ?? 0;
+                    final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+                    if (bucket == 'cash') {
+                      totalCash += total;
+                    } else if (bucket == 'cheque') {
+                      totalCheque += total;
+                    } else {
+                      totalBank += total;
+                    }
+                  }
+                  final headers = <String>[
+                    'Receipt No', 'Reg No', 'Student Name', 'Class',
+                    ...visibleFeeTypes,
+                    'Fine', 'Total',
+                    if (showCash) 'Cash',
+                    if (showCheque) 'Cheque',
+                    if (showBank) 'Bank',
+                    'Net Amt',
+                  ];
+                  final widths = <double>[
+                    120, 90, 180, 120,
+                    ...visibleFeeTypes.map((_) => 110.0),
+                    90, 110,
+                    if (showCash) 100,
+                    if (showCheque) 100,
+                    if (showBank) 100,
+                    110,
+                  ];
+                  final numericStart = 4 + visibleFeeTypes.length - 1;
+                  final numericCols = <int>{
+                    for (int i = 4; i < headers.length; i++) i,
+                  };
+                  // Decrement is unused
+                  // ignore: unused_local_variable
+                  final _ = numericStart;
+                  return _stickyTable(
+                    columnWidths: widths,
+                    headers: headers,
+                    rows: [
+                      for (final r in visibleRows.skip(_dailyPage * _tablePageSize).take(_tablePageSize))
+                        () {
+                          final fees = r['fees'] as Map<String, double>;
+                          final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+                          final total = (r['total'] as num?)?.toDouble() ?? 0;
+                          final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+                          return <String>[
+                            r['paynumber']?.toString() ?? '',
+                            r['stuadmno']?.toString() ?? '',
+                            r['stuname']?.toString() ?? '',
+                            '${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(),
+                            ...visibleFeeTypes.map((ft) => (fees[ft] != null && fees[ft] != 0) ? _formatNumber(fees[ft]!) : ''),
+                            fine != 0 ? _formatNumber(fine) : '',
+                            _formatNumber(total),
+                            if (showCash) (bucket == 'cash' ? _formatNumber(total) : ''),
+                            if (showCheque) (bucket == 'cheque' ? _formatNumber(total) : ''),
+                            if (showBank) (bucket == 'bank' ? _formatNumber(total) : ''),
+                            _formatNumber(total),
+                          ];
+                        }(),
+                    ],
+                    footer: <String>[
+                      'TOTAL', '', '', '',
+                      ...visibleFeeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
+                      _formatNumber(totalFine),
+                      _formatNumber(totalAmt),
+                      if (showCash) _formatNumber(totalCash),
+                      if (showCheque) _formatNumber(totalCheque),
+                      if (showBank) _formatNumber(totalBank),
+                      _formatNumber(totalAmt),
+                    ],
+                    numericCols: numericCols,
+                  );
+                }),
+        ),
+        _pagerBar(
+          total: visibleRows.length,
+          page: _dailyPage,
+          onPrev: _dailyPage > 0 ? () => setState(() => _dailyPage--) : null,
+          onNext: (_dailyPage + 1) * _tablePageSize < visibleRows.length
+              ? () => setState(() => _dailyPage++)
+              : null,
         ),
       ],
     );

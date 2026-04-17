@@ -238,7 +238,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           'feetype': isPartial ? 'Partial Payment ($payMethod)' : 'Payment ($payMethod)',
           'reference': d['demno']?.toString() ?? d['dem_id']?.toString() ?? '-',
           'debit': balance,
-          'credit': paidAmount,
+          'credit': paidAmount - ((d['fineamount'] as num?)?.toDouble() ?? 0),
           'fine': (d['fineamount'] as num?)?.toDouble() ?? 0,
           'type': 'payment',
         });
@@ -923,7 +923,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           ),
                           child: Text(
                             closingBalance <= 0
-                                ? '₹${closingBalance.abs().toStringAsFixed(0)}  Advance'
+                                ? '₹${closingBalance.abs().toStringAsFixed(0)}  Fine'
                                 : '₹${closingBalance.toStringAsFixed(0)}  Due',
                             style: TextStyle(
                                 fontSize: 14.sp,

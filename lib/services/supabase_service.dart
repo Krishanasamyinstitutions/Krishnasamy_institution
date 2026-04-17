@@ -917,20 +917,27 @@ class SupabaseService {
       // Fetch payment dates and student names in parallel
       final Map<int, String> payDateMap = {};
       final Map<int, String> stuNameMap = {};
+      // Only reconciled (approved) payments should show in the date-wise
+      // register — pending-approval money is displayed separately.
+      final Set<int> approvedPayIds = {};
 
       final enrichFutures = <Future>[];
 
-      // Payment date futures
+      // Payment date + recon status futures
       for (var i = 0; i < payIds.length; i += 500) {
         final chunk = payIds.sublist(i, (i + 500).clamp(0, payIds.length));
         enrichFutures.add(fromSchema('payment')
-            .select('pay_id, paydate')
+            .select('pay_id, paydate, recon_status')
             .inFilter('pay_id', chunk)
             .then((payRows) {
           for (final row in (payRows as List)) {
             final id = row['pay_id'] as int?;
             final date = row['paydate']?.toString();
-            if (id != null && date != null) payDateMap[id] = date;
+            final status = row['recon_status']?.toString() ?? 'P';
+            if (id != null) {
+              if (date != null) payDateMap[id] = date;
+              if (status == 'R') approvedPayIds.add(id);
+            }
           }
         }));
       }
@@ -960,7 +967,13 @@ class SupabaseService {
         if (stuId != null) d['stuname'] = stuNameMap[stuId] ?? '';
       }
 
-      return demandList;
+      // Drop demands whose payment is still pending approval.
+      final approved = demandList.where((d) {
+        final payId = d['pay_id'] as int?;
+        return payId != null && approvedPayIds.contains(payId);
+      }).toList();
+
+      return approved;
     } catch (e) {
       debugPrint('Error fetching paid fee demands: $e');
       return [];
