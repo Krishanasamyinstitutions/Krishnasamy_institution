@@ -1,0 +1,73 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Web build output
+/web/
+
+# Reference/asset files
+assets/Code React App with Supabase/
+nul
+
+# Windows ephemeral Flutter files (regenerated each build)
+windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# macOS / Linux ephemeral
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Compiled binaries / installers
+*.exe
+*.dll
+*.so
+*.dylib
+*.msix
+*.apk
+*.aab
+*.ipa
+
+# Release archives
+*.zip
+*.tar
+*.tar.gz
+
+# OS
+Thumbs.db

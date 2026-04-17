@@ -1,0 +1,2832 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
+import 'package:excel/excel.dart' as xl;
+import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions, PostgrestException;
+import 'package:provider/provider.dart';
+import '../../utils/app_theme.dart';
+import '../../utils/auth_provider.dart';
+import '../../services/supabase_service.dart';
+import '../../models/student_model.dart';
+
+class StudentsScreen extends StatefulWidget {
+  final StudentModel? initialStudent;
+  const StudentsScreen({super.key, this.initialStudent});
+
+  @override
+  State<StudentsScreen> createState() => _StudentsScreenState();
+}
+
+class _StudentsScreenState extends State<StudentsScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  // Student Info
+  String? _selectedYrId;
+  String? _selectedYrLabel;
+  List<Map<String, dynamic>> _years = [];
+  final _admNoController = TextEditingController();
+  final _nameController = TextEditingController();
+  String? _selectedGender;
+  DateTime? _admDate;
+  DateTime? _dob;
+  final _mobileController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _pinController = TextEditingController();
+  String? _selectedBloodGroup;
+  String? _selectedClass;
+  List<String> _classes = [];
+  String? _selectedConId;
+  List<Map<String, dynamic>> _concessions = [];
+  String? _photoUrl;
+  String? _insName;
+  String? _insLogo;
+
+  // Parent Info
+  String _selectedParentTab = 'Father';
+  final _fatherNameController = TextEditingController();
+  final _fatherMobileController = TextEditingController();
+  final _fatherOccController = TextEditingController();
+  final _motherNameController = TextEditingController();
+  final _motherMobileController = TextEditingController();
+  final _motherOccController = TextEditingController();
+  final _guardianNameController = TextEditingController();
+  final _guardianMobileController = TextEditingController();
+  final _guardianOccController = TextEditingController();
+
+  // Payment in charge
+  final _payNameController = TextEditingController();
+  final _payMobileController = TextEditingController();
+
+  bool _isUploadingPhoto = false;
+  bool _isFormEnabled = true;
+  List<StudentModel> _students = [];
+  Map<String, int> _classCounts = {};
+  Map<String, List<StudentModel>> _cachedClassStudents = {};
+  bool _loadingClassStudents = false;
+  StudentModel? _selectedStudent;
+  String? _selectedClassFilter; // null = show class list, non-null = show students of that class
+  String? _selectedCourseFilter; // tracks which course the selected class belongs to
+  final _searchController = TextEditingController();
+  final _globalSearchController = TextEditingController();
+  List<StudentModel> _globalSearchResults = [];
+  bool _isGlobalSearching = false;
+  int _studentPage = 0;
+  static const int _studentsPerPage = 20;
+
+  // Import state
+  bool _showImport = false;
+  String? _importFileName;
+  List<String> _importHeaders = [];
+  List<List<dynamic>> _importRows = [];
+  bool _importValidated = false;
+  Map<int, String> _rowErrors = {}; // rowIndex -> error message
+  List<String?> _importMappings = [];
+  int _importStep = 0; // 0=grid, 2=importing, 3=done
+  int _importedCount = 0;
+  int _skippedCount = 0;
+  int _totalCount = 0;
+  List<String> _importErrors = [];
+  String? _importErrorMsg;
+
+  static const _importGridKeys = [
+    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
+    'stumobile', 'stuemail', 'concession',
+    'admname', 'quoname',
+    'stuaddress', 'stucity', 'stustate', 'stucountry',
+    'stupin', 'stubloodgrp',
+    'fathername', 'fathermobile', 'fatheroccupation',
+    'mothername', 'mothermobile', 'motheroccupation',
+    'guardianname', 'guardianmobile', 'guardianoccupation',
+    'payincharge', 'payinchargemob',
+  ];
+
+  static const Map<String, String> _importGridLabels = {
+    'stuadmno': 'Roll No *',
+    'stuname': 'Name *',
+    'stugender': 'Gender *',
+    'studob': 'DOB *',
+    'stuadmdate': 'Adm Date',
+    'stuclass': 'Class *',
+    'courname': 'Course',
+    'stumobile': 'Mobile *',
+    'stuemail': 'Email',
+    'concession': 'Concession *',
+    'admname': 'Admission Type',
+    'quoname': 'Quota',
+    'stuaddress': 'Address',
+    'stucity': 'City',
+    'stustate': 'State',
+    'stucountry': 'Country',
+    'stupin': 'Pin Code',
+    'stubloodgrp': 'Blood Group',
+    'fathername': 'Father Name',
+    'fathermobile': 'Father Mobile',
+    'fatheroccupation': 'Father Occ.',
+    'mothername': 'Mother Name',
+    'mothermobile': 'Mother Mobile',
+    'motheroccupation': 'Mother Occ.',
+    'guardianname': 'Guardian Name',
+    'guardianmobile': 'Guardian Mobile',
+    'guardianoccupation': 'Guardian Occ.',
+    'payincharge': 'Pay In Charge *',
+    'payinchargemob': 'Pay Mobile *',
+  };
+
+  final ScrollController _importScrollController = ScrollController();
+
+  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'stumobile', 'stuclass', 'payincharge', 'payinchargemob'};
+
+  static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: const Color(0xFF555555));
+
+  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _genders = ['Male', 'Female', 'Other'];
+  static const List<String> _classOrder = [
+    'PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII',
+  ];
+
+  static const List<Color> _classColors = [
+    Color(0xFF6366F1), // PKG - Indigo
+    Color(0xFF8B5CF6), // LKG - Violet
+    Color(0xFFA855F7), // UKG - Purple
+    Color(0xFFEC4899), // I - Pink
+    Color(0xFFF43F5E), // II - Rose
+    Color(0xFFEF4444), // III - Red
+    Color(0xFFF97316), // IV - Orange
+    Color(0xFFF59E0B), // V - Amber
+    Color(0xFF22C55E), // VI - Green
+    Color(0xFF6C8EEF), // VII - Teal
+    Color(0xFF06B6D4), // VIII - Cyan
+    Color(0xFF6C8EEF), // IX - Blue
+    Color(0xFF2563EB), // X - Blue dark
+    Color(0xFF7C3AED), // XI - Violet dark
+    Color(0xFF9333EA), // XII - Purple dark
+  ];
+
+  Color _getClassColor(String className) {
+    final index = _classOrder.indexOf(className);
+    if (index >= 0 && index < _classColors.length) return _classColors[index];
+    return AppColors.accent;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDropdowns();
+  }
+
+  @override
+  void dispose() {
+    _importScrollController.dispose();
+    _admNoController.dispose();
+    _nameController.dispose();
+    _mobileController.dispose();
+    _emailController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _countryController.dispose();
+    _pinController.dispose();
+    _fatherNameController.dispose();
+    _fatherMobileController.dispose();
+    _fatherOccController.dispose();
+    _motherNameController.dispose();
+    _motherMobileController.dispose();
+    _motherOccController.dispose();
+    _guardianNameController.dispose();
+    _guardianMobileController.dispose();
+    _guardianOccController.dispose();
+    _payNameController.dispose();
+    _payMobileController.dispose();
+    _searchController.dispose();
+    _globalSearchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performGlobalSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _globalSearchResults = [];
+        _isGlobalSearching = false;
+      });
+      return;
+    }
+    setState(() => _isGlobalSearching = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final insId = auth.insId ?? 1;
+      final q = query.trim().toLowerCase();
+      final result = await SupabaseService.client
+          .from('student')
+          .select()
+          .eq('ins_id', insId)
+          .or('stuname.ilike.%$q%,stuadmno.ilike.%$q%,stumobile.ilike.%$q%')
+          .limit(20);
+      final students = (result as List).map((e) => StudentModel.fromJson(e)).toList();
+      if (mounted) {
+        setState(() {
+          _globalSearchResults = students;
+          _isGlobalSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isGlobalSearching = false);
+    }
+  }
+
+  Future<void> _loadDropdowns() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId ?? 1;
+
+    // Stage 1: parallel — includes class counts so list shows immediately with correct counts
+    final results = await Future.wait<dynamic>([
+      SupabaseService.getYears(insId),
+      SupabaseService.getConcessions(insId),
+      SupabaseService.getClasses(insId),
+      SupabaseService.getInstitutionInfo(insId),
+      SupabaseService.getStudentCountsByClass(insId),
+    ]);
+
+    if (!mounted) return;
+    final years = results[0] as List<Map<String, dynamic>>;
+    final concessions = results[1] as List<Map<String, dynamic>>;
+    final rawClasses = results[2] as List<String>;
+    final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
+    final classCounts = results[4] as Map<String, int>;
+    final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
+    final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
+
+    final allClasses = [...ordered, ...extra];
+    setState(() {
+      _years = years;
+      _concessions = concessions;
+      _classes = allClasses;
+      _classCounts = classCounts;
+      _insName = insInfo.name;
+      _insLogo = insInfo.logo;
+      if (years.isNotEmpty) {
+        _selectedYrId = years.first['yr_id'].toString();
+        _selectedYrLabel = years.first['yrlabel'];
+      }
+      // Don't auto-select — show all students by default
+    });
+
+    // Stage 2: background — load all students for search/export
+    final students = await SupabaseService.getStudents(insId);
+    if (!mounted) return;
+    setState(() => _students = students);
+
+    // Auto-select initial student if provided
+    if (widget.initialStudent != null) {
+      final s = students.firstWhere(
+        (s) => s.stuId == widget.initialStudent!.stuId,
+        orElse: () => widget.initialStudent!,
+      );
+      setState(() {
+        _selectedClassFilter = s.stuclass;
+        _selectedStudent = s;
+      });
+      _populateStudentForm(s);
+    }
+  }
+
+  String? _normalizeBloodGroup(String? raw) {
+    if (raw == null) return null;
+    // Map DB variants like "B+VE", "B-VE", "O+VE" → canonical dropdown values
+    const map = {
+      'A+VE': 'A+', 'A-VE': 'A-',
+      'B+VE': 'B+', 'B-VE': 'B-',
+      'AB+VE': 'AB+', 'AB-VE': 'AB-',
+      'O+VE': 'O+', 'O-VE': 'O-',
+    };
+    final upper = raw.trim().toUpperCase();
+    final normalized = map[upper] ?? raw.trim();
+    return _bloodGroups.contains(normalized) ? normalized : null;
+  }
+
+  Future<void> _populateStudentForm(StudentModel s) async {
+    // Clear any previously typed/shown data before populating
+    _admNoController.clear();
+    _nameController.clear();
+    _mobileController.clear();
+    _emailController.clear();
+    _addressController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _countryController.clear();
+    _pinController.clear();
+    _fatherNameController.clear();
+    _fatherMobileController.clear();
+    _fatherOccController.clear();
+    _motherNameController.clear();
+    _motherMobileController.clear();
+    _motherOccController.clear();
+    _guardianNameController.clear();
+    _guardianMobileController.clear();
+    _guardianOccController.clear();
+    _payNameController.clear();
+    _payMobileController.clear();
+    setState(() {
+      _selectedGender = null;
+      _selectedBloodGroup = null;
+      _selectedClass = null;
+      _selectedConId = null;
+      _admDate = null;
+      _dob = null;
+      _photoUrl = null;
+      _selectedParentTab = 'Father';
+      if (_years.isNotEmpty) {
+        _selectedYrId = _years.first['yr_id'].toString();
+        _selectedYrLabel = _years.first['yrlabel'];
+      }
+    });
+
+    String clean(String? v) => (v == null || v.toUpperCase() == 'NULL') ? '' : v;
+
+    _admNoController.text = s.stuadmno;
+    _nameController.text = s.stuname;
+    _mobileController.text = s.stumobile;
+    _emailController.text = clean(s.stuemail);
+    _addressController.text = clean(s.stuaddress);
+    _cityController.text = clean(s.stucity);
+    _stateController.text = clean(s.stustate);
+    _countryController.text = clean(s.stucountry);
+    _pinController.text = clean(s.stupin);
+
+    // Fetch parent data
+    final parent = await SupabaseService.getStudentParent(s.stuId);
+    if (!mounted) return;
+
+    _fatherNameController.text = clean(parent?['fathername']?.toString());
+    _fatherMobileController.text = clean(parent?['fathermobile']?.toString());
+    _fatherOccController.text = clean(parent?['fatheroccupation']?.toString());
+    _motherNameController.text = clean(parent?['mothername']?.toString());
+    _motherMobileController.text = clean(parent?['mothermobile']?.toString());
+    _motherOccController.text = clean(parent?['motheroccupation']?.toString());
+    _guardianNameController.text = clean(parent?['guardianname']?.toString());
+    _guardianMobileController.text = clean(parent?['guardianmobile']?.toString());
+    _guardianOccController.text = clean(parent?['guardianoccupation']?.toString());
+    _payNameController.text = clean(parent?['payincharge']?.toString());
+    _payMobileController.text = clean(parent?['payinchargemob']?.toString());
+
+    setState(() {
+      _selectedStudent = s;
+      _selectedGender = s.gender;
+      _selectedBloodGroup = _normalizeBloodGroup(s.stubloodgrp);
+      _selectedClass = s.stuclass;
+      _selectedConId = s.conId?.toString();
+      _admDate = s.stuadmdate;
+      _dob = s.studob;
+      _photoUrl = s.stuphoto;
+      _isFormEnabled = false; // view mode — buttons disabled
+    });
+  }
+
+  void _clearForm() {
+    _admNoController.clear();
+    _nameController.clear();
+    _mobileController.clear();
+    _emailController.clear();
+    _addressController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _countryController.clear();
+    _pinController.clear();
+    _fatherNameController.clear();
+    _fatherMobileController.clear();
+    _fatherOccController.clear();
+    _motherNameController.clear();
+    _motherMobileController.clear();
+    _motherOccController.clear();
+    _guardianNameController.clear();
+    _guardianMobileController.clear();
+    _guardianOccController.clear();
+    _payNameController.clear();
+    _payMobileController.clear();
+    setState(() {
+      _selectedGender = null;
+      _selectedBloodGroup = null;
+      _selectedClass = null;
+      _selectedConId = null;
+      _admDate = null;
+      _dob = null;
+      _photoUrl = null;
+      _selectedParentTab = 'Father';
+      _selectedStudent = null;
+      _isFormEnabled = true;
+      if (_years.isNotEmpty) {
+        _selectedYrId = _years.first['yr_id'].toString();
+        _selectedYrLabel = _years.first['yrlabel'];
+      }
+    });
+  }
+
+  bool _isSaving = false;
+
+  Future<void> _saveNewStudent() async {
+    if (_admNoController.text.trim().isEmpty ||
+        _nameController.text.trim().isEmpty ||
+        _selectedClass == null ||
+        _mobileController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields (Roll No, Name, Class, Mobile)'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId ?? 1;
+    final inscode = auth.inscode ?? '';
+    final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
+    final yrLabel = _selectedYrLabel ?? '';
+    final now = DateTime.now().toIso8601String().split('T').first;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final stuId = await SupabaseService.addStudent({
+        'ins_id': insId,
+        'inscode': inscode,
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'stuadmno': _admNoController.text.trim(),
+        'stuadmdate': (_admDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'stuname': _nameController.text.trim(),
+        'stugender': _selectedGender == 'Female' ? 'F' : _selectedGender == 'Male' ? 'M' : 'O',
+        'studob': _dob?.toIso8601String().split('T').first,
+        'stumobile': _mobileController.text.trim(),
+        'stuemail': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+        'stuaddress': _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+        'stucity': _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : null,
+        'stustate': _stateController.text.trim().isNotEmpty ? _stateController.text.trim() : null,
+        'stucountry': _countryController.text.trim().isNotEmpty ? _countryController.text.trim() : null,
+        'stupin': _pinController.text.trim().isNotEmpty ? _pinController.text.trim() : null,
+        'stubloodgrp': _selectedBloodGroup,
+        'stuclass': _selectedClass,
+        'con_id': _selectedConId != null ? int.tryParse(_selectedConId!) : null,
+        'stucondesc': _selectedConId != null ? _concessions.firstWhere((c) => c['con_id'].toString() == _selectedConId, orElse: () => {})['condesc'] : null,
+        'stuphoto': _photoUrl,
+        'stuser_id': _admNoController.text.trim(),
+        'stuotpstatus': 0,
+        'approvedby': '',
+        'approveddate': now,
+        'suspendedby': '',
+        'terminatedby': '',
+        'activestatus': 1,
+        'createdon': now,
+      });
+
+      // Save parent
+      final fatherMob = _fatherMobileController.text.trim().isNotEmpty ? _fatherMobileController.text.trim() : null;
+      final motherMob = _motherMobileController.text.trim().isNotEmpty ? _motherMobileController.text.trim() : null;
+      final payMob = _payMobileController.text.trim().isNotEmpty ? _payMobileController.text.trim() : null;
+
+      final existingParId = await SupabaseService.findParentByMobile(
+        insId: insId,
+        fatherMobile: fatherMob,
+        motherMobile: motherMob,
+        payMobile: payMob,
+      );
+
+      final parId = existingParId ?? await SupabaseService.saveParent({
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'partype': 'P',
+        'fathername': _fatherNameController.text.trim().isNotEmpty ? _fatherNameController.text.trim() : null,
+        'fathermobile': fatherMob,
+        'fatheroccupation': _fatherOccController.text.trim().isNotEmpty ? _fatherOccController.text.trim() : null,
+        'mothername': _motherNameController.text.trim().isNotEmpty ? _motherNameController.text.trim() : null,
+        'mothermobile': motherMob,
+        'motheroccupation': _motherOccController.text.trim().isNotEmpty ? _motherOccController.text.trim() : null,
+        'guardianname': _guardianNameController.text.trim().isNotEmpty ? _guardianNameController.text.trim() : null,
+        'guardianmobile': _guardianMobileController.text.trim().isNotEmpty ? _guardianMobileController.text.trim() : null,
+        'guardianoccupation': _guardianOccController.text.trim().isNotEmpty ? _guardianOccController.text.trim() : null,
+        'payincharge': _payNameController.text.trim().isNotEmpty ? _payNameController.text.trim() : null,
+        'payinchargemob': payMob,
+        'parotpstatus': 0,
+        'approveddate': now,
+        'activestatus': 1,
+      });
+
+      // Link parent to student
+      await SupabaseService.saveParentDetail({
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'par_id': parId,
+        'stu_id': stuId,
+        'ins_id': insId,
+        'inscode': inscode,
+        'stuadmno': _admNoController.text.trim(),
+        'stuname': _nameController.text.trim(),
+        'stuclass': _selectedClass,
+        'activestatus': 1,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Student added successfully'), backgroundColor: AppColors.success),
+        );
+        _clearForm();
+        _loadDropdowns();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving student: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Widget _avatarPlaceholder() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) return Icon(Icons.person_rounded, size: 36.sp, color: AppColors.accent);
+    return Center(
+      child: Text(
+        name[0].toUpperCase(),
+        style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.w700, color: AppColors.accent),
+      ),
+    );
+  }
+
+  Future<void> _uploadPhoto() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final ext = (file.extension ?? 'jpg').toLowerCase();
+      const mimeMap = {
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+        'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif',
+      };
+      final mimeType = mimeMap[ext] ?? 'image/jpeg';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await SupabaseService.client.storage.from('student-photos').uploadBinary(
+        fileName, file.bytes!, fileOptions: FileOptions(contentType: mimeType),
+      );
+      final url = SupabaseService.client.storage.from('student-photos').getPublicUrl(fileName);
+      if (mounted) setState(() => _photoUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo upload failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  List<StudentModel> get _filteredStudents {
+    final q = _searchController.text.toLowerCase();
+    if (q.isEmpty) return _students;
+    return _students.where((s) =>
+      s.stuname.toLowerCase().contains(q) ||
+      s.stuadmno.toLowerCase().contains(q) ||
+      s.stuclass.toLowerCase().contains(q),
+    ).toList();
+  }
+
+  /// Group filtered students by class, ordered by [_classOrder].
+  Map<String, List<StudentModel>> get _groupedStudents {
+    final students = _filteredStudents;
+    final map = <String, List<StudentModel>>{};
+    for (final s in students) {
+      final cls = s.stuclass.isNotEmpty ? s.stuclass : 'Unassigned';
+      map.putIfAbsent(cls, () => []).add(s);
+    }
+    // Sort keys by _classOrder
+    final sortedKeys = map.keys.toList()..sort((a, b) {
+      final ai = _classOrder.indexOf(a);
+      final bi = _classOrder.indexOf(b);
+      final aIdx = ai == -1 ? 999 : ai;
+      final bIdx = bi == -1 ? 999 : bi;
+      return aIdx.compareTo(bIdx);
+    });
+    return {for (final k in sortedKeys) k: map[k]!};
+  }
+
+  Widget _buildStudentAvatar(StudentModel s, Color classColor, bool isSelected) {
+    final bgColor = isSelected
+        ? classColor.withValues(alpha: 0.2)
+        : classColor.withValues(alpha: 0.1);
+    final letter = Text(
+      s.stuname.isNotEmpty ? s.stuname[0].toUpperCase() : '?',
+      style: TextStyle(color: classColor, fontWeight: FontWeight.w700, fontSize: 13.sp),
+    );
+
+    if (s.stuphoto != null && s.stuphoto!.startsWith('http')) {
+      return CircleAvatar(
+        radius: 16.r,
+        backgroundColor: bgColor,
+        child: ClipOval(
+          child: Image.network(
+            s.stuphoto!,
+            width: 32.w,
+            height: 32.h,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => letter,
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 16.r,
+      backgroundColor: bgColor,
+      child: letter,
+    );
+  }
+
+  // ─── Import / Export ─────────────────────────────────────────────────────────
+
+  Future<void> _exportClassStudents(String className, List<StudentModel> students) async {
+    if (students.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No students to export')));
+      return;
+    }
+
+    final headers = ['Roll No', 'Student Name', 'Gender', 'DOB', 'Class', 'Course', 'Mobile', 'Email', 'Address', 'City', 'State', 'Blood Group'];
+    final rows = <List<String>>[headers];
+    for (final s in students) {
+      rows.add([
+        s.stuadmno,
+        s.stuname,
+        s.gender,
+        '${s.studob.day.toString().padLeft(2, '0')}/${s.studob.month.toString().padLeft(2, '0')}/${s.studob.year}',
+        s.stuclass,
+        s.stumobile,
+        s.stuemail ?? '',
+        s.stuaddress ?? '',
+        s.stucity ?? '',
+        s.stustate ?? '',
+        s.stubloodgrp ?? '',
+      ]);
+    }
+
+    final csv = const ListToCsvConverter().convert(rows);
+
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: 'Export Class $className Students',
+      fileName: 'Class_${className}_Students.csv',
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+
+    if (result != null) {
+      final file = File(result);
+      await file.writeAsString(csv);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported ${students.length} students to CSV'), backgroundColor: AppColors.success),
+        );
+      }
+    }
+  }
+
+  // ─── Left Panel Builders ─────────────────────────────────────────────────────
+
+  // Group classes by course with correct counts
+  Map<String, Map<String, int>> _getCoursewiseClassCounts() {
+    final courseMap = <String, Map<String, int>>{};
+    for (final s in _students) {
+      final course = s.courname ?? 'Other';
+      final cls = s.stuclass;
+      courseMap.putIfAbsent(course, () => {});
+      courseMap[course]![cls] = (courseMap[course]![cls] ?? 0) + 1;
+    }
+    if (courseMap.isEmpty && _classes.isNotEmpty) {
+      courseMap['All'] = { for (final c in _classes) c: _classCounts[c] ?? 0 };
+    }
+    return courseMap;
+  }
+
+  Widget _buildClassList() {
+    if (_classes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final courseClassCounts = _getCoursewiseClassCounts();
+    final courseNames = courseClassCounts.keys.toList()..sort();
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      itemCount: courseNames.length,
+      itemBuilder: (context, courseIndex) {
+        final courseName = courseNames[courseIndex];
+        final classCounts = courseClassCounts[courseName]!;
+        final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
+
+        return ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
+          title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          trailing: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+            child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          ),
+          children: classCounts.keys.map((className) {
+            final count = classCounts[className] ?? 0;
+            final classColor = _getClassColor(className);
+            final isSelected = _selectedClassFilter == className && _selectedCourseFilter == courseName;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  setState(() {
+                    _selectedClassFilter = className;
+                    _selectedCourseFilter = courseName;
+                    _selectedStudent = null;
+                    _studentPage = 0;
+                    _searchController.clear();
+                  });
+                  if ((_groupedStudents[className]?.isEmpty ?? true) && _cachedClassStudents[className] == null) {
+                    setState(() => _loadingClassStudents = true);
+                    final auth = context.read<AuthProvider>();
+                    final insId = auth.insId ?? 1;
+                    final classStudents = await SupabaseService.getStudentsByClass(insId, className);
+                    if (mounted) {
+                      setState(() {
+                        _cachedClassStudents[className] = classStudents;
+                        _loadingClassStudents = false;
+                      });
+                    }
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+                  decoration: BoxDecoration(
+                    color: isSelected ? classColor.withValues(alpha: 0.08) : null,
+                    border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34.w, height: 34.h,
+                        decoration: BoxDecoration(
+                          color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
+                          borderRadius: BorderRadius.circular(9.r),
+                        ),
+                        child: Center(child: Icon(Icons.class_rounded, size: 16.sp, color: classColor)),
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(className, style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? classColor : AppColors.textPrimary)),
+                            Text('$count students', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Text('$count', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: classColor)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentListForClass(String className) {
+    var allStudents = _groupedStudents[className]?.isNotEmpty == true
+        ? _groupedStudents[className]!
+        : _cachedClassStudents[className] ?? [];
+    // Filter by course if selected
+    if (_selectedCourseFilter != null) {
+      allStudents = allStudents.where((s) => (s.courname ?? 'Other') == _selectedCourseFilter).toList();
+    }
+    if (_loadingClassStudents && allStudents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final q = _searchController.text.toLowerCase();
+    final students = q.isEmpty
+        ? allStudents
+        : allStudents.where((s) =>
+            s.stuname.toLowerCase().contains(q) ||
+            s.stuadmno.toLowerCase().contains(q)).toList();
+    final classColor = _getClassColor(className);
+
+    return Column(
+      children: [
+        // Back button + class header
+        Container(
+          padding: EdgeInsets.fromLTRB(6.w, 6.h, 14.w, 6.h),
+          decoration: BoxDecoration(
+            color: classColor.withValues(alpha: 0.06),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => setState(() {
+                  _selectedClassFilter = null;
+                  _selectedStudent = null;
+                  _searchController.clear();
+                }),
+                icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
+                color: classColor,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+              Icon(Icons.class_rounded, size: 14.sp, color: classColor.withValues(alpha: 0.7)),
+              SizedBox(width: 6.w),
+              Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
+              SizedBox(width: 6.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 1.h),
+                decoration: BoxDecoration(
+                  color: classColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text('${allStudents.length}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: classColor.withValues(alpha: 0.7))),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1.h, color: AppColors.border),
+        // Student list
+        Expanded(
+          child: students.isEmpty
+              ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
+              : ListView.builder(
+                  padding: EdgeInsets.symmetric(vertical: 4.h),
+                  itemCount: students.length,
+                  itemBuilder: (context, index) {
+                    final s = students[index];
+                    final isSelected = _selectedStudent?.stuId == s.stuId;
+                    return Material(
+                      color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() => _selectedStudent = s);
+                          _populateStudentForm(s);
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                          child: Row(
+                            children: [
+                              _buildStudentAvatar(s, classColor, isSelected),
+                              SizedBox(width: 10.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(s.stuname, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    Text(s.stuadmno, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle_rounded, size: 16.sp, color: AppColors.accent),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllStudentsTable() {
+    final q = _searchController.text.toLowerCase();
+    final allStudents = q.isEmpty
+        ? _students
+        : _students.where((s) => s.stuname.toLowerCase().contains(q) || s.stuadmno.toLowerCase().contains(q) || (s.courname ?? '').toLowerCase().contains(q)).toList();
+    final totalStudents = allStudents.length;
+    final totalPages = (totalStudents / _studentsPerPage).ceil();
+    final startIdx = _studentPage * _studentsPerPage;
+    final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
+    final pagedStudents = allStudents.sublist(startIdx, endIdx);
+
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(6.w, 6.h, 14.w, 6.h),
+          child: Row(
+            children: [
+              Icon(Icons.people_alt_rounded, size: 18.sp, color: AppColors.primary),
+              SizedBox(width: 8.w),
+              Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10.r)),
+                child: Text('$totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 200.w,
+                height: 36.h,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() => _studentPage = 0),
+                  decoration: InputDecoration(hintText: 'Search...', prefixIcon: Icon(Icons.search, size: 18.sp), isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8.h)),
+                  style: TextStyle(fontSize: 13.sp),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          color: AppColors.primary,
+          child: Row(
+            children: [
+              SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+              SizedBox(width: 30.w),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: pagedStudents.length,
+            itemBuilder: (context, index) {
+              final s = pagedStudents[index];
+              final serialNo = startIdx + index + 1;
+              return InkWell(
+                onTap: () => _populateStudentForm(s),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5))),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                      Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+                      SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
+                      SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+          child: Row(
+            children: [
+              Text('Showing ${startIdx + 1}-$endIdx of $totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+              const Spacer(),
+              IconButton(icon: Icon(Icons.first_page, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null),
+              IconButton(icon: Icon(Icons.chevron_left, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null),
+              Container(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h), decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)), child: Text('${_studentPage + 1}/${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 12.sp, color: Colors.white, fontWeight: FontWeight.w600))),
+              IconButton(icon: Icon(Icons.chevron_right, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null),
+              IconButton(icon: Icon(Icons.last_page, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClassStudentTable(String className) {
+    var allStudents = _groupedStudents[className]?.isNotEmpty == true
+        ? _groupedStudents[className]!
+        : _cachedClassStudents[className] ?? [];
+    // Filter by course
+    if (_selectedCourseFilter != null) {
+      allStudents = allStudents.where((s) => (s.courname ?? 'Other') == _selectedCourseFilter).toList();
+    }
+    if (_loadingClassStudents && allStudents.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final classColor = _getClassColor(className);
+
+    // Search filter
+    final q = _searchController.text.toLowerCase();
+    final filteredStudents = q.isEmpty
+        ? allStudents
+        : allStudents.where((s) =>
+            s.stuname.toLowerCase().contains(q) ||
+            s.stuadmno.toLowerCase().contains(q)).toList();
+
+    // Pagination
+    final totalStudents = filteredStudents.length;
+    final totalPages = (totalStudents / _studentsPerPage).ceil();
+    if (_studentPage >= totalPages && totalPages > 0) _studentPage = totalPages - 1;
+    final startIdx = _studentPage * _studentsPerPage;
+    final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
+    final pagedStudents = filteredStudents.sublist(startIdx, endIdx);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with back button
+          Container(
+            padding: EdgeInsets.fromLTRB(10.w, 10.h, 20.w, 10.h),
+            decoration: BoxDecoration(
+              color: classColor.withValues(alpha: 0.04),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => setState(() {
+                    _selectedClassFilter = null;
+                    _selectedStudent = null;
+                    _studentPage = 0;
+                    _searchController.clear();
+                  }),
+                  icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
+                  color: classColor,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  tooltip: 'Back to classes',
+                ),
+                Icon(Icons.class_rounded, size: 20.sp, color: classColor),
+                SizedBox(width: 8.w),
+                Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
+                SizedBox(width: 8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: classColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: classColor)),
+                ),
+                const Spacer(),
+                // Search
+                SizedBox(
+                  width: 200.w,
+                  height: 34.h,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      hintStyle: TextStyle(fontSize: 13.sp),
+                      prefixIcon: Icon(Icons.search_rounded, size: 16.sp),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                      isDense: true,
+                    ),
+                    style: TextStyle(fontSize: 13.sp),
+                    onChanged: (_) => setState(() => _studentPage = 0),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Tooltip(
+                  message: 'Export $className',
+                  child: InkWell(
+                    onTap: () => _exportClassStudents(className, allStudents),
+                    borderRadius: BorderRadius.circular(6.r),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.file_download_rounded, size: 14.sp, color: AppColors.success),
+                          SizedBox(width: 4.w),
+                          Text('Export', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Table section
+          Expanded(
+            child: Column(
+                  children: [
+                    // Table header
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                      color: const Color(0xFF6C8EEF),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 16.w),
+                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 30.w),
+                        ],
+                      ),
+                    ),
+                    // Student rows
+                    Expanded(
+                      child: pagedStudents.isEmpty
+                          ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
+                          : ListView.builder(
+                              padding: EdgeInsets.zero,
+                              itemCount: pagedStudents.length,
+                              itemBuilder: (context, index) {
+                                final s = pagedStudents[index];
+                                final serialNo = startIdx + index + 1;
+                                return InkWell(
+                                  onTap: () {
+                                    setState(() => _selectedStudent = s);
+                                    _populateStudentForm(s);
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                                    color: index.isEven ? Colors.white : AppColors.surface,
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 50.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 16.w),
+                                        SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                                        SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    // Pagination footer
+                    if (totalStudents > _studentsPerPage)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                        decoration: const BoxDecoration(
+                          border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(7),
+                            bottomRight: Radius.circular(7),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(Icons.first_page_rounded, size: 20.sp),
+                              onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null,
+                              tooltip: 'First page', splashRadius: 18,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.chevron_left_rounded, size: 20.sp),
+                              onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null,
+                              tooltip: 'Previous', splashRadius: 18,
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
+                              child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
+                              onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null,
+                              tooltip: 'Next', splashRadius: 18,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.last_page_rounded, size: 20.sp),
+                              onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null,
+                              tooltip: 'Last page', splashRadius: 18,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Build ────────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header
+        Row(
+          children: [
+            Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22.sp),
+            SizedBox(width: 10.w),
+            Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            SizedBox(width: 12.w),
+            OutlinedButton.icon(
+              onPressed: () => setState(() {
+                _showImport = !_showImport;
+                if (!_showImport) _resetImport();
+              }),
+              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18.sp),
+              label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _showImport ? AppColors.error : AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16.h),
+
+        // Global search results
+        if (_globalSearchController.text.isNotEmpty) ...[
+          Container(
+            constraints: BoxConstraints(maxHeight: 300.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: _isGlobalSearching
+                ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+                : _globalSearchResults.isEmpty
+                    ? Padding(
+                        padding: EdgeInsets.all(16.w),
+                        child: Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp))),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: _globalSearchResults.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                        itemBuilder: (context, index) {
+                          final s = _globalSearchResults[index];
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 16.r,
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              child: Text(s.stuname[0].toUpperCase(), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12.sp)),
+                            ),
+                            title: Text(s.stuname, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp)),
+                            subtitle: Text('Adm No: ${s.stuadmno} | Mobile: ${s.stumobile} | Class: ${s.stuclass}', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                            onTap: () async {
+                              _globalSearchController.clear();
+                              setState(() {
+                                _globalSearchResults = [];
+                                _selectedClassFilter = s.stuclass;
+                                _selectedStudent = s;
+                                _studentPage = 0;
+                                _searchController.clear();
+                              });
+                              if (_cachedClassStudents[s.stuclass] == null) {
+                                setState(() => _loadingClassStudents = true);
+                                final auth = context.read<AuthProvider>();
+                                final insId = auth.insId ?? 1;
+                                final classStudents = await SupabaseService.getStudentsByClass(insId, s.stuclass);
+                                if (mounted) {
+                                  setState(() {
+                                    _cachedClassStudents[s.stuclass] = classStudents;
+                                    _loadingClassStudents = false;
+                                  });
+                                }
+                              }
+                            },
+                          );
+                        },
+                      ),
+          ),
+          SizedBox(height: 12.h),
+        ],
+
+        Expanded(
+          child: _showImport ? _buildStudentImportSection() : Form(
+            key: _formKey,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // LEFT — Student List
+                SizedBox(
+                  width: 260.w,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  // Header
+                  Container(
+                    padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 10.h),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20.sp),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
+                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 0.h),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1.h, color: AppColors.border),
+                  // Class list (always visible)
+                  Expanded(
+                    child: _buildClassList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SizedBox(width: 16.w),
+
+          // RIGHT — Student Details or Class Table
+          Expanded(
+            child: _selectedStudent == null
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _selectedClassFilter != null ? _buildClassStudentTable(_selectedClassFilter!) : _buildAllStudentsTable(),
+                  )
+                : Column(
+                    children: [
+                      // Back breadcrumb
+                      if (_selectedStudent != null)
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          margin: EdgeInsets.only(bottom: 8.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              InkWell(
+                                onTap: () => setState(() { _selectedStudent = null; }),
+                                borderRadius: BorderRadius.circular(6.r),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
+                                      SizedBox(width: 6.w),
+                                      Text('Back to Student List', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              Icon(Icons.chevron_right_rounded, size: 16.sp, color: AppColors.textSecondary),
+                              SizedBox(width: 4.w),
+                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              SizedBox(width: 6.w),
+                              Text('(${_selectedStudent!.stuadmno})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Student Information panel
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(children: [
+                                                  Icon(Icons.person_rounded, color: AppColors.accent, size: 20.sp),
+                                                  SizedBox(width: 8.w),
+                                                  Text('Student Information',
+                                                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                                ]),
+                                                SizedBox(height: 6.h),
+                                                Row(children: [
+                                                  if (_insLogo != null)
+                                                    Image.network(
+                                                      _insLogo!,
+                                                      width: 48.w, height: 48.h, fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
+                                                    )
+                                                  else
+                                                    Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
+                                                  SizedBox(width: 8.w),
+                                                  Flexible(
+                                                    child: Text(
+                                                      _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
+                                                      style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ]),
+                                              ],
+                                            ),
+                                          ),
+                                          Column(
+                                            children: [
+                                              Container(
+                                                width: 72.w, height: 72.h,
+                                                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accent.withValues(alpha: 0.1)),
+                                                child: ClipOval(
+                                                  child: _photoUrl != null
+                                                      ? Image.network(_photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatarPlaceholder())
+                                                      : _avatarPlaceholder(),
+                                                ),
+                                              ),
+                                              TextButton.icon(
+                                                onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
+                                                icon: _isUploadingPhoto
+                                                    ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2))
+                                                    : Icon(Icons.camera_alt_rounded, size: 14.sp),
+                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 13.sp)),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    const Divider(color: AppColors.border),
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        padding: EdgeInsets.fromLTRB(0, 4.h, 0, 20.h),
+                                        child: IgnorePointer(
+                                          ignoring: !_isFormEnabled,
+                                          child: _buildStudentFields(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(width: 16.w),
+
+                            // Parent + Payment panels
+                            Expanded(
+                              child: SingleChildScrollView(
+                                child: Column(
+                                    children: [
+                                      _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
+                                      SizedBox(height: 16.h),
+                                      _panel(title: 'Payment In Charge', icon: Icons.payments_rounded, child: _buildPaymentFields()),
+                                      if (_selectedStudent == null) ...[
+                                        SizedBox(height: 16.h),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextButton.icon(
+                                                onPressed: _isSaving ? null : _clearForm,
+                                                icon: Icon(Icons.close_rounded, size: 16.sp),
+                                                label: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: AppColors.textSecondary,
+                                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(width: 12.w),
+                                            Expanded(
+                                              child: ElevatedButton.icon(
+                                                onPressed: _isSaving ? null : _saveNewStudent,
+                                                icon: _isSaving
+                                                    ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                    : Icon(Icons.save_rounded, size: 18.sp),
+                                                label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.accent,
+                                                  foregroundColor: Colors.white,
+                                                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ] else if (_selectedStudent!.isActive) ...[
+                                      ],
+                                      SizedBox(height: 24.h),
+                                    ],
+                                  ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Left panel: Student fields ───────────────────────────────────────────────
+
+  Widget _buildStudentFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _row2(
+          _fieldFull(label: 'Academic Year *', child: DropdownButtonFormField<String>(
+            initialValue: _selectedYrId,
+            decoration: _dec('Select year'),
+            dropdownColor: Colors.white,
+            style: _inputStyle,
+            items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']))).toList(),
+            onChanged: (v) => setState(() {
+              _selectedYrId = v;
+              _selectedYrLabel = v != null
+                  ? _years.firstWhere((y) => y['yr_id'].toString() == v)['yrlabel']
+                  : null;
+            }),
+            validator: (v) => v == null ? 'Required' : null,
+          )),
+          _fieldFull(label: 'Roll Number *', child: TextFormField(
+            controller: _admNoController,
+            decoration: _dec('Enter roll no'),
+            style: _inputStyle,
+            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _fieldFull(label: 'Student Name *', child: TextFormField(
+          controller: _nameController,
+          decoration: _dec('Enter full name'),
+          style: _inputStyle,
+          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        )),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(
+            label: 'Admission Date *',
+            child: InkWell(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _admDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime.now(),
+                );
+                if (d != null) setState(() => _admDate = d);
+              },
+              child: InputDecorator(
+                decoration: _dec('Select admission date').copyWith(
+                  suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary),
+                ),
+                child: Text(
+                  _admDate != null
+                      ? '${_admDate!.day.toString().padLeft(2, '0')}/${_admDate!.month.toString().padLeft(2, '0')}/${_admDate!.year}'
+                      : 'Select admission date',
+                  style: TextStyle(
+                    color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                    fontSize: 13.sp,
+                    fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          _fieldFull(label: 'Gender *', child: DropdownButtonFormField<String>(
+            initialValue: _selectedGender,
+            decoration: _dec('Select gender'),
+            dropdownColor: Colors.white,
+            style: _inputStyle,
+            items: _genders.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+            onChanged: (v) => setState(() => _selectedGender = v),
+            validator: (v) => v == null ? 'Required' : null,
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(label: 'Date of Birth *', child: InkWell(
+            onTap: () async {
+              final d = await showDatePicker(
+                context: context,
+                initialDate: _dob ?? DateTime(2015),
+                firstDate: DateTime(1990),
+                lastDate: DateTime.now(),
+              );
+              if (d != null) setState(() => _dob = d);
+            },
+            child: InputDecorator(
+              decoration: _dec('Select DOB'),
+              child: Text(
+                _dob != null
+                    ? '${_dob!.day.toString().padLeft(2, '0')}/${_dob!.month.toString().padLeft(2, '0')}/${_dob!.year}'
+                    : 'DD/MM/YYYY',
+                style: TextStyle(
+                  color: _dob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                  fontSize: 13.sp,
+                  fontWeight: _dob != null ? FontWeight.w700 : FontWeight.normal,
+                ),
+              ),
+            ),
+          )),
+          _fieldFull(label: 'Mobile Number', child: TextFormField(
+            controller: _mobileController,
+            decoration: _dec('Enter mobile'),
+            style: _inputStyle,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(label: 'Email', child: TextFormField(
+            controller: _emailController,
+            decoration: _dec('Enter email'),
+            style: _inputStyle,
+            keyboardType: TextInputType.emailAddress,
+          )),
+          _fieldFull(label: 'Class *', child: DropdownButtonFormField<String>(
+            initialValue: _selectedClass,
+            decoration: _dec('Select class'),
+            dropdownColor: Colors.white,
+            style: _inputStyle,
+            items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            onChanged: (v) => setState(() => _selectedClass = v),
+            validator: (v) => v == null ? 'Required' : null,
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _fieldFull(label: 'Course', child: TextFormField(
+          initialValue: _selectedStudent?.courname ?? '',
+          decoration: _dec('Course'),
+          style: _inputStyle,
+          enabled: false,
+        )),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
+            initialValue: _selectedBloodGroup,
+            isExpanded: true,
+            decoration: _dec('Select'),
+            dropdownColor: Colors.white,
+            style: _inputStyle,
+            items: _bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+            onChanged: (v) => setState(() => _selectedBloodGroup = v),
+          )),
+          _fieldFull(label: 'Concession', child: DropdownButtonFormField<String>(
+            initialValue: _selectedConId,
+            isExpanded: true,
+            decoration: _dec('Select concession'),
+            style: _inputStyle,
+            items: _concessions.map((c) => DropdownMenuItem(
+              value: c['con_id'].toString(),
+              child: Text(c['condesc'], overflow: TextOverflow.ellipsis),
+            )).toList(),
+            onChanged: (v) => setState(() {
+              _selectedConId = v;
+            }),
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _fieldFull(label: 'Address *', child: TextFormField(
+          controller: _addressController,
+          decoration: _dec('Enter address'),
+          style: _inputStyle,
+          maxLines: 2,
+          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+        )),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(label: 'City', child: TextFormField(controller: _cityController, decoration: _dec('Enter city'), style: _inputStyle)),
+          _fieldFull(label: 'State', child: TextFormField(controller: _stateController, decoration: _dec('Enter state'), style: _inputStyle)),
+        ),
+        SizedBox(height: 14.h),
+
+        _row2(
+          _fieldFull(label: 'Country', child: TextFormField(controller: _countryController, decoration: _dec('Enter country'), style: _inputStyle)),
+          _fieldFull(label: 'Pin Code *', child: TextFormField(
+            controller: _pinController,
+            decoration: _dec('Enter pin'),
+            style: _inputStyle,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          )),
+        ),
+      ],
+    );
+  }
+
+  // ─── Right panel: Parent fields ───────────────────────────────────────────────
+
+  Widget _buildParentFields() {
+    final controllers = _selectedParentTab == 'Father'
+        ? (_fatherNameController, _fatherMobileController, _fatherOccController)
+        : _selectedParentTab == 'Mother'
+            ? (_motherNameController, _motherMobileController, _motherOccController)
+            : (_guardianNameController, _guardianMobileController, _guardianOccController);
+    final prefix = _selectedParentTab;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 8.h,
+          children: ['Father', 'Mother', 'Guardian'].map((tab) {
+            final selected = _selectedParentTab == tab;
+            return ChoiceChip(
+              label: Text(tab),
+              selected: selected,
+              onSelected: (_) => setState(() => _selectedParentTab = tab),
+              selectedColor: AppColors.accent,
+              labelStyle: TextStyle(color: selected ? Colors.white : AppColors.textPrimary, fontWeight: FontWeight.w600),
+              backgroundColor: AppColors.border.withValues(alpha: 0.3),
+            );
+          }).toList(),
+        ),
+        SizedBox(height: 16.h),
+
+        IgnorePointer(
+          ignoring: !_isFormEnabled,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldFull(label: '$prefix Name', child: TextFormField(
+                controller: controllers.$1,
+                decoration: _dec('Enter $prefix name'),
+                style: _inputStyle,
+              )),
+              SizedBox(height: 14.h),
+              _row2(
+                _fieldFull(label: '$prefix Mobile', child: TextFormField(
+                  controller: controllers.$2,
+                  decoration: _dec('Enter mobile'),
+                  style: _inputStyle,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                )),
+                _fieldFull(label: '$prefix Occupation', child: TextFormField(
+                  controller: controllers.$3,
+                  decoration: _dec('Enter occupation'),
+                  style: _inputStyle,
+                )),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Right panel: Payment fields ──────────────────────────────────────────────
+
+  Widget _buildPaymentFields() {
+    return IgnorePointer(
+      ignoring: !_isFormEnabled,
+      child: _row2(
+      _fieldFull(label: 'Name *', child: TextFormField(
+        controller: _payNameController,
+        decoration: _dec('Enter name'),
+        style: _inputStyle,
+        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+      )),
+      _fieldFull(label: 'Mobile Number *', child: TextFormField(
+        controller: _payMobileController,
+        decoration: _dec('Enter mobile'),
+        style: _inputStyle,
+        keyboardType: TextInputType.phone,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+      )),
+    ));
+  }
+
+  // ─── Excel Import ─────────────────────────────────────────────────────────────
+
+  /// Known student fields for column mapping
+  static const _importFields = <String, String>{
+    '': '-- Skip --',
+    'stuadmno': 'Roll No',
+    'stuname': 'Name',
+    'stugender': 'Gender',
+    'studob': 'DOB',
+    'stumobile': 'Mobile',
+    'stuclass': 'Class',
+    'courname': 'Course',
+    'stuemail': 'Email',
+    'stuaddress': 'Address',
+    'stucity': 'City',
+    'stustate': 'State',
+    'stucountry': 'Country',
+    'stupin': 'PIN',
+    'stubloodgrp': 'Blood Group',
+    'stuadmdate': 'Admission Date',
+    'fathername': 'Father Name',
+    'fathermobile': 'Father Mobile',
+    'fatheroccupation': 'Father Occupation',
+    'mothername': 'Mother Name',
+    'mothermobile': 'Mother Mobile',
+    'motheroccupation': 'Mother Occupation',
+    'guardianname': 'Guardian Name',
+    'guardianmobile': 'Guardian Mobile',
+    'guardianoccupation': 'Guardian Occupation',
+    'payincharge': 'Payment In Charge',
+    'payinchargemob': 'Payment Mobile',
+    'admname': 'Admission Type',
+    'quoname': 'Quota',
+    'batch': 'Batch',
+  };
+
+  /// Auto-map header text to field key (case-insensitive)
+  static String _autoMapHeader(String header) {
+    final h = header.trim().toLowerCase();
+    const map = {
+      'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno', 'roll no': 'stuadmno', 'rollno': 'stuadmno', 'roll number': 'stuadmno',
+      'name': 'stuname', 'student name': 'stuname', 'stuname': 'stuname',
+      'gender': 'stugender', 'sex': 'stugender',
+      'dob': 'studob', 'date of birth': 'studob', 'birth date': 'studob',
+      'mobile': 'stumobile', 'phone': 'stumobile', 'mobile no': 'stumobile', 'phone no': 'stumobile',
+      'class': 'stuclass', 'grade': 'stuclass',
+      'course': 'courname', 'course name': 'courname', 'courname': 'courname',
+      'email': 'stuemail', 'e-mail': 'stuemail',
+      'address': 'stuaddress',
+      'city': 'stucity', 'town': 'stucity',
+      'state': 'stustate',
+      'country': 'stucountry',
+      'pin': 'stupin', 'pincode': 'stupin', 'pin code': 'stupin', 'zip': 'stupin', 'zip code': 'stupin',
+      'blood group': 'stubloodgrp', 'bloodgroup': 'stubloodgrp',
+      'admission date': 'stuadmdate', 'adm date': 'stuadmdate',
+      'father name': 'fathername', 'fathername': 'fathername',
+      'father mobile': 'fathermobile', 'fathermobile': 'fathermobile', 'father phone': 'fathermobile',
+      'father occupation': 'fatheroccupation', 'fatheroccupation': 'fatheroccupation',
+      'mother name': 'mothername', 'mothername': 'mothername',
+      'mother mobile': 'mothermobile', 'mothermobile': 'mothermobile', 'mother phone': 'mothermobile',
+      'mother occupation': 'motheroccupation', 'motheroccupation': 'motheroccupation',
+      'guardian name': 'guardianname', 'guardianname': 'guardianname',
+      'guardian mobile': 'guardianmobile', 'guardianmobile': 'guardianmobile', 'guardian phone': 'guardianmobile',
+      'guardian occupation': 'guardianoccupation', 'guardianoccupation': 'guardianoccupation',
+      'concession': 'concession', 'concession category': 'concession',
+      'payment in charge': 'payincharge', 'pay in charge': 'payincharge', 'payincharge': 'payincharge', 'pay name': 'payincharge',
+      'payment mobile': 'payinchargemob', 'pay mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob',
+      'admission type': 'admname', 'admtype': 'admname', 'admname': 'admname',
+      'quota': 'quoname', 'quota name': 'quoname', 'quoname': 'quoname',
+      'batch': 'batch', 'batch no': 'batch', 'batch number': 'batch',
+    };
+    return map[h] ?? '';
+  }
+
+  /// Parse a date string in common formats
+  static DateTime? _parseDate(String? s) {
+    if (s == null || s.trim().isEmpty) return null;
+    final t = s.trim();
+    // yyyy-MM-dd (ISO format)
+    try { return DateTime.parse(t); } catch (_) {}
+    final parts = t.split(RegExp(r'[/\-.]'));
+    if (parts.length == 3) {
+      final a = int.tryParse(parts[0]);
+      final b = int.tryParse(parts[1]);
+      final c = int.tryParse(parts[2]);
+      if (a != null && b != null && c != null) {
+        // Try MM-DD-YYYY or MM-DD-YY (US format)
+        if (a >= 1 && a <= 12 && b >= 1 && b <= 31) {
+          final year = c < 100 ? (c > 50 ? c + 1900 : c + 2000) : c;
+          return DateTime(year, a, b);
+        }
+        // Try DD-MM-YYYY or DD-MM-YY (Indian format)
+        if (b >= 1 && b <= 12 && a >= 1 && a <= 31) {
+          final year = c < 100 ? (c > 50 ? c + 1900 : c + 2000) : c;
+          return DateTime(year, b, a);
+        }
+        // Try YYYY-MM-DD where first part is year
+        if (a > 1900 && b >= 1 && b <= 12 && c >= 1 && c <= 31) {
+          return DateTime(a, b, c);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Normalize gender input to M/F/O
+  static String _normalizeGender(String? g) {
+    if (g == null) return 'M';
+    final v = g.trim().toUpperCase();
+    if (v == 'M' || v == 'MALE') return 'M';
+    if (v == 'F' || v == 'FEMALE') return 'F';
+    return 'O';
+  }
+
+  // ─── Import Logic ───────────────────────────────────────────────────────
+
+  void _resetImport() {
+    setState(() {
+      _showImport = false;
+      _importStep = 0;
+      _importFileName = null;
+      _importHeaders = [];
+      _importRows = [];
+      _importMappings = [];
+      _importedCount = 0;
+      _skippedCount = 0;
+      _totalCount = 0;
+      _importErrors = [];
+      _importErrorMsg = null;
+      _rowErrors = {};
+    });
+  }
+
+  Future<void> _pickImportFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv', 'xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.bytes == null) return;
+
+    final ext = (file.extension ?? '').toLowerCase();
+    try {
+      List<String> headers;
+      List<List<dynamic>> rows;
+
+      if (ext == 'csv') {
+        final csvString = utf8.decode(file.bytes!);
+        final parsed = const CsvToListConverter().convert(csvString);
+        if (parsed.isEmpty) throw Exception('CSV file is empty');
+        headers = parsed.first.map((e) => e.toString().trim()).toList();
+        rows = parsed.skip(1).where((r) => r.any((c) => c.toString().trim().isNotEmpty)).toList();
+      } else {
+        final excel = xl.Excel.decodeBytes(file.bytes!);
+        final sheetName = excel.tables.keys.first;
+        final sheet = excel.tables[sheetName]!;
+        if (sheet.rows.isEmpty) throw Exception('Excel file is empty');
+        headers = sheet.rows.first.map((c) => c?.value?.toString().trim() ?? '').toList();
+        rows = sheet.rows.skip(1)
+            .where((r) => r.any((c) => c?.value != null && c!.value.toString().trim().isNotEmpty))
+            .map((r) => r.map((c) => c?.value ?? '').toList())
+            .toList();
+      }
+
+      final mappings = headers.map((h) {
+        final m = _autoMapHeader(h);
+        return m.isEmpty ? null : m;
+      }).toList();
+
+      setState(() {
+        _importFileName = file.name;
+        _importHeaders = headers;
+        _importRows = rows;
+        _importValidated = false;
+        _importMappings = mappings;
+        _importStep = 1;
+        _importErrorMsg = null;
+      });
+    } catch (e) {
+      setState(() => _importErrorMsg = 'Failed to parse file: $e');
+    }
+  }
+
+  Future<void> _exportStudentTemplate() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Students'];
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
+      'Father Name', 'Father Mobile', 'Father Occupation',
+      'Mother Name', 'Mother Mobile', 'Mother Occupation',
+      'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
+      'Payment In Charge', 'Payment Mobile',
+    ];
+
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, 18.0);
+    }
+    sheet.setRowHeight(0, 32);
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Template',
+        fileName: 'student_import_template.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Template exported successfully'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportSampleData() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Students'];
+    excel.delete('Sheet1');
+
+    final headers = [
+      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
+      'Father Name', 'Father Mobile', 'Father Occupation',
+      'Mother Name', 'Mother Mobile', 'Mother Occupation',
+      'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
+      'Payment In Charge', 'Payment Mobile',
+    ];
+    final sampleRows = [
+      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
+      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'I Year', 'BSC-CS', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220'],
+      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'II Year', 'BBA', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230'],
+      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'I Year', 'MCA', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240'],
+    ];
+
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, 18);
+    }
+    for (int r = 0; r < sampleRows.length; r++) {
+      for (int c = 0; c < sampleRows[r].length; c++) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+        cell.value = xl.TextCellValue(sampleRows[r][c]);
+      }
+    }
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Sample Data',
+        fileName: 'student_import_sample.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sample data exported successfully'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  String _importMappedCell(List<dynamic> row, String fieldKey) {
+    final idx = _importMappings.indexOf(fieldKey);
+    if (idx < 0 || idx >= row.length) return '';
+    return row[idx].toString().trim();
+  }
+
+  String? _importCellByKey(List<dynamic> row, String fieldKey) {
+    final idx = _importMappings.indexOf(fieldKey);
+    if (idx < 0 || idx >= row.length) return null;
+    final v = row[idx].toString().trim();
+    return v.isEmpty ? null : v;
+  }
+
+  /// Returns null if the value is null, empty, or whitespace-only
+  static String? _nullIfEmpty(String? v) {
+    if (v == null) return null;
+    final trimmed = v.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Validates email format; returns null if invalid
+  static String? _validEmail(String? v) {
+    final e = _nullIfEmpty(v);
+    if (e == null) return null;
+    // Basic email check — must contain @ and .
+    final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return regex.hasMatch(e) ? e : null;
+  }
+
+  String? _validateImportRow(int rowIdx) {
+    final row = _importRows[rowIdx];
+    final missing = <String>[];
+    for (final reqKey in _importRequiredFields) {
+      final colIdx = _importMappings.indexOf(reqKey);
+      if (colIdx < 0 || colIdx >= row.length || row[colIdx].toString().trim().isEmpty) {
+        missing.add(_importGridLabels[reqKey] ?? _importFields[reqKey] ?? reqKey);
+      }
+    }
+    if (missing.isEmpty) return null;
+    return 'Missing: ${missing.join(', ')}';
+  }
+
+  static String _friendlyError(String msg) {
+    final m = msg.toLowerCase();
+    if (m.contains('duplicate key') || m.contains('unique constraint')) {
+      if (m.contains('stuadmno') || m.contains('admission')) return 'Roll number already exists';
+      if (m.contains('stuemail') || m.contains('email')) return 'Email already exists';
+      if (m.contains('payinchargemob')) return 'Payment mobile already exists';
+      return 'Duplicate record found';
+    }
+    if (m.contains('not-null') || m.contains('null value')) {
+      final match = RegExp(r'column "(\w+)"').firstMatch(msg);
+      final col = match?.group(1) ?? '';
+      final labels = {'stuadmno': 'Roll No', 'stuname': 'Name', 'stugender': 'Gender', 'studob': 'Date of Birth', 'stumobile': 'Mobile', 'stuclass': 'Class', 'payincharge': 'Pay In Charge', 'payinchargemob': 'Payment Mobile'};
+      return '${labels[col] ?? col} is required';
+    }
+    if (m.contains('foreign key') || m.contains('fkey')) return 'Invalid reference - check class, year, or concession values';
+    if (m.contains('check constraint')) {
+      if (m.contains('gender')) return 'Gender must be M, F, or T';
+      if (m.contains('email')) return 'Invalid email format';
+      if (m.contains('activestatus')) return 'Invalid status value';
+      return 'Invalid value format';
+    }
+    if (m.contains('value too long')) return 'Value too long for the field';
+    if (m.contains('invalid input syntax')) return 'Invalid data format';
+    if (m.contains('permission denied')) return 'Permission denied';
+    return msg.length > 80 ? '${msg.substring(0, 80)}...' : msg;
+  }
+
+  void _validateImportData() {
+    final errors = <int, String>{};
+    for (int i = 0; i < _importRows.length; i++) {
+      final err = _validateImportRow(i);
+      if (err != null) errors[i] = err;
+    }
+    setState(() {
+      _rowErrors = errors;
+      _importValidated = errors.isEmpty;
+    });
+    if (errors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${errors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  Future<void> _startStudentImport() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId ?? 1;
+
+    // Check master data exists before allowing import
+    final masterData = await SupabaseService.checkMasterData(insId);
+    if (!masterData.hasFeeGroups || !masterData.hasFeeTypes || !masterData.hasConcessions || !masterData.hasClassFeeDemand) {
+      if (mounted) {
+        final missing = <String>[];
+        if (!masterData.hasFeeGroups) missing.add('Fee Groups');
+        if (!masterData.hasFeeTypes) missing.add('Fee Types');
+        if (!masterData.hasConcessions) missing.add('Concessions');
+        if (!masterData.hasClassFeeDemand) missing.add('Class Fee Demand');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please import master data first: ${missing.join(', ')}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    final inscode = auth.inscode ?? '';
+    final yrId = int.tryParse(_selectedYrId ?? '1') ?? 1;
+    final yrLabel = _selectedYrLabel ?? '';
+
+    setState(() {
+      _importStep = 2;
+      _importedCount = 0;
+      _skippedCount = 0;
+      _totalCount = _importRows.length;
+      _importErrors = [];
+    });
+
+    // 1. Validate and build staging rows
+    final stagingRows = <Map<String, dynamic>>[];
+    for (int i = 0; i < _importRows.length; i++) {
+      final err = _validateImportRow(i);
+      if (err != null) {
+        _skippedCount++;
+        _importErrors.add('Row ${i + 2}: $err');
+        continue;
+      }
+      final row = _importRows[i];
+      final dob = _parseDate(_importCellByKey(row, 'studob'));
+      final admDate = _parseDate(_importCellByKey(row, 'stuadmdate'));
+      stagingRows.add({
+        'ins_id': insId,
+        'inscode': inscode,
+        'yr_id': yrId,
+        'yrlabel': yrLabel,
+        'stuadmno': _importCellByKey(row, 'stuadmno'),
+        'stuname': _importCellByKey(row, 'stuname'),
+        'stugender': _normalizeGender(_importCellByKey(row, 'stugender')),
+        'studob': dob?.toIso8601String().split('T').first,
+        'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
+        'stuclass': _importCellByKey(row, 'stuclass'),
+        'courname': _nullIfEmpty(_importCellByKey(row, 'courname')),
+        'stumobile': _importCellByKey(row, 'stumobile'),
+        'stuemail': _validEmail(_importCellByKey(row, 'stuemail')),
+        'concession': _nullIfEmpty(_importCellByKey(row, 'concession')),
+        'stuaddress': _nullIfEmpty(_importCellByKey(row, 'stuaddress')),
+        'stucity': _nullIfEmpty(_importCellByKey(row, 'stucity')),
+        'stustate': _nullIfEmpty(_importCellByKey(row, 'stustate')),
+        'stucountry': _nullIfEmpty(_importCellByKey(row, 'stucountry')),
+        'stupin': _nullIfEmpty(_importCellByKey(row, 'stupin')),
+        'stubloodgrp': _nullIfEmpty(_importCellByKey(row, 'stubloodgrp')),
+        'fathername': _nullIfEmpty(_importCellByKey(row, 'fathername')),
+        'fathermobile': _nullIfEmpty(_importCellByKey(row, 'fathermobile')),
+        'fatheroccupation': _nullIfEmpty(_importCellByKey(row, 'fatheroccupation')),
+        'mothername': _nullIfEmpty(_importCellByKey(row, 'mothername')),
+        'mothermobile': _nullIfEmpty(_importCellByKey(row, 'mothermobile')),
+        'motheroccupation': _nullIfEmpty(_importCellByKey(row, 'motheroccupation')),
+        'guardianname': _nullIfEmpty(_importCellByKey(row, 'guardianname')),
+        'guardianmobile': _nullIfEmpty(_importCellByKey(row, 'guardianmobile')),
+        'guardianoccupation': _nullIfEmpty(_importCellByKey(row, 'guardianoccupation')),
+        'payincharge': _nullIfEmpty(_importCellByKey(row, 'payincharge')) ?? '-',
+        'payinchargemob': _nullIfEmpty(_importCellByKey(row, 'payinchargemob')),
+        'admname': _nullIfEmpty(_importCellByKey(row, 'admname')),
+        'quoname': _nullIfEmpty(_importCellByKey(row, 'quoname')),
+        'batch': _nullIfEmpty(_importCellByKey(row, 'batch')),
+        'status': 'PENDING',
+      });
+    }
+
+    if (stagingRows.isEmpty) {
+      setState(() => _importStep = 3);
+      return;
+    }
+
+    setState(() {});
+
+    try {
+      // 2. Bulk insert into staging table (batches of 200)
+      for (int i = 0; i < stagingRows.length; i += 200) {
+        final batch = stagingRows.sublist(i, (i + 200).clamp(0, stagingRows.length));
+        await SupabaseService.fromSchema('student_import').insert(batch);
+        setState(() {
+          _importedCount = i + batch.length;
+        });
+      }
+
+      // 3. Call DB function to move data to original tables
+      setState(() {
+        _importedCount = 0;
+      });
+      final result = await SupabaseService.client.rpc('process_student_import', params: {'p_ins_id': insId});
+
+      if (result is List && result.isNotEmpty) {
+        final r = result.first;
+        _importedCount = (r['imported'] as num?)?.toInt() ?? 0;
+        _skippedCount += (r['skipped'] as num?)?.toInt() ?? 0;
+      }
+
+      // 4. Fetch errors from staging table
+      final errors = await SupabaseService.fromSchema('student_import')
+          .select('imp_id, stuadmno, error_msg, status')
+          .eq('ins_id', insId)
+          .inFilter('status', ['ERROR', 'NO_PARENT']);
+      for (final e in errors) {
+        final status = e['status'];
+        final admNo = e['stuadmno'] ?? '';
+        if (status == 'NO_PARENT') {
+          _importErrors.add('Roll $admNo: Payment In Charge or Mobile is missing - student not created');
+        } else {
+          _importErrors.add('Roll $admNo: ${_friendlyError(e['error_msg']?.toString() ?? 'Unknown error')}');
+        }
+      }
+
+      // 5. Clean up processed staging rows
+      await SupabaseService.fromSchema('student_import')
+          .delete()
+          .eq('ins_id', insId)
+          .inFilter('status', ['DONE', 'ERROR', 'NO_PARENT']);
+
+    } catch (e) {
+      _importErrors.add('Import failed: $e');
+    }
+
+    setState(() => _importStep = 3);
+    _loadDropdowns();
+  }
+
+  // ─── Import UI ──────────────────────────────────────────────────────────
+
+  Widget _buildStudentImportSection() {
+    if (_importStep == 2) return _buildImportProgressStep();
+    if (_importStep == 3) return _buildImportDoneStep();
+
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title bar
+          Row(
+            children: [
+              Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
+              SizedBox(width: 8.w),
+              Text('Import Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (_importFileName != null)
+                Text(_importFileName!, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              SizedBox(width: 12.w),
+              ElevatedButton.icon(
+                onPressed: _pickImportFile,
+                icon: Icon(Icons.folder_open_rounded, size: 16.sp),
+                label: const Text('Browse'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _exportStudentTemplate,
+                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+                label: const Text('Format to Excel'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF217346),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _exportSampleData,
+                icon: Icon(Icons.download_rounded, size: 16.sp),
+                label: const Text('Sample Data'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          if (_importErrorMsg != null) ...[
+            SizedBox(height: 8.h),
+            Text(_importErrorMsg!, style: TextStyle(color: AppColors.error, fontSize: 13.sp)),
+          ],
+          SizedBox(height: 12.h),
+
+          // Data grid
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: Scrollbar(
+                controller: _importScrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _importScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: 54 + _importGridKeys.fold<double>(0, (sum, k) => sum + _gridColWidth(k) + 1),
+                    child: Column(
+                      children: [
+                        // Header row
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF6C8EEF),
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(7),
+                              topRight: Radius.circular(7),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              _gridHeaderCell('S.No', width: 50.w, center: true),
+                              _gridHeaderDivider(),
+                              for (final key in _importGridKeys) ...[
+                                _gridHeaderCell(_importGridLabels[key] ?? key, width: _gridColWidth(key)),
+                                _gridHeaderDivider(),
+                              ],
+                            ],
+                          ),
+                        ),
+                        // Data rows
+                        Expanded(
+                          child: _importRows.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                      SizedBox(height: 8.h),
+                                      Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                      SizedBox(height: 4.h),
+                                      Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _importRows.length,
+                                  itemBuilder: (context, index) {
+                                    final row = _importRows[index];
+                                    final isEven = index % 2 == 0;
+                                    final hasError = _rowErrors.containsKey(index);
+                                    return Tooltip(
+                                      message: hasError ? _rowErrors[index]! : '',
+                                      child: Container(
+                                        color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
+                                        padding: EdgeInsets.symmetric(vertical: 6.h),
+                                        child: Row(
+                                          children: [
+                                            _gridDataCell('${index + 1}', width: 50.w, center: true),
+                                            for (final key in _importGridKeys)
+                                              _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
+                                            if (hasError)
+                                              Padding(
+                                                padding: EdgeInsets.only(right: 8.w),
+                                                child: Tooltip(
+                                                  message: _rowErrors[index]!,
+                                                  child: Icon(Icons.error_outline, color: AppColors.error, size: 16.sp),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 12.h),
+
+          // Bottom bar
+          Row(
+            children: [
+              Text(
+                '${_importRows.length} rows',
+                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _importRows.isEmpty || _importValidated ? null : _validateImportData,
+                icon: Icon(_importValidated ? Icons.check_circle : Icons.check_circle_outline, size: 16.sp),
+                label: Text(_importValidated ? 'Validated' : 'Validate'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _importRows.isNotEmpty && !_importValidated ? Colors.orange : (_importValidated ? AppColors.success : Colors.grey),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              ElevatedButton.icon(
+                onPressed: _importValidated ? _startStudentImport : null,
+                icon: Icon(Icons.save_rounded, size: 16.sp),
+                label: const Text('Save'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              OutlinedButton(
+                onPressed: _resetImport,
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImportProgressStep() {
+    final progress = _totalCount > 0 ? (_importedCount + _skippedCount) / _totalCount : 0.0;
+    return Center(
+      child: Container(
+        width: 400.w,
+        padding: EdgeInsets.all(32.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            SizedBox(height: 20.h),
+            Text('Importing... ${_importedCount + _skippedCount} / $_totalCount', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+            SizedBox(height: 12.h),
+            LinearProgressIndicator(value: progress, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.accent)),
+            SizedBox(height: 8.h),
+            Text('$_importedCount imported, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportDoneStep() {
+    return Center(
+      child: Container(
+        width: 500.w,
+        padding: EdgeInsets.all(32.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded, size: 64.sp, color: AppColors.success),
+            SizedBox(height: 16.h),
+            Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            SizedBox(height: 12.h),
+            Text('$_importedCount imported successfully, $_skippedCount skipped', style: TextStyle(fontSize: 13.sp)),
+            if (_importErrors.isNotEmpty) ...[
+              SizedBox(height: 16.h),
+              Container(
+                height: 150.h,
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: ListView(
+                  children: _importErrors.map((e) => Padding(
+                    padding: EdgeInsets.only(bottom: 4.h),
+                    child: Text(e, style: TextStyle(fontSize: 13.sp, color: AppColors.error)),
+                  )).toList(),
+                ),
+              ),
+            ],
+            SizedBox(height: 20.h),
+            ElevatedButton(
+              onPressed: _resetImport,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+              ),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _gridColWidth(String key) {
+    switch (key) {
+      case 'stuadmno': return 100;
+      case 'stuname': return 160;
+      case 'stugender': return 80;
+      case 'studob': return 100;
+      case 'stuadmdate': return 100;
+      case 'stuclass': return 70;
+      case 'stumobile': return 110;
+      case 'stuemail': return 160;
+      case 'concession': return 130;
+      case 'stuaddress': return 160;
+      case 'stucity': return 100;
+      case 'stustate': return 100;
+      case 'stucountry': return 100;
+      case 'stupin': return 80;
+      case 'stubloodgrp': return 90;
+      case 'fathername': case 'mothername': case 'guardianname': return 140;
+      case 'fathermobile': case 'mothermobile': case 'guardianmobile': return 120;
+      case 'fatheroccupation': case 'motheroccupation': case 'guardianoccupation': return 120;
+      case 'payincharge': return 130;
+      case 'payinchargemob': return 120;
+      default: return 110;
+    }
+  }
+
+  Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
+  }
+
+  Widget _gridHeaderDivider() {
+    return Container(width: 1.w, height: 36.h, color: Colors.white.withValues(alpha: 0.15));
+  }
+
+  Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
+    final child = Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+      alignment: center ? Alignment.center : Alignment.centerLeft,
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    );
+    return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+  /// Card panel with a labelled header
+  Widget _panel({required String title, required IconData icon, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: AppColors.accent, size: 20.sp),
+            SizedBox(width: 8.w),
+            Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          ]),
+          SizedBox(height: 4.h),
+          const Divider(color: AppColors.border),
+          SizedBox(height: 12.h),
+          child,
+        ],
+      ),
+    );
+  }
+
+  /// Two fields side by side
+  Widget _row2(Widget left, Widget right) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        SizedBox(width: 14.w),
+        Expanded(child: right),
+      ],
+    );
+  }
+
+  /// Field with label that expands to fill available width
+  Widget _fieldFull({required String label, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
+        SizedBox(height: 6.h),
+        child,
+      ],
+    );
+  }
+
+  InputDecoration _dec(String hint) => InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
+    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
+    filled: true,
+    fillColor: Colors.white,
+  );
+}
+
+// _ExcelImportDialog removed — import is now inline grid in _StudentsScreenState
