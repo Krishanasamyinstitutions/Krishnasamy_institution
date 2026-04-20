@@ -99,7 +99,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static const _importGridKeys = [
     'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
     'stumobile', 'stuemail', 'concession',
-    'admname', 'quoname',
+    'admname', 'quoname', 'batch',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
     'fathername', 'fathermobile', 'fatheroccupation',
@@ -121,6 +121,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'concession': 'Concession *',
     'admname': 'Admission Type',
     'quoname': 'Quota',
+    'batch': 'Batch',
     'stuaddress': 'Address',
     'stucity': 'City',
     'stustate': 'State',
@@ -1912,6 +1913,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'payinchargemob': 'Payment Mobile',
     'admname': 'Admission Type',
     'quoname': 'Quota',
+    'batch': 'Batch',
   };
 
   /// Auto-map header text to field key (case-insensitive)
@@ -1947,6 +1949,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'payment mobile': 'payinchargemob', 'pay mobile': 'payinchargemob', 'payinchargemob': 'payinchargemob',
       'admission type': 'admname', 'admtype': 'admname', 'admname': 'admname',
       'quota': 'quoname', 'quota name': 'quoname', 'quoname': 'quoname',
+      'batch': 'batch', 'batch no': 'batch', 'batch number': 'batch',
     };
     return map[h] ?? '';
   }
@@ -2074,6 +2077,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
+      'Admission Type', 'Quota', 'Batch',
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2129,6 +2133,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
+      'Admission Type', 'Quota', 'Batch',
     ];
     final sampleRows = [
       ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
@@ -2351,6 +2356,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'guardianoccupation': _nullIfEmpty(_importCellByKey(row, 'guardianoccupation')),
         'payincharge': _nullIfEmpty(_importCellByKey(row, 'payincharge')) ?? '-',
         'payinchargemob': _nullIfEmpty(_importCellByKey(row, 'payinchargemob')),
+        'admname': _nullIfEmpty(_importCellByKey(row, 'admname')),
+        'quoname': _nullIfEmpty(_importCellByKey(row, 'quoname')),
+        'batch': _nullIfEmpty(_importCellByKey(row, 'batch')),
         'status': 'PENDING',
       });
     }

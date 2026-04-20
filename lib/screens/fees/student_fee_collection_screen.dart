@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -80,6 +81,74 @@ class _StudentFeeCollectionScreenState
     super.initState();
     _fetchClasses();
     _loadFineRules();
+    _sweepOrphanedPayments();
+  }
+
+  /// Reconcile any 'I' (in-progress) online payments older than 15 minutes.
+  /// For each one, ask Razorpay for the actual status:
+  ///   - captured: call complete_payment_grouped so a paynumber is generated
+  ///     and feedemand rows are updated (matching the live-polling path).
+  ///   - anything else: mark 'F'.
+  /// This prevents the case where polling was cut short but the student's
+  /// money cleared — without this sweep the row sits at 'I' forever.
+  Future<void> _sweepOrphanedPayments() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final cutoff = DateTime.now().subtract(const Duration(minutes: 15)).toIso8601String();
+      final orphans = await SupabaseService.fromSchema('payment')
+          .select('pay_id, payorderid, payitems')
+          .eq('ins_id', insId)
+          .eq('paystatus', 'I')
+          .lt('createdat', cutoff);
+      for (final p in (orphans as List)) {
+        final payId = p['pay_id'] as int;
+        final orderId = p['payorderid']?.toString();
+        String? paymentId;
+        bool captured = false;
+        if (orderId != null && orderId.isNotEmpty) {
+          try {
+            final resp = await SupabaseService.client.functions.invoke(
+              'get-razorpay-payment', body: {'order_id': orderId},
+            );
+            final data = resp.data as Map<String, dynamic>;
+            if (data['status'] == 'captured' && data['payment_id'] != null) {
+              captured = true;
+              paymentId = data['payment_id'].toString();
+            }
+          } catch (_) {}
+        }
+        if (captured) {
+          // Decode stored items and run the normal completion path so the
+          // row gets a paynumber and feedemand is updated.
+          List<dynamic> items = [];
+          final raw = p['payitems']?.toString();
+          if (raw != null && raw.isNotEmpty) {
+            try { items = jsonDecode(raw) as List<dynamic>; } catch (_) {}
+          }
+          try {
+            await SupabaseService.client.rpc('complete_payment_grouped', params: {
+              'p_pay_id': payId,
+              'p_pay_method': 'razorpay',
+              'p_pay_reference': 'Razorpay: $paymentId (recovered)',
+              'p_items': items,
+              'p_ins_id': insId,
+              'p_status': 'C',
+            });
+          } catch (e) {
+            debugPrint('Recovery complete failed for pay_id=$payId: $e');
+          }
+        } else {
+          await SupabaseService.fromSchema('payment')
+              .update({'paystatus': 'F'})
+              .eq('pay_id', payId)
+              .eq('ins_id', insId);
+        }
+      }
+    } catch (e) {
+      debugPrint('Orphaned payment sweep failed: $e');
+    }
   }
 
   Future<void> _loadFineRules() async {
@@ -1818,6 +1887,49 @@ class _StudentFeeCollectionScreenState
     final totalNet = _totalNetSelected;
     final amountInPaise = (totalNet * 100).round();
 
+    // Block duplicate online attempts while a recent 'I' row exists for this
+    // student. The sweep only clears orphans after 15 minutes, so within that
+    // window we warn the user to wait instead of creating another pending row.
+    try {
+      final pending = await SupabaseService.fromSchema('payment')
+          .select('pay_id, createdat')
+          .eq('ins_id', insId!)
+          .eq('stu_id', stuId)
+          .eq('paystatus', 'I')
+          .order('createdat', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (pending != null) {
+        final createdAtStr = pending['createdat']?.toString();
+        final createdAt = createdAtStr != null ? DateTime.tryParse(createdAtStr) : null;
+        if (createdAt != null) {
+          final ageMin = DateTime.now().difference(createdAt).inMinutes;
+          if (ageMin < 15) {
+            final waitMin = 15 - ageMin;
+            if (mounted) {
+              setState(() => _processing = false);
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Payment in progress'),
+                  content: Text(
+                    'An online payment for this student is still pending.\n'
+                    'Please try again in about $waitMin minute${waitMin == 1 ? '' : 's'}.',
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+                  ],
+                ),
+              );
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Pending-payment check failed: $e');
+    }
+
     try {
       final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
       final yrId = firstDemand['yr_id'] as int?;
@@ -1842,8 +1954,13 @@ class _StudentFeeCollectionScreenState
         });
       }
 
-      // 1. Create a temporary payment for Razorpay order (status I)
-      await SupabaseService.fromSchema('payment').insert({
+      // 1. Create a temporary payment for Razorpay order (status I).
+      // Use insert().select() to atomically return pay_id — avoids the race
+      // where a follow-up query could pick up a different row if two online
+      // payments are started simultaneously for the same student.
+      // Store the items JSON in paygwresponse so the orphan sweep can
+      // reconstruct and finalize this payment if polling misses the capture.
+      final inserted = await SupabaseService.fromSchema('payment').insert({
         'ins_id': insId,
         'inscode': inscode,
         'stu_id': stuId,
@@ -1855,18 +1972,9 @@ class _StudentFeeCollectionScreenState
         'paystatus': 'I',
         'createdby': createdBy,
         'recon_status': 'P',
-      });
-
-      // Get the pay_id of the inserted record
-      final insertedPay = await SupabaseService.fromSchema('payment')
-          .select('pay_id')
-          .eq('ins_id', insId!)
-          .eq('stu_id', stuId)
-          .eq('paystatus', 'I')
-          .order('pay_id', ascending: false)
-          .limit(1)
-          .single();
-      final payId = insertedPay['pay_id'] as int;
+        'payitems': jsonEncode(items),
+      }).select('pay_id').single();
+      final payId = inserted['pay_id'] as int;
 
       // 2. Create Razorpay order
       final orderResponse = await SupabaseService.client.functions.invoke(
@@ -1948,9 +2056,10 @@ class _StudentFeeCollectionScreenState
 </html>
 ''';
 
-      // Write temp HTML file for WebView
+      // Write temp HTML file for WebView — unique per pay_id so concurrent
+      // sessions (or retries after an abandoned checkout) never share state.
       final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/tbs_razorpay_checkout.html');
+      final tempFile = File('${tempDir.path}/tbs_razorpay_checkout_$payId.html');
       await tempFile.writeAsString(html);
 
       // 4. Show WebView dialog with Razorpay checkout + polling
@@ -1976,7 +2085,7 @@ class _StudentFeeCollectionScreenState
     try {
       await webviewController.initialize();
       await webviewController.setBackgroundColor(Colors.white);
-      await webviewController.loadUrl('file:///$htmlPath');
+      await webviewController.loadUrl(Uri.file(htmlPath).toString());
     } catch (e) {
       if (!completer.isCompleted) completer.complete(null);
       if (mounted) {
@@ -1987,8 +2096,38 @@ class _StudentFeeCollectionScreenState
       return;
     }
 
-    // Start polling for payment status
+    // Start polling for payment status. Cap total polling time at 10 minutes
+    // so a stuck Razorpay session can't leave the dialog and timer alive.
+    final pollStarted = DateTime.now();
+    const pollMaxDuration = Duration(minutes: 10);
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (DateTime.now().difference(pollStarted) > pollMaxDuration) {
+        timer.cancel();
+        // Before giving up, do ONE final verification with Razorpay. The
+        // student may have captured the payment in the last few seconds
+        // before our timer elapsed — we don't want to mark F while money
+        // has actually cleared on their side.
+        try {
+          final payRec = await SupabaseService.fromSchema('payment')
+              .select('payorderid').eq('pay_id', payId).single();
+          final orderId = payRec['payorderid']?.toString();
+          if (orderId != null && orderId.isNotEmpty) {
+            final finalResp = await SupabaseService.client.functions.invoke(
+              'get-razorpay-payment', body: {'order_id': orderId},
+            );
+            final fd = finalResp.data as Map<String, dynamic>;
+            if (fd['status'] == 'captured' && fd['payment_id'] != null) {
+              await SupabaseService.fromSchema('payment').update({
+                'payreference': fd['payment_id'].toString(),
+              }).eq('pay_id', payId).eq('ins_id', insId!);
+              if (!completer.isCompleted) completer.complete('C');
+              return;
+            }
+          }
+        } catch (_) {}
+        if (!completer.isCompleted) completer.complete('F');
+        return;
+      }
       try {
         final payRecord = await SupabaseService.fromSchema('payment')
             .select('payorderid')
@@ -2008,7 +2147,9 @@ class _StudentFeeCollectionScreenState
         final rpStatus = rpData['status']?.toString();
 
         if (rpPaymentId != null && rpPaymentId.isNotEmpty) {
-          if (rpStatus == 'captured' || rpStatus == 'authorized') {
+          // Only 'captured' means money is actually in the account.
+          // 'authorized' is still pending — treat as in-progress (keep polling).
+          if (rpStatus == 'captured') {
             timer.cancel();
             await SupabaseService.fromSchema('payment').update({
               'payreference': rpPaymentId,
@@ -2098,10 +2239,8 @@ class _StudentFeeCollectionScreenState
     // Dispose webview first
     try { webviewController.dispose(); } catch (_) {}
 
-    // Close dialog if still open
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
+    // Dialog is already popped by its own close handlers (cancel, success, or X button).
+    // Do NOT pop again here — it would pop the parent screen and cascade toward login.
 
     // Wait a moment for dialog to close
     await Future.delayed(const Duration(milliseconds: 300));
