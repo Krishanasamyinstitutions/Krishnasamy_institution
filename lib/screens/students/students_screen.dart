@@ -101,7 +101,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static const _importGridKeys = [
     'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
     'stumobile', 'stuemail', 'concession',
-    'admname', 'quoname',
+    'admname', 'quoname', 'batch',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
     'fathername', 'fathermobile', 'fatheroccupation',
@@ -123,6 +123,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'concession': 'Concession *',
     'admname': 'Admission Type',
     'quoname': 'Quota',
+    'batch': 'Batch',
     'stuaddress': 'Address',
     'stucity': 'City',
     'stustate': 'State',
@@ -2064,6 +2065,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
+      'Admission Type', 'Quota', 'Batch',
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2119,6 +2121,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
+      'Admission Type', 'Quota', 'Batch',
     ];
     final sampleRows = [
       ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],

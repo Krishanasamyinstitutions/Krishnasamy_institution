@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 
@@ -225,13 +226,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (_logoFile != null && regResult['inscode'] != null) {
         try {
           final inscode = regResult['inscode'].toString();
-          final ext = _logoFile!.path.split('.').last;
+          final ext = _logoFile!.path.split('.').last.toLowerCase();
           final path = 'logos/$inscode.$ext';
-          await SupabaseService.client.storage.from('InstitutionLogos').upload(path, _logoFile!);
+          await SupabaseService.client.storage.from('InstitutionLogos').upload(
+            path,
+            _logoFile!,
+            fileOptions: const FileOptions(upsert: true),
+          );
           final logoUrl = SupabaseService.client.storage.from('InstitutionLogos').getPublicUrl(path);
           await SupabaseService.client.from('institution').update({'inslogo': logoUrl}).eq('ins_id', regResult['ins_id']);
+          debugPrint('Logo uploaded: $logoUrl');
         } catch (e) {
           debugPrint('Logo upload failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Institution created, but logo upload failed: $e'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          }
         }
       }
 
