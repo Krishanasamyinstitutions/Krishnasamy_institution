@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
+import '../../widgets/app_icon.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
 import 'dart:io';
 import '../../utils/app_theme.dart';
@@ -394,25 +395,62 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tab bar
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
-            tabs: [
-              Tab(text: 'Pending (${_pendingPayments.length})'),
-              const Tab(text: 'Bank Statement'),
-              Tab(text: 'Reconciled (${_reconciledPayments.length})'),
-            ],
-          ),
+        // Pill-style tabs (matches Fee Collection/Reports)
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            final tabLabels = [
+              'Pending (${_pendingPayments.length})',
+              'Bank Statement',
+              'Reconciled (${_reconciledPayments.length})',
+            ];
+            final tabIcons = ['clock', 'document-upload', 'tick-square'];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < tabLabels.length; i++) ...[
+                      GestureDetector(
+                        onTap: () => _tabController.animateTo(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
+                              const SizedBox(width: 8),
+                              Text(
+                                tabLabels[i],
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
         ),
+        SizedBox(height: 6.h),
 
         // Content
         Expanded(
@@ -434,294 +472,427 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   // ── Tab 1: Pending Reconciliation ──
   Widget _buildPendingTab() {
     final filteredPending = _filteredPayments(_pendingPayments);
-    return Column(
-      children: [
-        // Actions bar
-        Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Row(
-            children: [
-              Text('${_selectedForRecon.length} selected', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: _selectedForRecon.isEmpty ? null : _reconcileSelected,
-                icon: Icon(Icons.check_circle_rounded, size: 18.sp),
-                label: Text('Approve Selected', style: TextStyle(fontSize: 13.sp)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
-              ),
-              SizedBox(width: 8.w),
-              OutlinedButton.icon(
-                onPressed: _loadPayments,
-                icon: Icon(Icons.refresh_rounded, size: 18.sp),
-                label: Text('Refresh', style: TextStyle(fontSize: 13.sp)),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
-              ),
-            ],
-          ),
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
         ),
-        // Table
-        Expanded(
-          child: filteredPending.isEmpty
-              ? Center(child: Text('No pending payments for reconciliation', style: TextStyle(color: AppColors.textSecondary)))
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // Header
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                        color: AppColors.primary,
-                        child: Row(
-                            children: [
-                              SizedBox(width: 40.w, child: Checkbox(
-                              value: filteredPending.isNotEmpty && filteredPending.every((p) => _selectedForRecon.contains(p['pay_id'] as int)),
-                              onChanged: (v) {
-                                setState(() {
-                                  if (v == true) {
-                                    _selectedForRecon.addAll(filteredPending.map((p) => p['pay_id'] as int));
-                                  } else {
-                                    for (final p in filteredPending) {
-                                      _selectedForRecon.remove(p['pay_id'] as int);
-                                    }
-                                  }
-                                });
-                              },
-                              fillColor: WidgetStateProperty.all(Colors.white),
-                              checkColor: AppColors.primary,
-                            )),
-                            Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                            Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                            Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                            Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                            Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                            Expanded(flex: 2, child: Text('REFERENCE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                          ],
-                        ),
+        child: Column(
+          children: [
+            // Title + actions
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  AppIcon.linear('clock', size: 18, color: AppColors.accent),
+                  SizedBox(width: 8.w),
+                  Text('Pending Payments', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  SizedBox(width: 12.w),
+                  Text('${_selectedForRecon.length} selected', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                  const Spacer(),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: _selectedForRecon.isEmpty ? null : _reconcileSelected,
+                      icon: AppIcon('tick-circle', size: 16, color: Colors.white),
+                      label: Text('Approve Selected', style: TextStyle(fontSize: 13.sp)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(horizontal: 18.w),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
-                      // Rows
-                      ...filteredPending.asMap().entries.map((entry) {
-                        final idx = entry.key;
-                        final p = entry.value;
-                        final payId = p['pay_id'] as int;
-                        final isSelected = _selectedForRecon.contains(payId);
-                        return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                          color: isSelected ? AppColors.accent.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: _loadPayments,
+                      icon: AppIcon('refresh', size: 16, color: Colors.white),
+                      label: const Text('Refresh'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(horizontal: 18.w),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Table wrapped in inner rounded card
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: filteredPending.isEmpty
+                      ? Center(child: Text('No pending payments for reconciliation', style: TextStyle(color: AppColors.textSecondary)))
+                      : Column(
+                          children: [
+                        // Header
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          color: AppColors.tableHeadBg,
                           child: Row(
                             children: [
                               SizedBox(width: 40.w, child: Checkbox(
-                                value: isSelected,
+                                value: filteredPending.isNotEmpty && filteredPending.every((p) => _selectedForRecon.contains(p['pay_id'] as int)),
                                 onChanged: (v) {
                                   setState(() {
-                                    if (v == true) { _selectedForRecon.add(payId); } else { _selectedForRecon.remove(payId); }
+                                    if (v == true) {
+                                      _selectedForRecon.addAll(filteredPending.map((p) => p['pay_id'] as int));
+                                    } else {
+                                      for (final p in filteredPending) {
+                                        _selectedForRecon.remove(p['pay_id'] as int);
+                                      }
+                                    }
                                   });
                                 },
                                 activeColor: AppColors.accent,
                               )),
-                              Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                              Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
-                              Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                              Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp))),
-                              Expanded(flex: 2, child: Text(_formatDate(p['paydate']?.toString()), style: TextStyle(fontSize: 13.sp))),
-                              Expanded(flex: 2, child: Text(p['payreference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                              Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 2, child: Text('REFERENCE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
                             ],
                           ),
-                        );
-                      }),
-                    ],
-                  ),
+                        ),
+                        // Rows
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                ...filteredPending.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final p = entry.value;
+                                  final payId = p['pay_id'] as int;
+                                  final isSelected = _selectedForRecon.contains(payId);
+                                  return Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                                    color: isSelected ? AppColors.accent.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 40.w, child: Checkbox(
+                                          value: isSelected,
+                                          onChanged: (v) {
+                                            setState(() {
+                                              if (v == true) { _selectedForRecon.add(payId); } else { _selectedForRecon.remove(payId); }
+                                            });
+                                          },
+                                          activeColor: AppColors.accent,
+                                        )),
+                                        Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(_formatDate(p['paydate']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(p['payreference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   // ── Tab 2: Bank Statement Upload ──
   Widget _buildBankStatementTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Row(
-            children: [
-              ElevatedButton.icon(
-                onPressed: _uploadBankStatement,
-                icon: Icon(Icons.upload_file_rounded, size: 18.sp),
-                label: Text('Upload Bank Statement (CSV)', style: TextStyle(fontSize: 13.sp)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              ElevatedButton.icon(
-                onPressed: _downloadSampleTemplate,
-                icon: Icon(Icons.grid_on_rounded, size: 18.sp),
-                label: Text('Format to Excel', style: TextStyle(fontSize: 13.sp)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                ),
-              ),
-              const Spacer(),
-              if (_bankStatementRows.isNotEmpty) ...[
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  AppIcon.linear('document-upload', size: 18, color: AppColors.accent),
+                  SizedBox(width: 8.w),
+                  Text('Bank Statement', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  SizedBox(width: 12.w),
+                  if (_bankStatementRows.isNotEmpty) ...[
                 Text('${_bankStatementRows.where((r) => r['matched_pay_id'] != null).length} matched', style: TextStyle(fontSize: 13.sp, color: AppColors.success, fontWeight: FontWeight.w600)),
                 SizedBox(width: 16.w),
-                ElevatedButton.icon(
-                  onPressed: _reconcileFromBankMatch,
-                  icon: Icon(Icons.check_circle_rounded, size: 18.sp),
-                  label: Text('Reconcile Matched', style: TextStyle(fontSize: 13.sp)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: _reconcileFromBankMatch,
+                    icon: AppIcon('tick-circle', size: 16, color: Colors.white),
+                    label: Text('Reconcile Matched', style: TextStyle(fontSize: 13.sp)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],
-            ],
-          ),
-        ),
-        // Table header always visible
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-          color: AppColors.primary,
-          child: Row(
-            children: [
-              SizedBox(width: 40.w, child: Text('S.NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(flex: 2, child: Text('REFERENCE/UTR', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(flex: 2, child: Text('MATCHED WITH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(flex: 1, child: Text('MATCH TYPE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _bankStatementRows.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.cloud_upload_outlined, size: 48.sp, color: AppColors.textLight),
-                      SizedBox(height: 12.h),
-                      Text('Upload a bank statement CSV to match with pending payments', style: TextStyle(color: AppColors.textSecondary)),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      ..._bankStatementRows.asMap().entries.map((entry) {
-                        final idx = entry.key;
-                        final row = entry.value;
-                        final isMatched = row['matched_pay_id'] != null;
-
-                        return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                          color: isMatched ? AppColors.success.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
-                          child: Row(
-                            children: [
-                              SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                              Expanded(flex: 2, child: Text(row['date']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
-                              Expanded(flex: 2, child: Text(row['reference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
-                              Expanded(flex: 2, child: Text('Rs.${(row['amount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                              Expanded(
-                                flex: 2,
-                                child: isMatched
-                                    ? Builder(builder: (_) {
-                                        final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
-                                        final payNos = payIds.map((id) {
-                                          final p = _pendingPayments.firstWhere((p) => p['pay_id'] == id, orElse: () => {});
-                                          return p.isNotEmpty ? p['paynumber']?.toString() ?? '$id' : '$id';
-                                        }).join(', ');
-                                        return Row(
-                                          children: [
-                                            Icon(Icons.link_rounded, size: 14.sp, color: AppColors.success),
-                                            SizedBox(width: 4.w),
-                                            Flexible(child: Text(payNos, style: TextStyle(fontSize: 12.sp, color: AppColors.success, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
-                                          ],
-                                        );
-                                      })
-                                    : Text('No match', style: TextStyle(fontSize: 12.sp, color: AppColors.textLight)),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: isMatched
-                                    ? Text(row['match_type']?.toString() ?? '', style: TextStyle(fontSize: 11.sp, color: AppColors.accent, fontWeight: FontWeight.w500))
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
+              const Spacer(),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _uploadBankStatement,
+                  icon: AppIcon('document-upload', size: 16, color: Colors.white),
+                  label: Text('Upload Bank Statement (CSV)', style: TextStyle(fontSize: 13.sp)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
+              ),
+              SizedBox(width: 8.w),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _downloadSampleTemplate,
+                  icon: AppIcon('element-4', size: 16, color: Colors.white),
+                  label: Text('Format to Excel', style: TextStyle(fontSize: 13.sp)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Table in a rounded card
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  // Table header
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    color: AppColors.tableHeadBg,
+                    child: Row(
+                      children: [
+                        SizedBox(width: 40.w, child: Text('S.NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('REFERENCE/UTR', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('MATCHED WITH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 1, child: Text('MATCH TYPE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _bankStatementRows.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon.linear('cloud-add', size: 48.sp, color: AppColors.textLight),
+                                SizedBox(height: 12.h),
+                                Text('Upload a bank statement CSV to match with pending payments', style: TextStyle(color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                ..._bankStatementRows.asMap().entries.map((entry) {
+                                  final idx = entry.key;
+                                  final row = entry.value;
+                                  final isMatched = row['matched_pay_id'] != null;
+
+                                  return Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                                    color: isMatched ? AppColors.success.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(row['date']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(row['reference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text('Rs.${(row['amount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(
+                                          flex: 2,
+                                          child: isMatched
+                                              ? Builder(builder: (_) {
+                                                  final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
+                                                  final payNos = payIds.map((id) {
+                                                    final p = _pendingPayments.firstWhere((p) => p['pay_id'] == id, orElse: () => {});
+                                                    return p.isNotEmpty ? p['paynumber']?.toString() ?? '$id' : '$id';
+                                                  }).join(', ');
+                                                  return Row(
+                                                    children: [
+                                                      AppIcon('link-1', size: 14, color: AppColors.success),
+                                                      SizedBox(width: 4.w),
+                                                      Flexible(child: Text(payNos, style: TextStyle(fontSize: 12.sp, color: AppColors.success, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                                                    ],
+                                                  );
+                                                })
+                                              : Text('No match', style: TextStyle(fontSize: 12.sp, color: AppColors.textLight)),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: isMatched
+                                              ? Text(row['match_type']?.toString() ?? '', style: TextStyle(fontSize: 11.sp, color: AppColors.accent, fontWeight: FontWeight.w500))
+                                              : const SizedBox.shrink(),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
+        ),
+      ),
     );
   }
 
   // ── Tab 3: Reconciled Payments ──
   Widget _buildReconciledTab() {
     final filteredReconciled = _filteredPayments(_reconciledPayments);
-    return filteredReconciled.isEmpty
-        ? Center(child: Text('No reconciled payments yet', style: TextStyle(color: AppColors.textSecondary)))
-        : SingleChildScrollView(
-            padding: EdgeInsets.all(16.w),
-            child: Column(
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  color: AppColors.primary,
-                  child: Row(
-                    children: [
-                      SizedBox(width: 40.w, child: Text('#', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('RECONCILED BY', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('RECONCILED DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                      Expanded(flex: 2, child: Text('BANK REF', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-                    ],
+    return Padding(
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  AppIcon.linear('tick-square', size: 18, color: AppColors.accent),
+                  SizedBox(width: 8.w),
+                  Text('Reconciled Payments', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  SizedBox(width: 8.w),
+                  Text('${filteredReconciled.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
                   ),
-                ),
-                ...filteredReconciled.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final p = entry.value;
-                  return Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                    color: idx.isEven ? Colors.white : AppColors.surface,
+                  child: filteredReconciled.isEmpty
+            ? Center(child: Text('No reconciled payments yet', style: TextStyle(color: AppColors.textSecondary)))
+            : Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                        Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success))),
-                        Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
-                        Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                        Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp))),
-                        Expanded(flex: 2, child: Text(p['reconciled_by']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp))),
-                        Expanded(flex: 2, child: Text(_formatDate(p['reconciled_date']?.toString()), style: TextStyle(fontSize: 13.sp))),
-                        Expanded(flex: 2, child: Text(p['bank_reference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
+                        SizedBox(width: 40.w, child: Text('#', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('RECONCILED BY', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('RECONCILED DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        Expanded(flex: 2, child: Text('BANK REF', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
                       ],
                     ),
-                  );
-                }),
-              ],
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          ...filteredReconciled.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final p = entry.value;
+                            return Container(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                              color: idx.isEven ? Colors.white : AppColors.surface,
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(p['reconciled_by']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(_formatDate(p['reconciled_date']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(p['bank_reference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+                ),
+              ),
             ),
-          );
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDate(String? dateStr) {

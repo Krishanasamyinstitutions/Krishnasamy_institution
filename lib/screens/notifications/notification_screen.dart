@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 class NotificationScreen extends StatefulWidget {
   final VoidCallback? onReadChanged;
   const NotificationScreen({super.key, this.onReadChanged});
@@ -108,23 +109,23 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  IconData _typeIcon(String? type) {
+  String _typeIcon(String? type) {
     switch (type?.toLowerCase()) {
       case 'fee':
       case 'payment':
-        return Icons.payments_rounded;
+        return 'indianrupeesign.circle.fill';
       case 'exam':
-        return Icons.quiz_rounded;
+        return 'message-question';
       case 'attendance':
-        return Icons.fact_check_rounded;
+        return 'clipboard-tick';
       case 'notice':
-        return Icons.campaign_rounded;
+        return 'volume-high';
       case 'alert':
-        return Icons.warning_rounded;
+        return 'warning-2';
       case 'message':
-        return Icons.message_rounded;
+        return 'message';
       default:
-        return Icons.notifications_rounded;
+        return 'notification';
     }
   }
 
@@ -196,7 +197,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.notifications_rounded, color: AppColors.accent, size: 22.sp),
+              AppIcon('notification', color: AppColors.accent, size: 18),
               SizedBox(width: 10.w),
               Text('Notifications', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
               if (_unreadCount > 0) ...[
@@ -234,18 +235,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
               if (_unreadCount > 0)
                 TextButton.icon(
                   onPressed: _markAllAsRead,
-                  icon: Icon(Icons.done_all_rounded, size: 16.sp),
+                  icon: AppIcon('task-square', size: 16),
                   label: Text('Mark all read', style: TextStyle(fontSize: 13.sp)),
                   style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
                 ),
-              TextButton.icon(
-                onPressed: _fetchNotifications,
-                icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                label: const Text('Refresh'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _fetchNotifications,
+                  icon: AppIcon('refresh', size: 16, color: Colors.white),
+                  label: const Text('Refresh'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -277,7 +284,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off_rounded, size: 56.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+          AppIcon('notification-bing', size: 56.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
           SizedBox(height: 14.h),
           Text(
             _filter == 'Unread' ? 'No unread notifications' : _filter == 'Read' ? 'No read notifications' : 'No notifications yet',
@@ -315,13 +322,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
           children: [
             // Icon
             Container(
-              width: 44.w,
-              height: 44.h,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 color: _typeColor(type).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(_typeIcon(type), size: 22.sp, color: _typeColor(type)),
+              child: AppIcon(_typeIcon(type), size: 14, color: _typeColor(type)),
             ),
             SizedBox(width: 14.w),
             // Content
@@ -359,11 +366,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   SizedBox(height: 8.h),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      AppIcon('calendar-1', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       SizedBox(width: 4.w),
                       Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       SizedBox(width: 12.w),
-                      Icon(Icons.access_time_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      AppIcon('clock', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       SizedBox(width: 4.w),
                       Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                     ],
@@ -372,7 +379,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
             ),
             SizedBox(width: 8.w),
-            Icon(Icons.chevron_right_rounded, size: 20.sp, color: AppColors.textSecondary),
+            AppIcon.linear('Chevron Right', size: 20, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -409,7 +416,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
+                    AppIcon.linear('Chevron Left', size: 16, color: AppColors.accent),
                     SizedBox(width: 6.w),
                     Text('Back to Notifications', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                   ],
@@ -427,13 +434,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 48.w,
-                      height: 48.h,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: _typeColor(type).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12.r),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
-                      child: Icon(_typeIcon(type), size: 24.sp, color: _typeColor(type)),
+                      child: AppIcon(_typeIcon(type), size: 16, color: _typeColor(type)),
                     ),
                     SizedBox(width: 16.w),
                     Expanded(
@@ -455,11 +462,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 ),
                                 SizedBox(width: 10.w),
                               ],
-                              Icon(Icons.calendar_today_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              AppIcon('calendar-1', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                               SizedBox(width: 4.w),
                               Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                               SizedBox(width: 10.w),
-                              Icon(Icons.access_time_rounded, size: 12.sp, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              AppIcon('clock', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                               SizedBox(width: 4.w),
                               Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                             ],

@@ -7,6 +7,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 
+import '../../widgets/app_icon.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -192,8 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(22.r),
                       ),
-                      child: Icon(
-                        Icons.school_rounded,
+                      child: AppIcon('teacher',
                         size: 40.sp,
                         color: AppColors.accent,
                       ),
@@ -240,9 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildFeatureList(BuildContext context) {
     final features = [
-      {'icon': Icons.shield_outlined, 'text': 'Enterprise-grade security'},
-      {'icon': Icons.devices_rounded, 'text': 'Access from any device'},
-      {'icon': Icons.support_agent_rounded, 'text': '24/7 dedicated support'},
+      {'icon': 'shield-tick', 'text': 'Enterprise-grade security'},
+      {'icon': 'monitor', 'text': 'Access from any device'},
+      {'icon': '24-support', 'text': '24/7 dedicated support'},
     ];
 
     return Column(
@@ -259,10 +259,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10.r),
                 ),
-                child: Icon(
-                  f['icon'] as IconData,
+                child: AppIcon(
+                  f['icon'] as String,
                   color: AppColors.accent,
-                  size: 18.sp,
+                  size: 18,
                 ),
               ),
               SizedBox(width: 14.w),
@@ -298,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       alignment: Alignment.centerLeft,
                       child: IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
+                        icon: const AppIcon.linear('Chevron Left'),
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.white,
                           side: const BorderSide(color: AppColors.border),
@@ -349,8 +349,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline_rounded,
-                                    color: AppColors.error, size: 20.sp),
+                                AppIcon.linear('info-circle',
+                                    color: AppColors.error, size: 20),
                                 SizedBox(width: 10.w),
                                 Expanded(
                                   child: Text(
@@ -392,8 +392,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   isExpanded: true,
                                   decoration: InputDecoration(
                                     hintText: 'Select your institution',
-                                    prefixIcon: Icon(Icons.school_outlined,
-                                        size: 20.sp, color: AppColors.textLight),
+                                    prefixIcon: AppIcon.linear('teacher',
+                                        size: 20, color: AppColors.textLight),
                                     prefixIconConstraints: BoxConstraints(
                                         minWidth: 52.w, minHeight: 0),
                                   ),
@@ -438,7 +438,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     isExpanded: true,
                                     decoration: InputDecoration(
                                       hintText: 'Select academic year',
-                                      prefixIcon: Icon(Icons.calendar_today_outlined, size: 20.sp, color: AppColors.textLight),
+                                      prefixIcon: AppIcon.linear('calendar', size: 20, color: AppColors.textLight),
                                       prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
                                     ),
                                     items: _availableYears.map((y) {
@@ -472,9 +472,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: _isSuperAdmin ? TextInputType.text : TextInputType.emailAddress,
                           decoration: InputDecoration(
                             hintText: _isSuperAdmin ? 'Enter username' : 'admin@edudesk.com',
-                            prefixIcon: Icon(
-                                _isSuperAdmin ? Icons.person_outline : Icons.email_outlined,
-                                size: 20.sp, color: AppColors.textLight),
+                            prefixIcon: AppIcon(
+                                _isSuperAdmin ? 'user' : 'sms',
+                                size: 20, color: AppColors.textLight),
                             prefixIconConstraints: BoxConstraints(
                                 minWidth: 52.w, minHeight: 0),
                           ),
@@ -513,16 +513,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: '••••••••',
-                            prefixIcon: Icon(Icons.lock_outline_rounded,
-                                size: 20.sp, color: AppColors.textLight),
+                            prefixIcon: AppIcon.linear('lock',
+                                size: 20, color: AppColors.textLight),
                             prefixIconConstraints: BoxConstraints(
                                 minWidth: 52.w, minHeight: 0),
                             suffixIcon: IconButton(
-                              icon: Icon(
+                              icon: AppIcon(
                                 _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                                size: 20.sp,
+                                    ? 'eye-slash'
+                                    : 'eye',
+                                size: 20,
                                 color: AppColors.textLight,
                               ),
                               onPressed: () {
@@ -656,7 +656,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline_rounded,
+                          AppIcon.linear('info-circle',
                               color: AppColors.info.withValues(alpha: 0.7),
                               size: 18.sp),
                           SizedBox(width: 10.w),

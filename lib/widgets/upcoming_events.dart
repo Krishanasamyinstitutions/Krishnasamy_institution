@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+import './app_icon.dart';
 class UpcomingEventsWidget extends StatelessWidget {
   const UpcomingEventsWidget({super.key});
 
@@ -117,7 +118,7 @@ class _EventTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded,
+                    AppIcon('calendar-1',
                         size: 12, color: AppColors.textLight),
                     const SizedBox(width: 4),
                     Text(
@@ -128,7 +129,7 @@ class _EventTile extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(width: 12),
-                    Icon(Icons.access_time_rounded,
+                    AppIcon('clock',
                         size: 12, color: AppColors.textLight),
                     const SizedBox(width: 4),
                     Text(

@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 class CustomRolesScreen extends StatefulWidget {
   const CustomRolesScreen({super.key});
 
@@ -162,7 +163,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.security_rounded, color: AppColors.accent, size: 22.sp),
+                        AppIcon('shield-tick', color: AppColors.accent, size: 18),
                         SizedBox(width: 8.w),
                         Text(
                           _editingUrId != null ? 'Edit Role' : 'Add Role',
@@ -182,7 +183,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _isLoading ? null : _saveRole,
-                            icon: Icon(_editingUrId != null ? Icons.save : Icons.add, size: 18.sp),
+                            icon: AppIcon(_editingUrId != null ? 'save-2' : 'add', size: 18),
                             label: Text(_editingUrId != null ? 'Update' : 'Add'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
@@ -227,20 +228,26 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.admin_panel_settings_rounded, size: 18.sp, color: AppColors.accent),
+                        AppIcon('security-user', size: 18, color: AppColors.accent),
                         SizedBox(width: 8.w),
                         Text('Custom Roles', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                         const Spacer(),
                         Text('${_roles.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         SizedBox(width: 12.w),
-                        TextButton.icon(
-                          onPressed: _fetchRoles,
-                          icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                          label: const Text('Refresh'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                        SizedBox(
+                          height: 40,
+                          child: ElevatedButton.icon(
+                            onPressed: _fetchRoles,
+                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            label: const Text('Refresh'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(horizontal: 18.w),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                       ],
@@ -292,7 +299,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                                     borderRadius: BorderRadius.circular(6.r),
                                     child: Padding(
                                       padding: EdgeInsets.all(4.w),
-                                      child: Icon(Icons.edit_rounded, size: 16.sp, color: AppColors.accent),
+                                      child: AppIcon('edit-2', size: 16, color: AppColors.accent),
                                     ),
                                   ),
                                   SizedBox(width: 8.w),
@@ -301,7 +308,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                                     borderRadius: BorderRadius.circular(6.r),
                                     child: Padding(
                                       padding: EdgeInsets.all(4.w),
-                                      child: Icon(Icons.delete_rounded, size: 16.sp, color: Colors.red),
+                                      child: AppIcon('trash', size: 16, color: Colors.red),
                                     ),
                                   ),
                                 ],
