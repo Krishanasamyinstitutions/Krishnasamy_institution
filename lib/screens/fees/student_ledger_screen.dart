@@ -85,6 +85,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       final rawClasses = counts.keys.toList();
       final ordered = _classOrder.where(rawClasses.contains).toList();
       final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList()..sort();
+      if (!mounted) return;
       setState(() {
         _allStudents = students;
         _classes = [...ordered, ...extra];
@@ -93,6 +94,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         _loadingClasses = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _loadingClasses = false);
     }
   }
