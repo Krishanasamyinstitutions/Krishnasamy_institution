@@ -6,6 +6,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 
+import '../../widgets/app_icon.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -99,8 +100,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: Icon(
-                        Icons.school_rounded,
+                      child: AppIcon('teacher',
                         size: 60.sp,
                         color: AppColors.accent,
                       ),

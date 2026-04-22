@@ -10,6 +10,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
 int _classIndex(String c) {
@@ -84,13 +85,6 @@ class _StudentFeeCollectionScreenState
     _sweepOrphanedPayments();
   }
 
-  /// Reconcile any 'I' (in-progress) online payments older than 15 minutes.
-  /// For each one, ask Razorpay for the actual status:
-  ///   - captured: call complete_payment_grouped so a paynumber is generated
-  ///     and feedemand rows are updated (matching the live-polling path).
-  ///   - anything else: mark 'F'.
-  /// This prevents the case where polling was cut short but the student's
-  /// money cleared — without this sweep the row sits at 'I' forever.
   Future<void> _sweepOrphanedPayments() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
@@ -120,8 +114,6 @@ class _StudentFeeCollectionScreenState
           } catch (_) {}
         }
         if (captured) {
-          // Decode stored items and run the normal completion path so the
-          // row gets a paynumber and feedemand is updated.
           List<dynamic> items = [];
           final raw = p['payitems']?.toString();
           if (raw != null && raw.isNotEmpty) {
@@ -525,75 +517,84 @@ class _StudentFeeCollectionScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        // Header card
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.payments_rounded, color: AppColors.accent, size: 22.sp),
-              SizedBox(width: 10.w),
-              Text('Fee Collection',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      )),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _clear,
-                icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                label: const Text('Clear'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                  textStyle: TextStyle(
-                      fontSize: 13.sp, fontWeight: FontWeight.w500),
-                ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Top: Student Lookup (horizontal) ──
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
               ),
-            ],
-          ),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: _buildStudentLookupContent(),
+            ),
+            SizedBox(height: 12.h),
+            // Body
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_student != null) ...[
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      padding: EdgeInsets.all(12.w),
+                      child: _buildStudentCardContent(),
+                    ),
+                    SizedBox(height: 12.h),
+                  ],
+                  // ── Demands ──
+                  Expanded(child: _buildDemandsPanel()),
+                ],
+              ),
+            ),
+          ],
         ),
-        SizedBox(height: 10.h),
-
-        // Body
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Top: Student Lookup (horizontal) ──
-              Container(
+        // Floating suggestions popup over the body (doesn't push content down)
+        if (_studentSuggestions.isNotEmpty || _classSuggestions.isNotEmpty)
+          Positioned(
+            left: 260,
+            width: 500,
+            top: 115,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              shadowColor: Colors.black.withValues(alpha: 0.15),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 520),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: EdgeInsets.all(12.w),
-                child: _buildStudentLookupContent(),
-              ),
-              SizedBox(height: 12.h),
-              if (_student != null) ...[
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  padding: EdgeInsets.all(12.w),
-                  child: _buildStudentCardContent(),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _studentSuggestions.isNotEmpty
+                      ? _studentSuggestions.length
+                      : _classSuggestions.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final source = _studentSuggestions.isNotEmpty ? _studentSuggestions : _classSuggestions;
+                    final s = source[i];
+                    return ListTile(
+                      dense: true,
+                      title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                      onTap: () => _selectSuggestion(s),
+                    );
+                  },
                 ),
-                SizedBox(height: 12.h),
-              ],
-              // ── Demands ──
-              Expanded(child: _buildDemandsPanel()),
-            ],
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -603,12 +604,36 @@ class _StudentFeeCollectionScreenState
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Student Lookup',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  )),
-          SizedBox(height: 12.h),
+          Row(
+            children: [
+              AppIcon.linear('search-normal', size: 18, color: AppColors.accent),
+              SizedBox(width: 8.w),
+              Text('Student Lookup',
+                  style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      )),
+              const Spacer(),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _clear,
+                  icon: AppIcon('refresh', size: 16, color: Colors.white),
+                  label: const Text('Clear'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 14.h),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -616,17 +641,20 @@ class _StudentFeeCollectionScreenState
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: _admNoController,
-                        onSubmitted: (_) => _search(),
-                        decoration: _inputDec('Roll No'),
-                        style: TextStyle(fontSize: 13.sp),
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          controller: _admNoController,
+                          onSubmitted: (_) => _search(),
+                          decoration: _inputDec('Roll No'),
+                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                        ),
                       ),
                     ),
                     SizedBox(width: 8.w),
                     SizedBox(
-                      height: 42.h,
-                      width: 42.w,
+                      height: 40,
+                      width: 40,
                       child: ElevatedButton(
                         onPressed: _searching ? null : _search,
                         style: ElevatedButton.styleFrom(
@@ -640,10 +668,10 @@ class _StudentFeeCollectionScreenState
                             ? SizedBox(
                                 width: 18.w,
                                 height: 18.h,
-                                child: CircularProgressIndicator(
+                                child: const CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white),
                               )
-                            : Icon(Icons.search_rounded, size: 20.sp),
+                            : const AppIcon.linear('search-normal', size: 14),
                       ),
                     ),
                   ],
@@ -651,117 +679,76 @@ class _StudentFeeCollectionScreenState
               ),
               SizedBox(width: 10.w),
               Expanded(
-                child: TextField(
-                  controller: _nameController,
-                  decoration: _inputDec('Student Name'),
-                  style: TextStyle(fontSize: 13.sp),
-                  onChanged: _searchByName,
+                child: SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: _nameController,
+                    decoration: _inputDec('Student Name'),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    onChanged: _searchByName,
+                  ),
                 ),
               ),
               SizedBox(width: 10.w),
               Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedCourse,
-                  decoration: _inputDec('Course'),
-                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                  isExpanded: true,
-                  items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedCourse = val;
-                      _selectedClass = null;
-                      _classSuggestions = [];
-                      if (val != null && _courseClassMap.containsKey(val)) {
-                        _classList = List<String>.from(_courseClassMap[val]!);
-                      } else if (val != null) {
-                        _classList = List<String>.from(_allClasses);
-                      } else {
-                        _classList = List<String>.from(_allClasses);
-                      }
-                      _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
-                      if (val != null && val.startsWith('M') && _classList.length > 2) {
-                        _classList = _classList.sublist(0, 2);
-                      }
-                    });
-                  },
+                child: SizedBox(
+                  height: 40,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedCourse,
+                    decoration: _inputDec('Course'),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    isExpanded: true,
+                    items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedCourse = val;
+                        _selectedClass = null;
+                        _classSuggestions = [];
+                        if (val != null && _courseClassMap.containsKey(val)) {
+                          _classList = List<String>.from(_courseClassMap[val]!);
+                        } else if (val != null) {
+                          _classList = List<String>.from(_allClasses);
+                        } else {
+                          _classList = List<String>.from(_allClasses);
+                        }
+                        _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+                        if (val != null && val.startsWith('M') && _classList.length > 2) {
+                          _classList = _classList.sublist(0, 2);
+                        }
+                      });
+                    },
+                  ),
                 ),
               ),
               SizedBox(width: 10.w),
               Expanded(
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey(_selectedCourse),
-                  value: _selectedClass,
-                  decoration: _inputDec('Class'),
-                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                  isExpanded: true,
-                  items: _classList.map((c) {
-                    final label = _selectedCourse != null && c.contains('-')
-                        ? '${c.split('-').first} Year'
-                        : c;
-                    return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp)));
-                  }).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedClass = val;
-                      _classController.text = val ?? '';
-                      _classSuggestions = [];
-                    });
-                    if (val != null) _searchByClass(val);
-                  },
+                child: SizedBox(
+                  height: 40,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey(_selectedCourse),
+                    value: _selectedClass,
+                    decoration: _inputDec('Class'),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    isExpanded: true,
+                    items: _classList.map((c) {
+                      final label = _selectedCourse != null && c.contains('-')
+                          ? '${c.split('-').first} Year'
+                          : c;
+                      return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)));
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedClass = val;
+                        _classController.text = val ?? '';
+                        _classSuggestions = [];
+                      });
+                      if (val != null) _searchByClass(val);
+                    },
+                  ),
                 ),
               ),
             ],
           ),
-          if (_studentSuggestions.isNotEmpty)
-            Container(
-              margin: EdgeInsets.only(top: 4.h),
-              constraints: const BoxConstraints(maxHeight: 180),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: _studentSuggestions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final s = _studentSuggestions[i];
-                  return ListTile(
-                    dense: true,
-                    title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
-                    onTap: () => _selectSuggestion(s),
-                  );
-                },
-              ),
-            ),
-          if (_classSuggestions.isNotEmpty)
-            Container(
-              margin: EdgeInsets.only(top: 4.h),
-              constraints: const BoxConstraints(maxHeight: 220),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: _classSuggestions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final s = _classSuggestions[i];
-                  return ListTile(
-                    dense: true,
-                    title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 13.sp)),
-                    onTap: () => _selectSuggestion(s),
-                  );
-                },
-              ),
-            ),
           if (_errorMsg != null) ...[
             SizedBox(height: 10.h),
             Container(
@@ -824,11 +811,11 @@ class _StudentFeeCollectionScreenState
         SizedBox(width: 16.w),
         Container(width: 1, height: 36.h, color: AppColors.border),
         SizedBox(width: 16.w),
-        Expanded(child: _detailRow(Icons.person_outline_rounded, 'Father', fatherName)),
+        Expanded(child: _detailRow('user', 'Father', fatherName)),
         SizedBox(width: 16.w),
-        Expanded(child: _detailRow(Icons.menu_book_outlined, 'Course', courseName)),
+        Expanded(child: _detailRow('book-1', 'Course', courseName)),
         SizedBox(width: 16.w),
-        Expanded(child: _detailRow(Icons.school_outlined, 'Class', className)),
+        Expanded(child: _detailRow('teacher', 'Class', className)),
       ],
     );
   }
@@ -868,7 +855,7 @@ class _StudentFeeCollectionScreenState
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -876,16 +863,15 @@ class _StudentFeeCollectionScreenState
           // Panel header
           Container(
             padding:
-                EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-            decoration: BoxDecoration(
-              border:
-                  Border(bottom: BorderSide(color: AppColors.border)),
-            ),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                AppIcon.linear('document-text', size: 18, color: AppColors.accent),
+                SizedBox(width: 8.w),
                 Text('Pending Fee Demands',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    style: TextStyle(
+                          fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         )),
@@ -913,19 +899,20 @@ class _StudentFeeCollectionScreenState
                   SizedBox(width: 8.w),
                   SizedBox(
                     width: 180.w,
-                    height: 38.h,
+                    height: 40,
                     child: DropdownButtonFormField<String?>(
                       value: _selectedTerm,
                       isExpanded: true,
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
                         isDense: true,
                       ),
                       items: [
-                        DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp))),
-                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 12.sp), overflow: TextOverflow.ellipsis))),
+                        DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis))),
                       ],
                       onChanged: (v) => setState(() => _selectedTerm = v),
                     ),
@@ -953,7 +940,7 @@ class _StudentFeeCollectionScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_rounded,
+            AppIcon('search-normal-1',
                 size: 52.sp, color: Colors.grey.shade300),
             SizedBox(height: 12.h),
             Text('Search a student to view pending fees',
@@ -969,7 +956,7 @@ class _StudentFeeCollectionScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline_rounded,
+            AppIcon.linear('tick-circle',
                 size: 52.sp, color: Colors.green.shade300),
             SizedBox(height: 12.h),
             Text('No pending fee demands',
@@ -984,12 +971,21 @@ class _StudentFeeCollectionScreenState
     final allSelected = demands.isNotEmpty &&
         demands.every((d) => _selected.contains(_demKey(d)));
 
-    return Column(
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
       children: [
-        // Table header (dark)
+        // Table header
         Container(
-          color: const Color(0xFF6C8EEF),
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+          color: AppColors.tableHeadBg,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
               SizedBox(
@@ -1012,8 +1008,8 @@ class _StudentFeeCollectionScreenState
                   fillColor: WidgetStateProperty.resolveWith((s) =>
                       s.contains(WidgetState.selected)
                           ? AppColors.accent
-                          : Colors.white24),
-                  side: const BorderSide(color: Colors.white38),
+                          : Colors.transparent),
+                  side: BorderSide(color: AppColors.border),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -1179,7 +1175,7 @@ class _StudentFeeCollectionScreenState
           ),
           child: Row(
             children: [
-              Icon(Icons.check_circle_outline_rounded, size: 16.sp, color: AppColors.accent),
+              AppIcon.linear('tick-circle', size: 16, color: AppColors.accent),
               SizedBox(width: 6.w),
               Text(
                 '${_selected.length} of ${demands.length} selected',
@@ -1216,7 +1212,7 @@ class _StudentFeeCollectionScreenState
               ElevatedButton.icon(
                 onPressed:
                     _selected.isEmpty ? null : _onCollectAndReceipt,
-                icon: Icon(Icons.payment_rounded, size: 16.sp),
+                icon: AppIcon('wallet-money', size: 16),
                 label: const Text('Proceed to Pay'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
@@ -1235,6 +1231,8 @@ class _StudentFeeCollectionScreenState
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -1336,7 +1334,7 @@ class _StudentFeeCollectionScreenState
                         ),
                         GestureDetector(
                           onTap: () => Navigator.of(context).pop(),
-                          child: Icon(Icons.close, size: 22.sp, color: AppColors.textSecondary),
+                          child: AppIcon.linear('close-circle', size: 18, color: AppColors.textSecondary),
                         ),
                       ],
                     ),
@@ -1395,9 +1393,8 @@ class _StudentFeeCollectionScreenState
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              size: 16.sp,
+                            AppIcon.linear('info-circle',
+                              size: 16,
                               color: AppColors.info,
                             ),
                             SizedBox(width: 8.w),
@@ -1417,7 +1414,7 @@ class _StudentFeeCollectionScreenState
                           controller: _upiRefController,
                           decoration: InputDecoration(
                             hintText: 'e.g. 412345678901',
-                            prefixIcon: Icon(Icons.receipt_long_rounded, size: 18.sp),
+                            prefixIcon: AppIcon('receipt-2', size: 18),
                             contentPadding: EdgeInsets.symmetric(
                               horizontal: 12.w,
                               vertical: 12.h,
@@ -1479,7 +1476,7 @@ class _StudentFeeCollectionScreenState
                                 },
                                 decoration: InputDecoration(
                                   hintText: 'DD/MM/YYYY',
-                                  suffixIcon: Icon(Icons.calendar_today, size: 16.sp),
+                                  suffixIcon: AppIcon.linear('calendar', size: 16),
                                   contentPadding: EdgeInsets.symmetric(
                                     horizontal: 12.w,
                                     vertical: 12.h,
@@ -1681,7 +1678,7 @@ class _StudentFeeCollectionScreenState
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56.sp),
+            AppIcon('tick-circle', color: AppColors.success, size: 56.sp),
             SizedBox(height: 12.h),
             Text('Payment Successful', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
             SizedBox(height: 8.h),
@@ -1695,7 +1692,7 @@ class _StudentFeeCollectionScreenState
                 _clear();
                 if (payId != null) _downloadReceipt(payId, payNumber);
               },
-              icon: Icon(Icons.download_rounded, size: 16.sp),
+              icon: AppIcon('document-download', size: 16),
               label: const Text('Download Receipt'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.accent,
@@ -1742,10 +1739,6 @@ class _StudentFeeCollectionScreenState
     // Declared outside try so the catch block can reset fineamount on failure.
     final items = <Map<String, dynamic>>[];
 
-    // Pre-flight: re-fetch balances for selected demands to catch the case
-    // where another accountant already collected these fees while this
-    // screen was open. Fast-path UI feedback — the DB still enforces this
-    // authoritatively via FOR UPDATE in process_grouped_payment.
     try {
       final selectedDemIds = _allDemands
           .where((d) => _selected.contains(_demKey(d)))
@@ -1935,9 +1928,6 @@ class _StudentFeeCollectionScreenState
     final totalNet = _totalNetSelected;
     final amountInPaise = (totalNet * 100).round();
 
-    // Block duplicate online attempts while a recent 'I' row exists for this
-    // student. The sweep only clears orphans after 15 minutes, so within that
-    // window we warn the user to wait instead of creating another pending row.
     try {
       final pending = await SupabaseService.fromSchema('payment')
           .select('pay_id, createdat')
@@ -2002,12 +1992,7 @@ class _StudentFeeCollectionScreenState
         });
       }
 
-      // 1. Create a temporary payment for Razorpay order (status I).
-      // Use insert().select() to atomically return pay_id — avoids the race
-      // where a follow-up query could pick up a different row if two online
-      // payments are started simultaneously for the same student.
-      // Store the items JSON in paygwresponse so the orphan sweep can
-      // reconstruct and finalize this payment if polling misses the capture.
+      // 1. Create a temporary payment for Razorpay order (status I)
       final inserted = await SupabaseService.fromSchema('payment').insert({
         'ins_id': insId,
         'inscode': inscode,
@@ -2104,8 +2089,7 @@ class _StudentFeeCollectionScreenState
 </html>
 ''';
 
-      // Write temp HTML file for WebView — unique per pay_id so concurrent
-      // sessions (or retries after an abandoned checkout) never share state.
+      // Write temp HTML file for WebView
       final tempDir = Directory.systemTemp;
       final tempFile = File('${tempDir.path}/tbs_razorpay_checkout_$payId.html');
       await tempFile.writeAsString(html);
@@ -2144,17 +2128,12 @@ class _StudentFeeCollectionScreenState
       return;
     }
 
-    // Start polling for payment status. Cap total polling time at 10 minutes
-    // so a stuck Razorpay session can't leave the dialog and timer alive.
+    // Start polling for payment status. Cap total polling at 10 minutes.
     final pollStarted = DateTime.now();
     const pollMaxDuration = Duration(minutes: 10);
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (DateTime.now().difference(pollStarted) > pollMaxDuration) {
         timer.cancel();
-        // Before giving up, do ONE final verification with Razorpay. The
-        // student may have captured the payment in the last few seconds
-        // before our timer elapsed — we don't want to mark F while money
-        // has actually cleared on their side.
         try {
           final payRec = await SupabaseService.fromSchema('payment')
               .select('payorderid').eq('pay_id', payId).single();
@@ -2195,8 +2174,6 @@ class _StudentFeeCollectionScreenState
         final rpStatus = rpData['status']?.toString();
 
         if (rpPaymentId != null && rpPaymentId.isNotEmpty) {
-          // Only 'captured' means money is actually in the account.
-          // 'authorized' is still pending — treat as in-progress (keep polling).
           if (rpStatus == 'captured') {
             timer.cancel();
             await SupabaseService.fromSchema('payment').update({
@@ -2214,10 +2191,8 @@ class _StudentFeeCollectionScreenState
       } catch (_) {}
     });
 
-    // Show WebView dialog. Capture the dialog's own BuildContext so the
-    // polling paths (below) can pop the dialog before we dispose the
-    // WebviewController — otherwise the exit-animation frames render a
-    // disposed controller and Flutter throws "used after being disposed".
+    // Show WebView dialog. Capture its BuildContext so polling paths can
+    // pop before we dispose the WebviewController.
     BuildContext? dialogCtx;
     if (mounted) {
       showDialog(
@@ -2241,7 +2216,7 @@ class _StudentFeeCollectionScreenState
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.payment, color: Colors.white, size: 20.sp),
+                      AppIcon.linear('wallet-money', color: Colors.white, size: 20),
                       SizedBox(width: 8.w),
                       Expanded(
                         child: Text(
@@ -2252,10 +2227,6 @@ class _StudentFeeCollectionScreenState
                       InkWell(
                         onTap: () async {
                           _pollTimer?.cancel();
-                          // Don't dispose webviewController here — the dialog's
-                          // exit animation still renders the Webview widget
-                          // for a frame or two. Dispose happens once after
-                          // completer.future resolves below.
                           try {
                             final checkPay = await SupabaseService.fromSchema('payment')
                                 .select('payreference')
@@ -2272,7 +2243,7 @@ class _StudentFeeCollectionScreenState
                           Navigator.pop(ctx);
                           if (!completer.isCompleted) completer.complete(null);
                         },
-                        child: Icon(Icons.close, color: Colors.white, size: 20.sp),
+                        child: AppIcon.linear('close-circle', color: Colors.white, size: 20),
                       ),
                     ],
                   ),
@@ -2291,9 +2262,7 @@ class _StudentFeeCollectionScreenState
 
     final result = await completer.future;
 
-    // Pop the dialog if it's still showing (polling paths don't pop it
-    // themselves — only the close/cancel onTap handlers do). Must happen
-    // before dispose so the Webview widget is no longer in the tree.
+    // Pop dialog first (if polling paths finished without popping).
     if (dialogCtx != null && dialogCtx!.mounted) {
       final nav = Navigator.maybeOf(dialogCtx!);
       if (nav != null && nav.canPop()) {
@@ -2301,8 +2270,7 @@ class _StudentFeeCollectionScreenState
       }
     }
 
-    // Let the dialog's exit animation finish before disposing the
-    // controller, otherwise Flutter renders a disposed Webview and throws.
+    // Let the exit animation finish before disposing the Webview.
     await Future.delayed(const Duration(milliseconds: 300));
     try { webviewController.dispose(); } catch (_) {}
 
@@ -2406,7 +2374,7 @@ class _StudentFeeCollectionScreenState
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       padding: EdgeInsets.all(12.w),
@@ -2434,11 +2402,11 @@ class _StudentFeeCollectionScreenState
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value) {
+  Widget _detailRow(String icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15.sp, color: AppColors.textSecondary),
+        AppIcon(icon, size: 15, color: AppColors.textSecondary),
         SizedBox(width: 8.w),
         Text('$label  ',
             style: TextStyle(
@@ -2535,7 +2503,8 @@ class _THCell extends StatelessWidget {
           style: TextStyle(
               fontSize: 13.sp,
               fontWeight: FontWeight.w700,
-              color: Colors.white)),
+              color: AppColors.textPrimary,
+              letterSpacing: 0.3)),
     );
   }
 }
@@ -2554,7 +2523,7 @@ class _TDCell extends StatelessWidget {
       child: Text(text,
           textAlign: textAlign,
           style: style ??
-              TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+              TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis),
     );
   }

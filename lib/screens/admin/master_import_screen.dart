@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../widgets/app_icon.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
@@ -24,11 +25,11 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(errors.isEmpty ? Icons.check_circle_rounded : Icons.warning_rounded, size: 64.sp, color: errors.isEmpty ? AppColors.success : AppColors.error),
+            AppIcon(errors.isEmpty ? 'tick-circle' : 'warning-2', size: 64.sp, color: errors.isEmpty ? AppColors.success : AppColors.error),
             SizedBox(height: 16.h),
             Text(errors.isEmpty ? 'Import Complete' : 'Import Completed with Errors', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
             SizedBox(height: 12.h),
-            Text('$imported imported successfully, $skipped skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            Text('$imported imported successfully, $skipped skipped', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
             if (errors.isNotEmpty) ...[
               SizedBox(height: 16.h),
               Container(
@@ -88,64 +89,76 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Tabs (pill style, same as Reports)
         ListenableBuilder(
           listenable: _tabCtrl,
           builder: (context, _) {
             final selected = _tabCtrl.index;
             final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand', 'Admission Type', 'Quota'];
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border),
-              ),
-              padding: EdgeInsets.all(4.w),
-              child: Row(
-                children: List.generate(tabLabels.length, (i) {
-                  final isActive = selected == i;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _tabCtrl.animateTo(i),
-                      child: Container(
-                        margin: EdgeInsets.only(right: i < tabLabels.length - 1 ? 4.w : 0),
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        decoration: BoxDecoration(
-                          color: isActive ? AppColors.accent : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Center(
-                          child: Text(
-                            tabLabels[i],
-                            style: TextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                              color: isActive ? Colors.white : AppColors.textPrimary,
-                            ),
+            final tabIcons = ['teacher', 'book-1', 'category-2', 'receipt-1', 'receipt-discount', 'note-2', 'user-tick', 'ticket'];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < tabLabels.length; i++) ...[
+                      GestureDetector(
+                        onTap: () => _tabCtrl.animateTo(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
+                              const SizedBox(width: 8),
+                              Text(
+                                tabLabels[i],
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
               ),
             );
           },
         ),
-        SizedBox(height: 10.h),
+        // Content (white card)
         Expanded(
-          child: TabBarView(
-            controller: _tabCtrl,
-            children: const [
-              _CourseTab(),
-              _ClassTab(),
-              _FeeGroupTab(),
-              _FeeTypeTab(),
-              _ConcessionTab(),
-              _ClassFeeDemandTab(),
-              _AdmissionTypeTab(),
-              _QuotaTab(),
-            ],
+          child: Container(
+            decoration: AppCard.decoration(),
+            clipBehavior: Clip.antiAlias,
+            margin: const EdgeInsets.only(top: 8),
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: const [
+                _CourseTab(),
+                _ClassTab(),
+                _FeeGroupTab(),
+                _FeeTypeTab(),
+                _ConcessionTab(),
+                _ClassFeeDemandTab(),
+                _AdmissionTypeTab(),
+                _QuotaTab(),
+              ],
+            ),
           ),
         ),
       ],
@@ -294,13 +307,13 @@ Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = 
   final child = Container(
     padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
     alignment: center ? Alignment.center : Alignment.centerLeft,
-    child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
+    child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
 
 Widget _gridHeaderDivider() {
-  return Container(width: 1, height: 36.h, color: Colors.white.withValues(alpha: 0.15));
+  return Container(width: 1, height: 36.h, color: AppColors.border);
 }
 
 Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
@@ -310,7 +323,7 @@ Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = fa
     decoration: BoxDecoration(
       border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
     ),
-    child: Text(text, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+    child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -354,16 +367,16 @@ Widget _buildImportCard({
         // Title bar
         Row(
           children: [
-            Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
+            AppIcon('document-upload', size: 20, color: AppColors.accent),
             SizedBox(width: 8.w),
             Text(title, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
             const Spacer(),
             if (fileName != null)
-              Text(fileName, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              Text(fileName, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
             SizedBox(width: 12.w),
             ElevatedButton.icon(
               onPressed: onBrowse,
-              icon: Icon(Icons.folder_open_rounded, size: 16.sp),
+              icon: AppIcon('folder-open', size: 16),
               label: const Text('Browse'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
@@ -376,7 +389,7 @@ Widget _buildImportCard({
             SizedBox(width: 8.w),
             ElevatedButton.icon(
               onPressed: onTemplate,
-              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+              icon: AppIcon('grid-1', size: 16),
               label: const Text('Format to Excel'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF217346),
@@ -390,7 +403,7 @@ Widget _buildImportCard({
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: onSampleDownload,
-                icon: Icon(Icons.download_rounded, size: 16.sp),
+                icon: AppIcon('document-download', size: 16),
                 label: const Text('Sample Data'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE65100),
@@ -416,11 +429,11 @@ Widget _buildImportCard({
               children: [
                 Row(
                   children: [
-                    Icon(errors.isEmpty ? Icons.check_circle : Icons.warning_rounded, color: errors.isEmpty ? AppColors.success : AppColors.error, size: 18.sp),
+                    AppIcon(errors.isEmpty ? 'tick-circle' : 'warning-2', color: errors.isEmpty ? AppColors.success : AppColors.error, size: 18),
                     SizedBox(width: 8.w),
                     Text('$imported imported, $skipped skipped', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp)),
                     const Spacer(),
-                    IconButton(icon: Icon(Icons.close, size: 16.sp), onPressed: onDismissResult, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                    IconButton(icon: AppIcon.linear('close-circle', size: 16), onPressed: onDismissResult, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                   ],
                 ),
                 if (errors.isNotEmpty) ...[
@@ -429,7 +442,7 @@ Widget _buildImportCard({
                     padding: EdgeInsets.only(top: 2.h),
                     child: Text(e, style: TextStyle(fontSize: 13.sp, color: Colors.red)),
                   )),
-                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                  if (errors.length > 5) Text('... and ${errors.length - 5} more errors', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                 ],
               ],
             ),
@@ -449,7 +462,7 @@ Widget _buildImportCard({
                 // Header row
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6C8EEF),
+                    color: AppColors.tableHeadBg,
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(7.r),
                       topRight: Radius.circular(7.r),
@@ -472,7 +485,7 @@ Widget _buildImportCard({
                     color: AppColors.accent.withValues(alpha: 0.06),
                     child: Row(
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 14.sp, color: AppColors.accent),
+                        AppIcon.linear('box-1', size: 14, color: AppColors.accent),
                         SizedBox(width: 6.w),
                         Text('Existing Records (${existingRows.length})', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                       ],
@@ -487,11 +500,11 @@ Widget _buildImportCard({
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                  AppIcon('element-4', size: 48.sp, color: AppColors.textPrimary.withValues(alpha: 0.3)),
                                   SizedBox(height: 8.h),
-                                  Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                  Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                                   SizedBox(height: 4.h),
-                                  Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                  Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                                 ],
                               ),
                             )
@@ -527,14 +540,14 @@ Widget _buildImportCard({
         // Bottom bar
         Row(
           children: [
-            Text('${displayRows.length} rows${showExisting ? ' (existing)' : ''}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            Text('${displayRows.length} rows${showExisting ? ' (existing)' : ''}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             const Spacer(),
             OutlinedButton.icon(
               onPressed: rows.isNotEmpty && !saving ? onValidate : null,
-              icon: Icon(Icons.check_circle_outline_rounded, size: 16.sp),
+              icon: AppIcon.linear('tick-circle', size: 16),
               label: const Text('Validate'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: rows.isNotEmpty && !saving ? AppColors.accent : AppColors.textSecondary,
+                foregroundColor: rows.isNotEmpty && !saving ? AppColors.accent : AppColors.textPrimary,
                 padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                 textStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
@@ -545,7 +558,7 @@ Widget _buildImportCard({
               onPressed: saving ? null : (isValidated ? onSave : null),
               icon: saving
                   ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Icon(Icons.save_rounded, size: 16.sp),
+                  : AppIcon('save-2', size: 16),
               label: Text(saving ? 'Saving...' : 'Save'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isValidated ? AppColors.accent : Colors.grey.shade300,

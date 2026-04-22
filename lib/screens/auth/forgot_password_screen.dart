@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 
+import '../../widgets/app_icon.dart';
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -52,7 +53,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_rounded),
+                      icon: const AppIcon.linear('Chevron Left'),
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.white,
                         side: const BorderSide(color: AppColors.border),
@@ -79,10 +80,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             : AppColors.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(22.r),
                       ),
-                      child: Icon(
+                      child: AppIcon(
                         _emailSent
-                            ? Icons.mark_email_read_rounded
-                            : Icons.lock_reset_rounded,
+                            ? 'sms-tracking'
+                            : 'password-check',
                         size: 40.sp,
                         color: _emailSent
                             ? AppColors.success
@@ -141,8 +142,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
                               hintText: 'you@school.edu',
-                              prefixIcon: Icon(Icons.email_outlined,
-                                  size: 20.sp, color: AppColors.textLight),
+                              prefixIcon: AppIcon.linear('sms',
+                                  size: 20, color: AppColors.textLight),
                               prefixIconConstraints:
                                   BoxConstraints(minWidth: 52.w, minHeight: 0),
                             ),

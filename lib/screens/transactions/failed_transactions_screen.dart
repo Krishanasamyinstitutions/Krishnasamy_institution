@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
+import '../../widgets/app_icon.dart';
+import '../../widgets/app_search_field.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
@@ -33,6 +35,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   Map<int, StudentModel> _stuIdToStudent = {};
   DateTime? _filterFromDate;
   DateTime? _filterToDate;
+  final Set<String> _filterMethods = {}; // empty = all methods
   String? _insName;
   String? _insLogoUrl;
   String? _insAddress;
@@ -50,6 +53,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         if (_filterFromDate != null && dateOnly.isBefore(_filterFromDate!)) return false;
         if (_filterToDate != null && dateOnly.isAfter(_filterToDate!)) return false;
         return true;
+      }).toList();
+    }
+    // Method filter
+    if (_filterMethods.isNotEmpty) {
+      filtered = filtered.where((t) {
+        final m = (t.paymethod ?? '').toLowerCase();
+        return _filterMethods.contains(m);
       }).toList();
     }
     // Search filter
@@ -153,7 +163,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     }
     return TextButton.icon(
       onPressed: () => _showReceiptOptions(t),
-      icon: Icon(Icons.download_rounded, size: 18.sp, color: AppColors.accent),
+      icon: AppIcon('document-download', size: 18, color: AppColors.accent),
       label: Text('Download', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
       style: TextButton.styleFrom(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -266,7 +276,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         Navigator.pop(ctx);
                         _downloadReceiptAsPdf(t);
                       },
-                      icon: const Icon(Icons.download_rounded, size: 18),
+                      icon: const AppIcon('document-download', size: 18),
                       label: const Text('Download'),
                     ),
                     SizedBox(width: 8.w),
@@ -275,7 +285,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         Navigator.pop(ctx);
                         _printReceipt(t);
                       },
-                      icon: Icon(Icons.print_rounded, size: 18.sp),
+                      icon: AppIcon('printer', size: 18),
                       label: const Text('Print'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
@@ -289,7 +299,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                     SizedBox(width: 8.w),
                     IconButton(
                       onPressed: () => Navigator.pop(ctx),
-                      icon: Icon(Icons.close, size: 20.sp),
+                      icon: AppIcon.linear('close-circle', size: 20),
                     ),
                   ],
                 ),
@@ -691,7 +701,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             final selected = _tabController.index;
             final tabColors = [AppColors.accent, Colors.green.shade600, Colors.red.shade600];
             final tabBgColors = [AppColors.accent.withValues(alpha: 0.1), Colors.green.shade50, Colors.red.shade50];
-            final tabIcons = [Icons.list_alt_rounded, Icons.check_circle_rounded, Icons.error_rounded];
+            final tabIcons = ['menu-1', 'tick-circle', 'close-circle'];
             final tabLabels = ['All', 'Paid', 'Failed'];
             final filteredPaid = _applyDateFilter(_paidTransactions);
             final filteredFailed = _applyDateFilter(_failedTransactions);
@@ -701,50 +711,53 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               filteredFailed.length,
             ];
 
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border),
-              ),
-              padding: const EdgeInsets.all(4),
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
-                children: List.generate(3, (i) {
-                  final isActive = selected == i;
-                  return Expanded(
-                    child: GestureDetector(
+                children: [
+                  for (int i = 0; i < 3; i++) ...[
+                    GestureDetector(
                       onTap: () => _tabController.animateTo(i),
-                      child: Container(
-                        margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                         decoration: BoxDecoration(
-                          color: isActive ? tabColors[i] : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10.r),
+                          color: selected == i ? tabColors[i] : Colors.transparent,
+                          borderRadius: BorderRadius.circular(22),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(tabIcons[i], size: 16, color: isActive ? Colors.white : tabColors[i]),
+                            AppIcon(tabIcons[i], size: 16, color: selected == i ? Colors.white : tabColors[i]),
                             SizedBox(width: 8.w),
-                            Text(tabLabels[i], style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textPrimary)),
+                            Text(
+                              tabLabels[i],
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: selected == i ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
                             SizedBox(width: 8.w),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isActive ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
-                                borderRadius: BorderRadius.circular(10.r),
+                                color: selected == i ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
+                                borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${tabCounts[i]}',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: isActive ? Colors.white : tabColors[i]),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: selected == i ? Colors.white : tabColors[i]),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                  );
-                }),
+                    if (i < 2) const SizedBox(width: 8),
+                  ],
+                ],
               ),
             );
           },
@@ -765,116 +778,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             ),
             child: Column(
               children: [
-                // Date filter row
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.border)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
-                      SizedBox(width: 8.w),
-                      Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                      SizedBox(width: 8.w),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _filterFromDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) setState(() => _filterFromDate = picked);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                              SizedBox(width: 6.w),
-                              Text(
-                                _filterFromDate != null
-                                    ? '${_filterFromDate!.day.toString().padLeft(2, '0')}/${_filterFromDate!.month.toString().padLeft(2, '0')}/${_filterFromDate!.year}'
-                                    : 'From',
-                                style: TextStyle(fontSize: 13.sp),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('—', style: TextStyle(color: AppColors.textSecondary))),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _filterToDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) setState(() => _filterToDate = picked);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                              SizedBox(width: 6.w),
-                              Text(
-                                _filterToDate != null
-                                    ? '${_filterToDate!.day.toString().padLeft(2, '0')}/${_filterToDate!.month.toString().padLeft(2, '0')}/${_filterToDate!.year}'
-                                    : 'To',
-                                style: TextStyle(fontSize: 13.sp),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      ...[
-                        ('Today', () { final now = DateTime.now(); setState(() { _filterFromDate = DateTime(now.year, now.month, now.day); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
-                        ('7 Days', () { final now = DateTime.now(); setState(() { _filterFromDate = now.subtract(const Duration(days: 7)); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
-                        ('30 Days', () { final now = DateTime.now(); setState(() { _filterFromDate = now.subtract(const Duration(days: 30)); _filterToDate = DateTime(now.year, now.month, now.day); }); }),
-                        ('All', () { setState(() { _filterFromDate = null; _filterToDate = null; }); }),
-                      ].map((e) => Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: InkWell(
-                          onTap: e.$2,
-                          borderRadius: BorderRadius.circular(6.r),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(6.r),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Text(e.$1, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500)),
-                          ),
-                        ),
-                      )),
-                    ],
-                  ),
-                ),
                 // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.border)),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      Icon(Icons.receipt_long_rounded,
-                          color: AppColors.primary, size: 20),
+                      AppIcon('receipt-2',
+                          color: AppColors.accent, size: 20),
                       SizedBox(width: 8.w),
                       Text(
                         'Transactions',
@@ -883,46 +793,59 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                             ),
                       ),
                       const Spacer(),
+                      AppSearchField(
+                        controller: _searchController,
+                        hintText: 'Search by name, pay no, reference...',
+                        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                        width: 320,
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.only(right: 10),
+                                child: IconButton(
+                                  icon: const AppIcon('close-circle', size: 14),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                  splashRadius: 12,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              )
+                            : null,
+                      ),
+                      SizedBox(width: 8.w),
                       SizedBox(
-                        width: 260,
-                        height: 34,
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-                          decoration: InputDecoration(
-                            hintText: 'Search by name, pay no, reference...',
-                            hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
-                            prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.close_rounded, size: 16),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _searchQuery = '');
-                                    },
-                                    splashRadius: 14,
-                                  )
-                                : null,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-                            filled: true,
-                            fillColor: AppColors.surface,
-                            isDense: true,
+                        height: 40,
+                        child: OutlinedButton.icon(
+                          onPressed: _openDateRangeDialog,
+                          icon: const AppIcon.linear('calendar', size: 16, color: AppColors.textPrimary),
+                          label: Text(
+                            _dateRangeLabel(),
+                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                           ),
-                          style: TextStyle(fontSize: 13.sp),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 14.w),
+                            side: const BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                          ),
                         ),
                       ),
                       SizedBox(width: 8.w),
-                      TextButton.icon(
-                        onPressed: _fetchData,
-                        icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Refresh'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.textSecondary,
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                          textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                      SizedBox(
+                        height: 40,
+                        child: ElevatedButton.icon(
+                          onPressed: _fetchData,
+                          icon: AppIcon('refresh', size: 16, color: Colors.white),
+                          label: const Text('Refresh'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(horizontal: 18.w),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ],
@@ -949,15 +872,236 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String _dateRangeLabel() {
+    final hasDate = _filterFromDate != null || _filterToDate != null;
+    final hasMethod = _filterMethods.isNotEmpty;
+    if (!hasDate && !hasMethod) return 'Date & Method';
+
+    String datePart;
+    if (!hasDate) {
+      datePart = 'All Dates';
+    } else if (_filterFromDate != null && _filterToDate != null) {
+      datePart = '${_fmtDate(_filterFromDate!)} – ${_fmtDate(_filterToDate!)}';
+    } else if (_filterFromDate != null) {
+      datePart = 'From ${_fmtDate(_filterFromDate!)}';
+    } else {
+      datePart = 'Until ${_fmtDate(_filterToDate!)}';
+    }
+    if (hasMethod) {
+      return '$datePart · ${_filterMethods.length} method${_filterMethods.length == 1 ? '' : 's'}';
+    }
+    return datePart;
+  }
+
+  Future<void> _openDateRangeDialog() async {
+    // Collect available methods from transactions
+    final availableMethods = <String>{};
+    for (final t in _allTransactions) {
+      final m = (t.paymethod ?? '').toLowerCase().trim();
+      if (m.isNotEmpty && m != '-') availableMethods.add(m);
+    }
+    final methodList = availableMethods.toList()..sort();
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        DateTime? from = _filterFromDate;
+        DateTime? to = _filterToDate;
+        final Set<String> methods = {..._filterMethods};
+        return StatefulBuilder(builder: (ctx, setStateDialog) {
+          Widget presetChip(String label, VoidCallback onTap) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              );
+
+          Widget methodChip(String m) {
+            final selected = methods.contains(m);
+            return Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 6),
+              child: InkWell(
+                onTap: () => setStateDialog(() {
+                  if (selected) {
+                    methods.remove(m);
+                  } else {
+                    methods.add(m);
+                  }
+                }),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    m.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
+            return InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: value ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                );
+                if (picked != null) onChanged(picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AppIcon.linear('calendar', size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(value != null ? _fmtDate(value) : hint,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
+              );
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
+            title: Row(
+              children: [
+                Text('Filters', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const AppIcon.linear('close-circle', size: 20, color: AppColors.textSecondary),
+                  splashRadius: 18,
+                  tooltip: 'Close',
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  sectionLabel('QUICK RANGE'),
+                  Row(children: [
+                    presetChip('Today', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = DateTime(now.year, now.month, now.day); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('7 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 7)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('30 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 30)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('All', () {
+                      setStateDialog(() { from = null; to = null; });
+                    }),
+                  ]),
+                  const SizedBox(height: 16),
+                  sectionLabel('CUSTOM RANGE'),
+                  Row(children: [
+                    Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
+                  ]),
+                  if (methodList.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    sectionLabel('PAYMENT METHOD'),
+                    Wrap(children: methodList.map(methodChip).toList()),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => setStateDialog(() { from = null; to = null; methods.clear(); }),
+                child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _filterFromDate = from;
+                    _filterToDate = to;
+                    _filterMethods
+                      ..clear()
+                      ..addAll(methods);
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
   List<PaymentModel> _applyDateFilter(List<PaymentModel> list) {
-    if (_filterFromDate == null && _filterToDate == null) return list;
-    return list.where((t) {
-      final date = t.paydate ?? t.createdat;
-      final dateOnly = DateTime(date.year, date.month, date.day);
-      if (_filterFromDate != null && dateOnly.isBefore(_filterFromDate!)) return false;
-      if (_filterToDate != null && dateOnly.isAfter(_filterToDate!)) return false;
-      return true;
-    }).toList();
+    var filtered = list;
+    if (_filterFromDate != null || _filterToDate != null) {
+      filtered = filtered.where((t) {
+        final date = t.paydate ?? t.createdat;
+        final dateOnly = DateTime(date.year, date.month, date.day);
+        if (_filterFromDate != null && dateOnly.isBefore(_filterFromDate!)) return false;
+        if (_filterToDate != null && dateOnly.isAfter(_filterToDate!)) return false;
+        return true;
+      }).toList();
+    }
+    if (_filterMethods.isNotEmpty) {
+      filtered = filtered.where((t) {
+        final m = (t.paymethod ?? '').toLowerCase();
+        return _filterMethods.contains(m);
+      }).toList();
+    }
+    return filtered;
   }
 
   Widget _buildSummaryCards() {
@@ -976,7 +1120,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '\u20B9 ${paidTotal.toStringAsFixed(2)}',
             '${filteredPaid.length} transactions',
             Colors.green,
-            Icons.check_circle_outline_rounded,
+            'tick-circle',
           ),
         ),
         SizedBox(width: 16.w),
@@ -986,7 +1130,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '\u20B9 ${failedTotal.toStringAsFixed(2)}',
             '${filteredFailed.length} transactions',
             Colors.red,
-            Icons.error_outline_rounded,
+            'info-circle',
           ),
         ),
         SizedBox(width: 16.w),
@@ -996,7 +1140,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredPaid.length + filteredFailed.length}',
             'All records',
             AppColors.primary,
-            Icons.receipt_long_rounded,
+            'receipt-2',
           ),
         ),
       ],
@@ -1004,7 +1148,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   Widget _buildSummaryCard(
-      String title, String value, String subtitle, Color color, IconData icon) {
+      String title, String value, String subtitle, Color color, String icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -1020,7 +1164,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10.r),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: AppIcon(icon, color: color, size: 20),
           ),
           SizedBox(width: 14.w),
           Expanded(
@@ -1061,6 +1205,240 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
+  // ── Sticky-header table (reused by all three tabs) ──
+  static const _txColWidths = <double>[60, 120, 180, 110, 80, 100, 90, 100, 160, 110, 90, 140];
+  static const _txHeaders = <String>[
+    'S NO.', 'PAY NO', 'STUDENT', 'COURSE', 'CLASS', 'AMOUNT',
+    'CURRENCY', 'METHOD', 'REFERENCE', 'DATE', 'STATUS', 'DOWNLOAD RECEIPT',
+  ];
+
+  // Persistent horizontal scroll controllers per tab so the scrollbar thumb tracks scroll state
+  final Map<String, ScrollController> _hCtrls = {};
+  ScrollController _hCtrlFor(String key) => _hCtrls.putIfAbsent(key, () => ScrollController());
+
+  Widget _buildStickyTable(List<PaymentModel> transactions, {bool? fixedIsPaid}) {
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
+    final headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary, letterSpacing: 0.3);
+
+    final baseTotal = _txColWidths.fold<double>(0, (a, b) => a + b) + 32;
+    final ctrlKey = fixedIsPaid == null ? 'all' : (fixedIsPaid ? 'paid' : 'failed');
+    final hController = _hCtrlFor(ctrlKey);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: LayoutBuilder(builder: (ctx, constraints) {
+          final viewportW = constraints.maxWidth;
+          final needsHScroll = baseTotal > viewportW;
+          // If viewport is wider than the base width, scale columns up proportionally
+          // so the table fills the available width. Otherwise keep fixed widths and scroll.
+          final scale = needsHScroll ? 1.0 : (viewportW / baseTotal);
+          final widths = [for (final w in _txColWidths) w * scale];
+          final contentWidth = needsHScroll ? baseTotal : viewportW;
+          final scrollbarHeight = needsHScroll ? 20.0 : 0.0;
+
+          Widget headerRow = Container(
+            color: AppColors.tableHeadBg,
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            width: contentWidth,
+            child: Row(
+              children: [
+                for (int c = 0; c < _txHeaders.length; c++)
+                  SizedBox(width: widths[c], child: Text(_txHeaders[c], style: headerStyle, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          );
+
+          Widget bodyRow(int i) {
+            final t = transactions[i];
+            final stuName = _getStudentName(t);
+            final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
+            final isSuccess = fixedIsPaid ?? t.isSuccess;
+            final statusColor = isSuccess ? Colors.green : Colors.red;
+            final statusText = isSuccess ? 'Paid' : 'Failed';
+            final date = (fixedIsPaid == true ? t.paydate : (fixedIsPaid == false ? t.createdat : (t.paydate ?? t.createdat)));
+            final dateStr = date != null
+                ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
+                : '-';
+            return Container(
+              color: i.isEven ? Colors.white : AppColors.surface,
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              width: contentWidth,
+              child: Row(
+                children: [
+                  SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
+                  SizedBox(width: widths[1], child: Text(t.paynumber ?? '${t.payId}', style: cellStyle)),
+                  SizedBox(width: widths[2], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                  SizedBox(width: widths[3], child: Text(stu?.courname ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[4], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[5], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
+                  SizedBox(width: widths[6], child: Text(t.transcurrency, style: cellStyle)),
+                  SizedBox(width: widths[7], child: Text(t.paymethod ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[8], child: Text(t.payreference ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
+                  SizedBox(width: widths[9], child: Text(dateStr, style: cellStyle)),
+                  SizedBox(
+                    width: widths[10],
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8.r)),
+                        child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13.sp)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: widths[11], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
+                ],
+              ),
+            );
+          }
+
+          final body = ListView.separated(
+            itemCount: transactions.length,
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
+            itemBuilder: (_, i) => bodyRow(i),
+          );
+
+          return Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: hController,
+                  scrollDirection: Axis.horizontal,
+                  physics: needsHScroll ? null : const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: contentWidth,
+                    height: constraints.maxHeight - scrollbarHeight,
+                    child: Column(
+                      children: [
+                        headerRow,
+                        Container(height: 1, color: AppColors.border),
+                        Expanded(child: body),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (needsHScroll) _classicHScrollbar(hController),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _classicHScrollbar(ScrollController ctrl) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (context, _) {
+        return Container(
+          height: 20,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF0F0F0),
+            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () {
+                  if (!ctrl.hasClients) return;
+                  ctrl.animateTo(
+                    (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0E0E0),
+                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                  ),
+                  child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final hasClients = ctrl.hasClients && ctrl.positions.isNotEmpty && ctrl.position.hasContentDimensions;
+                    if (!hasClients) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) setState(() {});
+                      });
+                    }
+                    final maxExtent = hasClients ? ctrl.position.maxScrollExtent : 1.0;
+                    final viewportWidth = hasClients ? ctrl.position.viewportDimension : c.maxWidth;
+                    final totalContentWidth = maxExtent + viewportWidth;
+                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
+                    final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
+                    final trackSpace = c.maxWidth - thumbWidth;
+                    final scrollRatio = maxExtent > 0 ? (ctrl.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+                    final thumbOffset = trackSpace * scrollRatio;
+                    return GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        if (trackSpace > 0 && hasClients) {
+                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                          ctrl.jumpTo(newRatio * maxExtent);
+                        }
+                      },
+                      child: Container(
+                        color: const Color(0xFFF0F0F0),
+                        height: 20,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              left: thumbOffset,
+                              top: 2,
+                              child: Container(
+                                width: thumbWidth,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFC0C0C0),
+                                  borderRadius: BorderRadius.circular(2),
+                                  border: Border.all(color: const Color(0xFFB0B0B0)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  if (!ctrl.hasClients) return;
+                  ctrl.animateTo(
+                    (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0E0E0),
+                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+                  ),
+                  child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildAllTransactionTable() {
     final allTransactions = _allTransactions;
     if (allTransactions.isEmpty) {
@@ -1068,7 +1446,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.receipt_long_rounded,
+            AppIcon('receipt-2',
                 size: 64, color: AppColors.accent.withValues(alpha: 0.5)),
             SizedBox(height: 16.h),
             Text(
@@ -1082,77 +1460,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         ),
       );
     }
-
-    final transactions = allTransactions;
-
-    return SingleChildScrollView(
-      child: DataTable(
-        dividerThickness: 0,
-        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-        headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-        columnSpacing: 20,
-        horizontalMargin: 16,
-        headingRowHeight: 42,
-        columns: const [
-          DataColumn(label: Text('S NO.')),
-          DataColumn(label: Text('PAY NO')),
-          DataColumn(label: Text('STUDENT')),
-          DataColumn(label: Text('COURSE')),
-          DataColumn(label: Text('CLASS')),
-          DataColumn(label: Text('AMOUNT')),
-          DataColumn(label: Text('CURRENCY')),
-          DataColumn(label: Text('METHOD')),
-          DataColumn(label: Text('REFERENCE')),
-          DataColumn(label: Text('DATE')),
-          DataColumn(label: Text('STATUS')),
-          DataColumn(label: Text('DOWNLOAD RECEIPT')),
-        ],
-        rows: List.generate(transactions.length, (i) {
-          final t = transactions[i];
-          final stuName = _getStudentName(t);
-          final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
-          final isPaid = t.isSuccess;
-          final statusColor = isPaid ? Colors.green : Colors.red;
-          final statusText = isPaid ? 'Paid' : 'Failed';
-          final date = t.paydate ?? t.createdat;
-          return DataRow(
-            color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
-            cells: [
-              DataCell(Text('${i + 1}')),
-              DataCell(Text(t.paynumber ?? '${t.payId}')),
-              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
-              DataCell(Text(stu?.courname ?? '-')),
-              DataCell(Text(stu?.stuclass ?? '-')),
-              DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
-              DataCell(Text(t.transcurrency)),
-              DataCell(Text(t.paymethod ?? '-')),
-              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 160), child: Text(t.payreference ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(Text('${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}')),
-              DataCell(Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8.r)),
-                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13.sp)),
-              )),
-              DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
-            ],
-          );
-        }),
-      ),
-    );
+    return _buildStickyTable(allTransactions);
   }
 
-  Widget _buildTransactionTable(List<PaymentModel> allItems,
-      {required bool isPaid}) {
+  Widget _buildTransactionTable(List<PaymentModel> allItems, {required bool isPaid}) {
     if (allItems.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isPaid
-                  ? Icons.payment_rounded
-                  : Icons.check_circle_outline_rounded,
+            AppIcon(
+              isPaid ? 'wallet-money' : 'tick-circle',
               size: 64,
               color: AppColors.accent.withValues(alpha: 0.5),
             ),
@@ -1177,62 +1495,6 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         ),
       );
     }
-
-    final transactions = allItems;
-
-    return SingleChildScrollView(
-      child: DataTable(
-        dividerThickness: 0,
-        headingRowColor: WidgetStateProperty.all(const Color(0xFF6C8EEF)),
-        headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: Colors.white),
-        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-        columnSpacing: 20,
-        horizontalMargin: 16,
-        headingRowHeight: 42,
-        columns: const [
-          DataColumn(label: Text('S NO.')),
-          DataColumn(label: Text('PAY NO')),
-          DataColumn(label: Text('STUDENT')),
-          DataColumn(label: Text('COURSE')),
-          DataColumn(label: Text('CLASS')),
-          DataColumn(label: Text('AMOUNT')),
-          DataColumn(label: Text('CURRENCY')),
-          DataColumn(label: Text('METHOD')),
-          DataColumn(label: Text('REFERENCE')),
-          DataColumn(label: Text('DATE')),
-          DataColumn(label: Text('STATUS')),
-          DataColumn(label: Text('DOWNLOAD RECEIPT')),
-        ],
-        rows: List.generate(transactions.length, (i) {
-          final t = transactions[i];
-          final stuName = _getStudentName(t);
-          final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
-          final statusColor = isPaid ? Colors.green : Colors.red;
-          final statusText = isPaid ? 'Paid' : 'Failed';
-          final date = isPaid ? t.paydate : t.createdat;
-          return DataRow(
-            color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF2F6FA)),
-            cells: [
-              DataCell(Text('${i + 1}')),
-              DataCell(Text(t.paynumber ?? '${t.payId}')),
-              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(stuName, overflow: TextOverflow.ellipsis))),
-              DataCell(Text(stu?.courname ?? '-')),
-              DataCell(Text(stu?.stuclass ?? '-')),
-              DataCell(Text(t.transtotalamount.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w600))),
-              DataCell(Text(t.transcurrency)),
-              DataCell(Text(t.paymethod ?? '-')),
-              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 160), child: Text(t.payreference ?? '-', overflow: TextOverflow.ellipsis))),
-              DataCell(Text(date != null ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}' : '-')),
-              DataCell(Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.shade50, borderRadius: BorderRadius.circular(8.r)),
-                child: Text(statusText, style: TextStyle(color: statusColor.shade700, fontWeight: FontWeight.w600, fontSize: 13.sp)),
-              )),
-              DataCell(t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
-            ],
-          );
-        }),
-      ),
-    );
+    return _buildStickyTable(allItems, fixedIsPaid: isPaid);
   }
 }
