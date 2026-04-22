@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/app_icon.dart';
+import '../../widgets/app_search_field.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
@@ -276,7 +278,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     border: Border(bottom: BorderSide(color: AppColors.border))),
                 child: Row(
                   children: [
-                    Icon(Icons.people_alt_rounded, size: 16.sp, color: AppColors.accent),
+                    AppIcon('people', size: 16, color: AppColors.accent),
                     SizedBox(width: 8.w),
                     Text('Students',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -313,10 +315,17 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             initiallyExpanded: false,
                             tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
                             title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                            trailing: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
-                              child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+                                  child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                                ),
+                                SizedBox(width: 6.w),
+                                AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
+                              ],
                             ),
                             children: classCounts.keys.map((cls) {
                               final count = classCounts[cls] ?? 0;
@@ -340,7 +349,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                         color: color.withValues(alpha: isSelected ? 0.2 : 0.1),
                                         borderRadius: BorderRadius.circular(9.r),
                                       ),
-                                      child: Center(child: Icon(Icons.class_rounded, size: 16.sp, color: color)),
+                                      child: Center(child: AppIcon('book-1', size: 16, color: color)),
                                     ),
                                     SizedBox(width: 10.w),
                                     Expanded(
@@ -363,8 +372,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                       child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: color)),
                                     ),
                                     SizedBox(width: 6.w),
-                                    Icon(isSelected ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
-                                        size: 16.sp, color: isSelected ? color : AppColors.textSecondary),
+                                    AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
                                   ],
                                 ),
                               ),
@@ -416,7 +424,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
           child: Row(
             children: [
-              Icon(Icons.people_alt_rounded, size: 18.sp, color: AppColors.primary),
+              AppIcon('people', size: 18, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
               SizedBox(width: 8.w),
@@ -426,60 +434,76 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                 child: Text('${students.length}', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
               ),
               const Spacer(),
-              SizedBox(
-                width: 200.w, height: 36.h,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(hintText: 'Search...', prefixIcon: Icon(Icons.search, size: 18.sp), isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8.h)),
-                  style: TextStyle(fontSize: 13.sp),
-                ),
+              AppSearchField(
+                controller: _searchController,
+                hintText: 'Search...',
+                onChanged: (_) => setState(() {}),
+                width: 240.w,
               ),
             ],
           ),
         ),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-          color: AppColors.primary,
-          child: Row(
-            children: [
-              SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 40.w),
-            ],
-          ),
-        ),
         Expanded(
-          child: ListView.separated(
-            itemCount: students.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
-            itemBuilder: (context, i) {
-              final s = students[i];
-              return Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _selectStudent(s),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                    color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 48.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                        SizedBox(width: 80.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-                        SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
-                        SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
-                        SizedBox(width: 60.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                        SizedBox(width: 40.w, child: Icon(Icons.chevron_right_rounded, size: 18.sp, color: AppColors.accent)),
+                        SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 40.w),
                       ],
                     ),
                   ),
-                ),
-              );
-            },
+                  Container(height: 1, color: AppColors.border),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: students.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (context, i) {
+                        final s = students[i];
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _selectStudent(s),
+                            child: Container(
+                              color: i.isOdd ? AppColors.surface : Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 48.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 80.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                  Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                                  SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 60.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 40.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -510,7 +534,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.class_rounded, size: 14.sp, color: color),
+              AppIcon('book-1', size: 14, color: color),
               SizedBox(width: 6.w),
               Text('Class $cls',
                   style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: color)),
@@ -525,22 +549,11 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: color)),
               ),
               const Spacer(),
-              SizedBox(
-                width: 240.w,
-                height: 36.h,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight),
-                    prefixIcon: Icon(Icons.search_rounded, size: 16.sp, color: AppColors.textLight),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
-                  ),
-                ),
+              AppSearchField(
+                controller: _searchController,
+                hintText: 'Search...',
+                onChanged: (_) => setState(() {}),
+                width: 260.w,
               ),
             ],
           ),
@@ -548,15 +561,15 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
         // Table header
         Container(
-          color: const Color(0xFF6C8EEF),
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+          color: AppColors.tableHeadBg,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
-              SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
-              SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white))),
+              SizedBox(width: 48.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              SizedBox(width: 80.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              SizedBox(width: 60.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
               SizedBox(width: 40.w),
             ],
           ),
@@ -578,31 +591,32 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           child: InkWell(
                             onTap: () => _selectStudent(s),
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                              color: i.isOdd ? AppColors.surface : Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
                               child: Row(
                                 children: [
                                   SizedBox(
                                     width: 48.w,
-                                    child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                    child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                                   ),
                                   SizedBox(
                                     width: 80.w,
-                                    child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: color)),
+                                    child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                                   ),
                                   Expanded(
-                                    child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                    child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
                                   ),
                                   SizedBox(
                                     width: 100.w,
-                                    child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w500)),
+                                    child: Text(s.courname ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                                   ),
                                   SizedBox(
                                     width: 60.w,
-                                    child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                    child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                                   ),
                                   SizedBox(
                                     width: 40.w,
-                                    child: Icon(Icons.chevron_right_rounded, size: 18.sp, color: color.withValues(alpha: 0.7)),
+                                    child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary),
                                   ),
                                 ],
                               ),
@@ -625,25 +639,35 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       children: [
         // Back + student info
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
           child: Row(
             children: [
-              IconButton(
-                onPressed: () => setState(() {
+              InkWell(
+                onTap: () => setState(() {
                   _selectedStudent = null;
                   _demands = [];
-                              _parent = null;
+                  _parent = null;
                 }),
-                icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
-                color: AppColors.accent,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                tooltip: 'Back to student list',
+                borderRadius: BorderRadius.circular(8.r),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                      SizedBox(width: 6.w),
+                      Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ],
+                  ),
+                ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 12.w),
+              Container(width: 1, height: 18, color: AppColors.border),
+              SizedBox(width: 12.w),
               CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.accent.withValues(alpha: 0.12),
@@ -677,14 +701,22 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                 SizedBox(width: 8.w),
                 _chip('Pending', '₹${_totalPending.toStringAsFixed(0)}', AppColors.error),
                 SizedBox(width: 12.w),
-                TextButton.icon(
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
                   onPressed: _demands.isNotEmpty ? _exportToExcel : null,
-                  icon: Icon(Icons.download_rounded, size: 16.sp),
+                  icon: AppIcon('document-download', size: 16, color: Colors.white),
                   label: const Text('Export'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.accent,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.4),
+                    disabledForegroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
                   ),
                 ),
               ],
@@ -708,12 +740,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     final totalFine    = rows.fold(0.0, (s, r) => s + ((r['fine'] as num?)?.toDouble() ?? 0));
     final closingBalance = totalDebit - totalCredit;
 
-    return Column(
+    return Padding(
+      padding: EdgeInsets.all(16.w),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
       children: [
         // ── Column header ──
         Container(
-          color: const Color(0xFF6C8EEF),
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+          color: AppColors.tableHeadBg,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
               SizedBox(width: 100.w, child: const _TH('DATE')),
@@ -727,6 +768,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             ],
           ),
         ),
+        Container(height: 1, color: AppColors.border),
 
         // ── Data rows ──
         Expanded(
@@ -738,7 +780,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.receipt_long_outlined, size: 48.sp, color: Colors.grey.shade300),
+                            AppIcon.linear('receipt-2', size: 48.sp, color: Colors.grey.shade300),
                             SizedBox(height: 12.h),
                             Text('No fee demands found for this student',
                                 style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400)),
@@ -757,14 +799,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     final credit = r['credit'] as double;
                     final isDemand = r['type'] == 'demand';
                     return Container(
-                      color: i.isOdd ? const Color(0xFFFAFAFA) : Colors.white,
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+                      color: i.isOdd ? AppColors.surface : Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
                       child: Row(
                         children: [
                           SizedBox(
                             width: 100.w,
                             child: Text(_fmt(r['date'] as String),
-                                style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                           ),
                           SizedBox(
                             width: 110.w,
@@ -777,7 +819,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 90.w,
                             child: Text(r['term'] as String,
-                                style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                           ),
                           Expanded(
                             child: Row(
@@ -792,7 +834,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                 ),
                                 Expanded(
                                   child: Text(r['feetype'] as String,
-                                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                                       overflow: TextOverflow.ellipsis),
                                 ),
                               ],
@@ -801,7 +843,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 110.w,
                             child: Text(r['reference'] as String,
-                                style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                                 overflow: TextOverflow.ellipsis),
                           ),
                           SizedBox(
@@ -849,14 +891,13 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         ),
 
         // ── Footer ──
-        ClipRRect(
-          borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(12.r), bottomRight: Radius.circular(12.r)),
+        Container(
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
           child: Column(
             children: [
               // Total row — same dark bg as header
               Container(
-                color: const Color(0xFF6C8EEF),
+                color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
                 child: Row(
                   children: [
@@ -866,7 +907,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     Expanded(
                       child: Text('TOTAL',
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
-                              color: Colors.white, letterSpacing: 0.5.w)),
+                              color: AppColors.textPrimary, letterSpacing: 0.5.w)),
                     ),
                     SizedBox(width: 110.w),
                     SizedBox(
@@ -874,14 +915,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                       child: Text('₹${totalDebit.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                              color: AppColors.textPrimary)),
                     ),
                     SizedBox(
                       width: 100.w,
                       child: Text('₹${totalCredit.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                              color: AppColors.textPrimary)),
                     ),
                     SizedBox(
                       width: 80.w,
@@ -889,14 +930,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           totalFine > 0 ? '₹${totalFine.toStringAsFixed(0)}' : '-',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                              color: AppColors.textPrimary)),
                     ),
                   ],
                 ),
               ),
               // Closing Balance row — slightly lighter dark
               Container(
-                color: const Color(0xFF6C8EEF),
+                color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
                 child: Row(
                   children: [
@@ -906,7 +947,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     Expanded(
                       child: Text('CLOSING BALANCE',
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
-                              color: Colors.white, letterSpacing: 0.5.w)),
+                              color: AppColors.textPrimary, letterSpacing: 0.5.w)),
                     ),
                     SizedBox(width: 110.w),
                     SizedBox(
@@ -916,12 +957,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
                           decoration: BoxDecoration(
-                            color: closingBalance <= 0
-                                ? Colors.white.withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.2),
+                            color: AppColors.primary.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.4)),
+                                color: AppColors.primary.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             closingBalance <= 0
@@ -930,7 +969,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             style: TextStyle(
                                 fontSize: 14.sp,
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white),
+                                color: AppColors.textPrimary),
                           ),
                         ),
                       ),
@@ -942,6 +981,8 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           ),
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -1191,19 +1232,28 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
   Widget _chip(String label, String value, Color color) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8.r), border: Border.all(color: color.withValues(alpha: 0.2))),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontSize: 9.sp, color: color.withValues(alpha: 0.7))),
-        Text(value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: color)),
-      ]),
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: color.withValues(alpha: 0.85), letterSpacing: 0.2)),
+          SizedBox(height: 2.h),
+          Text(value, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: color)),
+        ],
+      ),
     );
   }
 
 
-  Widget _emptyState(IconData icon, String msg) => Center(
+  Widget _emptyState(String icon, String msg) => Center(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 48.sp, color: Colors.grey.shade300),
+      AppIcon(icon, size: 48.sp, color: Colors.grey.shade300),
       SizedBox(height: 12.h),
       Text(msg, style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400)),
     ]),
@@ -1221,6 +1271,6 @@ class _TH extends StatelessWidget {
   const _TH(this.text, {this.align = TextAlign.left});
   @override
   Widget build(BuildContext context) =>
-      Text(text, textAlign: align, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white));
+      Text(text, textAlign: align, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3));
 }
 

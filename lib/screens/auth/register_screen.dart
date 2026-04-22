@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 class RegisterScreen extends StatefulWidget {
   final VoidCallback? onRegistered;
   const RegisterScreen({super.key, this.onRegistered});
@@ -324,7 +325,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 if (_currentStep > 0)
                   OutlinedButton.icon(
                     onPressed: () => _goToStep(_currentStep - 1),
-                    icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
+                    icon: AppIcon.linear('Chevron Left', size: 18),
                     label: const Text('Previous'),
                     style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 16.h),
@@ -337,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ElevatedButton.icon(
                     onPressed: () => _goToStep(_currentStep + 1),
                     icon: const Text('Next'),
-                    label: Icon(Icons.arrow_forward_rounded, size: 18.sp),
+                    label: AppIcon.linear('Chevron Right', size: 18),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: Colors.white,
@@ -355,9 +356,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildMilestoneProgress(BuildContext context) {
     final steps = [
-      {'icon': Icons.domain_add_rounded, 'label': 'Institution Info'},
-      {'icon': Icons.location_on_rounded, 'label': 'Affiliation & Address'},
-      {'icon': Icons.lock_rounded, 'label': 'Account Setup'},
+      {'icon': 'building', 'label': 'Institution Info'},
+      {'icon': 'location', 'label': 'Affiliation & Address'},
+      {'icon': 'lock', 'label': 'Account Setup'},
     ];
 
     return Container(
@@ -411,10 +412,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Center(
                     child: isDone
-                        ? Icon(Icons.check_rounded, size: 20.sp, color: Colors.white)
-                        : Icon(
-                            step['icon'] as IconData,
-                            size: 20.sp,
+                        ? AppIcon('tick-circle', size: 20, color: Colors.white)
+                        : AppIcon(
+                            step['icon'] as String,
+                            size: 20,
                             color: isActive ? AppColors.accent : AppColors.textSecondary,
                           ),
                   ),
@@ -467,7 +468,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                Icon(Icons.domain_add_rounded, color: AppColors.accent, size: 22.sp),
+                AppIcon('building', color: AppColors.accent, size: 18),
                 SizedBox(width: 10.w),
                 Text('Institution Information', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
               ]),
@@ -508,7 +509,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.add_photo_alternate_outlined, size: 28.sp, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                                AppIcon.linear('gallery-add', size: 28, color: AppColors.textSecondary.withValues(alpha: 0.5)),
                                 SizedBox(height: 4.h),
                                 Text('Upload', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.5))),
                               ],
@@ -560,7 +561,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   InkWell(
                     onTap: _pickInstitutionStartDate,
                     child: InputDecorator(
-                      decoration: _inputDec('Select date').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                      decoration: _inputDec('Select date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                       child: Text(
                         _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
                         style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
@@ -636,7 +637,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Icon(Icons.verified_rounded, color: AppColors.accent, size: 22.sp),
+                    AppIcon('verify', color: AppColors.accent, size: 18),
                     SizedBox(width: 10.w),
                     Text('Affiliation Information', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
                   ]),
@@ -660,7 +661,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       InkWell(
                         onTap: _pickAffiliationStartYear,
                         child: InputDecorator(
-                          decoration: _inputDec('Select year').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                          decoration: _inputDec('Select year').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                           child: Text(
                             _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
                             style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
@@ -687,7 +688,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Icon(Icons.location_on_rounded, color: AppColors.accent, size: 22.sp),
+                  AppIcon('location', color: AppColors.accent, size: 18),
                   SizedBox(width: 10.w),
                   Text('Address', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
                 ]),
@@ -750,7 +751,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Icon(Icons.calendar_today_rounded, color: AppColors.accent, size: 22.sp),
+                  AppIcon('calendar-1', color: AppColors.accent, size: 18),
                   SizedBox(width: 10.w),
                   Text('Academic Year', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
                 ]),
@@ -777,7 +778,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (picked != null) setState(() => _yearStartDate = picked);
                       },
                       child: InputDecorator(
-                        decoration: _inputDec('Select start date').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                        decoration: _inputDec('Select start date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearStartDate != null ? _formatDate(_yearStartDate!) : 'Select start date',
                           style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
@@ -794,7 +795,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (picked != null) setState(() => _yearEndDate = picked);
                       },
                       child: InputDecorator(
-                        decoration: _inputDec('Select end date').copyWith(suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                        decoration: _inputDec('Select end date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearEndDate != null ? _formatDate(_yearEndDate!) : 'Select end date',
                           style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
@@ -831,7 +832,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Icon(Icons.lock_rounded, color: AppColors.accent, size: 22.sp),
+                  AppIcon('lock', color: AppColors.accent, size: 18),
                   SizedBox(width: 10.w),
                   Text('Account Setup', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700)),
                 ]),
@@ -845,7 +846,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _adminNameController,
                       decoration: _inputDec('Enter admin name').copyWith(
-                        prefixIcon: Icon(Icons.person_outline_rounded, size: 18.sp, color: AppColors.textSecondary),
+                        prefixIcon: AppIcon.linear('user', size: 18, color: AppColors.textSecondary),
                       ),
                       style: _fieldStyle(),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
@@ -857,7 +858,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     DropdownButtonFormField<String>(
                       value: _adminDesignation,
                       decoration: _inputDec('Select designation').copyWith(
-                        prefixIcon: Icon(Icons.badge_outlined, size: 18.sp, color: AppColors.textSecondary),
+                        prefixIcon: AppIcon.linear('personalcard', size: 18, color: AppColors.textSecondary),
                       ),
                       style: _fieldStyle(),
                       items: _designationOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
@@ -874,7 +875,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _adminEmailController,
                       decoration: _inputDec('Enter email').copyWith(
-                        prefixIcon: Icon(Icons.email_outlined, size: 18.sp, color: AppColors.textSecondary),
+                        prefixIcon: AppIcon.linear('sms', size: 18, color: AppColors.textSecondary),
                       ),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.emailAddress,
@@ -887,7 +888,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _adminPhoneController,
                       decoration: _inputDec('Enter phone').copyWith(
-                        prefixIcon: Icon(Icons.phone_outlined, size: 18.sp, color: AppColors.textSecondary),
+                        prefixIcon: AppIcon.linear('call', size: 18, color: AppColors.textSecondary),
                       ),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.phone,
@@ -916,7 +917,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Row(children: [
-                      Icon(Icons.calendar_today_rounded, size: 18.sp, color: AppColors.textSecondary),
+                      AppIcon('calendar-1', size: 18, color: AppColors.textSecondary),
                       SizedBox(width: 10.w),
                       Text(
                         _adminDob != null
@@ -937,9 +938,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: _inputDec('Enter password').copyWith(
-                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 18.sp, color: AppColors.textSecondary),
+                    prefixIcon: AppIcon.linear('lock', size: 18, color: AppColors.textSecondary),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18.sp, color: AppColors.textSecondary),
+                      icon: AppIcon(_obscurePassword ? 'eye-slash' : 'eye', size: 18, color: AppColors.textSecondary),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
@@ -957,9 +958,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirm,
                   decoration: _inputDec('Re-enter password').copyWith(
-                    prefixIcon: Icon(Icons.lock_outline_rounded, size: 18.sp, color: AppColors.textSecondary),
+                    prefixIcon: AppIcon.linear('lock', size: 18, color: AppColors.textSecondary),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18.sp, color: AppColors.textSecondary),
+                      icon: AppIcon(_obscureConfirm ? 'eye-slash' : 'eye', size: 18, color: AppColors.textSecondary),
                       onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
@@ -978,7 +979,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: _isCreating ? null : _handleRegister,
                     icon: _isCreating
                         ? SizedBox(width: 20.w, height: 20.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Icon(Icons.check_circle_rounded, size: 20.sp),
+                        : AppIcon('tick-circle', size: 20),
                     label: Text(_isCreating ? 'Creating...' : 'Create Institution', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.accent,

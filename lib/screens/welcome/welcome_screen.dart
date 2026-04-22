@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
+import '../../widgets/app_icon.dart';
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -97,8 +98,7 @@ class WelcomeScreen extends StatelessWidget {
                                 width: 2,
                               ),
                             ),
-                            child: Icon(
-                              Icons.school_rounded,
+                            child: AppIcon('teacher',
                               size: 50.sp,
                               color: AppColors.accent,
                             ),
@@ -177,8 +177,7 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Icon(
-                    Icons.school_rounded,
+                  child: AppIcon('teacher',
                     size: 44.sp,
                     color: AppColors.accent,
                   ),
@@ -291,7 +290,7 @@ class WelcomeScreen extends StatelessWidget {
               delay: const Duration(milliseconds: 500),
               child: _WelcomeButton(
                 label: 'Super Admin Login',
-                icon: Icons.admin_panel_settings_rounded,
+                icon: 'security-user',
                 isPrimary: true,
                 onTap: () =>
                     Navigator.pushNamed(context, AppRoutes.login, arguments: 'super_admin'),
@@ -305,7 +304,7 @@ class WelcomeScreen extends StatelessWidget {
               delay: const Duration(milliseconds: 600),
               child: _WelcomeButton(
                 label: 'Institution Login',
-                icon: Icons.school_rounded,
+                icon: 'teacher',
                 isPrimary: false,
                 onTap: () =>
                     Navigator.pushNamed(context, AppRoutes.login, arguments: 'institution'),
@@ -362,8 +361,7 @@ class WelcomeScreen extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.play_circle_outline_rounded,
+                        AppIcon.linear('play-circle',
                           color: AppColors.primary.withValues(alpha: 0.7),
                           size: 20.sp,
                         ),
@@ -390,7 +388,7 @@ class WelcomeScreen extends StatelessWidget {
 
 class _WelcomeButton extends StatefulWidget {
   final String label;
-  final IconData icon;
+  final String icon;
   final bool isPrimary;
   final VoidCallback onTap;
 
@@ -439,11 +437,11 @@ class _WelcomeButtonState extends State<_WelcomeButton> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              AppIcon(
                 widget.icon,
                 color:
                     widget.isPrimary ? Colors.white : AppColors.textPrimary,
-                size: 20.sp,
+                size: 20,
               ),
               SizedBox(width: 10.w),
               Text(
