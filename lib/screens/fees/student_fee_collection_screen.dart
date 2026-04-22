@@ -1742,6 +1742,54 @@ class _StudentFeeCollectionScreenState
     // Declared outside try so the catch block can reset fineamount on failure.
     final items = <Map<String, dynamic>>[];
 
+    // Pre-flight: re-fetch balances for selected demands to catch the case
+    // where another accountant already collected these fees while this
+    // screen was open. Fast-path UI feedback — the DB still enforces this
+    // authoritatively via FOR UPDATE in process_grouped_payment.
+    try {
+      final selectedDemIds = _allDemands
+          .where((d) => _selected.contains(_demKey(d)))
+          .map((d) => d['dem_id'] as int)
+          .toList();
+      if (selectedDemIds.isNotEmpty) {
+        final fresh = await SupabaseService.fromSchema('feedemand')
+            .select('dem_id, balancedue, paidstatus')
+            .eq('ins_id', insId!)
+            .inFilter('dem_id', selectedDemIds);
+        final stale = (fresh as List).where((r) {
+          final bal = (r['balancedue'] as num?)?.toDouble() ?? 0;
+          return bal <= 0 || r['paidstatus'] == 'P';
+        }).toList();
+        if (stale.isNotEmpty) {
+          if (mounted) {
+            setState(() => _processing = false);
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Already paid'),
+                content: const Text(
+                  'One or more selected fees have already been collected '
+                  '(possibly by another user). Please refresh and try again.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _search();
+                    },
+                    child: const Text('Refresh'),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Pre-flight balance check failed: $e');
+    }
+
     try {
       final firstDemand = _allDemands.firstWhere((d) => _selected.contains(_demKey(d)));
       final yrId = firstDemand['yr_id'] as int?;
@@ -2166,12 +2214,18 @@ class _StudentFeeCollectionScreenState
       } catch (_) {}
     });
 
-    // Show WebView dialog
+    // Show WebView dialog. Capture the dialog's own BuildContext so the
+    // polling paths (below) can pop the dialog before we dispose the
+    // WebviewController — otherwise the exit-animation frames render a
+    // disposed controller and Flutter throws "used after being disposed".
+    BuildContext? dialogCtx;
     if (mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => Dialog(
+        builder: (ctx) {
+          dialogCtx = ctx;
+          return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
           child: SizedBox(
             width: 500.w,
@@ -2198,7 +2252,10 @@ class _StudentFeeCollectionScreenState
                       InkWell(
                         onTap: () async {
                           _pollTimer?.cancel();
-                          // Check if payment was already completed before closing
+                          // Don't dispose webviewController here — the dialog's
+                          // exit animation still renders the Webview widget
+                          // for a frame or two. Dispose happens once after
+                          // completer.future resolves below.
                           try {
                             final checkPay = await SupabaseService.fromSchema('payment')
                                 .select('payreference')
@@ -2207,14 +2264,11 @@ class _StudentFeeCollectionScreenState
                                 .maybeSingle();
                             final ref = checkPay?['payreference']?.toString() ?? '';
                             if (ref.isNotEmpty && ref.startsWith('pay_')) {
-                              // Payment was successful
-                              try { webviewController.dispose(); } catch (_) {}
                               Navigator.pop(ctx);
                               if (!completer.isCompleted) completer.complete('C');
                               return;
                             }
                           } catch (_) {}
-                          try { webviewController.dispose(); } catch (_) {}
                           Navigator.pop(ctx);
                           if (!completer.isCompleted) completer.complete(null);
                         },
@@ -2230,20 +2284,27 @@ class _StudentFeeCollectionScreenState
               ],
             ),
           ),
-        ),
+        );
+        },
       );
     }
 
     final result = await completer.future;
 
-    // Dispose webview first
-    try { webviewController.dispose(); } catch (_) {}
+    // Pop the dialog if it's still showing (polling paths don't pop it
+    // themselves — only the close/cancel onTap handlers do). Must happen
+    // before dispose so the Webview widget is no longer in the tree.
+    if (dialogCtx != null && dialogCtx!.mounted) {
+      final nav = Navigator.maybeOf(dialogCtx!);
+      if (nav != null && nav.canPop()) {
+        nav.pop();
+      }
+    }
 
-    // Dialog is already popped by its own close handlers (cancel, success, or X button).
-    // Do NOT pop again here — it would pop the parent screen and cascade toward login.
-
-    // Wait a moment for dialog to close
+    // Let the dialog's exit animation finish before disposing the
+    // controller, otherwise Flutter renders a disposed Webview and throws.
     await Future.delayed(const Duration(milliseconds: 300));
+    try { webviewController.dispose(); } catch (_) {}
 
     if (result == 'C' || result == 'F' || result == null) {
       final status = result == 'C' ? 'C' : 'F';
