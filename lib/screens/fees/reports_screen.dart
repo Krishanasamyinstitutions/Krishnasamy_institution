@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/app_icon.dart';
 
 const _termOrder = [
   'I SEMESTER', 'I TERM', 'II SEMESTER', 'II TERM', 'III SEMESTER', 'III TERM',
@@ -112,6 +113,205 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     return 'bank';
   }
 
+  String _dailyFmt(DateTime? d) =>
+      d == null ? '-' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  String _dailyDateMethodLabel() {
+    final hasDate = _dailyFrom != null || _dailyTo != null;
+    final hasMode = _selectedMode != null;
+    if (!hasDate && !hasMode) return 'Date & Method';
+    String datePart;
+    if (!hasDate) {
+      datePart = 'All Dates';
+    } else if (_dailyFrom != null && _dailyTo != null) {
+      datePart = '${_dailyFmt(_dailyFrom)} – ${_dailyFmt(_dailyTo)}';
+    } else if (_dailyFrom != null) {
+      datePart = 'From ${_dailyFmt(_dailyFrom)}';
+    } else {
+      datePart = 'Until ${_dailyFmt(_dailyTo)}';
+    }
+    if (hasMode) {
+      return '$datePart · ${_selectedMode!.toUpperCase()}';
+    }
+    return datePart;
+  }
+
+  Future<void> _openDailyDateMethodDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        DateTime? from = _dailyFrom;
+        DateTime? to = _dailyTo;
+        String? mode = _selectedMode;
+        return StatefulBuilder(builder: (ctx, setStateDialog) {
+          Widget presetChip(String label, VoidCallback onTap) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              );
+
+          Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
+            return InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: value ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                );
+                if (picked != null) onChanged(picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(value != null ? _dailyFmt(value) : hint,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget modeChip(String label, String? key) {
+            final selected = mode == key;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 6),
+              child: InkWell(
+                onTap: () => setStateDialog(() => mode = key),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
+              );
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
+            title: Row(
+              children: [
+                Text('Filters', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                  splashRadius: 18,
+                  tooltip: 'Close',
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 460,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  sectionLabel('QUICK RANGE'),
+                  Wrap(children: [
+                    presetChip('Today', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = DateTime(now.year, now.month, now.day); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('7 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 7)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('30 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 30)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('This Month', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = DateTime(now.year, now.month, 1); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                  ]),
+                  const SizedBox(height: 16),
+                  sectionLabel('CUSTOM RANGE'),
+                  Row(children: [
+                    Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
+                  ]),
+                  const SizedBox(height: 16),
+                  sectionLabel('PAYMENT MODE'),
+                  Wrap(children: [
+                    modeChip('All', null),
+                    modeChip('Cash', 'cash'),
+                    modeChip('Bank', 'bank'),
+                  ]),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => setStateDialog(() { from = null; to = null; mode = null; }),
+                child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _dailyFrom = from;
+                    _dailyTo = to;
+                    _selectedMode = mode;
+                  });
+                  _loadDailyCollection();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
   List<Widget> _dailyModeChips() {
     Widget chip(String label, String? key) {
       final active = _selectedMode == key;
@@ -129,8 +329,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ),
             child: Text(label, style: TextStyle(
               fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: active ? AppColors.accent : null,
+              fontWeight: FontWeight.w600,
+              color: active ? AppColors.accent : AppColors.textPrimary,
             )),
           ),
         ),
@@ -368,6 +568,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Tabs (pill style)
         ListenableBuilder(
@@ -375,57 +576,79 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           builder: (context, _) {
             final selected = _tabController.index;
             final tabLabels = ['Daily Collection', 'Student Ledger', 'Pending Payment', 'Consolidated Status'];
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-              child: Row(
-                children: [
-                  ...List.generate(tabLabels.length, (i) => Padding(
-                    padding: EdgeInsets.only(right: 8.w),
-                    child: GestureDetector(
-                      onTap: () => _tabController.animateTo(i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                        decoration: BoxDecoration(
-                          color: selected == i ? AppColors.accent : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20.r),
-                          border: Border.all(color: selected == i ? AppColors.accent : AppColors.border),
+            final tabIcons = ['calendar-1', 'book-1', 'clock', 'chart-2'];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < tabLabels.length; i++) ...[
+                      GestureDetector(
+                        onTap: () => _tabController.animateTo(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
+                              const SizedBox(width: 8),
+                              Text(
+                                tabLabels[i],
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Text(tabLabels[i], style: TextStyle(
-                          fontSize: 13.sp, fontWeight: FontWeight.w600,
-                          color: selected == i ? Colors.white : AppColors.textSecondary,
-                        )),
                       ),
-                    ),
-                  )),
-                  const Spacer(),
-                  if (_loading) SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
-                ],
+                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                    ],
+                    const SizedBox(width: 16),
+                    if (_loading)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                      ),
+                  ],
+                ),
               ),
             );
           },
         ),
-        // Filters
+        // Filters (wrapped in one card)
         ListenableBuilder(listenable: _tabController, builder: (_, __) => _buildFilters()),
-        // Content
+        // Content (white table area)
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? Center(child: Text('Error: $_error'))
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildDailyCollection(),
-                        _buildStudentLedger(),
-                        _buildPendingPayment(),
-                        _buildConsolidatedStatus(),
-                      ],
-                    ),
+          child: Container(
+            decoration: AppCard.decoration(),
+            clipBehavior: Clip.antiAlias,
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text('Error: $_error'))
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildDailyCollection(),
+                          _buildStudentLedger(),
+                          _buildPendingPayment(),
+                          _buildConsolidatedStatus(),
+                        ],
+                      ),
+          ),
         ),
       ],
     );
@@ -433,10 +656,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   InputDecoration _filterDec(String hint, {IconData? icon}) => InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight),
+        hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight, fontWeight: FontWeight.w600),
         isDense: true,
         prefixIcon: icon != null
-            ? Icon(icon, size: 16.sp, color: AppColors.textSecondary)
+            ? Icon(icon, size: 16.sp, color: AppColors.accent)
             : null,
         prefixIconConstraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
         contentPadding:
@@ -456,25 +679,30 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       );
 
   Widget _buildFilters() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          // Course filter
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: AppCard.decoration(),
+        child: Row(
+          children: [
+            // Scrollable filters (left)
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Course filter
           SizedBox(
             width: 160.w,
             child: DropdownButtonFormField<String?>(
               value: _selectedCourse,
               isExpanded: true,
               decoration: _filterDec('Course', icon: Icons.school_rounded),
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
               items: [
-                DropdownMenuItem<String?>(value: null, child: Text('All Courses', style: TextStyle(fontSize: 13.sp))),
-                ..._courses.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))),
+                DropdownMenuItem<String?>(value: null, child: Text('All Courses', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                ..._courses.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
               ],
               onChanged: (v) => setState(() { _selectedCourse = v; _selectedClass = null; }),
             ),
@@ -488,13 +716,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               value: _selectedClass,
               isExpanded: true,
               decoration: _filterDec('Class', icon: Icons.class_rounded),
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
               items: [
-                DropdownMenuItem<String?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 13.sp))),
+                DropdownMenuItem<String?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
                 ...(_selectedCourse != null
                     ? _classes.where((c) => _allDemands.any((d) => d['courname']?.toString() == _selectedCourse && d['stuclass']?.toString() == c))
                     : _classes
-                ).map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp)))),
+                ).map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
               ],
               onChanged: (v) => setState(() => _selectedClass = v),
             ),
@@ -507,10 +735,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 value: _selectedFeeType,
                 isExpanded: true,
                 decoration: _filterDec('Fee Type', icon: Icons.payments_rounded),
-                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                 items: [
-                  DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
-                  ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp)))),
+                  DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                  ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
                 ],
                 onChanged: (v) => setState(() => _selectedFeeType = v),
               ),
@@ -522,23 +750,65 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 value: _selectedPrefix,
                 isExpanded: true,
                 decoration: _filterDec('Prefix', icon: Icons.tag_rounded),
-                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                 items: [
-                  DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp))),
-                  ..._dailyPrefixes().map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp)))),
+                  DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                  ..._dailyPrefixes().map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
                 ],
                 onChanged: (v) => setState(() => _selectedPrefix = v),
               ),
             ),
           ],
-          const Spacer(),
-          // Reset
-          TextButton.icon(
-            onPressed: () => setState(() { _selectedCourse = null; _selectedClass = null; _selectedFeeType = null; _selectedPrefix = null; }),
-            icon: Icon(Icons.refresh_rounded, size: 16.sp),
-            label: Text('Reset', style: TextStyle(fontSize: 13.sp)),
-          ),
-        ],
+                  ],
+                ),
+              ),
+            ),
+            // Reset (right corner)
+            SizedBox(width: 12.w),
+            SizedBox(
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: () => setState(() {
+                  _selectedCourse = null;
+                  _selectedClass = null;
+                  _selectedFeeType = null;
+                  _selectedPrefix = null;
+                }),
+                icon: AppIcon('refresh', size: 16, color: Colors.white),
+                label: const Text('Refresh'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(horizontal: 18.w),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Solid-color action button — matches Master Data's Browse / Format / Sample style.
+  Widget _miniExportBtn({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 12.h),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -566,36 +836,40 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       byClass.putIfAbsent('${r['course']}|${r['class']}', () => []).add(r);
     }
 
-    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700);
-    final cellStyle = TextStyle(fontSize: 11.sp);
+    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
 
     return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(children: [
-            Text('Consolidated Fee Collection Status — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: () => _exportConsolidatedExcel(rows, byClass),
-              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
-              label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+      // tab-body-open
+          children: [
+            Container(
+              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+              child: Row(children: [
+                AppIcon('chart-2', size: 18, color: AppColors.accent),
+                SizedBox(width: 8.w),
+                Text('Consolidated Status', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                SizedBox(width: 8.w),
+                Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                const Spacer(),
+                _miniExportBtn(
+                  onPressed: () => _exportConsolidatedExcel(rows, byClass),
+                  icon: Icons.table_chart_rounded,
+                  label: 'Excel',
+                  color: const Color(0xFF10B981),
+                ),
+                SizedBox(width: 8.w),
+                _miniExportBtn(
+                  onPressed: () => _exportConsolidatedPdf(rows, byClass),
+                  icon: Icons.picture_as_pdf_rounded,
+                  label: 'PDF',
+                  color: const Color(0xFFEF4444),
+                ),
+              ]),
             ),
-            SizedBox(width: 6.w),
-            ElevatedButton.icon(
-              onPressed: () => _exportConsolidatedPdf(rows, byClass),
-              icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
-              label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
-            ),
-          ]),
-        ),
-        Expanded(
-          child: _stickyTable(
+            Expanded(
+              child: _stickyTable(
             columnWidths: const [90, 90, 80, 100, 110, 90, 80, 110, 100, 110, 100, 110],
-            headers: const ['Course', 'Class', 'Strength', 'Semester', 'Category', 'Stud Count', 'Type', 'Due', 'Concess', 'Net Demand', 'Paid', 'Balance'],
+            headers: const ['COURSE', 'CLASS', 'STRENGTH', 'SEMESTER', 'CATEGORY', 'STUD COUNT', 'TYPE', 'DUE', 'CONCESS', 'NET DEMAND', 'PAID', 'BALANCE'],
             rows: [
               for (final r in rows.skip(_consolidatedPage * _tablePageSize).take(_tablePageSize))
                 [
@@ -624,15 +898,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             numericCols: const {2, 5, 7, 8, 9, 10, 11},
           ),
         ),
-        _pagerBar(
-          total: rows.length,
-          page: _consolidatedPage,
-          onPrev: _consolidatedPage > 0 ? () => setState(() => _consolidatedPage--) : null,
-          onNext: (_consolidatedPage + 1) * _tablePageSize < rows.length
-              ? () => setState(() => _consolidatedPage++)
-              : null,
-        ),
-      ],
+            _pagerBar(
+              total: rows.length,
+              page: _consolidatedPage,
+              onPrev: _consolidatedPage > 0 ? () => setState(() => _consolidatedPage--) : null,
+              onNext: (_consolidatedPage + 1) * _tablePageSize < rows.length
+                  ? () => setState(() => _consolidatedPage++)
+                  : null,
+            ),
+          ],
     );
   }
 
@@ -774,7 +1048,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
         build: (ctx) => [
           pw.Table.fromTextArray(
-            headers: const ['Course', 'Class', 'Strength', 'Semester', 'Category', 'Stud Count', 'Type', 'Due', 'Concess', 'Net Demand', 'Paid', 'Balance'],
+            headers: const ['COURSE', 'CLASS', 'STRENGTH', 'SEMESTER', 'CATEGORY', 'STUD COUNT', 'TYPE', 'DUE', 'CONCESS', 'NET DEMAND', 'PAID', 'BALANCE'],
             data: data,
             headerStyle: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
@@ -881,69 +1155,73 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       grandConcess += (r['concession'] as double);
     }
 
-    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700);
-    final cellStyle = TextStyle(fontSize: 11.sp);
+    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
 
     return Column(
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(children: [
-            Text('Pending Payment Report — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
-            const Spacer(),
-            ElevatedButton.icon(
-              onPressed: () => _exportPendingPaymentExcel(rows, byClass, grandPending, grandConcess),
-              icon: Icon(Icons.table_chart_rounded, size: 16.sp),
-              label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+      // tab-body-open
+          children: [
+            Container(
+              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+              child: Row(children: [
+                AppIcon('clock', size: 18, color: AppColors.accent),
+                SizedBox(width: 8.w),
+                Text('Pending Payment', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                SizedBox(width: 8.w),
+                Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                const Spacer(),
+                _miniExportBtn(
+                  onPressed: () => _exportPendingPaymentExcel(rows, byClass, grandPending, grandConcess),
+                  icon: Icons.table_chart_rounded,
+                  label: 'Excel',
+                  color: const Color(0xFF10B981),
+                ),
+                SizedBox(width: 8.w),
+                _miniExportBtn(
+                  onPressed: () => _exportPendingPaymentPdf(rows, byClass, grandPending, grandConcess),
+                  icon: Icons.picture_as_pdf_rounded,
+                  label: 'PDF',
+                  color: const Color(0xFFEF4444),
+                ),
+              ]),
             ),
-            SizedBox(width: 6.w),
-            ElevatedButton.icon(
-              onPressed: () => _exportPendingPaymentPdf(rows, byClass, grandPending, grandConcess),
-              icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
-              label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
-            ),
-          ]),
-        ),
-        Expanded(
-          child: _stickyTable(
-            columnWidths: const [90, 90, 100, 140, 90, 170, 110, 100, 90, 110],
-            headers: const ['Course', 'Class', 'Semester', 'Admn Type', 'Reg. No', 'Name', 'Pending Amt', 'Con. Amt', 'Quota', 'Mobile No'],
-            rows: [
-              for (final r in rows.skip(_pendingPage * _tablePageSize).take(_tablePageSize))
-                [
-                  r['course']?.toString() ?? '',
-                  r['class']?.toString() ?? '',
-                  r['semester']?.toString() ?? '',
-                  r['admname']?.toString() ?? '',
-                  r['stuadmno']?.toString() ?? '',
-                  r['stuname']?.toString() ?? '',
-                  _formatNumber((r['pending'] as double?) ?? 0),
-                  _formatNumber((r['concession'] as double?) ?? 0),
-                  r['quoname']?.toString() ?? '',
-                  r['stumobile']?.toString() ?? '',
+            Expanded(
+              child: _stickyTable(
+                columnWidths: const [90, 90, 100, 140, 90, 170, 110, 100, 90, 110],
+                headers: const ['COURSE', 'CLASS', 'SEMESTER', 'ADMN TYPE', 'REG. NO', 'NAME', 'PENDING AMT', 'CON. AMT', 'QUOTA', 'MOBILE NO'],
+                rows: [
+                  for (final r in rows.skip(_pendingPage * _tablePageSize).take(_tablePageSize))
+                    [
+                      r['course']?.toString() ?? '',
+                      r['class']?.toString() ?? '',
+                      r['semester']?.toString() ?? '',
+                      r['admname']?.toString() ?? '',
+                      r['stuadmno']?.toString() ?? '',
+                      r['stuname']?.toString() ?? '',
+                      _formatNumber((r['pending'] as double?) ?? 0),
+                      _formatNumber((r['concession'] as double?) ?? 0),
+                      r['quoname']?.toString() ?? '',
+                      r['stumobile']?.toString() ?? '',
+                    ],
                 ],
-            ],
-            footer: [
-              'G.Tot', '', '', '', '', '',
-              _formatNumber(grandPending),
-              _formatNumber(grandConcess),
-              '', '',
-            ],
-            numericCols: const {6, 7},
-          ),
-        ),
-        _pagerBar(
-          total: rows.length,
-          page: _pendingPage,
-          onPrev: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
-          onNext: (_pendingPage + 1) * _tablePageSize < rows.length
-              ? () => setState(() => _pendingPage++)
-              : null,
-        ),
-      ],
+                footer: [
+                  'G.Tot', '', '', '', '', '',
+                  _formatNumber(grandPending),
+                  _formatNumber(grandConcess),
+                  '', '',
+                ],
+                numericCols: const {6, 7},
+              ),
+            ),
+            _pagerBar(
+              total: rows.length,
+              page: _pendingPage,
+              onPrev: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
+              onNext: (_pendingPage + 1) * _tablePageSize < rows.length
+                  ? () => setState(() => _pendingPage++)
+                  : null,
+            ),
+          ],
     );
   }
 
@@ -958,14 +1236,24 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   }) {
     assert(columnWidths.length == headers.length);
     final baseTotal = columnWidths.fold<double>(0, (a, b) => a + b.w);
-    final headerStyle = TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.white);
-    final cellStyle = TextStyle(fontSize: 11.sp, color: AppColors.textPrimary);
+    final headerStyle = TextStyle(
+      fontSize: 13.sp,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+      letterSpacing: 0.3,
+    );
+    final footerStyle = TextStyle(
+      fontSize: 13.sp,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    );
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
 
     Widget rowWidget(List<String> values, List<double> widths, {Color? bg, TextStyle? style}) {
       return Container(
         width: double.infinity,
         color: bg,
-        padding: EdgeInsets.symmetric(vertical: 10.h),
+        padding: EdgeInsets.symmetric(vertical: 12.h),
         child: Row(
           mainAxisSize: MainAxisSize.max,
           children: [
@@ -999,34 +1287,44 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         final widths = [for (final c in columnWidths) c.w * scale];
         final width = needsScroll ? baseTotal : constraints.maxWidth;
         final scrollbarHeight = needsScroll ? 20.0 : 0.0;
-        return Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                controller: hController,
-                scrollDirection: Axis.horizontal,
-                physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
-                child: SizedBox(
-                  width: width,
-                  height: constraints.maxHeight - scrollbarHeight,
-                  child: Column(
-                    children: [
-                      rowWidget(headers, widths, bg: const Color(0xFF6C8EEF), style: headerStyle),
-                      Expanded(
-                        child: ListView.separated(
-                          itemCount: rows.length,
-                          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
-                          itemBuilder: (_, i) => rowWidget(rows[i], widths, bg: i.isEven ? Colors.white : const Color(0xFFF9FAFB)),
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: hController,
+                  scrollDirection: Axis.horizontal,
+                  physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: width,
+                    height: constraints.maxHeight - scrollbarHeight,
+                    child: Column(
+                      children: [
+                        rowWidget(headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
+                        Container(height: 1, color: AppColors.border),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: rows.length,
+                            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                            itemBuilder: (_, i) => rowWidget(rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                          ),
                         ),
-                      ),
-                      rowWidget(footer, widths, bg: const Color(0xFF6C8EEF), style: headerStyle),
-                    ],
+                        Container(height: 1, color: AppColors.border),
+                        rowWidget(footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            if (needsScroll) _classicHScrollbar(hController),
-          ],
+              if (needsScroll) _classicHScrollbar(hController),
+            ],
+          ),
         );
       },
     );
@@ -1143,10 +1441,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
       child: Row(
         children: [
-          Text('$start–$end of $total', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+          Text('$start–$end of $total', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
           const Spacer(),
           IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Previous'),
-          Text('Page ${page + 1} of $pages', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600)),
+          Text('Page ${page + 1} of $pages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
           IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right_rounded), tooltip: 'Next'),
         ],
       ),
@@ -1266,7 +1564,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
         build: (ctx) => [
           pw.Table.fromTextArray(
-            headers: const ['Course', 'Class', 'Semester', 'Admn Type', 'Reg. No', 'Name', 'Pending Amt', 'Con. Amt', 'Quota', 'Mobile'],
+            headers: const ['COURSE', 'CLASS', 'SEMESTER', 'ADMN TYPE', 'REG. NO', 'NAME', 'PENDING AMT', 'CON. AMT', 'QUOTA', 'MOBILE'],
             data: data,
             headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
@@ -1353,8 +1651,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Widget _buildStudentLedger() {
     final students = _studentsForLedger();
-    final headerStyle = TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700);
-    final cellStyle = TextStyle(fontSize: 12.sp);
+    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textPrimary);
 
     // Build rows grouped by term (YEARLY / V SEM / VI SEM / Misc)
     final grouped = <String, List<Map<String, dynamic>>>{};
@@ -1378,12 +1676,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
 
     return Column(
+      // tab-body-open
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-          decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: AppColors.border))),
+          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
           child: Row(
             children: [
+              AppIcon('book-1', size: 18, color: AppColors.accent),
+              SizedBox(width: 8.w),
+              Text('Student Ledger', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              if (_ledgerLoading) ...[
+                SizedBox(width: 12.w),
+                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+              ],
+              const Spacer(),
               SizedBox(
                 width: 360.w,
                 child: Autocomplete<Map<String, dynamic>>(
@@ -1398,35 +1704,54 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   onSelected: (s) => _loadStudentLedger(s['stuadmno'] as String),
                   fieldViewBuilder: (ctx, ctrl, focus, onSubmit) {
                     _ledgerSearchCtrl.value = ctrl.value;
-                    return TextField(
-                      controller: ctrl,
-                      focusNode: focus,
-                      decoration: InputDecoration(
-                        labelText: 'Search Student (Adm No / Name)',
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                    return Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F2F4),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      style: TextStyle(fontSize: 13.sp),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Row(
+                        children: [
+                          const AppIcon.linear('search-normal', size: 16, color: Color(0xFF9CA3AF)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: ctrl,
+                              focusNode: focus,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937)),
+                              cursorHeight: 16,
+                              decoration: const InputDecoration(
+                                hintText: 'Search Student (Adm No / Name)',
+                                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
+                                isCollapsed: true,
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),
               ),
-              const Spacer(),
-              if (_ledgerLoading) SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               SizedBox(width: 8.w),
-              ElevatedButton.icon(
-                onPressed: _ledgerDemands.isEmpty ? null : _exportStudentLedgerExcel,
-                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
-                label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+              _miniExportBtn(
+                onPressed: _ledgerDemands.isEmpty ? () {} : _exportStudentLedgerExcel,
+                icon: Icons.table_chart_rounded,
+                label: 'Excel',
+                color: const Color(0xFF10B981),
               ),
-              SizedBox(width: 6.w),
-              ElevatedButton.icon(
-                onPressed: _ledgerDemands.isEmpty ? null : _exportStudentLedgerPdf,
-                icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
-                label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+              SizedBox(width: 8.w),
+              _miniExportBtn(
+                onPressed: _ledgerDemands.isEmpty ? () {} : _exportStudentLedgerPdf,
+                icon: Icons.picture_as_pdf_rounded,
+                label: 'PDF',
+                color: const Color(0xFFEF4444),
               ),
             ],
           ),
@@ -1438,18 +1763,18 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(_insName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                if (_insAddress.isNotEmpty) Text(_insAddress, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                if (_insAddress.isNotEmpty) Text(_insAddress, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                 SizedBox(height: 6.h),
-                Text('STUDENT LEDGER — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700)),
+                Text('STUDENT LEDGER — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
                 SizedBox(height: 8.h),
                 Row(children: [
-                  Expanded(child: Text('Name: ${_ledgerStudent!['stuname'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
-                  Expanded(child: Text('Reg No: ${_ledgerStudent!['stuadmno'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                  Expanded(child: Text('Name: ${_ledgerStudent!['stuname'] ?? ''}', style: TextStyle(fontSize: 13.sp))),
+                  Expanded(child: Text('Reg No: ${_ledgerStudent!['stuadmno'] ?? ''}', style: TextStyle(fontSize: 13.sp))),
                 ]),
                 SizedBox(height: 4.h),
                 Row(children: [
-                  Expanded(child: Text('Course: ${_ledgerStudent!['courname'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
-                  Expanded(child: Text('Class: ${_ledgerStudent!['stuclass'] ?? ''}', style: TextStyle(fontSize: 12.sp))),
+                  Expanded(child: Text('Course: ${_ledgerStudent!['courname'] ?? ''}', style: TextStyle(fontSize: 13.sp))),
+                  Expanded(child: Text('Class: ${_ledgerStudent!['stuclass'] ?? ''}', style: TextStyle(fontSize: 13.sp))),
                 ]),
               ],
             ),
@@ -1457,7 +1782,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           Expanded(
             child: _stickyTable(
               columnWidths: const [100, 200, 100, 110, 110, 110, 80, 120, 110, 110],
-              headers: const ['Details', 'Fee Type', 'Demand', 'Concess.', 'Net Demand', 'Collection', 'Fine', 'Doc. No', 'Doc. Date', 'Balance'],
+              headers: const ['DETAILS', 'FEE TYPE', 'DEMAND', 'CONCESS.', 'NET DEMAND', 'COLLECTION', 'FINE', 'DOC. NO', 'DOC. DATE', 'BALANCE'],
               rows: [
                 for (final entry in grouped.entries) ...[
                   [entry.key, '', '', '', '', '', '', '', '', ''],
@@ -1700,13 +2025,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 borderRadius: BorderRadius.circular(6.r),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500)),
+              child: Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             ),
           ),
         );
 
-    final headerStyle = TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700);
-    final cellStyle = TextStyle(fontSize: 12.sp);
+    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textPrimary);
 
     final visibleRows = _dailyRows.where((r) {
       if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
@@ -1745,114 +2070,48 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
 
     return Column(
+      // tab-body-open
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
+          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
           child: Row(
             children: [
-              const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
+              AppIcon('calendar-1', size: 18, color: AppColors.accent),
               SizedBox(width: 8.w),
-              Text('Date Range:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+              Text('Daily Collection', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               SizedBox(width: 8.w),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(context: context, initialDate: _dailyFrom ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
-                  if (picked != null) {
-                    setState(() => _dailyFrom = picked);
-                    _loadDailyCollection();
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(6.r)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                    SizedBox(width: 6.w),
-                    Text(_dailyFrom != null ? fmt(_dailyFrom) : 'From', style: TextStyle(fontSize: 13.sp)),
-                  ]),
-                ),
-              ),
-              Padding(padding: EdgeInsets.symmetric(horizontal: 6.w), child: const Text('—', style: TextStyle(color: AppColors.textSecondary))),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(context: context, initialDate: _dailyTo ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2030));
-                  if (picked != null) {
-                    setState(() => _dailyTo = picked);
-                    _loadDailyCollection();
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(6.r)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                    SizedBox(width: 6.w),
-                    Text(_dailyTo != null ? fmt(_dailyTo) : 'To', style: TextStyle(fontSize: 13.sp)),
-                  ]),
-                ),
-              ),
-              SizedBox(width: 8.w),
-              quick('Today', () {
-                final now = DateTime.now();
-                setState(() {
-                  _dailyFrom = DateTime(now.year, now.month, now.day);
-                  _dailyTo = DateTime(now.year, now.month, now.day);
-                });
-                _loadDailyCollection();
-              }),
-              quick('7 Days', () {
-                final now = DateTime.now();
-                setState(() {
-                  _dailyFrom = now.subtract(const Duration(days: 7));
-                  _dailyTo = DateTime(now.year, now.month, now.day);
-                });
-                _loadDailyCollection();
-              }),
-              quick('30 Days', () {
-                final now = DateTime.now();
-                setState(() {
-                  _dailyFrom = now.subtract(const Duration(days: 30));
-                  _dailyTo = DateTime(now.year, now.month, now.day);
-                });
-                _loadDailyCollection();
-              }),
-              quick('This Month', () {
-                final now = DateTime.now();
-                setState(() {
-                  _dailyFrom = DateTime(now.year, now.month, 1);
-                  _dailyTo = DateTime(now.year, now.month, now.day);
-                });
-                _loadDailyCollection();
-              }),
-              SizedBox(width: 16.w),
-              Text('Mode:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-              SizedBox(width: 6.w),
-              ..._dailyModeChips(),
+              if (_dailyLoading)
+                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               const Spacer(),
-              if (_dailyLoading) SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
-              SizedBox(width: 8.w),
-              ElevatedButton.icon(
-                onPressed: _dailyRows.isEmpty ? null : () => _exportDailyCollectionExcel(),
-                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
-                label: Text('Excel', style: TextStyle(fontSize: 12.sp)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1D6F42), foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              SizedBox(
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: _openDailyDateMethodDialog,
+                  icon: const Icon(Icons.calendar_today, size: 16, color: AppColors.textPrimary),
+                  label: Text(
+                    _dailyDateMethodLabel(),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  ),
                 ),
               ),
-              SizedBox(width: 6.w),
-              ElevatedButton.icon(
-                onPressed: _dailyRows.isEmpty ? null : () => _exportDailyCollectionPdf(),
-                icon: Icon(Icons.picture_as_pdf_rounded, size: 16.sp),
-                label: Text('PDF', style: TextStyle(fontSize: 12.sp)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB71C1C), foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                ),
+              SizedBox(width: 8.w),
+              _miniExportBtn(
+                onPressed: _dailyRows.isEmpty ? () {} : () => _exportDailyCollectionExcel(),
+                icon: Icons.table_chart_rounded,
+                label: 'Excel',
+                color: const Color(0xFF10B981),
+              ),
+              SizedBox(width: 8.w),
+              _miniExportBtn(
+                onPressed: _dailyRows.isEmpty ? () {} : () => _exportDailyCollectionPdf(),
+                icon: Icons.picture_as_pdf_rounded,
+                label: 'PDF',
+                color: const Color(0xFFEF4444),
               ),
             ],
           ),
@@ -1879,17 +2138,21 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     }
                   }
                   final headers = <String>[
-                    'Receipt No', 'Reg No', 'Student Name', 'Class',
-                    ...visibleFeeTypes,
-                    'Fine', 'Total',
-                    if (showCash) 'Cash',
-                    if (showCheque) 'Cheque',
-                    if (showBank) 'Bank',
-                    'Net Amt',
+                    'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'CLASS',
+                    ...visibleFeeTypes.map((t) => t.toUpperCase()),
+                    'FINE', 'TOTAL',
+                    if (showCash) 'CASH',
+                    if (showCheque) 'CHEQUE',
+                    if (showBank) 'BANK',
+                    'NET AMT',
                   ];
                   final widths = <double>[
                     120, 90, 180, 120,
-                    ...visibleFeeTypes.map((_) => 110.0),
+                    ...visibleFeeTypes.map((t) {
+                      // Enough width for full uppercase label ("NEW ADMISSION FEES" etc.)
+                      final len = t.length;
+                      return (len > 14 ? 180.0 : len > 10 ? 150.0 : 120.0);
+                    }),
                     90, 110,
                     if (showCash) 100,
                     if (showCheque) 100,
@@ -2052,7 +2315,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       children: [
                         Text(courseName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                         const Spacer(),
-                        Text('${pivotData.length} students', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text('${pivotData.length} students', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                         SizedBox(width: 16.w),
                         Text('Total Pending: ${_formatNumber(grandTotal)}',
                             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.red)),
@@ -2139,7 +2402,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       children: [
                         Text(className, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                         const Spacer(),
-                        Text('${pivotData.length} students', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text('${pivotData.length} students', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                         SizedBox(width: 16.w),
                         Text('Total Pending: ${_formatNumber(grandTotal)}',
                             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.red)),
@@ -2179,7 +2442,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  Text(subtitle, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                  Text(subtitle, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                 ],
               ),
               const Spacer(),
@@ -2207,9 +2470,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 padding: EdgeInsets.only(left: 12.w),
                 child: Column(
                   children: [
-                    Text(t, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                    Text(t, style: TextStyle(fontSize: 10.sp, color: AppColors.textPrimary)),
                     Text(_formatNumber(termTotals[t] ?? 0),
-                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   ],
                 ),
               )),
@@ -2250,18 +2513,18 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         classTotalFine += rowFine;
         allRows.add(DataRow(
           cells: [
-            DataCell(Text('$sno', style: TextStyle(fontSize: 11.sp))),
-            DataCell(Text(row['stuclass']?.toString() ?? '', style: TextStyle(fontSize: 11.sp))),
-            DataCell(Text(row['stuadmno']?.toString() ?? '', style: TextStyle(fontSize: 11.sp))),
-            DataCell(Text(row['stuname']?.toString() ?? '', style: TextStyle(fontSize: 11.sp))),
+            DataCell(Text('$sno', style: TextStyle(fontSize: 13.sp))),
+            DataCell(Text(row['stuclass']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
+            DataCell(Text(row['stuadmno']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
+            DataCell(Text(row['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
             ...terms.map((t) {
               final val = (row[t] as double?) ?? 0;
               if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
-              return DataCell(Text(val > 0 ? _formatNumber(val) : '', style: TextStyle(fontSize: 11.sp)));
+              return DataCell(Text(val > 0 ? _formatNumber(val) : '', style: TextStyle(fontSize: 13.sp)));
             }),
-            DataCell(Text(rowFine > 0 ? _formatNumber(rowFine) : '', style: TextStyle(fontSize: 11.sp, color: Colors.orange))),
-            DataCell(Text(rowTotal > 0 ? _formatNumber(rowTotal) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600))),
-            DataCell(Text(row['_remarks']?.toString() ?? '', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary))),
+            DataCell(Text(rowFine > 0 ? _formatNumber(rowFine) : '', style: TextStyle(fontSize: 13.sp, color: Colors.orange))),
+            DataCell(Text(rowTotal > 0 ? _formatNumber(rowTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+            DataCell(Text(row['_remarks']?.toString() ?? '', style: TextStyle(fontSize: 10.sp, color: AppColors.textPrimary))),
           ],
         ));
       }
@@ -2270,17 +2533,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       allRows.add(DataRow(
         color: WidgetStateProperty.all(const Color(0xFFE2E8F0)),
         cells: [
-          DataCell(Text('', style: TextStyle(fontSize: 11.sp))),
-          DataCell(Text('Total', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 11.sp))),
-          DataCell(Text('', style: TextStyle(fontSize: 11.sp))),
+          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
+          DataCell(Text('Total', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
+          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
           ...terms.map((t) => DataCell(Text(
             (classTotals[t] ?? 0) > 0 ? _formatNumber(classTotals[t]!) : '',
-            style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
           ))),
-          DataCell(Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.orange))),
-          DataCell(Text(classGrandTotal > 0 ? _formatNumber(classGrandTotal) : '', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 11.sp))),
+          DataCell(Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.orange))),
+          DataCell(Text(classGrandTotal > 0 ? _formatNumber(classGrandTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
         ],
       ));
     }
@@ -2289,19 +2552,24 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(const Color(0xFF1E2532)),
-          headingTextStyle: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.white),
-          dataTextStyle: TextStyle(fontSize: 11.sp, color: AppColors.textPrimary),
+          headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
+          headingTextStyle: TextStyle(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.3,
+          ),
+          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
           columnSpacing: 14, horizontalMargin: 10, dataRowMinHeight: 30, dataRowMaxHeight: 34, headingRowHeight: 36,
           columns: [
-            const DataColumn(label: Text('Sno')),
-            const DataColumn(label: Text('Class')),
-            const DataColumn(label: Text('Admn. No')),
-            const DataColumn(label: Text('Student Name')),
-            ...terms.map((t) => DataColumn(label: Text(t), numeric: true)),
-            const DataColumn(label: Text('Fine'), numeric: true),
-            const DataColumn(label: Text('Total'), numeric: true),
-            const DataColumn(label: Text('Remarks')),
+            const DataColumn(label: Text('SNO')),
+            const DataColumn(label: Text('CLASS')),
+            const DataColumn(label: Text('ADMN. NO')),
+            const DataColumn(label: Text('STUDENT NAME')),
+            ...terms.map((t) => DataColumn(label: Text(t.toUpperCase()), numeric: true)),
+            const DataColumn(label: Text('FINE'), numeric: true),
+            const DataColumn(label: Text('TOTAL'), numeric: true),
+            const DataColumn(label: Text('REMARKS')),
           ],
           rows: allRows,
         ),
@@ -2314,9 +2582,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.assessment_outlined, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.4)),
+          Icon(Icons.assessment_outlined, size: 48.sp, color: AppColors.accent.withValues(alpha: 0.4)),
           SizedBox(height: 12.h),
-          Text(message, style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary)),
+          Text(message, style: TextStyle(fontSize: 14.sp, color: AppColors.textPrimary)),
         ],
       ),
     );

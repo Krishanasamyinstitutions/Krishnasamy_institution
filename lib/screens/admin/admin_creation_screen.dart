@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/institution_user_model.dart';
 
+import '../../widgets/app_icon.dart';
 class AdminCreationScreen extends StatefulWidget {
   const AdminCreationScreen({super.key});
 
@@ -92,7 +93,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
         builder: (ctx, setDialogState) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.badge_outlined, size: 18.sp, color: AppColors.accent),
+              AppIcon.linear('personalcard', size: 18, color: AppColors.textSecondary),
               SizedBox(width: 8.w),
               Text('Add Designation', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
             ],
@@ -135,7 +136,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton.icon(
-              icon: Icon(Icons.add, size: 16.sp, color: Colors.white),
+              icon: AppIcon('add', size: 16, color: Colors.white),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
               onPressed: () async {
                 final name = controller.text.trim();
@@ -250,8 +251,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           // Header
           Row(
             children: [
-              Icon(Icons.admin_panel_settings_rounded,
-                  color: AppColors.primary, size: 22.sp),
+              AppIcon('security-user',
+                  color: AppColors.accent, size: 18),
               SizedBox(width: 10.w),
               Text(
                 'User Creation',
@@ -305,8 +306,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.person_add_rounded,
-                    size: 18.sp, color: AppColors.accent),
+                AppIcon('user-add',
+                    size: 18, color: AppColors.textSecondary),
                 SizedBox(width: 8.w),
                 Text('Create New User',
                     style:
@@ -336,7 +337,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   value: '__add_new__',
                   child: Row(
                     children: [
-                      Icon(Icons.add_circle_outline, size: 16.sp, color: Color(0xFF00BFA5)),
+                      AppIcon.linear('add-circle', size: 16, color: Color(0xFF00BFA5)),
                       SizedBox(width: 8.w),
                       Text('Add New Designation', style: TextStyle(color: Color(0xFF00BFA5), fontWeight: FontWeight.w600)),
                     ],
@@ -526,7 +527,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
       contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8.r),
@@ -552,6 +553,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     }
 
     return Container(
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10.r),
@@ -560,10 +562,10 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       child: Column(
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
+            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 12.h),
             child: Row(
               children: [
-                Icon(Icons.group_rounded, size: 18.sp, color: AppColors.accent),
+                AppIcon('people', size: 18, color: AppColors.textSecondary),
                 SizedBox(width: 8.w),
                 Text('Existing Users', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
                 const Spacer(),
@@ -576,32 +578,46 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   child: Text('${_users.length} users', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                 ),
                 SizedBox(width: 8.w),
-                TextButton.icon(
-                  onPressed: _fetchUsers,
-                  icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                  label: const Text('Refresh'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: _fetchUsers,
+                    icon: AppIcon('refresh', size: 16, color: Colors.white),
+                    label: const Text('Refresh'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          // Inner bordered table (same pattern as Master Data)
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
           // Simplified table header
           Container(
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-            color: const Color(0xFF6C8EEF),
+            color: AppColors.tableHeadBg,
             child: Row(
               children: [
-                SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                 SizedBox(width: 16.w),
-                Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                SizedBox(width: 70.w, child: Text('STATUS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                Expanded(flex: 3, child: Text('NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                Expanded(flex: 2, child: Text('DESIGNATION', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                SizedBox(width: 70.w, child: Text('STATUS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                 SizedBox(width: 30.w),
               ],
             ),
@@ -610,7 +626,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           if (_isLoading)
             Padding(padding: EdgeInsets.all(32.w), child: Center(child: CircularProgressIndicator()))
           else if (_users.isEmpty)
-            Padding(padding: EdgeInsets.all(32.w), child: Center(child: Text('No users found', style: TextStyle(color: AppColors.textSecondary))))
+            Padding(padding: EdgeInsets.all(32.w), child: Center(child: Text('No users found', style: TextStyle(color: AppColors.textPrimary))))
           else
             ...List.generate(_users.length, (i) {
               final u = _users[i];
@@ -621,13 +637,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   color: i.isEven ? Colors.white : AppColors.surface,
                   child: Row(
                     children: [
-                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
                       SizedBox(width: 16.w),
                       Expanded(
                         flex: 3,
                         child: Text(u.usename, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                       ),
-                      Expanded(flex: 2, child: Text(u.desname, style: TextStyle(fontSize: 13.sp))),
+                      Expanded(flex: 2, child: Text(u.desname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
                       Expanded(
                         flex: 2,
                         child: Row(
@@ -638,7 +654,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                                 color: u.urname.toLowerCase() == 'admin' ? AppColors.accent.withValues(alpha: 0.1) : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(6.r),
                               ),
-                              child: Text(u.urname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: u.urname.toLowerCase() == 'admin' ? AppColors.accent : AppColors.textSecondary)),
+                              child: Text(u.urname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: u.urname.toLowerCase() == 'admin' ? AppColors.accent : AppColors.textPrimary)),
                             ),
                           ],
                         ),
@@ -652,16 +668,19 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                               color: u.isActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6.r),
                             ),
-                            child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
+                            child: Text(u.isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: u.isActive ? AppColors.success : AppColors.error)),
                           ),
                         ),
                       ),
-                      SizedBox(width: 30.w, child: Icon(Icons.chevron_right_rounded, size: 18.sp, color: AppColors.textSecondary)),
+                      SizedBox(width: 30.w, child: AppIcon.linear('Chevron Right', size: 18, color: AppColors.textPrimary)),
                     ],
                   ),
                 ),
               );
             }),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -672,18 +691,18 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
         ? _users.where((x) => x.useId == u.userepto).map((x) => x.usename).firstOrNull
         : null;
 
-    Widget detailRow(String label, String value, {IconData? icon, Color? valueColor}) {
+    Widget detailRow(String label, String value, {String? icon, Color? valueColor}) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 20.w),
         child: Row(
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 16.sp, color: AppColors.accent),
+              AppIcon(icon, size: 16, color: AppColors.accent),
               SizedBox(width: 10.w),
             ],
             SizedBox(
               width: 130.w,
-              child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             ),
             Expanded(
               child: Text(value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: valueColor ?? AppColors.textPrimary)),
@@ -703,20 +722,32 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header with back button
+          // Header with back button + breadcrumb
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(Icons.arrow_back_rounded, size: 20.sp),
-                  onPressed: () => setState(() => _selectedUser = null),
-                  tooltip: 'Back to list',
+                InkWell(
+                  onTap: () => setState(() => _selectedUser = null),
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                      SizedBox(width: 6.w),
+                      Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ]),
+                  ),
                 ),
-                SizedBox(width: 4.w),
-                Icon(Icons.person_rounded, size: 18.sp, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('User Details', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                SizedBox(width: 12.w),
+                Container(width: 1, height: 18, color: AppColors.border),
+                SizedBox(width: 12.w),
+                Text('User Creation', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                SizedBox(width: 6.w),
+                AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                SizedBox(width: 6.w),
+                Text(u.urname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -749,7 +780,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   children: [
                     Text(u.usename, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
                     SizedBox(height: 2.h),
-                    Text('${u.desname} - ${u.urname}', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                    Text('${u.desname} - ${u.urname}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                   ],
                 ),
               ],
@@ -758,22 +789,22 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           const Divider(height: 1),
           // Detail rows
           SizedBox(height: 8.h),
-          detailRow('Email', u.usemail, icon: Icons.email_rounded),
+          detailRow('Email', u.usemail, icon: 'sms'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Phone', u.usephone, icon: Icons.phone_rounded),
+          detailRow('Phone', u.usephone, icon: 'call'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Designation', u.desname, icon: Icons.badge_rounded),
+          detailRow('Designation', u.desname, icon: 'personalcard'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Role', u.urname, icon: Icons.security_rounded, valueColor: u.urname.toLowerCase() == 'admin' ? AppColors.accent : null),
+          detailRow('Role', u.urname, icon: 'shield-tick', valueColor: u.urname.toLowerCase() == 'admin' ? AppColors.accent : null),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Reports To', reportTo ?? 'None', icon: Icons.supervisor_account_rounded),
+          detailRow('Reports To', reportTo ?? 'None', icon: 'profile-circle'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Start Date', '${u.usestadate.day.toString().padLeft(2, '0')}/${u.usestadate.month.toString().padLeft(2, '0')}/${u.usestadate.year}', icon: Icons.calendar_today_rounded),
+          detailRow('Start Date', '${u.usestadate.day.toString().padLeft(2, '0')}/${u.usestadate.month.toString().padLeft(2, '0')}/${u.usestadate.year}', icon: 'calendar-1'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Date of Birth', '${u.usedob.day.toString().padLeft(2, '0')}/${u.usedob.month.toString().padLeft(2, '0')}/${u.usedob.year}', icon: Icons.cake_rounded),
+          detailRow('Date of Birth', '${u.usedob.day.toString().padLeft(2, '0')}/${u.usedob.month.toString().padLeft(2, '0')}/${u.usedob.year}', icon: 'cake'),
           if (u.usecategory != null && u.usecategory!.isNotEmpty) ...[
             Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-            detailRow('Category', u.usecategory!, icon: Icons.category_rounded),
+            detailRow('Category', u.usecategory!, icon: 'category'),
           ],
           SizedBox(height: 16.h),
           // Terminate button
@@ -784,7 +815,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () => _confirmTerminate(u),
-                  icon: Icon(Icons.block_rounded, size: 18.sp),
+                  icon: AppIcon('forbidden-2', size: 18),
                   label: const Text('Terminate', style: TextStyle(fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.error,

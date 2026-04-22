@@ -5,6 +5,7 @@ import '../utils/auth_provider.dart';
 import '../services/supabase_service.dart';
 import '../models/payment_model.dart';
 
+import './app_icon.dart';
 class RecentActivitiesWidget extends StatefulWidget {
   const RecentActivitiesWidget({super.key});
 
@@ -195,8 +196,7 @@ class _RecentActivitiesWidgetState extends State<RecentActivitiesWidget> {
                             color: color.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
-                            Icons.payment_rounded,
+                          child: AppIcon('wallet-money',
                             size: 16,
                             color: color,
                           ),

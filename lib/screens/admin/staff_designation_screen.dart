@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 class StaffDesignationScreen extends StatefulWidget {
   const StaffDesignationScreen({super.key});
 
@@ -156,7 +157,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.badge_rounded, color: AppColors.accent, size: 22.sp),
+                        AppIcon('personalcard', color: AppColors.accent, size: 18),
                         SizedBox(width: 8.w),
                         Text(
                           'Add Designation',
@@ -189,7 +190,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _isLoading ? null : _saveDesignation,
-                            icon: Icon(Icons.add, size: 18.sp),
+                            icon: AppIcon('add', size: 18),
                             label: const Text('Add'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
@@ -227,20 +228,26 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.badge_rounded, size: 18.sp, color: AppColors.accent),
+                        AppIcon('personalcard', size: 18, color: AppColors.accent),
                         SizedBox(width: 8.w),
                         Text('Designations', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
                         const Spacer(),
                         Text('${_designations.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         SizedBox(width: 12.w),
-                        TextButton.icon(
-                          onPressed: _fetchDesignations,
-                          icon: Icon(Icons.refresh_rounded, size: 16.sp),
-                          label: const Text('Refresh'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                        SizedBox(
+                          height: 40,
+                          child: ElevatedButton.icon(
+                            onPressed: _fetchDesignations,
+                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            label: const Text('Refresh'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(horizontal: 18.w),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ),
                       ],
@@ -295,7 +302,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                                     borderRadius: BorderRadius.circular(6.r),
                                     child: Padding(
                                       padding: EdgeInsets.all(4.w),
-                                      child: Icon(Icons.delete_rounded, size: 16.sp, color: Colors.red),
+                                      child: AppIcon('trash', size: 16, color: Colors.red),
                                     ),
                                   ),
                                 ],

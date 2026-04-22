@@ -23,6 +23,7 @@ import '../fees/reports_screen.dart';
 
 
 
+import '../../widgets/app_icon.dart';
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -49,20 +50,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 
   static const List<_NavItem> _allNavItems = [
-    _NavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _NavItem(Icons.upload_rounded, 'Master Data', adminOnly: true),
-    _NavItem(Icons.settings_rounded, 'Sequence Creation', adminOnly: true),
-    _NavItem(Icons.people_alt_rounded, 'Students', adminOnly: true),
-    _NavItem(Icons.menu_book_rounded, 'Student Ledger'),
-    _NavItem(Icons.approval_rounded, 'Fee Demand Approval', adminOnly: true),
-    _NavItem(Icons.request_page_rounded, 'Fee Demand'),
-    _NavItem(Icons.payments_rounded, 'Fee Collection', accountantOnly: true),
-    _NavItem(Icons.account_balance_rounded, 'Bank Reconciliation', accountantOnly: true),
-    _NavItem(Icons.receipt_long_rounded, 'Transactions'),
-    _NavItem(Icons.admin_panel_settings_rounded, 'User Creation', adminOnly: true),
-    _NavItem(Icons.notifications_rounded, 'Notices'),
-    _NavItem(Icons.notifications_active_rounded, 'Notifications'),
-    _NavItem(Icons.assessment_rounded, 'Reports'),
+    _NavItem('element-3', 'Dashboard', section: 'MAIN MENU'),
+    _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true),
+    _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
+    _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),
+    _NavItem('people', 'Students', section: 'STUDENTS', adminOnly: true),
+    _NavItem('book-1', 'Student Ledger', section: 'STUDENTS'),
+    _NavItem('receipt-edit', 'Fee Demand', section: 'FEES'),
+    _NavItem('tick-square', 'Fee Demand Approval', section: 'FEES', adminOnly: true),
+    _NavItem('bank', 'Bank Reconciliation', section: 'FEES', adminOnly: true),
+    _NavItem('indianrupeesign.circle.fill', 'Fee Collection', section: 'FEES', accountantOnly: true, unselectedIcon: 'indianrupeesign.circle'),
+    _NavItem('receipt-2', 'Transactions', section: 'FEES'),
+    _NavItem('notification', 'Notices', section: 'GENERAL'),
+    _NavItem('notification-bing', 'Notifications', section: 'GENERAL'),
+    _NavItem('chart-1', 'Reports', section: 'GENERAL'),
   ];
 
   late List<_NavItem> _navItems;
@@ -431,21 +432,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _isFullHeightScreen()
                       ? Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                            4,
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                          ),
+                          padding: const EdgeInsets.all(16),
                           child: _buildDashboardContent(context, isDesktop),
                         )
                       : SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                            4,
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                            isDesktop ? (size.width < 1100 ? 12 : size.width < 1400 ? 16 : 28) : 16,
-                          ),
+                          padding: const EdgeInsets.all(16),
                           child: _buildDashboardContent(context, isDesktop),
                         ),
                 ),
@@ -458,6 +449,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSidebar(BuildContext context, bool collapsed) {
+    // Group visible nav items by section, preserving insertion order.
+    final orderedSections = <String>[];
+    final groupedIndices = <String, List<int>>{};
+    for (var i = 0; i < _navItems.length; i++) {
+      final section = _navItems[i].section;
+      if (!groupedIndices.containsKey(section)) {
+        orderedSections.add(section);
+        groupedIndices[section] = [];
+      }
+      groupedIndices[section]!.add(i);
+    }
+
+    final hPad = collapsed
+        ? 12.w
+        : (MediaQuery.of(context).size.width < 1100 ? 10.w : 14.w);
+
     return Container(
       color: AppColors.surfaceSidebar,
       child: Column(
@@ -466,113 +473,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: EdgeInsets.symmetric(
               horizontal: collapsed ? 16.w : (MediaQuery.of(context).size.width < 1100 ? 14.w : 24.w),
-              vertical: 24.h,
+              vertical: 20.h,
             ),
             child: Row(
               children: [
                 Container(
-                  width: 42.w,
-                  height: 42.h,
+                  width: 32.w,
+                  height: 32.h,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
-                  child: Icon(
-                    Icons.school_rounded,
+                  child: AppIcon('teacher',
                     color: AppColors.primary,
-                    size: 22.sp,
+                    size: 16,
                   ),
                 ),
                 if (!collapsed) ...[
-                  SizedBox(width: 14.w),
+                  SizedBox(width: 10.w),
                   Text(
                     'EduDesk',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
 
-          SizedBox(height: 8.h),
-
-          // Nav items
+          // Nav items grouped by section
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: collapsed ? 12.w : (MediaQuery.of(context).size.width < 1100 ? 10.w : 16.w)),
-              itemCount: _navItems.length,
-              itemBuilder: (context, index) {
-                final item = _navItems[index];
-                final isSelected = _selectedNavIndex == index;
+            child: ListView(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              children: [
+                for (var s = 0; s < orderedSections.length; s++) ...[
+                  if (!collapsed)
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: s == 0 ? 4.h : 18.h,
+                        bottom: 8.h,
+                        left: 10.w,
+                      ),
+                      child: Text(
+                        orderedSections[s],
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    )
+                  else
+                    SizedBox(height: s == 0 ? 4.h : 18.h),
+                  for (final idx in groupedIndices[orderedSections[s]]!)
+                    _buildNavTile(context, idx, collapsed),
+                ],
+                SizedBox(height: 16.h),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                return Padding(
-                  padding: EdgeInsets.only(bottom: 4.h),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() => _selectedNavIndex = index);
-                        _loadUnreadNotifCount();
-                      },
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        clipBehavior: Clip.hardEdge,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: collapsed ? 12.w : (MediaQuery.of(context).size.width < 1100 ? 10.w : 16.w),
-                          vertical: 12.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withValues(alpha: 0.12)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              item.icon,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: MediaQuery.of(context).size.width <= 1366 ? 18.sp : 22.sp,
-                            ),
-                            if (!collapsed) ...[
-                              SizedBox(width: 14.w),
-                              Flexible(
-                                child: Text(
-                                  item.label,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: isSelected
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.w400,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+  Widget _buildNavTile(BuildContext context, int index, bool collapsed) {
+    final item = _navItems[index];
+    final isSelected = _selectedNavIndex == index;
+    final badge = item.label == 'Notifications' && _unreadNotifCount > 0
+        ? _unreadNotifCount.toString()
+        : null;
+
+    const selectedBg = AppColors.primary;
+    const selectedFg = AppColors.textOnPrimary;
+    const unselectedFg = AppColors.textSecondary;
+
+    final iconSize =
+        MediaQuery.of(context).size.width <= 1366 ? 18.sp : 20.sp;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4.h),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() => _selectedNavIndex = index);
+            _loadUnreadNotifCount();
+          },
+          borderRadius: BorderRadius.circular(12.r),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: EdgeInsets.symmetric(
+              horizontal: collapsed ? 12.w : 14.w,
+              vertical: 11.h,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected ? selectedBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Row(
+              children: [
+                AppIcon(
+                  isSelected ? item.icon : (item.unselectedIcon ?? item.icon),
+                  style: isSelected
+                      ? AppIconStyle.bold
+                      : AppIconStyle.linear,
+                  color: isSelected ? selectedFg : unselectedFg,
+                  size: iconSize,
+                ),
+                if (!collapsed) ...[
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: isSelected ? selectedFg : unselectedFg,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
                       ),
                     ),
                   ),
-                );
-              },
+                  if (badge != null)
+                    Text(
+                      badge,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : unselectedFg,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ],
             ),
           ),
-
-          SizedBox(height: 16.h),
-        ],
+        ),
       ),
     );
   }
@@ -581,8 +625,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final auth = context.watch<AuthProvider>();
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1100 ? 12 : MediaQuery.of(context).size.width < 1400 ? 16 : 28) : 16,
-        vertical: 12,
+        horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1100 ? 12 : MediaQuery.of(context).size.width < 1400 ? 16 : 24) : 16,
+        vertical: 10,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -593,50 +637,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (!isDesktop && MediaQuery.of(context).size.width <= 500)
             IconButton(
               onPressed: () => Scaffold.of(context).openDrawer(),
-              icon: const Icon(Icons.menu_rounded),
+              icon: const AppIcon('menu'),
             ),
           if (isDesktop)
-            IconButton(
-              onPressed: () =>
-                  setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-              icon: Icon(
-                _sidebarCollapsed
-                    ? Icons.menu_open_rounded
-                    : Icons.menu_rounded,
-              ),
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                ),
-              ),
+            _softIconButton(
+              icon: _sidebarCollapsed ? 'menu-open' : 'menu-close',
+              onTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             ),
-          SizedBox(width: 16.w),
+          SizedBox(width: 14.w),
+          // Page title + academic year chip
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _navItems[_selectedNavIndex].label,
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.2, height: 1.1),
               ),
-              if (_academicYear.isNotEmpty)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.calendar_today_rounded, size: 14.sp, color: AppColors.accent),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'Academic Year $_academicYear',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
+              if (_academicYear.isNotEmpty) ...[
+                SizedBox(height: 5.h),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon('calendar-1', size: 14, color: AppColors.accent),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'AY $_academicYear',
+                        style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                      ),
+                    ],
+                  ),
                 ),
+              ],
             ],
           ),
 
-          // School logo, name and address (center)
+          // Center: institution identity
           if (isDesktop)
             Expanded(
               child: Center(
@@ -646,18 +689,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         if (auth.insLogo != null)
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8.r),
+                            borderRadius: BorderRadius.circular(10.r),
                             child: Image.network(
                               auth.insLogo!,
-                              width: 44.w,
-                              height: 44.h,
+                              width: 56.w,
+                              height: 56.h,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(Icons.school_rounded, size: 36.sp, color: AppColors.accent),
+                              errorBuilder: (_, __, ___) => AppIcon('teacher', size: 44.sp, color: AppColors.accent),
                             ),
                           )
                         else
-                          Icon(Icons.school_rounded, size: 36.sp, color: AppColors.accent),
-                        SizedBox(width: 10.w),
+                          AppIcon('teacher', size: 48.sp, color: AppColors.accent),
+                        SizedBox(width: 14.w),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -665,14 +708,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             if (auth.insName != null)
                               Text(
                                 auth.insName!,
-                                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3, height: 1.1),
                               ),
-                            if (auth.insAddress != null)
+                            if (auth.insAddress != null) ...[
+                              SizedBox(height: 2.h),
                               Text(
                                 auth.insAddress!,
-                                style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary),
+                                style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                                 overflow: TextOverflow.ellipsis,
                               ),
+                            ],
                           ],
                         ),
                       ],
@@ -681,131 +726,160 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-          SizedBox(width: 16.w),
+          SizedBox(width: 12.w),
 
-          // Notification bell
+          // Notification bell (primary-colored)
           Stack(
+            clipBehavior: Clip.none,
             children: [
-              IconButton(
-                onPressed: () {
+              _softIconButton(
+                icon: 'notification',
+                iconLinear: true,
+                filled: true,
+                onTap: () {
                   setState(() => _selectedNavIndex = _navItems.indexWhere((i) => i.label == 'Notifications'));
                   _loadUnreadNotifCount();
                 },
-                icon: Icon(Icons.notifications_outlined, size: 22.sp),
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                ),
               ),
               if (_unreadNotifCount > 0)
                 Positioned(
-                  right: 8.w,
-                  top: 8.h,
+                  right: 6,
+                  top: 6,
                   child: Container(
-                    width: 8.w,
-                    height: 8.h,
-                    decoration: const BoxDecoration(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
                       color: AppColors.error,
                       shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
                 ),
             ],
           ),
-          SizedBox(width: 12.w),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10.r),
-              border: Border.all(color: AppColors.border),
+          SizedBox(width: 14.w),
+          // Profile pill card (clickable — opens popup)
+          PopupMenuButton<String>(
+            tooltip: 'Profile options',
+            position: PopupMenuPosition.under,
+            offset: Offset(0, 8.h),
+            color: Colors.white,
+            elevation: 10,
+            surfaceTintColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              side: const BorderSide(color: AppColors.border),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  radius: 17.r,
-                  backgroundColor: AppColors.accent.withValues(alpha: 0.2),
-                  child: Text(
-                    (auth.userName ?? 'U')[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 10.w),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isDesktop ? 180 : 120,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        auth.userName ?? 'User',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                      ),
-                      Text(
-                        auth.userRole ?? 'Staff',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: 'Profile options',
-                  position: PopupMenuPosition.under,
-                  offset: Offset(0, 8.h),
-                  color: Colors.white,
-                  elevation: 10,
-                  surfaceTintColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  menuPadding: EdgeInsets.symmetric(vertical: 6.h),
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: AppColors.textSecondary,
-                  ),
-                  onSelected: (value) async {
-                    if (value == 'signout') {
-                      await auth.logout();
-                      if (context.mounted) {
-                        Navigator.pushReplacementNamed(context, AppRoutes.welcome);
-                      }
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<String>(
-                      value: 'signout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout_rounded, size: 18.sp),
-                          SizedBox(width: 8.w),
-                          const Text('Sign out'),
-                        ],
-                      ),
-                    ),
+            menuPadding: EdgeInsets.symmetric(vertical: 6.h),
+            padding: EdgeInsets.zero,
+            onSelected: (value) async {
+              if (value == 'signout') {
+                await auth.logout();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'signout',
+                child: Row(
+                  children: [
+                    AppIcon('logout', size: 18),
+                    SizedBox(width: 8.w),
+                    const Text('Sign out'),
                   ],
                 ),
-              ],
+              ),
+            ],
+            child: Container(
+              padding: EdgeInsets.only(left: 4.w, right: 12.w, top: 4.h, bottom: 4.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.18),
+                    child: Text(
+                      (auth.userName ?? 'U')[0].toUpperCase(),
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20.sp,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isDesktop ? 220 : 140,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          auth.userName ?? 'User',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.2),
+                        ),
+                        SizedBox(height: 2.h),
+                        Text(
+                          auth.userEmail ?? (auth.userRole ?? 'Staff'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500, height: 1.15),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Soft-shadow icon button used in the top bar (mail, notifications, etc.)
+  // When [filled] is true, the button uses the primary colour as background
+  // with white iconography (used for the notification bell).
+  Widget _softIconButton({
+    required String icon,
+    bool iconLinear = false,
+    bool filled = false,
+    required VoidCallback onTap,
+  }) {
+    final bg = filled ? AppColors.primary : Colors.white;
+    final fg = filled ? Colors.white : AppColors.textSecondary;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: iconLinear
+              ? AppIcon.linear(icon, size: 28, color: fg)
+              : AppIcon(icon, size: 28, color: fg),
+        ),
       ),
     );
   }
@@ -871,11 +945,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _NavItem {
-  final IconData icon;
+  final String icon;
+  final String? unselectedIcon;
   final String label;
+  final String section;
   final bool adminOnly;
   final bool accountantOnly;
   final bool hideForAccountant;
-  const _NavItem(this.icon, this.label, {this.adminOnly = false, this.accountantOnly = false, this.hideForAccountant = false});
+  const _NavItem(this.icon, this.label, {this.section = 'MAIN', this.adminOnly = false, this.accountantOnly = false, this.hideForAccountant = false, this.unselectedIcon});
 }
 

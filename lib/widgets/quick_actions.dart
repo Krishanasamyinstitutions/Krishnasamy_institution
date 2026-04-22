@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+import './app_icon.dart';
 class QuickActionsWidget extends StatelessWidget {
   final VoidCallback? onAddStudent;
 
@@ -10,23 +11,23 @@ class QuickActionsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       _QuickAction(
-        icon: Icons.person_add_rounded,
+        icon: 'user-add',
         label: 'Add Student',
         color: AppColors.accent,
         onTap: onAddStudent,
       ),
       _QuickAction(
-        icon: Icons.receipt_long_rounded,
+        icon: 'receipt-2',
         label: 'Collect Fee',
         color: AppColors.secondary,
       ),
       _QuickAction(
-        icon: Icons.campaign_rounded,
+        icon: 'volume-high',
         label: 'Send Notice',
         color: AppColors.info,
       ),
       _QuickAction(
-        icon: Icons.bar_chart_rounded,
+        icon: 'chart-2',
         label: 'View Reports',
         color: AppColors.primaryLight,
       ),
@@ -118,7 +119,7 @@ class _QuickActionChipState extends State<_QuickActionChip> {
                   color: widget.action.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
+                child: AppIcon(
                   widget.action.icon,
                   size: 16,
                   color: widget.action.color,
@@ -142,7 +143,7 @@ class _QuickActionChipState extends State<_QuickActionChip> {
 }
 
 class _QuickAction {
-  final IconData icon;
+  final String icon;
   final String label;
   final Color color;
   final VoidCallback? onTap;

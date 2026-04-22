@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
 class NoticesScreen extends StatefulWidget {
   const NoticesScreen({super.key});
 
@@ -114,20 +115,20 @@ class _NoticesScreenState extends State<NoticesScreen> {
     }
   }
 
-  IconData _categoryIcon(String? category) {
+  String _categoryIcon(String? category) {
     switch (category?.toLowerCase()) {
       case 'exam':
-        return Icons.quiz_rounded;
+        return 'message-question';
       case 'holiday':
-        return Icons.beach_access_rounded;
+        return 'sun-1';
       case 'event':
-        return Icons.event_rounded;
+        return 'calendar-1';
       case 'fee':
-        return Icons.payments_rounded;
+        return 'indianrupeesign.circle.fill';
       case 'result':
-        return Icons.assessment_rounded;
+        return 'chart-1';
       default:
-        return Icons.campaign_rounded;
+        return 'volume-high';
     }
   }
 
@@ -151,7 +152,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.campaign_rounded, color: AppColors.accent, size: 22),
+              AppIcon('volume-high', color: AppColors.accent, size: 18),
               SizedBox(width: 10.w),
               Text('Notices & Announcements', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
@@ -166,7 +167,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: () => setState(() => _showCreateForm = true),
-                icon: const Icon(Icons.add_rounded, size: 18),
+                icon: const AppIcon('add', size: 18),
                 label: Text('Create Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
@@ -178,14 +179,20 @@ class _NoticesScreenState extends State<NoticesScreen> {
                 ),
               ),
               SizedBox(width: 8.w),
-              TextButton.icon(
-                onPressed: _fetchNotices,
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Refresh'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: _fetchNotices,
+                  icon: AppIcon('refresh', size: 16, color: Colors.white),
+                  label: const Text('Refresh'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -215,7 +222,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off_rounded, size: 64, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+          AppIcon('notification-bing', size: 64, color: AppColors.textSecondary.withValues(alpha: 0.3)),
           SizedBox(height: 16.h),
           Text('No notices yet', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           SizedBox(height: 6.h),
@@ -223,7 +230,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
           SizedBox(height: 20.h),
           ElevatedButton.icon(
             onPressed: () => setState(() => _showCreateForm = true),
-            icon: const Icon(Icons.add_rounded, size: 18),
+            icon: const AppIcon('add', size: 18),
             label: const Text('Create First Notice'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
@@ -249,7 +256,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
       onTap: () => setState(() => _selectedNotice = notice),
       borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12.r),
@@ -260,13 +267,13 @@ class _NoticesScreenState extends State<NoticesScreen> {
           children: [
             // Icon
             Container(
-              width: 40,
-              height: 40,
+              width: 22,
+              height: 22,
               decoration: BoxDecoration(
                 color: _priorityColor(priority).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10.r),
+                borderRadius: BorderRadius.circular(5.r),
               ),
-              child: Icon(_categoryIcon(category), size: 20, color: _priorityColor(priority)),
+              child: AppIcon(_categoryIcon(category), size: 10, color: _priorityColor(priority)),
             ),
             SizedBox(width: 12.w),
             // Content
@@ -290,7 +297,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                           child: Text(priority, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
                         ),
                       SizedBox(width: 8.w),
-                      const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textSecondary),
+                      const AppIcon.linear('Chevron Right', size: 18, color: AppColors.textSecondary),
                     ],
                   ),
                   if (desc.isNotEmpty) ...[
@@ -300,16 +307,16 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   SizedBox(height: 4.h),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      AppIcon('calendar-1', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       SizedBox(width: 4.w),
                       Text(_formatDate(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       SizedBox(width: 10.w),
-                      Icon(Icons.access_time_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                      AppIcon('clock', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                       SizedBox(width: 4.w),
                       Text(_timeAgo(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       if (category != null) ...[
                         SizedBox(width: 10.w),
-                        Icon(Icons.label_rounded, size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                        AppIcon('tag', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                         SizedBox(width: 4.w),
                         Text(category, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
                       ],
@@ -347,7 +354,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                icon: const AppIcon.linear('Chevron Left', size: 20),
                 onPressed: () => setState(() => _selectedNotice = null),
                 tooltip: 'Back to notices',
               ),
@@ -386,13 +393,13 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 48,
-                        height: 48,
+                        width: 26,
+                        height: 26,
                         decoration: BoxDecoration(
                           color: _priorityColor(priority).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10.r),
+                          borderRadius: BorderRadius.circular(6.r),
                         ),
-                        child: Icon(_categoryIcon(category), size: 24, color: _priorityColor(priority)),
+                        child: AppIcon(_categoryIcon(category), size: 12, color: _priorityColor(priority)),
                       ),
                       SizedBox(width: 16.w),
                       Expanded(
@@ -433,7 +440,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                     SizedBox(height: 20.h),
                     Row(
                       children: [
-                        const Icon(Icons.people_rounded, size: 16, color: AppColors.textSecondary),
+                        const AppIcon('people', size: 16, color: AppColors.textSecondary),
                         SizedBox(width: 6.w),
                         Text('Target: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         Text(target, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
@@ -447,7 +454,7 @@ class _NoticesScreenState extends State<NoticesScreen> {
                     SizedBox(height: 12.h),
                     Row(
                       children: [
-                        const Icon(Icons.person_rounded, size: 16, color: AppColors.textSecondary),
+                        const AppIcon('user', size: 16, color: AppColors.textSecondary),
                         SizedBox(width: 6.w),
                         Text('Posted by: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         Text(createdBy, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
@@ -745,12 +752,12 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                icon: const AppIcon.linear('Chevron Left', size: 20),
                 onPressed: widget.onBack,
                 tooltip: 'Back to notices',
               ),
               SizedBox(width: 4.w),
-              const Icon(Icons.edit_notifications_rounded, size: 20, color: AppColors.accent),
+              const AppIcon('notification-bing', size: 20, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('Create Notice', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
@@ -759,7 +766,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
               else
                 ElevatedButton.icon(
                   onPressed: _submitNotice,
-                  icon: const Icon(Icons.send_rounded, size: 16),
+                  icon: const AppIcon('send-2', size: 16),
                   label: Text('Send Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
@@ -833,8 +840,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  t == 'All Students' ? Icons.groups_rounded : t == 'Staff' ? Icons.badge_rounded : t == 'Pending Fees' ? Icons.pending_actions_rounded : Icons.class_rounded,
+                                AppIcon(
+                                  t == 'All Students' ? 'profile-2user' : t == 'Staff' ? 'personalcard' : t == 'Pending Fees' ? 'timer' : 'book-1',
                                   size: 16,
                                   color: isSelected ? Colors.white : AppColors.textSecondary,
                                 ),
@@ -906,8 +913,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(
-                                              isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                            AppIcon(
+                                              isSelected ? 'tick-square' : 'stop',
                                               size: 16,
                                               color: isSelected ? AppColors.accent : AppColors.textSecondary,
                                             ),
@@ -960,7 +967,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                       isExpanded: true,
                                       hint: Text('All Terms', style: TextStyle(fontSize: 13.sp)),
                                       style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                      icon: const AppIcon.linear('Chevron Down', size: 18),
                                       items: [
                                         const DropdownMenuItem<String?>(value: null, child: Text('All Terms')),
                                         ..._availableFeeTerms.map((term) => DropdownMenuItem<String?>(value: term, child: Text(term))),
@@ -1031,7 +1038,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded, size: 15, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
+                                AppIcon('calendar-1', size: 15, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
                                 SizedBox(width: 8.w),
                                 Text(
                                   _fromDate != null
@@ -1060,7 +1067,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.event_busy_rounded, size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
+                                AppIcon('calendar-remove', size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
                                 SizedBox(width: 8.w),
                                 Text(
                                   _toDate != null
@@ -1097,7 +1104,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.preview_rounded, size: 16, color: AppColors.accent),
+                            const AppIcon('eye', size: 16, color: AppColors.accent),
                             SizedBox(width: 6.w),
                             Text('Preview', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
                           ],
@@ -1123,7 +1130,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               child: Text(_category, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                             ),
                             SizedBox(width: 8.w),
-                            Icon(Icons.people_rounded, size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                            AppIcon('people', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                             SizedBox(width: 4.w),
                             Text(
                               _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : _targetType == 'Pending Fees' ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}' : '${_selectedClasses.length} classes',
@@ -1213,7 +1220,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     ),
                   ),
                 ),
-                Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                AppIcon('calendar-1', size: 16, color: AppColors.textSecondary.withValues(alpha: 0.6)),
               ],
             ),
           ),

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
+import '../../widgets/app_icon.dart';
+import '../../widgets/app_search_field.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions, PostgrestException;
 import 'package:provider/provider.dart';
@@ -341,7 +343,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _admDate = null;
       _dob = null;
       _photoUrl = null;
-      _selectedParentTab = 'Father';
       if (_years.isNotEmpty) {
         _selectedYrId = _years.first['yr_id'].toString();
         _selectedYrLabel = _years.first['yrlabel'];
@@ -418,7 +419,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _admDate = null;
       _dob = null;
       _photoUrl = null;
-      _selectedParentTab = 'Father';
       _selectedStudent = null;
       _isFormEnabled = true;
       if (_years.isNotEmpty) {
@@ -549,7 +549,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   Widget _avatarPlaceholder() {
     final name = _nameController.text.trim();
-    if (name.isEmpty) return Icon(Icons.person_rounded, size: 36.sp, color: AppColors.accent);
+    if (name.isEmpty) return AppIcon('user', size: 36.sp, color: AppColors.accent);
     return Center(
       child: Text(
         name[0].toUpperCase(),
@@ -733,10 +733,17 @@ class _StudentsScreenState extends State<StudentsScreen> {
           initiallyExpanded: false,
           tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
           title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          trailing: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
-            child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+                child: Text('$courseTotal', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ),
+              SizedBox(width: 6.w),
+              AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
+            ],
           ),
           children: classCounts.keys.map((className) {
             final count = classCounts[className] ?? 0;
@@ -780,7 +787,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           color: classColor.withValues(alpha: isSelected ? 0.2 : 0.1),
                           borderRadius: BorderRadius.circular(9.r),
                         ),
-                        child: Center(child: Icon(Icons.class_rounded, size: 16.sp, color: classColor)),
+                        child: Center(child: AppIcon('book-1', size: 16, color: classColor)),
                       ),
                       SizedBox(width: 10.w),
                       Expanded(
@@ -800,6 +807,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         ),
                         child: Text('$count', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: classColor)),
                       ),
+                      SizedBox(width: 6.w),
+                      AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
                     ],
                   ),
                 ),
@@ -846,12 +855,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                   _selectedStudent = null;
                   _searchController.clear();
                 }),
-                icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
+                icon: AppIcon.linear('Chevron Left', size: 18),
                 color: classColor,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              Icon(Icons.class_rounded, size: 14.sp, color: classColor.withValues(alpha: 0.7)),
+              AppIcon('book-1', size: 14, color: classColor.withValues(alpha: 0.7)),
               SizedBox(width: 6.w),
               Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: classColor)),
               SizedBox(width: 6.w),
@@ -900,7 +909,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 ),
                               ),
                               if (isSelected)
-                                Icon(Icons.check_circle_rounded, size: 16.sp, color: AppColors.accent),
+                                AppIcon('tick-circle', size: 16, color: AppColors.accent),
                             ],
                           ),
                         ),
@@ -924,13 +933,15 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
     final pagedStudents = allStudents.sublist(startIdx, endIdx);
 
+    final cellStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
+
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.fromLTRB(6.w, 6.h, 14.w, 6.h),
+          padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 4.h),
           child: Row(
             children: [
-              Icon(Icons.people_alt_rounded, size: 18.sp, color: AppColors.primary),
+              AppIcon('people', size: 18, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
               SizedBox(width: 8.w),
@@ -940,61 +951,96 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 child: Text('$totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
               ),
               const Spacer(),
+              AppSearchField(
+                controller: _searchController,
+                hintText: 'Search...',
+                onChanged: (_) => setState(() => _studentPage = 0),
+                width: 240.w,
+              ),
+              SizedBox(width: 10.w),
               SizedBox(
-                width: 200.w,
-                height: 36.h,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() => _studentPage = 0),
-                  decoration: InputDecoration(hintText: 'Search...', prefixIcon: Icon(Icons.search, size: 18.sp), isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8.h)),
-                  style: TextStyle(fontSize: 13.sp),
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() {
+                    _showImport = !_showImport;
+                    if (!_showImport) _resetImport();
+                  }),
+                  icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: 16),
+                  label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _showImport ? AppColors.error : AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    elevation: 0,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-          color: AppColors.primary,
-          child: Row(
-            children: [
-              SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-              SizedBox(width: 30.w),
-            ],
-          ),
-        ),
         Expanded(
-          child: ListView.builder(
-            itemCount: pagedStudents.length,
-            itemBuilder: (context, index) {
-              final s = pagedStudents[index];
-              final serialNo = startIdx + index + 1;
-              return InkWell(
-                onTap: () => _populateStudentForm(s),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5))),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 40.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                      SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                      Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-                      SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w500))),
-                      SizedBox(width: 80.w, child: Text(s.stuclass, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary))),
-                      SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                      SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                      SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
-                    ],
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                    color: AppColors.tableHeadBg,
+                    child: Row(
+                      children: [
+                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 30.w),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                  Container(height: 1, color: AppColors.border),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: pagedStudents.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (context, index) {
+                        final s = pagedStudents[index];
+                        final serialNo = startIdx + index + 1;
+                        return InkWell(
+                          onTap: () => _populateStudentForm(s),
+                          child: Container(
+                            color: index.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                            child: Row(
+                              children: [
+                                SizedBox(width: 40.w, child: Text('$serialNo', style: cellStyle)),
+                                SizedBox(width: 100.w, child: Text(s.stuadmno, style: cellStyle)),
+                                Expanded(child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: cellStyle)),
+                                SizedBox(width: 80.w, child: Text(s.stuclass, style: cellStyle)),
+                                SizedBox(width: 80.w, child: Text(s.stugender, style: cellStyle)),
+                                SizedBox(width: 120.w, child: Text(s.stumobile, style: cellStyle)),
+                                SizedBox(width: 30.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         Container(
@@ -1003,11 +1049,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
             children: [
               Text('Showing ${startIdx + 1}-$endIdx of $totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
               const Spacer(),
-              IconButton(icon: Icon(Icons.first_page, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null),
-              IconButton(icon: Icon(Icons.chevron_left, size: 18.sp), onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null),
+              IconButton(icon: AppIcon.linear('Double Arrow Left', size: 18), onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null),
+              IconButton(icon: AppIcon.linear('Chevron Left', size: 18), onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null),
               Container(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h), decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)), child: Text('${_studentPage + 1}/${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 12.sp, color: Colors.white, fontWeight: FontWeight.w600))),
-              IconButton(icon: Icon(Icons.chevron_right, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null),
-              IconButton(icon: Icon(Icons.last_page, size: 18.sp), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null),
+              IconButton(icon: AppIcon.linear('Chevron Right', size: 18), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null),
+              IconButton(icon: AppIcon.linear('Double Arrow Right', size: 18), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null),
             ],
           ),
         ),
@@ -1053,58 +1099,52 @@ class _StudentsScreenState extends State<StudentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with back button
+          // Header with back button + breadcrumb
           Container(
-            padding: EdgeInsets.fromLTRB(10.w, 10.h, 20.w, 10.h),
-            decoration: BoxDecoration(
-              color: classColor.withValues(alpha: 0.04),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-            ),
+            padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
             child: Row(
               children: [
-                IconButton(
-                  onPressed: () => setState(() {
+                InkWell(
+                  onTap: () => setState(() {
                     _selectedClassFilter = null;
                     _selectedStudent = null;
                     _studentPage = 0;
                     _searchController.clear();
                   }),
-                  icon: Icon(Icons.arrow_back_rounded, size: 18.sp),
-                  color: classColor,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  tooltip: 'Back to classes',
-                ),
-                Icon(Icons.class_rounded, size: 20.sp, color: classColor),
-                SizedBox(width: 8.w),
-                Text('Class $className', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: classColor)),
-                SizedBox(width: 8.w),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                  decoration: BoxDecoration(
-                    color: classColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10.r),
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                        SizedBox(width: 6.w),
+                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ],
+                    ),
                   ),
-                  child: Text('${allStudents.length} students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: classColor)),
                 ),
+                SizedBox(width: 12.w),
+                Container(width: 1, height: 18, color: AppColors.border),
+                SizedBox(width: 12.w),
+                Text('Students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                SizedBox(width: 6.w),
+                AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                SizedBox(width: 6.w),
+                Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                SizedBox(width: 6.w),
+                Text('(${allStudents.length})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 const Spacer(),
                 // Search
-                SizedBox(
-                  width: 200.w,
-                  height: 34.h,
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search...',
-                      hintStyle: TextStyle(fontSize: 13.sp),
-                      prefixIcon: Icon(Icons.search_rounded, size: 16.sp),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-                      isDense: true,
-                    ),
-                    style: TextStyle(fontSize: 13.sp),
-                    onChanged: (_) => setState(() => _studentPage = 0),
-                  ),
+                AppSearchField(
+                  controller: _searchController,
+                  hintText: 'Search...',
+                  onChanged: (_) => setState(() => _studentPage = 0),
+                  width: 240.w,
                 ),
                 SizedBox(width: 12.w),
                 Tooltip(
@@ -1122,7 +1162,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.file_download_rounded, size: 14.sp, color: AppColors.success),
+                          AppIcon('document-download', size: 14, color: AppColors.success),
                           SizedBox(width: 4.w),
                           Text('Export', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
                         ],
@@ -1140,16 +1180,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     // Table header
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                      color: const Color(0xFF6C8EEF),
+                      color: AppColors.tableHeadBg,
                       child: Row(
                         children: [
-                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                           SizedBox(width: 16.w),
-                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
-                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white))),
+                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                           SizedBox(width: 30.w),
                         ],
                       ),
@@ -1180,7 +1220,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                         Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
                                         SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
                                         SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 30.w, child: Icon(Icons.arrow_forward_ios_rounded, size: 16.sp, color: AppColors.accent)),
+                                        SizedBox(width: 30.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent)),
                                       ],
                                     ),
                                   ),
@@ -1207,12 +1247,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ),
                             const Spacer(),
                             IconButton(
-                              icon: Icon(Icons.first_page_rounded, size: 20.sp),
+                              icon: AppIcon.linear('Double Arrow Left', size: 20),
                               onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null,
                               tooltip: 'First page', splashRadius: 18,
                             ),
                             IconButton(
-                              icon: Icon(Icons.chevron_left_rounded, size: 20.sp),
+                              icon: AppIcon.linear('Chevron Left', size: 20),
                               onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null,
                               tooltip: 'Previous', splashRadius: 18,
                             ),
@@ -1222,12 +1262,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                               child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                             ),
                             IconButton(
-                              icon: Icon(Icons.chevron_right_rounded, size: 20.sp),
+                              icon: AppIcon.linear('Chevron Right', size: 20),
                               onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null,
                               tooltip: 'Next', splashRadius: 18,
                             ),
                             IconButton(
-                              icon: Icon(Icons.last_page_rounded, size: 20.sp),
+                              icon: AppIcon.linear('Double Arrow Right', size: 20),
                               onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null,
                               tooltip: 'Last page', splashRadius: 18,
                             ),
@@ -1248,32 +1288,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header
-        Row(
-          children: [
-            Icon(Icons.people_alt_rounded, color: AppColors.primary, size: 22.sp),
-            SizedBox(width: 10.w),
-            Text('Students', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            const Spacer(),
-            SizedBox(width: 12.w),
-            OutlinedButton.icon(
-              onPressed: () => setState(() {
-                _showImport = !_showImport;
-                if (!_showImport) _resetImport();
-              }),
-              icon: Icon(_showImport ? Icons.close : Icons.upload_file_rounded, size: 18.sp),
-              label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _showImport ? AppColors.error : AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 16.h),
 
         // Global search results
         if (_globalSearchController.text.isNotEmpty) ...[
@@ -1359,7 +1373,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.people_alt_rounded, color: AppColors.accent, size: 20.sp),
+                            AppIcon('people', color: AppColors.accent, size: 20),
                             SizedBox(width: 8.w),
                             Expanded(
                               child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
@@ -1418,40 +1432,45 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             children: [
                               InkWell(
                                 onTap: () => setState(() { _selectedStudent = null; }),
-                                borderRadius: BorderRadius.circular(6.r),
+                                borderRadius: BorderRadius.circular(8.r),
                                 child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                                   decoration: BoxDecoration(
-                                    color: AppColors.accent.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(6.r),
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(8.r),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.arrow_back_rounded, size: 16.sp, color: AppColors.accent),
+                                      AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
                                       SizedBox(width: 6.w),
-                                      Text('Back to Student List', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                      Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                                     ],
                                   ),
                                 ),
                               ),
-                              SizedBox(width: 8.w),
-                              Icon(Icons.chevron_right_rounded, size: 16.sp, color: AppColors.textSecondary),
-                              SizedBox(width: 4.w),
-                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              SizedBox(width: 12.w),
+                              Container(width: 1, height: 18, color: AppColors.border),
+                              SizedBox(width: 12.w),
+                              Text('Students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                              SizedBox(width: 6.w),
+                              AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                              SizedBox(width: 6.w),
+                              Text(_selectedStudent!.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                               SizedBox(width: 6.w),
                               Text('(${_selectedStudent!.stuadmno})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                             ],
                           ),
                         ),
                       Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Student Information panel
-                            Expanded(
-                              child: Container(
-                                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Student Information panel
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(20.w),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12.r),
@@ -1463,126 +1482,110 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     Row(
                                       crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(children: [
-                                                  Icon(Icons.person_rounded, color: AppColors.accent, size: 20.sp),
-                                                  SizedBox(width: 8.w),
-                                                  Text('Student Information',
-                                                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                                ]),
-                                                SizedBox(height: 6.h),
-                                                Row(children: [
-                                                  if (_insLogo != null)
-                                                    Image.network(
-                                                      _insLogo!,
-                                                      width: 48.w, height: 48.h, fit: BoxFit.contain,
-                                                      errorBuilder: (_, __, ___) => Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
-                                                    )
-                                                  else
-                                                    Icon(Icons.school_rounded, color: AppColors.accent, size: 44.sp),
-                                                  SizedBox(width: 8.w),
-                                                  Flexible(
-                                                    child: Text(
-                                                      _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
-                                                      style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ]),
-                                              ],
-                                            ),
-                                          ),
-                                          Column(
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Container(
-                                                width: 72.w, height: 72.h,
-                                                decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accent.withValues(alpha: 0.1)),
-                                                child: ClipOval(
-                                                  child: _photoUrl != null
-                                                      ? Image.network(_photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatarPlaceholder())
-                                                      : _avatarPlaceholder(),
+                                              Row(children: [
+                                                AppIcon('user', color: AppColors.accent, size: 20),
+                                                SizedBox(width: 8.w),
+                                                Text('Student Information',
+                                                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                              ]),
+                                              SizedBox(height: 6.h),
+                                              Row(children: [
+                                                if (_insLogo != null)
+                                                  Image.network(
+                                                    _insLogo!,
+                                                    width: 48.w, height: 48.h, fit: BoxFit.contain,
+                                                    errorBuilder: (_, __, ___) => AppIcon('teacher', color: AppColors.accent, size: 44.sp),
+                                                  )
+                                                else
+                                                  AppIcon('teacher', color: AppColors.accent, size: 44.sp),
+                                                SizedBox(width: 8.w),
+                                                Flexible(
+                                                  child: Text(
+                                                    _insName ?? context.read<AuthProvider>().insName ?? context.read<AuthProvider>().inscode ?? '',
+                                                    style: TextStyle(fontSize: 15.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
                                                 ),
-                                              ),
-                                              TextButton.icon(
-                                                onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
-                                                icon: _isUploadingPhoto
-                                                    ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2))
-                                                    : Icon(Icons.camera_alt_rounded, size: 14.sp),
-                                                label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 13.sp)),
-                                              ),
+                                              ]),
                                             ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        Column(
+                                          children: [
+                                            Container(
+                                              width: 72.w, height: 72.h,
+                                              decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.accent.withValues(alpha: 0.1)),
+                                              child: ClipOval(
+                                                child: _photoUrl != null
+                                                    ? Image.network(_photoUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _avatarPlaceholder())
+                                                    : _avatarPlaceholder(),
+                                              ),
+                                            ),
+                                            TextButton.icon(
+                                              onPressed: (_isFormEnabled && !_isUploadingPhoto) ? _uploadPhoto : null,
+                                              icon: _isUploadingPhoto
+                                                  ? SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2))
+                                                  : AppIcon('camera', size: 14),
+                                              label: Text(_isUploadingPhoto ? 'Uploading...' : 'Upload Photo', style: TextStyle(fontSize: 13.sp)),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                     const Divider(color: AppColors.border),
+                                    SizedBox(height: 4.h),
+                                    IgnorePointer(
+                                      ignoring: !_isFormEnabled,
+                                      child: _buildStudentFields(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 16.h),
+                              _panel(title: 'Parent / Guardian Information', icon: 'people', child: _buildParentFields()),
+                              SizedBox(height: 16.h),
+                              _panel(title: 'Payment In Charge', icon: 'indianrupeesign.circle.fill', child: _buildPaymentFields()),
+                              if (_selectedStudent == null) ...[
+                                SizedBox(height: 16.h),
+                                Row(
+                                  children: [
                                     Expanded(
-                                      child: SingleChildScrollView(
-                                        padding: EdgeInsets.fromLTRB(0, 4.h, 0, 20.h),
-                                        child: IgnorePointer(
-                                          ignoring: !_isFormEnabled,
-                                          child: _buildStudentFields(),
+                                      child: TextButton.icon(
+                                        onPressed: _isSaving ? null : _clearForm,
+                                        icon: AppIcon('close-circle', size: 16),
+                                        label: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppColors.textSecondary,
+                                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12.w),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _isSaving ? null : _saveNewStudent,
+                                        icon: _isSaving
+                                            ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                            : AppIcon('save-2', size: 18),
+                                        label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.accent,
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-
-                            SizedBox(width: 16.w),
-
-                            // Parent + Payment panels
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                    children: [
-                                      _panel(title: 'Parent / Guardian Information', icon: Icons.family_restroom_rounded, child: _buildParentFields()),
-                                      SizedBox(height: 16.h),
-                                      _panel(title: 'Payment In Charge', icon: Icons.payments_rounded, child: _buildPaymentFields()),
-                                      if (_selectedStudent == null) ...[
-                                        SizedBox(height: 16.h),
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: TextButton.icon(
-                                                onPressed: _isSaving ? null : _clearForm,
-                                                icon: Icon(Icons.close_rounded, size: 16.sp),
-                                                label: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w500)),
-                                                style: TextButton.styleFrom(
-                                                  foregroundColor: AppColors.textSecondary,
-                                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(width: 12.w),
-                                            Expanded(
-                                              child: ElevatedButton.icon(
-                                                onPressed: _isSaving ? null : _saveNewStudent,
-                                                icon: _isSaving
-                                                    ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                                    : Icon(Icons.save_rounded, size: 18.sp),
-                                                label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.accent,
-                                                  foregroundColor: Colors.white,
-                                                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ] else if (_selectedStudent!.isActive) ...[
-                                      ],
-                                      SizedBox(height: 24.h),
-                                    ],
-                                  ),
-                              ),
-                            ),
-                          ],
+                              ],
+                              SizedBox(height: 24.h),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1602,7 +1605,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _row2(
+        _row3(
           _fieldFull(label: 'Academic Year *', child: DropdownButtonFormField<String>(
             initialValue: _selectedYrId,
             decoration: _dec('Select year'),
@@ -1623,18 +1626,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
             style: _inputStyle,
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           )),
+          _fieldFull(label: 'Student Name *', child: TextFormField(
+            controller: _nameController,
+            decoration: _dec('Enter full name'),
+            style: _inputStyle,
+            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+          )),
         ),
         SizedBox(height: 14.h),
 
-        _fieldFull(label: 'Student Name *', child: TextFormField(
-          controller: _nameController,
-          decoration: _dec('Enter full name'),
-          style: _inputStyle,
-          validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-        )),
-        SizedBox(height: 14.h),
-
-        _row2(
+        _row3(
           _fieldFull(
             label: 'Admission Date *',
             child: InkWell(
@@ -1649,7 +1650,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
               },
               child: InputDecorator(
                 decoration: _dec('Select admission date').copyWith(
-                  suffixIcon: Icon(Icons.calendar_month_rounded, size: 18.sp, color: AppColors.textSecondary),
+                  suffixIcon: Padding(
+                    padding: EdgeInsets.only(right: 10.w),
+                    child: AppIcon('calendar-1', size: 14, color: AppColors.textSecondary),
+                  ),
                 ),
                 child: Text(
                   _admDate != null
@@ -1673,10 +1677,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onChanged: (v) => setState(() => _selectedGender = v),
             validator: (v) => v == null ? 'Required' : null,
           )),
-        ),
-        SizedBox(height: 14.h),
-
-        _row2(
           _fieldFull(label: 'Date of Birth *', child: InkWell(
             onTap: () async {
               final d = await showDatePicker(
@@ -1701,6 +1701,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
               ),
             ),
           )),
+        ),
+        SizedBox(height: 14.h),
+
+        _row3(
           _fieldFull(label: 'Mobile Number', child: TextFormField(
             controller: _mobileController,
             decoration: _dec('Enter mobile'),
@@ -1708,10 +1712,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
             keyboardType: TextInputType.phone,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           )),
-        ),
-        SizedBox(height: 14.h),
-
-        _row2(
           _fieldFull(label: 'Email', child: TextFormField(
             controller: _emailController,
             decoration: _dec('Enter email'),
@@ -1730,15 +1730,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ),
         SizedBox(height: 14.h),
 
-        _fieldFull(label: 'Course', child: TextFormField(
-          initialValue: _selectedStudent?.courname ?? '',
-          decoration: _dec('Course'),
-          style: _inputStyle,
-          enabled: false,
-        )),
-        SizedBox(height: 14.h),
-
-        _row2(
+        _row3(
+          _fieldFull(label: 'Course', child: TextFormField(
+            initialValue: _selectedStudent?.courname ?? '',
+            decoration: _dec('Course'),
+            style: _inputStyle,
+            enabled: false,
+          )),
           _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
             initialValue: _selectedBloodGroup,
             isExpanded: true,
@@ -1773,13 +1771,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
         )),
         SizedBox(height: 14.h),
 
-        _row2(
+        _row4(
           _fieldFull(label: 'City', child: TextFormField(controller: _cityController, decoration: _dec('Enter city'), style: _inputStyle)),
           _fieldFull(label: 'State', child: TextFormField(controller: _stateController, decoration: _dec('Enter state'), style: _inputStyle)),
-        ),
-        SizedBox(height: 14.h),
-
-        _row2(
           _fieldFull(label: 'Country', child: TextFormField(controller: _countryController, decoration: _dec('Enter country'), style: _inputStyle)),
           _fieldFull(label: 'Pin Code *', child: TextFormField(
             controller: _pinController,
@@ -1826,30 +1820,24 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
         IgnorePointer(
           ignoring: !_isFormEnabled,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _fieldFull(label: '$prefix Name', child: TextFormField(
-                controller: controllers.$1,
-                decoration: _dec('Enter $prefix name'),
-                style: _inputStyle,
-              )),
-              SizedBox(height: 14.h),
-              _row2(
-                _fieldFull(label: '$prefix Mobile', child: TextFormField(
-                  controller: controllers.$2,
-                  decoration: _dec('Enter mobile'),
-                  style: _inputStyle,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                )),
-                _fieldFull(label: '$prefix Occupation', child: TextFormField(
-                  controller: controllers.$3,
-                  decoration: _dec('Enter occupation'),
-                  style: _inputStyle,
-                )),
-              ),
-            ],
+          child: _row3(
+            _fieldFull(label: '$prefix Name', child: TextFormField(
+              controller: controllers.$1,
+              decoration: _dec('Enter $prefix name'),
+              style: _inputStyle,
+            )),
+            _fieldFull(label: '$prefix Mobile', child: TextFormField(
+              controller: controllers.$2,
+              decoration: _dec('Enter mobile'),
+              style: _inputStyle,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            )),
+            _fieldFull(label: '$prefix Occupation', child: TextFormField(
+              controller: controllers.$3,
+              decoration: _dec('Enter occupation'),
+              style: _inputStyle,
+            )),
           ),
         ),
       ],
@@ -2437,7 +2425,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // Title bar
           Row(
             children: [
-              Icon(Icons.upload_file_rounded, size: 20.sp, color: AppColors.accent),
+              AppIcon('document-upload', size: 20, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('Import Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               const Spacer(),
@@ -2446,7 +2434,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickImportFile,
-                icon: Icon(Icons.folder_open_rounded, size: 16.sp),
+                icon: AppIcon('folder-open', size: 16),
                 label: const Text('Browse'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
@@ -2459,7 +2447,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportStudentTemplate,
-                icon: Icon(Icons.table_chart_rounded, size: 16.sp),
+                icon: AppIcon('grid-1', size: 16),
                 label: const Text('Format to Excel'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF217346),
@@ -2472,7 +2460,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportSampleData,
-                icon: Icon(Icons.download_rounded, size: 16.sp),
+                icon: AppIcon('document-download', size: 16),
                 label: const Text('Sample Data'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFE65100),
@@ -2535,7 +2523,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.grid_on_rounded, size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                      AppIcon('element-4', size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
                                       SizedBox(height: 8.h),
                                       Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                                       SizedBox(height: 4.h),
@@ -2564,7 +2552,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                                 padding: EdgeInsets.only(right: 8.w),
                                                 child: Tooltip(
                                                   message: _rowErrors[index]!,
-                                                  child: Icon(Icons.error_outline, color: AppColors.error, size: 16.sp),
+                                                  child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
                                                 ),
                                               ),
                                           ],
@@ -2594,7 +2582,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               const Spacer(),
               ElevatedButton.icon(
                 onPressed: _importRows.isEmpty || _importValidated ? null : _validateImportData,
-                icon: Icon(_importValidated ? Icons.check_circle : Icons.check_circle_outline, size: 16.sp),
+                icon: AppIcon(_importValidated ? 'tick-circle' : 'tick-circle', size: 16),
                 label: Text(_importValidated ? 'Validated' : 'Validate'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _importRows.isNotEmpty && !_importValidated ? Colors.orange : (_importValidated ? AppColors.success : Colors.grey),
@@ -2607,7 +2595,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _importValidated ? _startStudentImport : null,
-                icon: Icon(Icons.save_rounded, size: 16.sp),
+                icon: AppIcon('save-2', size: 16),
                 label: const Text('Save'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
@@ -2674,7 +2662,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, size: 64.sp, color: AppColors.success),
+            AppIcon('tick-circle', size: 64.sp, color: AppColors.success),
             SizedBox(height: 16.h),
             Text('Import Complete', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             SizedBox(height: 12.h),
@@ -2767,7 +2755,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   // ─── Helpers ──────────────────────────────────────────────────────────────────
 
   /// Card panel with a labelled header
-  Widget _panel({required String title, required IconData icon, required Widget child}) {
+  Widget _panel({required String title, required String icon, required Widget child}) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
@@ -2780,7 +2768,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(icon, color: AppColors.accent, size: 20.sp),
+            AppIcon(icon, color: AppColors.accent, size: 20),
             SizedBox(width: 8.w),
             Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
@@ -2805,12 +2793,42 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  /// Three fields side by side
+  Widget _row3(Widget a, Widget b, Widget c) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: a),
+        SizedBox(width: 14.w),
+        Expanded(child: b),
+        SizedBox(width: 14.w),
+        Expanded(child: c),
+      ],
+    );
+  }
+
+  /// Four fields side by side
+  Widget _row4(Widget a, Widget b, Widget c, Widget d) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: a),
+        SizedBox(width: 14.w),
+        Expanded(child: b),
+        SizedBox(width: 14.w),
+        Expanded(child: c),
+        SizedBox(width: 14.w),
+        Expanded(child: d),
+      ],
+    );
+  }
+
   /// Field with label that expands to fill available width
   Widget _fieldFull({required String label, required Widget child}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.black)),
         SizedBox(height: 6.h),
         child,
       ],

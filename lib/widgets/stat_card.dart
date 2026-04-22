@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+import './app_icon.dart';
 class StatData {
   final String label;
   final String value;
   final String change;
   final bool isPositive;
-  final IconData icon;
+  final String icon;
   final Color color;
 
   const StatData({
@@ -69,10 +70,10 @@ class _StatCardState extends State<StatCard> {
                     color: widget.data.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
+                  child: AppIcon(
                     widget.data.icon,
                     color: widget.data.color,
-                    size: 22,
+                    size: 18,
                   ),
                 ),
                 Flexible(
@@ -88,10 +89,10 @@ class _StatCardState extends State<StatCard> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        AppIcon(
                           widget.data.isPositive
-                              ? Icons.trending_up_rounded
-                              : Icons.trending_down_rounded,
+                              ? 'arrow-up-1'
+                              : 'arrow-down',
                           size: 14,
                           color: widget.data.isPositive
                               ? AppColors.success

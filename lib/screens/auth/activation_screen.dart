@@ -5,6 +5,7 @@ import '../../services/supabase_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
+import '../../widgets/app_icon.dart';
 class ActivationScreen extends StatefulWidget {
   const ActivationScreen({super.key});
 
@@ -110,8 +111,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                           color: AppColors.primaryLight,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Icon(
-                          Icons.verified_user_rounded,
+                        child: const AppIcon('shield-tick',
                           size: 40,
                           color: AppColors.primary,
                         ),
@@ -156,7 +156,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                             color: AppColors.textSecondary.withValues(alpha: 0.5),
                             letterSpacing: 2,
                           ),
-                          prefixIcon: const Icon(Icons.key_rounded),
+                          prefixIcon: const AppIcon('key'),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide:
@@ -198,7 +198,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline,
+                              const AppIcon.linear('info-circle',
                                   color: AppColors.error, size: 18),
                               const SizedBox(width: 8),
                               Expanded(
@@ -220,7 +220,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
                       // Activate button
                       SizedBox(
                         width: double.infinity,
-                        height: 48,
+                        height: 40,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _activate,
                           style: ElevatedButton.styleFrom(
