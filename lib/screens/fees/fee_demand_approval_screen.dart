@@ -5,6 +5,8 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
+import '../../widgets/app_icon.dart';
+import '../../widgets/app_search_field.dart';
 class FeeDemandApprovalScreen extends StatefulWidget {
   const FeeDemandApprovalScreen({super.key});
 
@@ -303,7 +305,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                   child: const CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white),
                 )
-              : Icon(Icons.check_circle_outline_rounded, size: 18.sp),
+              : AppIcon.linear('tick-circle', size: 18),
           label: Text(_approving
               ? 'Approving...'
               : 'Approve (${_selected.length})'),
@@ -321,15 +323,23 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         ),
         SizedBox(width: 16.w),
 
-        // Count
-        TextButton.icon(
-          onPressed: _loading ? null : _loadDemands,
-          icon: Icon(Icons.refresh_rounded, size: 16.sp),
-          label: const Text('Refresh'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.textSecondary,
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+        // Refresh
+        SizedBox(
+          height: 40,
+          child: ElevatedButton.icon(
+            onPressed: _loading ? null : _loadDemands,
+            icon: AppIcon('refresh', size: 16, color: Colors.white),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(0xFF10B981),
+              disabledForegroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(horizontal: 18.w),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
         SizedBox(width: 4.w),
@@ -341,48 +351,31 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         const Spacer(),
 
         // Search
-        SizedBox(
-          width: 260.w,
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search by student name or ad...',
-              hintStyle:
-                  TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
-              prefixIcon: Icon(Icons.search_rounded, size: 18.sp),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(Icons.close_rounded, size: 16.sp),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                  borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                  borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                  borderSide:
-                      const BorderSide(color: AppColors.accent, width: 1.5)),
-              filled: true,
-              fillColor: AppColors.surface,
-              isDense: true,
-            ),
-            style: TextStyle(fontSize: 13.sp),
-            onChanged: (v) {
-              setState(() {
-                _searchQuery = v.trim().toLowerCase();
-                _currentPage = 1;
-              });
-            },
-          ),
+        AppSearchField(
+          controller: _searchController,
+          hintText: 'Search by student name or ad...',
+          onChanged: (v) {
+            setState(() {
+              _searchQuery = v.trim().toLowerCase();
+              _currentPage = 1;
+            });
+          },
+          width: 300.w,
+          suffixIcon: _searchQuery.isNotEmpty
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: IconButton(
+                    icon: const AppIcon('close-circle', size: 14),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    splashRadius: 12,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                )
+              : null,
         ),
         SizedBox(width: 12.w),
 
@@ -402,8 +395,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                   style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               style: TextStyle(
                   fontSize: 13.sp, color: AppColors.textPrimary),
-              icon: Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 18.sp, color: AppColors.textSecondary),
+              icon: AppIcon.linear('Chevron Down',
+                  size: 18, color: AppColors.textSecondary),
               isDense: true,
               onChanged: (v) => setState(() {
                 _selectedClass = v;
@@ -434,7 +427,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline_rounded,
+          AppIcon.linear('info-circle',
               size: 48.sp, color: AppColors.error),
           SizedBox(height: 8.h),
           Text(_errorMsg!,
@@ -486,7 +479,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_rounded,
+            AppIcon('message-text',
                 size: 48.sp,
                 color: AppColors.textSecondary.withValues(alpha: 0.4)),
             SizedBox(height: 8.h),
@@ -501,13 +494,16 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
       );
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: LayoutBuilder(
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: LayoutBuilder(
         builder: (context, constraints) {
           final tableH = constraints.maxHeight;
           final viewportW = constraints.maxWidth;
@@ -529,12 +525,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                         // Header
                         Container(
                           padding: EdgeInsets.symmetric(
-                              horizontal: 8.w, vertical: 11.h),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryDark,
-                            borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(14.r)),
-                          ),
+                              horizontal: 16.w, vertical: 12.h),
+                          color: AppColors.tableHeadBg,
                           child: Row(
                             children: [
                               SizedBox(width: 40.w),
@@ -582,6 +574,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             ],
           );
         },
+        ),
       ),
     );
   }
@@ -732,7 +725,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         style: TextStyle(
             fontSize: 13.sp,
             fontWeight: FontWeight.w700,
-            color: Colors.white),
+            color: AppColors.textPrimary,
+            letterSpacing: 0.3),
         textAlign: right
             ? TextAlign.right
             : center
@@ -780,9 +774,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
             : isSelected
                 ? AppColors.accent.withValues(alpha: 0.06)
                 : index.isOdd
-                    ? const Color(0xFFF8F9FA)
+                    ? AppColors.surface
                     : Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
             children: [
               SizedBox(
@@ -800,35 +794,35 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                     style: TextStyle(
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary)),
+                        color: AppColors.accent)),
               ),
               // Student Name
               Expanded(
                 flex: 5,
                 child: Text(name.isNotEmpty ? name : '-',
                     style: TextStyle(
-                        fontSize: 13.sp, color: AppColors.textPrimary),
+                        fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis),
               ),
               // Class
               Expanded(
                 flex: 2,
                 child: Text(cls,
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.center),
               ),
               // Course
               Expanded(
                 flex: 2,
                 child: Text(d['courname']?.toString() ?? '-',
-                    style: TextStyle(fontSize: 12.sp, color: AppColors.primary),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.center),
               ),
               // Year
               Expanded(
                 flex: 3,
                 child: Text(year,
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis),
               ),
@@ -836,7 +830,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(term,
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis),
               ),
@@ -844,14 +838,14 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(type,
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis),
               ),
               // Fee Amount
               Expanded(
                 flex: 3,
                 child: Text('₹${_fmt(feeAmt)}',
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.right),
               ),
               // Concession
@@ -860,7 +854,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 child: Padding(
                   padding: EdgeInsets.only(left: 12.w),
                   child: Text(concessionName,
-                      style: TextStyle(fontSize: 13.sp),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                       overflow: TextOverflow.ellipsis),
                 ),
               ),
@@ -869,7 +863,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 flex: 3,
                 child: Text('₹${_fmt(balance)}',
                     style: TextStyle(
-                        fontSize: 13.sp, fontWeight: FontWeight.w600),
+                        fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     textAlign: TextAlign.right),
               ),
               SizedBox(width: 32.w),
@@ -877,7 +871,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               Expanded(
                 flex: 3,
                 child: Text(createdBy,
-                    style: TextStyle(fontSize: 13.sp),
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis),
               ),
               // Status

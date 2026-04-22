@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 
+import '../../widgets/app_icon.dart';
 class SubscriptionExpiredScreen extends StatelessWidget {
   const SubscriptionExpiredScreen({super.key});
 
@@ -43,8 +44,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                         color: AppColors.warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Icon(
-                        Icons.timer_off_rounded,
+                      child: const AppIcon('timer-pause',
                         size: 40,
                         color: AppColors.warning,
                       ),
@@ -87,8 +87,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.info_outline_rounded,
+                          AppIcon.linear('info-circle',
                             color: AppColors.warning.withValues(alpha: 0.8),
                             size: 22,
                           ),
@@ -112,7 +111,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                     // Retry button
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 40,
                       child: ElevatedButton.icon(
                         onPressed: () {
                           // Go back to splash to re-check
@@ -122,7 +121,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                             (route) => false,
                           );
                         },
-                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        icon: const AppIcon('refresh', size: 20),
                         label: const Text(
                           'Retry',
                           style: TextStyle(
@@ -146,7 +145,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                     // Logout button
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 40,
                       child: OutlinedButton.icon(
                         onPressed: () async {
                           final auth = context.read<AuthProvider>();
@@ -159,7 +158,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                             );
                           }
                         },
-                        icon: const Icon(Icons.logout_rounded, size: 20),
+                        icon: const AppIcon('logout', size: 20),
                         label: const Text(
                           'Sign Out',
                           style: TextStyle(

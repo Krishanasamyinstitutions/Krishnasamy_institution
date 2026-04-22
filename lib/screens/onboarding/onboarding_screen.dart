@@ -4,11 +4,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
+import '../../widgets/app_icon.dart';
 class OnboardingData {
   final String title;
   final String subtitle;
   final String description;
-  final IconData icon;
+  final String icon;
   final Color iconColor;
   final List<String> features;
 
@@ -39,7 +40,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Organize Everything',
       description:
           'Effortlessly manage student records, admissions, attendance, and academic performance — all from one centralized platform.',
-      icon: Icons.people_alt_rounded,
+      icon: 'people',
       iconColor: AppColors.accent,
       features: [
         'Digital Student Profiles',
@@ -52,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Streamline Operations',
       description:
           'Manage faculty information, create timetables, assign duties, and track leave requests with intelligent scheduling tools.',
-      icon: Icons.calendar_month_rounded,
+      icon: 'calendar-1',
       iconColor: AppColors.secondary,
       features: [
         'Smart Timetables',
@@ -65,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Data-Driven Decisions',
       description:
           'Generate comprehensive reports, track performance trends, and gain actionable insights to improve educational outcomes.',
-      icon: Icons.insights_rounded,
+      icon: 'chart-21',
       iconColor: AppColors.info,
       features: [
         'Performance Analytics',
@@ -150,10 +151,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             color: AppColors.primary,
                             borderRadius: BorderRadius.circular(12.r),
                           ),
-                          child: Icon(
-                            Icons.school_rounded,
+                          child: AppIcon('teacher',
                             color: AppColors.accent,
-                            size: 22.sp,
+                            size: 18,
                           ),
                         ),
                         SizedBox(width: 12.w),
@@ -178,10 +178,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     ),
                           ),
                           SizedBox(width: 4.w),
-                          Icon(
-                            Icons.arrow_forward_rounded,
+                          AppIcon.linear('Chevron Right',
                             color: AppColors.textSecondary,
-                            size: 18.sp,
+                            size: 18,
                           ),
                         ],
                       ),
@@ -272,10 +271,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     ),
                               ),
                               SizedBox(width: 8.w),
-                              Icon(
-                                Icons.arrow_forward_rounded,
+                              AppIcon.linear('Chevron Right',
                                 color: Colors.white,
-                                size: 20.sp,
+                                size: 20,
                               ),
                             ],
                           ),
@@ -388,7 +386,7 @@ class _OnboardingPage extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(
+            AppIcon(
               data.icon,
               size: 100.sp,
               color: data.iconColor,
@@ -457,10 +455,9 @@ class _OnboardingPage extends StatelessWidget {
                     color: data.iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8.r),
                   ),
-                  child: Icon(
-                    Icons.check_rounded,
+                  child: AppIcon('tick-circle',
                     color: data.iconColor,
-                    size: 16.sp,
+                    size: 16,
                   ),
                 ),
                 SizedBox(width: 12.w),

@@ -10,6 +10,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../auth/register_screen.dart';
 
+import '../../widgets/app_icon.dart';
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
 
@@ -22,10 +23,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   bool _sidebarCollapsed = false;
 
   static const List<_SANavItem> _navItems = [
-    _SANavItem(Icons.dashboard_rounded, 'Dashboard'),
-    _SANavItem(Icons.domain_add_rounded, 'Register Institution'),
-    _SANavItem(Icons.business_rounded, 'Manage Institutions'),
-    _SANavItem(Icons.settings_rounded, 'Settings'),
+    _SANavItem('element-3', 'Dashboard'),
+    _SANavItem('building', 'Register Institution'),
+    _SANavItem('building', 'Manage Institutions'),
+    _SANavItem('setting-2', 'Settings'),
   ];
 
   List<Map<String, dynamic>> _institutions = [];
@@ -362,10 +363,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                     color: AppColors.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: Icon(
-                    Icons.admin_panel_settings_rounded,
+                  child: AppIcon('security-user',
                     color: AppColors.primary,
-                    size: 22.sp,
+                    size: 18,
                   ),
                 ),
                 if (!collapsed) ...[
@@ -417,12 +417,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         ),
                         child: Row(
                           children: [
-                            Icon(
+                            AppIcon(
                               item.icon,
                               color: isSelected
                                   ? AppColors.primary
                                   : Colors.black,
-                              size: 20.sp,
+                              size: 20,
                             ),
                             if (!collapsed) ...[
                               SizedBox(width: 14.w),
@@ -472,15 +472,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           if (!isDesktop)
             IconButton(
               onPressed: () => Scaffold.of(context).openDrawer(),
-              icon: const Icon(Icons.menu_rounded),
+              icon: const AppIcon('menu'),
             ),
           if (isDesktop)
             IconButton(
               onPressed: () =>
                   setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-              icon: Icon(_sidebarCollapsed
-                  ? Icons.menu_open_rounded
-                  : Icons.menu_rounded),
+              icon: AppIcon(_sidebarCollapsed
+                  ? 'menu-board'
+                  : 'menu'),
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.surface,
                 shape: RoundedRectangleBorder(
@@ -535,7 +535,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   elevation: 10,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r)),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  icon: const AppIcon.linear('Chevron Down',
                       color: Colors.black),
                   onSelected: (value) async {
                     if (value == 'signout') {
@@ -551,7 +551,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       value: 'signout',
                       child: Row(
                         children: [
-                          Icon(Icons.logout_rounded, size: 18.sp),
+                          AppIcon('logout', size: 18),
                           SizedBox(width: 8.w),
                           const Text('Sign out'),
                         ],
@@ -907,7 +907,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildStatCard(BuildContext context, String title, String value,
-      IconData icon, Color color) {
+      String icon, Color color) {
     return Expanded(
       child: Container(
         padding: EdgeInsets.all(20.w),
@@ -925,7 +925,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Icon(icon, color: color, size: 24.sp),
+              child: AppIcon(icon, color: color, size: 18),
             ),
             SizedBox(width: 16.w),
             Column(
@@ -1192,7 +1192,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   style: Theme.of(context).textTheme.headlineSmall),
               ElevatedButton.icon(
                 onPressed: () => setState(() => _selectedNavIndex = 1),
-                icon: const Icon(Icons.add, size: 18),
+                icon: const AppIcon('add', size: 18),
                 label: const Text('Register New'),
                 style:
                     ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
@@ -1312,7 +1312,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 }
 
 class _SANavItem {
-  final IconData icon;
+  final String icon;
   final String label;
   const _SANavItem(this.icon, this.label);
 }
@@ -1935,7 +1935,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.filter_alt_rounded,
+          const AppIcon('filter',
               size: 16, color: Colors.black),
           SizedBox(width: 8.w),
           Text('Date Range:',
@@ -1969,7 +1969,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.calendar_today,
+                  const AppIcon.linear('calendar',
                       size: 14, color: Colors.black),
                   SizedBox(width: 6.w),
                   Text(_filterFrom != null ? fmt(_filterFrom) : 'From',
@@ -2007,7 +2007,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.calendar_today,
+                  const AppIcon.linear('calendar',
                       size: 14, color: Colors.black),
                   SizedBox(width: 6.w),
                   Text(_filterTo != null ? fmt(_filterTo) : 'To',
@@ -2027,29 +2027,25 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
             _load();
           }),
           const Spacer(),
-          InkWell(
-            onTap: () {
-              setState(() {
-                _filterFrom = null;
-                _filterTo = null;
-              });
-              _load();
-            },
-            borderRadius: BorderRadius.circular(6.r),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.refresh_rounded,
-                      size: 16.sp, color: AppColors.accent),
-                  SizedBox(width: 4.w),
-                  Text('Refresh',
-                      style: TextStyle(
-                          fontSize: 12.sp,
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w600)),
-                ],
+          SizedBox(
+            height: 40,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _filterFrom = null;
+                  _filterTo = null;
+                });
+                _load();
+              },
+              icon: AppIcon('refresh', size: 16, color: Colors.white),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(horizontal: 18.w),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -2449,7 +2445,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 decoration: dec(
                   'Current Password',
                   suffix: IconButton(
-                    icon: Icon(_showCurrent ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    icon: AppIcon(_showCurrent ? 'eye-slash' : 'eye', size: 18),
                     onPressed: () => setState(() => _showCurrent = !_showCurrent),
                   ),
                 ),
@@ -2462,7 +2458,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 decoration: dec(
                   'New Password (leave blank to keep current)',
                   suffix: IconButton(
-                    icon: Icon(_showNew ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 18),
                     onPressed: () => setState(() => _showNew = !_showNew),
                   ),
                 ),
@@ -2478,7 +2474,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 decoration: dec(
                   'Confirm New Password',
                   suffix: IconButton(
-                    icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility, size: 18.sp),
+                    icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 18),
                     onPressed: () => setState(() => _showConfirm = !_showConfirm),
                   ),
                 ),
@@ -2495,7 +2491,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                   onPressed: _saving ? null : _save,
                   icon: _saving
                       ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.save_rounded, size: 18),
+                      : const AppIcon('save-2', size: 18),
                   label: Text(_saving ? 'Saving...' : 'Save Changes'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,

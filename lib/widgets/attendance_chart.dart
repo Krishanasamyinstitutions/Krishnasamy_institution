@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
+import './app_icon.dart';
 class AttendanceChartWidget extends StatelessWidget {
   const AttendanceChartWidget({super.key});
 
@@ -54,7 +55,7 @@ class AttendanceChartWidget extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                    const AppIcon.linear('Chevron Down', size: 18),
                   ],
                 ),
               ),
