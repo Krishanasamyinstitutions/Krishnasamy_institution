@@ -42,7 +42,8 @@ class _NoticesScreenState extends State<NoticesScreen> {
       final today = DateTime.now();
       final todayStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
 
-      // Auto-expire notices past their todate
+      // Hard-delete notices whose to-date has passed. No soft-delete retained
+      // — once a notice expires it's useless and taking up DB rows.
       final expiredIds = all
           .where((n) {
             final toDate = n['noticetodate']?.toString();
@@ -54,8 +55,13 @@ class _NoticesScreenState extends State<NoticesScreen> {
 
       if (expiredIds.isNotEmpty) {
         try {
+          // Delete child notifications first so we don't leave orphan
+          // inbox rows pointing at a soon-to-be-gone notice_id.
+          await SupabaseService.fromSchema('notification')
+              .delete()
+              .inFilter('notice_id', expiredIds);
           await SupabaseService.fromSchema('notice')
-              .update({'activestatus': 9})
+              .delete()
               .inFilter('notice_id', expiredIds);
         } catch (_) {}
       }
@@ -510,6 +516,10 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   String? _pendingFeeTermFilter;
   List<String> _availableFeeTerms = [];
   bool _isLoadingFeeTerms = false;
+  // Course → class map. Drives the Course dropdown + scoped class chips
+  // for both 'Specific Classes' and 'Pending Fees' target modes.
+  Map<String, List<String>> _courseClassMap = {};
+  String? _selectedCourse; // null = all courses
 
   static const _priorities = ['Normal', 'Medium', 'High', 'Urgent'];
   static const _categories = ['General', 'Exam', 'Holiday', 'Event', 'Fee', 'Result'];
@@ -556,11 +566,58 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     setState(() => _isLoadingClasses = true);
     try {
       final classes = await SupabaseService.getClasses(insId);
-      if (mounted) setState(() { _availableClasses = classes; _isLoadingClasses = false; });
+      final courseClassMap = await SupabaseService.getCourseClassMap(insId);
+      if (mounted) {
+        setState(() {
+          _availableClasses = classes;
+          _courseClassMap = courseClassMap;
+          _isLoadingClasses = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading classes: $e');
       if (mounted) setState(() => _isLoadingClasses = false);
     }
+  }
+
+  // Classes visible under the currently selected course. Falls back to
+  // the full set when no course is picked.
+  List<String> get _classesInScope {
+    if (_selectedCourse == null) return _availableClasses;
+    return _courseClassMap[_selectedCourse] ?? const [];
+  }
+
+  Widget _buildCourseFilterDropdown() {
+    final courses = _courseClassMap.keys.toList()..sort();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: _selectedCourse,
+          isExpanded: true,
+          hint: Text('All Courses', style: TextStyle(fontSize: 13.sp)),
+          style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+          icon: const AppIcon.linear('Chevron Down', size: 18),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('All Courses')),
+            ...courses.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+          ],
+          onChanged: (v) => setState(() {
+            _selectedCourse = v;
+            // Drop any selected classes that aren't in the new course's
+            // scope — otherwise they'd silently stay in `_selectedClasses`
+            // even though they no longer appear in the chip list.
+            final inScope = (v == null ? _availableClasses : (_courseClassMap[v] ?? const <String>[])).toSet();
+            _selectedClasses = _selectedClasses.where(inScope.contains).toList();
+          }),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadFeeTerms() async {
@@ -629,22 +686,23 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}'
                   : _selectedClasses.join(', ');
 
-      // Insert notice
-      await SupabaseService.fromSchema('notice').insert({
+      // Insert notice and capture its id so the child notifications can
+      // carry notice_id — the cleanup sweep uses that link to delete
+      // every related inbox entry when the notice expires.
+      final insertedNotice = await SupabaseService.fromSchema('notice').insert({
         'ins_id': insId,
         'noticetitle': title,
         'noticedesc': desc,
         'noticepriority': _priority,
         'noticecategory': _category,
         'noticetarget': targetLabel,
-        'noticefromdate': _fromDate?.toIso8601String(),
-        'noticetodate': _toDate?.toIso8601String(),
         'createdby': userName,
         'createdat': DateTime.now().toIso8601String(),
         'noticefromdate': _fromDate?.toIso8601String().split('T').first,
         'noticetodate': _toDate?.toIso8601String().split('T').first,
         'activestatus': 1,
-      });
+      }).select('notice_id').single();
+      final newNoticeId = insertedNotice['notice_id'] as int?;
 
       // Send notification to targeted audience
       List<Map<String, dynamic>> targetStudents = [];
@@ -655,6 +713,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           final staffNotifications = users.map((u) => {
             'ins_id': insId,
             'stu_id': null,
+            'notice_id': newNoticeId,
             'notititle': title,
             'notibody': desc,
             'notitype': 'notice',
@@ -664,7 +723,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           await SupabaseService.fromSchema('notification').insert(staffNotifications);
         }
       } else if (_targetType == 'Pending Fees') {
-        // Get students with pending fee balance, optionally filtered by term
+        // Get students with pending fee balance, optionally filtered by
+        // term and / or course / classes.
         final demands = await SupabaseService.getFeeDemands(insId);
         final pendingStuIds = <int>{};
         for (final d in demands) {
@@ -679,6 +739,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           final allStudents = await SupabaseService.getStudents(insId);
           targetStudents = allStudents
               .where((s) => pendingStuIds.contains(s.stuId))
+              .where((s) => _selectedCourse == null || s.courname == _selectedCourse)
+              .where((s) => _selectedClasses.isEmpty || _selectedClasses.contains(s.stuclass))
               .map((s) => {'stu_id': s.stuId, 'stuname': s.stuname})
               .toList();
         }
@@ -686,9 +748,13 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         final allStudents = await SupabaseService.getStudents(insId);
         targetStudents = allStudents.map((s) => {'stu_id': s.stuId, 'stuname': s.stuname}).toList();
       } else {
+        // Specific Classes target. If a course was picked, scope to it
+        // — otherwise "I Year" matches across all courses, which is
+        // almost never what the admin intended in a multi-course school.
         final allStudents = await SupabaseService.getStudents(insId);
         targetStudents = allStudents
             .where((s) => _selectedClasses.contains(s.stuclass))
+            .where((s) => _selectedCourse == null || s.courname == _selectedCourse)
             .map((s) => {'stu_id': s.stuId, 'stuname': s.stuname})
             .toList();
       }
@@ -698,6 +764,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         final notifications = targetStudents.map((s) => {
           'ins_id': insId,
           'stu_id': s['stu_id'],
+          'notice_id': newNoticeId,
           'notititle': title,
           'notibody': desc,
           'notitype': 'notice',
@@ -825,7 +892,10 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                           onTap: () {
                             setState(() {
                               _targetType = t;
-                              if (t != 'Specific Classes') _selectedClasses.clear();
+                              if (t != 'Specific Classes' && t != 'Pending Fees') {
+                                _selectedClasses.clear();
+                                _selectedCourse = null;
+                              }
                               if (t != 'Pending Fees') _pendingFeeTermFilter = null;
                             });
                             if (t == 'Pending Fees' && _availableFeeTerms.isEmpty) _loadFeeTerms();
@@ -869,6 +939,11 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Course dropdown — narrows the class chips below
+                          // so admins of multi-course institutions don't
+                          // pick the wrong "I Year" by accident.
+                          _buildCourseFilterDropdown(),
+                          SizedBox(height: 12.h),
                           Row(
                             children: [
                               Text('Select Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
@@ -880,7 +955,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                 ),
                               SizedBox(width: 12.w),
                               GestureDetector(
-                                onTap: () => setState(() => _selectedClasses = List.from(_availableClasses)),
+                                onTap: () => setState(() => _selectedClasses = List.from(_classesInScope)),
                                 child: Text('Select all', style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w500)),
                               ),
                             ],
@@ -891,7 +966,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               : Wrap(
                                   spacing: 8,
                                   runSpacing: 8,
-                                  children: _availableClasses.map((cls) {
+                                  children: _classesInScope.map((cls) {
                                     final isSelected = _selectedClasses.contains(cls);
                                     return GestureDetector(
                                       onTap: () {
@@ -936,7 +1011,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     ),
                   ],
 
-                  // Fee term filter (shown when Pending Fees is selected)
+                  // Fee term + course/class filter (Pending Fees target)
                   if (_targetType == 'Pending Fees') ...[
                     SizedBox(height: 12.h),
                     Container(
@@ -950,6 +1025,50 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Course narrows the class chips below; class chips
+                          // narrow which pending-fee students get the notice.
+                          Text('Filter by Course', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 8.h),
+                          _buildCourseFilterDropdown(),
+                          SizedBox(height: 12.h),
+                          Row(
+                            children: [
+                              Text('Filter by Class', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                              const Spacer(),
+                              if (_selectedClasses.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () => setState(() => _selectedClasses.clear()),
+                                  child: Text('Clear', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _classesInScope.map((cls) {
+                              final isSelected = _selectedClasses.contains(cls);
+                              return GestureDetector(
+                                onTap: () => setState(() {
+                                  if (isSelected) {
+                                    _selectedClasses.remove(cls);
+                                  } else {
+                                    _selectedClasses.add(cls);
+                                  }
+                                }),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.white,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
+                                  ),
+                                  child: Text(cls, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          SizedBox(height: 12.h),
                           Text('Filter by Fee Term', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                           SizedBox(height: 8.h),
                           _isLoadingFeeTerms

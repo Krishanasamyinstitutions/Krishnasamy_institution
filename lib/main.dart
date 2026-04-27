@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,14 @@ import 'utils/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Silence all debugPrint calls in release builds. Every existing
+  // debugPrint across the codebase routes through this handler, so
+  // this single override keeps debug behaviour identical while
+  // preventing logs from leaking in production.
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
 
   // Initialize Supabase
   await Supabase.initialize(
@@ -36,7 +45,7 @@ class SchoolAdminApp extends StatelessWidget {
       minTextAdapt: true,
       builder: (context, child) {
         return MaterialApp(
-          title: 'EduDesk - School Administration',
+          title: 'EduCore360 - School Administration',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

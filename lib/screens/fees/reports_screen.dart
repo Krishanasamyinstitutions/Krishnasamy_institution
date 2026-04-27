@@ -80,6 +80,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   final ScrollController _stickyHScroll = ScrollController();
   String? _selectedMode; // null = all, 'cash', 'bank'
   String? _selectedPrefix;
+  String? _selectedUser; // null = all, else a specific createdby value
+  // Lower-cased user names whose desname = 'Accountant' for this institution.
+  // The USER chip list in the Filters dialog is narrowed to these names so
+  // admins/principals who rarely collect don't clutter the filter.
+  Set<String> _accountantNames = {};
 
   // Student Ledger tab state
   String? _ledgerStuAdmNo;
@@ -143,6 +148,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         DateTime? from = _dailyFrom;
         DateTime? to = _dailyTo;
         String? mode = _selectedMode;
+        String? user = _selectedUser;
+        // Distinct cashiers in the currently loaded daily rows, narrowed to
+        // users whose designation is 'Accountant'. Admins/principals etc
+        // don't show here even if they posted a receipt, so the filter stays
+        // focused on the intended audit: per-cashier daily collection.
+        final users = {
+          for (final r in _dailyRows)
+            if ((r['createdby']?.toString() ?? '').isNotEmpty &&
+                _accountantNames.contains((r['createdby'] as String).trim().toLowerCase()))
+              r['createdby'].toString(),
+        }.toList()..sort();
         return StatefulBuilder(builder: (ctx, setStateDialog) {
           Widget presetChip(String label, VoidCallback onTap) => Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -279,12 +295,70 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     modeChip('Cash', 'cash'),
                     modeChip('Bank', 'bank'),
                   ]),
+                  // USER (accountant) filter — only relevant for the Cash
+                  // mode, since cash is the only method the accountant
+                  // physically handles. Bank/online payments reconcile via
+                  // the payment gateway, not per-user, so the filter would
+                  // just split already-unrelated totals.
+                  if (mode == 'cash' && users.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    sectionLabel('USER'),
+                    Wrap(children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8, bottom: 6),
+                        child: InkWell(
+                          onTap: () => setStateDialog(() => user = null),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: user == null ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: user == null ? AppColors.accent : AppColors.border),
+                            ),
+                            child: Text('All',
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: user == null ? AppColors.accent : AppColors.textPrimary,
+                                  letterSpacing: 0.3,
+                                )),
+                          ),
+                        ),
+                      ),
+                      ...users.map((u) {
+                        final selected = user == u;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8, bottom: 6),
+                          child: InkWell(
+                            onTap: () => setStateDialog(() => user = u),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                              ),
+                              child: Text(u,
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected ? AppColors.accent : AppColors.textPrimary,
+                                    letterSpacing: 0.3,
+                                  )),
+                            ),
+                          ),
+                        );
+                      }),
+                    ]),
+                  ],
                 ],
               ),
             ),
             actions: [
               TextButton(
-                onPressed: () => setStateDialog(() { from = null; to = null; mode = null; }),
+                onPressed: () => setStateDialog(() { from = null; to = null; mode = null; user = null; }),
                 child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
               ),
               ElevatedButton(
@@ -299,6 +373,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     _dailyFrom = from;
                     _dailyTo = to;
                     _selectedMode = mode;
+                    // User filter only applies under Cash; clear it when
+                    // the mode is anything else so non-cash rows aren't
+                    // silently filtered out by a stale user selection.
+                    _selectedUser = (mode == 'cash') ? user : null;
                   });
                   _loadDailyCollection();
                   Navigator.pop(ctx);
@@ -404,9 +482,24 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final results = await Future.wait([
         _fetchFeeDemandsDirectly(insId),
         SupabaseService.getInstitutionInfo(insId),
+        SupabaseService.client
+            .from('institutionusers')
+            .select('usename')
+            .eq('ins_id', insId)
+            // Case-insensitive "contains" so "Accountant", "Sr. Accountant",
+            // "Junior Accountant" all qualify — schools label roles
+            // inconsistently and we don't want the filter to silently drop
+            // everyone because of capitalisation.
+            .ilike('desname', '%accountant%')
+            .eq('activestatus', 1),
       ]);
       final demands = results[0] as List<Map<String, dynamic>>;
       final insInfo = results[1] as ({String? name, String? logo, String? address, String? mobile, String? email});
+      final accountantRows = results[2] as List;
+      final accountantNames = accountantRows
+          .map((r) => (r['usename']?.toString() ?? '').trim().toLowerCase())
+          .where((n) => n.isNotEmpty)
+          .toSet();
 
       // Extract filters
       final courseSet = <String>{};
@@ -430,6 +523,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         _insAddress = insInfo.address?.replaceAll('\n', ', ') ?? '';
         _insPhone = insInfo.mobile ?? '';
         _insEmail = insInfo.email ?? '';
+        _accountantNames = accountantNames;
         _loading = false;
       });
     } catch (e) {
@@ -478,6 +572,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           'total': (r['total'] as num?)?.toDouble() ?? 0,
           'fine': (r['fine'] as num?)?.toDouble() ?? 0,
           'paymethod': r['paymethod']?.toString() ?? '',
+          'createdby': r['createdby']?.toString() ?? '',
           'fees': fees,
         });
       }
@@ -730,7 +825,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           if (_tabController.index == 0) ...[
             SizedBox(width: 12.w),
             SizedBox(
-              width: 160.w,
+              width: 200.w,
               child: DropdownButtonFormField<String?>(
                 value: _selectedFeeType,
                 isExpanded: true,
@@ -1234,200 +1329,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     required List<String> footer,
     Set<int> numericCols = const {},
   }) {
-    assert(columnWidths.length == headers.length);
-    final baseTotal = columnWidths.fold<double>(0, (a, b) => a + b.w);
-    final headerStyle = TextStyle(
-      fontSize: 13.sp,
-      fontWeight: FontWeight.w700,
-      color: AppColors.textPrimary,
-      letterSpacing: 0.3,
-    );
-    final footerStyle = TextStyle(
-      fontSize: 13.sp,
-      fontWeight: FontWeight.w700,
-      color: AppColors.textPrimary,
-    );
-    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
-
-    Widget rowWidget(List<String> values, List<double> widths, {Color? bg, TextStyle? style}) {
-      return Container(
-        width: double.infinity,
-        color: bg,
-        padding: EdgeInsets.symmetric(vertical: 12.h),
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            for (int i = 0; i < values.length; i++)
-              SizedBox(
-                width: widths[i],
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w),
-                  child: Text(
-                    values[i],
-                    textAlign: numericCols.contains(i) ? TextAlign.right : TextAlign.left,
-                    style: style ?? cellStyle,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    }
-
-    // NOTE: both Pending Payment and Consolidated Status tabs call _stickyTable
-    // and are kept alive at once, so a shared controller would attach to two
-    // scroll views. Use a fresh one per invocation instead.
-    final hController = ScrollController();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final needsScroll = baseTotal > constraints.maxWidth;
-        final scale = needsScroll ? 1.0 : (constraints.maxWidth / baseTotal);
-        final widths = [for (final c in columnWidths) c.w * scale];
-        final width = needsScroll ? baseTotal : constraints.maxWidth;
-        final scrollbarHeight = needsScroll ? 20.0 : 0.0;
-        return Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: hController,
-                  scrollDirection: Axis.horizontal,
-                  physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: width,
-                    height: constraints.maxHeight - scrollbarHeight,
-                    child: Column(
-                      children: [
-                        rowWidget(headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
-                        Container(height: 1, color: AppColors.border),
-                        Expanded(
-                          child: ListView.separated(
-                            itemCount: rows.length,
-                            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
-                            itemBuilder: (_, i) => rowWidget(rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
-                          ),
-                        ),
-                        Container(height: 1, color: AppColors.border),
-                        rowWidget(footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              if (needsScroll) _classicHScrollbar(hController),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _classicHScrollbar(ScrollController ctrl) {
-    return AnimatedBuilder(
-      animation: ctrl,
-      builder: (context, _) {
-        return Container(
-          height: 20,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF0F0F0),
-            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-          ),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () {
-                  if (!ctrl.hasClients) return;
-                  ctrl.animateTo(
-                    (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                },
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0E0E0),
-                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                  ),
-                  child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
-                ),
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    final hasClients = ctrl.hasClients && ctrl.positions.isNotEmpty && ctrl.position.hasContentDimensions;
-                    final maxExtent = hasClients ? ctrl.position.maxScrollExtent : 1.0;
-                    final viewportWidth = hasClients ? ctrl.position.viewportDimension : c.maxWidth;
-                    final totalContentWidth = maxExtent + viewportWidth;
-                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
-                    final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
-                    final trackSpace = c.maxWidth - thumbWidth;
-                    final scrollRatio = maxExtent > 0 ? (ctrl.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                    final thumbOffset = trackSpace * scrollRatio;
-                    return GestureDetector(
-                      onHorizontalDragUpdate: (details) {
-                        if (trackSpace > 0 && hasClients) {
-                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                          ctrl.jumpTo(newRatio * maxExtent);
-                        }
-                      },
-                      child: Container(
-                        color: const Color(0xFFF0F0F0),
-                        height: 20,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: thumbOffset,
-                              top: 2,
-                              child: Container(
-                                width: thumbWidth,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFC0C0C0),
-                                  borderRadius: BorderRadius.circular(2),
-                                  border: Border.all(color: const Color(0xFFB0B0B0)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  if (!ctrl.hasClients) return;
-                  ctrl.animateTo(
-                    (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                },
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0E0E0),
-                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                  ),
-                  child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    return _StickyTable(
+      columnWidths: columnWidths,
+      headers: headers,
+      rows: rows,
+      footer: footer,
+      numericCols: numericCols,
     );
   }
 
@@ -2051,6 +1958,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         final p = idx > 0 ? n.substring(0, idx) : n;
         if (p != _selectedPrefix) return false;
       }
+      if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
       return true;
     }).toList();
 
@@ -2138,7 +2046,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     }
                   }
                   final headers = <String>[
-                    'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'CLASS',
+                    'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'COURSE', 'CLASS',
                     ...visibleFeeTypes.map((t) => t.toUpperCase()),
                     'FINE', 'TOTAL',
                     if (showCash) 'CASH',
@@ -2147,7 +2055,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     'NET AMT',
                   ];
                   final widths = <double>[
-                    120, 90, 180, 120,
+                    120, 90, 180, 110, 90,
                     ...visibleFeeTypes.map((t) {
                       // Enough width for full uppercase label ("NEW ADMISSION FEES" etc.)
                       final len = t.length;
@@ -2159,9 +2067,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     if (showBank) 100,
                     110,
                   ];
-                  final numericStart = 4 + visibleFeeTypes.length - 1;
+                  final numericStart = 5 + visibleFeeTypes.length - 1;
                   final numericCols = <int>{
-                    for (int i = 4; i < headers.length; i++) i,
+                    for (int i = 5; i < headers.length; i++) i,
                   };
                   // Decrement is unused
                   // ignore: unused_local_variable
@@ -2180,7 +2088,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             r['paynumber']?.toString() ?? '',
                             r['stuadmno']?.toString() ?? '',
                             r['stuname']?.toString() ?? '',
-                            '${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(),
+                            r['courname']?.toString() ?? '',
+                            r['stuclass']?.toString() ?? '',
                             ...visibleFeeTypes.map((ft) => (fees[ft] != null && fees[ft] != 0) ? _formatNumber(fees[ft]!) : ''),
                             fine != 0 ? _formatNumber(fine) : '',
                             _formatNumber(total),
@@ -2192,7 +2101,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         }(),
                     ],
                     footer: <String>[
-                      'TOTAL', '', '', '',
+                      'TOTAL', '', '', '', '',
                       ...visibleFeeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
                       _formatNumber(totalFine),
                       _formatNumber(totalAmt),
@@ -2891,6 +2800,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final p = idx > 0 ? n.substring(0, idx) : n;
           if (p != _selectedPrefix) return false;
         }
+        if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
         return true;
       }).toList();
       final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
@@ -2912,7 +2822,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final showCheque = _selectedMode == null || _selectedMode == 'cash';
       final showBank = _selectedMode == null || _selectedMode == 'bank';
       final modeCols = (showCash ? 1 : 0) + (showCheque ? 1 : 0) + (showBank ? 1 : 0);
-      final totalCols = 4 + feeTypes.length + 2 + modeCols + 1; // +fine +total +(cash/cheque/bank) +net
+      final totalCols = 5 + feeTypes.length + 2 + modeCols + 1; // +fine +total +(cash/cheque/bank) +net
 
       int row = 0;
       void merged(String text, xl.CellStyle style) {
@@ -2926,6 +2836,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       if (_insAddress.isNotEmpty) merged(_insAddress, xl.CellStyle(fontSize: 10));
       merged('DAILY COLLECTION STATEMENT FROM ${_formatDate(_dailyFrom!)} TO ${_formatDate(_dailyTo!)}', boldStyle);
       merged('Date: ${_formatDate(DateTime.now())}', xl.CellStyle(fontSize: 10));
+      // Collected-by line: specific user if filtered, otherwise derived
+      // from the distinct cashiers visible in the exported rows.
+      final exportCashiers = <String>{
+        for (final r in visibleRows)
+          if ((r['createdby']?.toString() ?? '').isNotEmpty) r['createdby'].toString(),
+      };
+      final exportCollectedBy = _selectedUser
+          ?? (exportCashiers.length == 1 ? exportCashiers.first : 'All accountants');
+      merged('Collected by: $exportCollectedBy', boldStyle);
       row++;
 
       final modeHeaders = <String>[
@@ -2933,7 +2852,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         if (showCheque) 'Cheque',
         if (showBank) 'Bank',
       ];
-      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Course', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
       for (int c = 0; c < headers.length; c++) {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).value = xl.TextCellValue(headers[c]);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row)).cellStyle = headerStyle;
@@ -2947,9 +2866,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       double totalCheque = 0;
       double totalBank = 0;
 
-      final fineCol = 4 + feeTypes.length;
-      final totalCol = 5 + feeTypes.length;
-      int cursor = 6 + feeTypes.length;
+      final fineCol = 5 + feeTypes.length;
+      final totalCol = 6 + feeTypes.length;
+      int cursor = 7 + feeTypes.length;
       final cashCol = showCash ? cursor++ : -1;
       final chequeCol = showCheque ? cursor++ : -1;
       final bankCol = showBank ? cursor++ : -1;
@@ -2968,13 +2887,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['paynumber']?.toString() ?? '');
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['stuadmno']?.toString() ?? '');
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['stuname']?.toString() ?? '');
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue('${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim());
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['courname']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(r['stuclass']?.toString() ?? '');
         for (int c = 0; c < feeTypes.length; c++) {
           final v = fees[feeTypes[c]] ?? 0;
           ftTotals[feeTypes[c]] = (ftTotals[feeTypes[c]] ?? 0) + v;
           if (v > 0) {
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).cellStyle = numStyle;
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
+            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + c, rowIndex: row)).cellStyle = numStyle;
           }
         }
         if (fine > 0) {
@@ -3006,8 +2926,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (int c = 0; c < feeTypes.length; c++) {
         final v = ftTotals[feeTypes[c]] ?? 0;
         if (v > 0) {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4 + c, rowIndex: row)).cellStyle = totalStyle;
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + c, rowIndex: row)).value = xl.DoubleCellValue(v);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5 + c, rowIndex: row)).cellStyle = totalStyle;
         }
       }
       if (totalFine > 0) {
@@ -3034,9 +2954,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       sheet.setColumnWidth(0, 12);
       sheet.setColumnWidth(1, 14);
       sheet.setColumnWidth(2, 24);
-      sheet.setColumnWidth(3, 18);
+      sheet.setColumnWidth(3, 14);
+      sheet.setColumnWidth(4, 12);
       for (int c = 0; c < feeTypes.length; c++) {
-        sheet.setColumnWidth(4 + c, 12);
+        sheet.setColumnWidth(5 + c, 12);
       }
       sheet.setColumnWidth(fineCol, 8);
       sheet.setColumnWidth(totalCol, 10);
@@ -3071,6 +2992,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final p = idx > 0 ? n.substring(0, idx) : n;
           if (p != _selectedPrefix) return false;
         }
+        if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
         return true;
       }).toList();
       final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
@@ -3104,7 +3026,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         if (showCheque) 'Cheque',
         if (showBank) 'Bank',
       ];
-      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
+      final headers = ['Receipt No', 'Reg No', 'Student Name', 'Course', 'Class', ...feeTypes, 'Fine', 'Total', ...modeHeaders, 'Net Amt'];
       final rows = <List<String>>[];
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
@@ -3115,7 +3037,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           r['paynumber']?.toString() ?? '',
           r['stuadmno']?.toString() ?? '',
           r['stuname']?.toString() ?? '',
-          '${r['courname'] ?? ''} ${r['stuclass'] ?? ''}'.trim(),
+          r['courname']?.toString() ?? '',
+          r['stuclass']?.toString() ?? '',
           ...feeTypes.map((ft) => (fees[ft] ?? 0) > 0 ? _formatNumber(fees[ft]!) : ''),
           fine > 0 ? _formatNumber(fine) : '',
           _formatNumber(total),
@@ -3126,7 +3049,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ]);
       }
       rows.add([
-        'TOTAL', '', '', '',
+        'TOTAL', '', '', '', '',
         ...feeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
         totalFine > 0 ? _formatNumber(totalFine) : '',
         _formatNumber(totalAmt),
@@ -3141,23 +3064,40 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4.landscape,
           margin: const pw.EdgeInsets.all(24),
-          header: (_) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(_insName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-              if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
-              pw.SizedBox(height: 6),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('DAILY COLLECTION STATEMENT FROM ${_formatDate(_dailyFrom!)} TO ${_formatDate(_dailyTo!)}',
-                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                  pw.Text('Date: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
-                ],
-              ),
-              pw.SizedBox(height: 6),
-            ],
-          ),
+          header: (_) {
+            // "Collected by" line — shows who the report covers.
+            //   * specific user filter active → that user's name
+            //   * no filter + 1 accountant visible in rows → their name
+            //   * no filter + multiple → "All accountants" so the report
+            //     makes it obvious that the totals span more than one
+            //     cashier (prevents a cashier accepting a report for
+            //     someone else's work).
+            final distinctCashiers = <String>{
+              for (final r in visibleRows)
+                if ((r['createdby']?.toString() ?? '').isNotEmpty) r['createdby'].toString(),
+            };
+            final collectedBy = _selectedUser
+                ?? (distinctCashiers.length == 1 ? distinctCashiers.first : 'All accountants');
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(_insName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                if (_insAddress.isNotEmpty) pw.Text(_insAddress, style: const pw.TextStyle(fontSize: 9)),
+                pw.SizedBox(height: 6),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('DAILY COLLECTION STATEMENT FROM ${_formatDate(_dailyFrom!)} TO ${_formatDate(_dailyTo!)}',
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Date: ${_formatDate(DateTime.now())}', style: const pw.TextStyle(fontSize: 10)),
+                  ],
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text('Collected by: $collectedBy', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 6),
+              ],
+            );
+          },
           build: (ctx) => [
             pw.Table.fromTextArray(
               headers: headers,
@@ -3205,5 +3145,304 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         SnackBar(content: Text('Report saved: ${file.path}'), backgroundColor: Colors.green),
       );
     }
+  }
+}
+
+/// Stateful wrapper so the horizontal ScrollController survives across
+/// rebuilds. Before this, applying a filter created a new ScrollController
+/// every build — the scrollbar thumb would freeze in place because the
+/// AnimatedBuilder was listening to an orphaned controller that was never
+/// attached to a live ScrollView.
+class _StickyTable extends StatefulWidget {
+  const _StickyTable({
+    required this.columnWidths,
+    required this.headers,
+    required this.rows,
+    required this.footer,
+    required this.numericCols,
+  });
+
+  final List<double> columnWidths;
+  final List<String> headers;
+  final List<List<String>> rows;
+  final List<String> footer;
+  final Set<int> numericCols;
+
+  @override
+  State<_StickyTable> createState() => _StickyTableState();
+}
+
+/// Classic Windows-style horizontal scrollbar with left/right arrow buttons
+/// and a draggable thumb. Thumb size/position are computed from the
+/// explicit content/viewport widths passed in, not from the ScrollController's
+/// position, so the thumb is correct on the first frame after a content
+/// change instead of lagging until the user scrolls.
+class _ClassicHScrollbar extends StatefulWidget {
+  const _ClassicHScrollbar({
+    required this.controller,
+    required this.contentWidth,
+    required this.viewportWidth,
+  });
+
+  final ScrollController controller;
+  final double contentWidth;
+  final double viewportWidth;
+
+  @override
+  State<_ClassicHScrollbar> createState() => _ClassicHScrollbarState();
+}
+
+class _ClassicHScrollbarState extends State<_ClassicHScrollbar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = widget.controller;
+    final maxExtent = (widget.contentWidth - widget.viewportWidth).clamp(0.0, double.infinity);
+    // Offset reads from the controller when attached, else 0.
+    final offset = (ctrl.hasClients && ctrl.positions.isNotEmpty)
+        ? ctrl.offset.clamp(0.0, maxExtent > 0 ? maxExtent : 0.0)
+        : 0.0;
+
+    return Container(
+      height: 20,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF0F0F0),
+        border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () {
+              if (!ctrl.hasClients) return;
+              ctrl.animateTo(
+                (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              );
+            },
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE0E0E0),
+                border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+              ),
+              child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
+            ),
+          ),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                // thumbRatio = viewport / content, proportional to how much
+                // of the total content is visible at once. Clamped so the
+                // thumb is always at least grabbable.
+                final thumbRatio = (widget.viewportWidth / widget.contentWidth).clamp(0.1, 1.0);
+                final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
+                final trackSpace = c.maxWidth - thumbWidth;
+                final scrollRatio = maxExtent > 0 ? (offset / maxExtent).clamp(0.0, 1.0) : 0.0;
+                final thumbOffset = trackSpace * scrollRatio;
+                return GestureDetector(
+                  onHorizontalDragUpdate: (details) {
+                    if (trackSpace > 0 && ctrl.hasClients && maxExtent > 0) {
+                      final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
+                      ctrl.jumpTo(newRatio * maxExtent);
+                    }
+                  },
+                  child: Container(
+                    color: const Color(0xFFF0F0F0),
+                    height: 20,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: thumbOffset,
+                          top: 2,
+                          child: Container(
+                            width: thumbWidth,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC0C0C0),
+                              borderRadius: BorderRadius.circular(2),
+                              border: Border.all(color: const Color(0xFFB0B0B0)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              if (!ctrl.hasClients) return;
+              ctrl.animateTo(
+                (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+              );
+            },
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE0E0E0),
+                border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
+              ),
+              child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StickyTableState extends State<_StickyTable> {
+  final ScrollController _hController = ScrollController();
+
+  @override
+  void dispose() {
+    _hController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StickyTable oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Content (rows/columns) may have changed after a filter, so the
+    // thumb size/position is probably now wrong. A ScrollController only
+    // notifies listeners on user scroll, not on content resize, so the
+    // scrollbar would otherwise keep the old ratio until the user scrolls.
+    // Poke it once after the next frame so the AnimatedBuilder reruns
+    // with the fresh maxScrollExtent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_hController.hasClients) return;
+      // jumpTo(offset) is a no-op that still fires notifyListeners().
+      _hController.jumpTo(_hController.offset.clamp(0.0, _hController.position.maxScrollExtent));
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_hController.hasClients) return;
+      _hController.jumpTo(0);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    assert(widget.columnWidths.length == widget.headers.length);
+    final baseTotal = widget.columnWidths.fold<double>(0, (a, b) => a + b.w);
+    final headerStyle = TextStyle(
+      fontSize: 13.sp,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+      letterSpacing: 0.3,
+    );
+    final footerStyle = TextStyle(
+      fontSize: 13.sp,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    );
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
+
+    Widget rowWidget(List<String> values, List<double> widths, {Color? bg, TextStyle? style}) {
+      return Container(
+        width: double.infinity,
+        color: bg,
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            for (int i = 0; i < values.length; i++)
+              SizedBox(
+                width: widths[i],
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w),
+                  child: Text(
+                    values[i],
+                    textAlign: widget.numericCols.contains(i) ? TextAlign.right : TextAlign.left,
+                    style: style ?? cellStyle,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final needsScroll = baseTotal > constraints.maxWidth;
+        final scale = needsScroll ? 1.0 : (constraints.maxWidth / baseTotal);
+        final widths = [for (final c in widget.columnWidths) c.w * scale];
+        final width = needsScroll ? baseTotal : constraints.maxWidth;
+        final scrollbarHeight = needsScroll ? 20.0 : 0.0;
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _hController,
+                  scrollDirection: Axis.horizontal,
+                  physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: width,
+                    height: constraints.maxHeight - scrollbarHeight,
+                    child: Column(
+                      children: [
+                        rowWidget(widget.headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
+                        Container(height: 1, color: AppColors.border),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: widget.rows.length,
+                            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                            itemBuilder: (_, i) => rowWidget(widget.rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                          ),
+                        ),
+                        Container(height: 1, color: AppColors.border),
+                        rowWidget(widget.footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (needsScroll)
+                _ClassicHScrollbar(
+                  controller: _hController,
+                  contentWidth: width,
+                  viewportWidth: constraints.maxWidth,
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

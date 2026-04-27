@@ -276,10 +276,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final auth = context.read<AuthProvider>();
       final insId = auth.insId;
       if (insId == null) return;
+      // Match the Notifications screen filter — staff-only (stu_id IS NULL).
+      // Without this the sidebar badge counted student notifications too,
+      // showing 73 while the screen actually displays a much smaller list.
       final rows = await SupabaseService.fromSchema('notification')
           .select('isread')
           .eq('ins_id', insId)
-          .eq('activestatus', 1);
+          .eq('activestatus', 1)
+          .isFilter('stu_id', null);
       final unread = (rows as List).where((n) => n['isread'] != true && n['isread'] != 1).length;
       if (mounted) setState(() => _unreadNotifCount = unread);
     } catch (_) {}
@@ -477,22 +481,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 32.w,
-                  height: 32.h,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: AppIcon('teacher',
-                    color: AppColors.primary,
-                    size: 16,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Container(
+                    width: 32.w,
+                    height: 32.h,
+                    color: Colors.white,
+                    padding: EdgeInsets.all(2.w),
+                    child: Image.asset(
+                      'assets/images/educore360_logo.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => AppIcon('teacher',
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                    ),
                   ),
                 ),
                 if (!collapsed) ...[
                   SizedBox(width: 10.w),
                   Text(
-                    'EduDesk',
+                    'EduCore360',
                     style: TextStyle(
                       fontSize: 16.sp,
                       color: AppColors.textPrimary,
