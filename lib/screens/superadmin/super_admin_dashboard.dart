@@ -2129,162 +2129,159 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
     }
   }
 
-  Widget _buildDateFilterBar() {
-    String fmt(DateTime? d) => d == null
-        ? ''
-        : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    Widget quick(String label, String key, VoidCallback onTap) {
-      final isActive = _activePreset == key;
-      return Padding(
-        padding: EdgeInsets.only(left: 4.w),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6.r),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? AppColors.accent.withValues(alpha: 0.15)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(6.r),
-              border: Border.all(
-                  color: isActive ? AppColors.accent : AppColors.border),
-            ),
-            child: Text(label,
-                style: TextStyle(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w500,
-                    color: isActive ? AppColors.accent : null)),
-          ),
-        ),
-      );
-    }
+  Future<void> _openDateFilter() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        DateTime? from = _filterFrom;
+        DateTime? to = _filterTo;
+        return StatefulBuilder(builder: (ctx, setStateDialog) {
+          Widget presetChip(String label, VoidCallback onTap) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(label,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  ),
+                ),
+              );
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          const AppIcon('filter',
-              size: 16, color: Colors.black),
-          SizedBox(width: 8.w),
-          Text('Date Range:',
-              style: TextStyle(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black)),
-          SizedBox(width: 8.w),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _filterFrom ?? DateTime.now(),
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
-              if (picked != null) {
-                setState(() {
-                  _filterFrom = picked;
-                  _activePreset = null;
-                });
-                _load();
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(6.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppIcon.linear('calendar',
-                      size: 14, color: Colors.black),
-                  SizedBox(width: 6.w),
-                  Text(_filterFrom != null ? fmt(_filterFrom) : 'From',
-                      style: TextStyle(fontSize: 13.sp)),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6.w),
-              child: const Text('—',
-                  style: TextStyle(color: Colors.black))),
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _filterTo ?? DateTime.now(),
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2030),
-              );
-              if (picked != null) {
-                setState(() {
-                  _filterTo = picked;
-                  _activePreset = null;
-                });
-                _load();
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(6.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppIcon.linear('calendar',
-                      size: 14, color: Colors.black),
-                  SizedBox(width: 6.w),
-                  Text(_filterTo != null ? fmt(_filterTo) : 'To',
-                      style: TextStyle(fontSize: 13.sp)),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(width: 8.w),
-          quick('Today', 'today', () {
-            final now = DateTime.now();
-            setState(() {
-              _filterFrom = DateTime(now.year, now.month, now.day);
-              _filterTo = DateTime(now.year, now.month, now.day);
-              _activePreset = 'today';
-            });
-            _load();
-          }),
-          const Spacer(),
-          SizedBox(
-            height: 40,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _filterFrom = null;
-                  _filterTo = null;
-                });
-                _load();
+          Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime> onChanged}) {
+            return InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: value ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                );
+                if (picked != null) onChanged(picked);
               },
-              icon: AppIcon('refresh', size: 16, color: Colors.white),
-              label: const Text('Refresh'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: EdgeInsets.symmetric(horizontal: 18.w),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIcon('calendar-1', size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(
+                      value != null
+                          ? '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}'
+                          : hint,
+                      style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w500,
+                          color: value != null ? AppColors.textPrimary : AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
+              );
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
+            title: Row(
+              children: [
+                Text('Filters', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const AppIcon.linear('close-circle', size: 20, color: AppColors.textSecondary),
+                  splashRadius: 18,
+                  tooltip: 'Close',
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  sectionLabel('QUICK RANGE'),
+                  Row(children: [
+                    presetChip('Today', () {
+                      final now = DateTime.now();
+                      setStateDialog(() {
+                        from = DateTime(now.year, now.month, now.day);
+                        to = DateTime(now.year, now.month, now.day);
+                      });
+                    }),
+                    presetChip('7 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() {
+                        from = now.subtract(const Duration(days: 7));
+                        to = DateTime(now.year, now.month, now.day);
+                      });
+                    }),
+                    presetChip('30 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() {
+                        from = now.subtract(const Duration(days: 30));
+                        to = DateTime(now.year, now.month, now.day);
+                      });
+                    }),
+                    presetChip('All', () {
+                      setStateDialog(() { from = null; to = null; });
+                    }),
+                  ]),
+                  const SizedBox(height: 16),
+                  sectionLabel('CUSTOM RANGE'),
+                  Row(children: [
+                    Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
+                  ]),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
+            actions: [
+              TextButton(
+                onPressed: () => setStateDialog(() { from = null; to = null; }),
+                child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _filterFrom = from;
+                    _filterTo = to;
+                    _activePreset = null;
+                  });
+                  Navigator.pop(ctx);
+                  _load();
+                },
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 
@@ -2300,26 +2297,25 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final Color accentColor;
     final String valueLabel;
     final String totalLabel;
+    final String titleIcon;
     switch (widget.mode) {
       case 'pending':
-        accentColor = const Color(0xFFEF5350);
         valueLabel = 'Pending';
         totalLabel = 'Total Pending';
+        titleIcon = 'timer';
         break;
       case 'demand':
-        accentColor = const Color(0xFF5C6BC0);
         valueLabel = 'Demand';
         totalLabel = 'Total Demand';
+        titleIcon = 'wallet-1';
         break;
       default:
-        accentColor = const Color(0xFF43A047);
         valueLabel = 'Collection';
         totalLabel = 'Total Collection';
+        titleIcon = 'tick-circle';
     }
-    final collectionColor = accentColor;
     final double total;
     if (widget.mode == 'collection') {
       total = widget.summary.totalCollected;
@@ -2332,208 +2328,291 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Course-wise $valueLabel',
-                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
-            Text(widget.summary.insName,
-                style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.black,
-                    fontWeight: FontWeight.w400)),
-          ],
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: FractionallySizedBox(
-                widthFactor: 0.6,
-                child: Padding(
-                  padding: EdgeInsets.all(20.w),
-                  child: Column(
-                    children: [
-                      if (widget.mode == 'collection') ...[
-                        _buildDateFilterBar(),
-                        SizedBox(height: 12.h),
-                      ],
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                            vertical: 16.h, horizontal: 18.w),
-                        decoration: BoxDecoration(
-                          color: collectionColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12.r),
-                          border: Border.all(
-                              color: collectionColor.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(totalLabel,
-                                style: TextStyle(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: collectionColor)),
-                            Text(_fmt(total),
-                                style: TextStyle(
-                                    fontSize: 20.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: collectionColor)),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 16.h),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 16.w, vertical: 12.h),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(12.r)),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                                flex: 2,
-                                child: Padding(
-                                    padding:
-                                        EdgeInsets.fromLTRB(16.w, 0, 12.w, 0),
-                                    child: Text('Course',
-                                        style: TextStyle(
-                                            fontSize: 13.sp,
-                                            fontWeight: FontWeight.w700)))),
-                            Expanded(
-                                flex: 2,
-                                child: Padding(
-                                    padding:
-                                        EdgeInsets.fromLTRB(0, 0, 24.w, 0),
-                                    child: Text('Class',
-                                        style: TextStyle(
-                                            fontSize: 13.sp,
-                                            fontWeight: FontWeight.w700)))),
-                            Expanded(
-                                child: Text(
-                                    widget.mode == 'pending'
-                                        ? 'Unpaid Students'
-                                        : widget.mode == 'collection'
-                                            ? 'Paid Students'
-                                            : 'Students',
+          : Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(10.r),
+                          child: Container(
+                            height: 40,
+                            padding: EdgeInsets.symmetric(horizontal: 14.w),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon.linear('Chevron Left',
+                                    size: 14, color: Colors.white),
+                                SizedBox(width: 6.w),
+                                Text('Back',
                                     style: TextStyle(
                                         fontSize: 13.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.accent),
-                                    textAlign: TextAlign.right)),
-                            Expanded(
-                                child: Text(valueLabel,
-                                    style: TextStyle(
-                                        fontSize: 13.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: collectionColor),
-                                    textAlign: TextAlign.right)),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
-                                bottom: Radius.circular(12.r)),
-                            border: Border(
-                              left: BorderSide(color: AppColors.border),
-                              right: BorderSide(color: AppColors.border),
-                              bottom: BorderSide(color: AppColors.border),
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white)),
+                              ],
                             ),
                           ),
-                          child: _rows.isEmpty
-                              ? Center(
-                                  child: Text('No data',
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: 13.sp)))
-                              : ListView.separated(
-                                  itemCount: _rows.length,
-                                  separatorBuilder: (_, __) => Divider(
-                                      height: 1, color: AppColors.border),
-                                  itemBuilder: (context, i) {
-                                    final r = _rows[i];
-                                    final courseLabel =
-                                        '${r['course'] ?? 'Other'}';
-                                    final classLabel =
-                                        '${r['class'] ?? ''}';
-                                    final collection =
-                                        (r[widget.mode] as num?)?.toDouble() ??
-                                            0;
-                                    final int students;
-                                    if (widget.mode == 'pending') {
-                                      students = (r['unpaid_students'] as num?)
-                                              ?.toInt() ??
-                                          0;
-                                    } else if (widget.mode == 'collection') {
-                                      students = (r['paid_students'] as num?)
-                                              ?.toInt() ??
-                                          0;
-                                    } else {
-                                      students =
-                                          (r['students'] as num?)?.toInt() ?? 0;
-                                    }
-                                    return Padding(
+                        ),
+                        SizedBox(width: 12.w),
+                        Container(width: 1, height: 18, color: AppColors.border),
+                        SizedBox(width: 12.w),
+                        Text(widget.summary.insName,
+                            style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary)),
+                        SizedBox(width: 6.w),
+                        AppIcon.linear('Chevron Right',
+                            size: 14, color: AppColors.textSecondary),
+                        SizedBox(width: 6.w),
+                        Text('Course-wise $valueLabel',
+                            style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
+                        const Spacer(),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 12.w, vertical: 6.h),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                                color: AppColors.accent.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('$totalLabel: ',
+                                  style: TextStyle(
+                                      fontSize: 12.sp,
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600)),
+                              Text(_fmt(total),
+                                  style: TextStyle(
+                                      fontSize: 13.sp,
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                        ),
+                        if (widget.mode == 'collection') ...[
+                          SizedBox(width: 12.w),
+                          SizedBox(
+                            height: 40,
+                            child: OutlinedButton.icon(
+                              onPressed: _openDateFilter,
+                              icon: AppIcon('calendar-1', size: 16, color: AppColors.textPrimary),
+                              label: Text('Date',
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.border),
+                                padding: EdgeInsets.symmetric(horizontal: 14.w),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          SizedBox(
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              onPressed: _load,
+                              icon: AppIcon('refresh', size: 16, color: Colors.white),
+                              label: const Text('Refresh'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(horizontal: 18.w),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  Expanded(
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+                            child: Row(
+                              children: [
+                                AppIcon(titleIcon,
+                                    size: 18, color: AppColors.accent),
+                                SizedBox(width: 8.w),
+                                Text('Course-wise Breakdown',
+                                    style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary)),
+                                const Spacer(),
+                                Text('${_rows.length} ${_rows.length == 1 ? "course" : "courses"}',
+                                    style: TextStyle(
+                                        fontSize: 12.sp,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                              child: Container(
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      color: AppColors.tableHeadBg,
                                       padding: EdgeInsets.symmetric(
                                           horizontal: 16.w, vertical: 12.h),
                                       child: Row(
                                         children: [
                                           Expanded(
                                               flex: 2,
-                                              child: Padding(
-                                                  padding: EdgeInsets.fromLTRB(
-                                                      16.w, 0, 12.w, 0),
-                                                  child: Text(courseLabel,
-                                                      style: TextStyle(
-                                                          fontSize: 13.sp,
-                                                          fontWeight: FontWeight
-                                                              .w600)))),
+                                              child: Text('COURSE',
+                                                  style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: AppColors.textPrimary,
+                                                      letterSpacing: 0.4))),
                                           Expanded(
                                               flex: 2,
-                                              child: Padding(
-                                                  padding: EdgeInsets.fromLTRB(
-                                                      0, 0, 24.w, 0),
-                                                  child: Text(classLabel,
-                                                      style: TextStyle(
-                                                          fontSize: 13.sp,
-                                                          fontWeight: FontWeight
-                                                              .w600)))),
-                                          Expanded(
-                                              child: Text('$students',
+                                              child: Text('CLASS',
                                                   style: TextStyle(
-                                                      fontSize: 13.sp,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: AppColors.accent),
-                                                  textAlign: TextAlign.right)),
+                                                      fontSize: 12.sp,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: AppColors.textPrimary,
+                                                      letterSpacing: 0.4))),
                                           Expanded(
-                                              child: Text(_fmt(collection),
+                                              child: Text(
+                                                  widget.mode == 'pending'
+                                                      ? 'UNPAID STUDENTS'
+                                                      : widget.mode == 'collection'
+                                                          ? 'PAID STUDENTS'
+                                                          : 'STUDENTS',
+                                                  textAlign: TextAlign.right,
                                                   style: TextStyle(
-                                                      fontSize: 13.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: collectionColor),
-                                                  textAlign: TextAlign.right)),
+                                                      fontSize: 12.sp,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: AppColors.textPrimary,
+                                                      letterSpacing: 0.4))),
+                                          Expanded(
+                                              child: Text(
+                                                  valueLabel.toUpperCase(),
+                                                  textAlign: TextAlign.right,
+                                                  style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: AppColors.textPrimary,
+                                                      letterSpacing: 0.4))),
                                         ],
                                       ),
-                                    );
-                                  },
+                                    ),
+                                    Expanded(
+                                      child: _rows.isEmpty
+                                          ? Center(
+                                              child: Text('No data',
+                                                  style: TextStyle(
+                                                      fontSize: 13.sp,
+                                                      color: AppColors.textSecondary,
+                                                      fontWeight: FontWeight.w600)))
+                                          : ListView.builder(
+                                              itemCount: _rows.length,
+                                              itemBuilder: (context, i) {
+                                                final r = _rows[i];
+                                                final courseLabel = '${r['course'] ?? 'Other'}';
+                                                final classLabel = '${r['class'] ?? ''}';
+                                                final amount = (r[widget.mode] as num?)?.toDouble() ?? 0;
+                                                final int students;
+                                                if (widget.mode == 'pending') {
+                                                  students = (r['unpaid_students'] as num?)?.toInt() ?? 0;
+                                                } else if (widget.mode == 'collection') {
+                                                  students = (r['paid_students'] as num?)?.toInt() ?? 0;
+                                                } else {
+                                                  students = (r['students'] as num?)?.toInt() ?? 0;
+                                                }
+                                                final zebra = i.isOdd ? AppColors.surface : Colors.white;
+                                                return Container(
+                                                  color: zebra,
+                                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                          flex: 2,
+                                                          child: Text(courseLabel,
+                                                              style: TextStyle(
+                                                                  fontSize: 13.sp,
+                                                                  fontWeight: FontWeight.w600,
+                                                                  color: AppColors.textSecondary))),
+                                                      Expanded(
+                                                          flex: 2,
+                                                          child: Text(classLabel,
+                                                              style: TextStyle(
+                                                                  fontSize: 13.sp,
+                                                                  fontWeight: FontWeight.w600,
+                                                                  color: AppColors.textSecondary))),
+                                                      Expanded(
+                                                          child: Text('$students',
+                                                              textAlign: TextAlign.right,
+                                                              style: TextStyle(
+                                                                  fontSize: 13.sp,
+                                                                  fontWeight: FontWeight.w600,
+                                                                  color: AppColors.textSecondary))),
+                                                      Expanded(
+                                                          child: Text(_fmt(amount),
+                                                              textAlign: TextAlign.right,
+                                                              style: TextStyle(
+                                                                  fontSize: 13.sp,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: AppColors.textPrimary))),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                  ],
                                 ),
-                        ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
     );
@@ -2922,37 +3001,65 @@ class _AggregateDrilldownPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                InkWell(
-                  borderRadius: BorderRadius.circular(10.r),
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: AppColors.border),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(10.r),
+                    child: Container(
+                      height: 40,
+                      padding: EdgeInsets.symmetric(horizontal: 14.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                          SizedBox(width: 6.w),
+                          Text('Back',
+                              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: AppIcon.linear('arrow-left-2', size: 18, color: AppColors.textSecondary),
                   ),
-                ),
-                SizedBox(width: 12.w),
-                Text(_title,
-                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                SizedBox(width: 12.w),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                  SizedBox(width: 12.w),
+                  Container(width: 1, height: 18, color: AppColors.border),
+                  SizedBox(width: 12.w),
+                  Text('Dashboard',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                  SizedBox(width: 6.w),
+                  AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                  SizedBox(width: 6.w),
+                  Text(_title,
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const Spacer(),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Total: ',
+                            style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                        Text(aggregate,
+                            style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
                   ),
-                  child: Text('Total: $aggregate',
-                      style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w700)),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: 16.h),
             Expanded(
