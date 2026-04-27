@@ -10,6 +10,7 @@ import '../../widgets/app_search_field.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 
 class FeeDemandScreen extends StatefulWidget {
@@ -305,7 +306,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       debugPrint('Error saving fee demand: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     } finally {

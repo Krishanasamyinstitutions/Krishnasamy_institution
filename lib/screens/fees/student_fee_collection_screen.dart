@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:webview_windows/webview_windows.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
@@ -140,6 +141,75 @@ class _StudentFeeCollectionScreenState
       }
     } catch (e) {
       debugPrint('Orphaned payment sweep failed: $e');
+    }
+  }
+
+  /// Resolve a single pending 'I' payment on demand, bypassing the 15-min
+  /// orphan sweep. Called from the "Check status now" button so a cashier in
+  /// a flaky-network school doesn't have to wait after a polling timeout.
+  Future<void> _resolvePendingPayment({
+    required int? payId,
+    required String? orderId,
+    required String? itemsRaw,
+    required int? insId,
+  }) async {
+    if (payId == null || insId == null) return;
+    setState(() => _processing = true);
+    bool captured = false;
+    String? paymentId;
+    try {
+      if (orderId != null && orderId.isNotEmpty) {
+        final resp = await SupabaseService.client.functions.invoke(
+          'get-razorpay-payment', body: {'order_id': orderId},
+        );
+        final data = resp.data as Map<String, dynamic>;
+        if (data['status'] == 'captured' && data['payment_id'] != null) {
+          captured = true;
+          paymentId = data['payment_id'].toString();
+        }
+      }
+    } catch (e) {
+      debugPrint('Razorpay status check failed: $e');
+    }
+
+    if (captured) {
+      List<dynamic> items = [];
+      if (itemsRaw != null && itemsRaw.isNotEmpty) {
+        try { items = jsonDecode(itemsRaw) as List<dynamic>; } catch (_) {}
+      }
+      try {
+        await SupabaseService.client.rpc('complete_payment_grouped', params: {
+          'p_pay_id': payId,
+          'p_pay_method': 'razorpay',
+          'p_pay_reference': 'Razorpay: $paymentId (recovered via Check Status)',
+          'p_items': items,
+          'p_ins_id': insId,
+          'p_status': 'C',
+        });
+      } catch (e) {
+        debugPrint('Recovery complete failed for pay_id=$payId: $e');
+      }
+    } else {
+      try {
+        await SupabaseService.fromSchema('payment')
+            .update({'paystatus': 'F'})
+            .eq('pay_id', payId)
+            .eq('ins_id', insId);
+      } catch (e) {
+        debugPrint('Mark-failed for pay_id=$payId failed: $e');
+      }
+    }
+
+    if (mounted) {
+      setState(() => _processing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(captured
+              ? 'Pending payment recovered. Please re-open the student.'
+              : 'No captured payment found — cleared pending lock. You can retry now.'),
+          backgroundColor: captured ? Colors.green : Colors.orange,
+        ),
+      );
     }
   }
 
@@ -779,17 +849,27 @@ class _StudentFeeCollectionScreenState
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        CircleAvatar(
-          radius: 22,
-          backgroundColor: AppColors.accent.withValues(alpha: 0.12),
-          child: Text(
-            name.isNotEmpty ? name[0].toUpperCase() : '?',
-            style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w700,
-                fontSize: 18.sp),
-          ),
-        ),
+        Builder(builder: (_) {
+          final photo = _student!['stuphoto']?.toString();
+          final fallback = CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.accent.withValues(alpha: 0.12),
+            child: Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18.sp),
+            ),
+          );
+          if (photo == null || photo.isEmpty) return fallback;
+          return CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.accent.withValues(alpha: 0.12),
+            backgroundImage: NetworkImage(photo),
+            onBackgroundImageError: (_, __) {},
+          );
+        }),
         SizedBox(width: 12.w),
         Expanded(
           child: Column(
@@ -813,7 +893,11 @@ class _StudentFeeCollectionScreenState
         SizedBox(width: 16.w),
         Expanded(child: _detailRow('user', 'Father', fatherName)),
         SizedBox(width: 16.w),
+        Container(width: 1, height: 36.h, color: AppColors.border),
+        SizedBox(width: 16.w),
         Expanded(child: _detailRow('book-1', 'Course', courseName)),
+        SizedBox(width: 16.w),
+        Container(width: 1, height: 36.h, color: AppColors.border),
         SizedBox(width: 16.w),
         Expanded(child: _detailRow('teacher', 'Class', className)),
       ],
@@ -1930,7 +2014,7 @@ class _StudentFeeCollectionScreenState
 
     try {
       final pending = await SupabaseService.fromSchema('payment')
-          .select('pay_id, createdat')
+          .select('pay_id, createdat, payorderid, payitems')
           .eq('ins_id', insId!)
           .eq('stu_id', stuId)
           .eq('paystatus', 'I')
@@ -1944,6 +2028,9 @@ class _StudentFeeCollectionScreenState
           final ageMin = DateTime.now().difference(createdAt).inMinutes;
           if (ageMin < 15) {
             final waitMin = 15 - ageMin;
+            final stalePayId = pending['pay_id'] as int?;
+            final staleOrderId = pending['payorderid']?.toString();
+            final staleItemsRaw = pending['payitems']?.toString();
             if (mounted) {
               setState(() => _processing = false);
               showDialog(
@@ -1952,9 +2039,22 @@ class _StudentFeeCollectionScreenState
                   title: const Text('Payment in progress'),
                   content: Text(
                     'An online payment for this student is still pending.\n'
-                    'Please try again in about $waitMin minute${waitMin == 1 ? '' : 's'}.',
+                    'Please try again in about $waitMin minute${waitMin == 1 ? '' : 's'}, '
+                    "or tap 'Check status now' to verify with Razorpay immediately.",
                   ),
                   actions: [
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await _resolvePendingPayment(
+                          payId: stalePayId,
+                          orderId: staleOrderId,
+                          itemsRaw: staleItemsRaw,
+                          insId: insId,
+                        );
+                      },
+                      child: const Text('Check status now'),
+                    ),
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
                   ],
                 ),
@@ -2120,10 +2220,37 @@ class _StudentFeeCollectionScreenState
       await webviewController.loadUrl(Uri.file(htmlPath).toString());
     } catch (e) {
       if (!completer.isCompleted) completer.complete(null);
+      // Most common failure here on Windows 10 pre-Oct-2021 boxes is the
+      // WebView2 runtime not being installed. Give a specific, actionable
+      // message instead of the raw exception text so the accountant knows
+      // to call IT / install the runtime, not that payments are broken.
+      final msg = e.toString().toLowerCase();
+      final isWebView2Missing = msg.contains('webview2') ||
+          msg.contains('not found') ||
+          msg.contains('0x80070002');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open payment window: $e'), backgroundColor: Colors.red),
-        );
+        if (isWebView2Missing) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Online payments unavailable'),
+              content: const Text(
+                'Microsoft Edge WebView2 runtime is missing on this PC, '
+                'so the online payment window cannot open.\n\n'
+                'Install the "Evergreen Bootstrapper" from:\n'
+                'https://developer.microsoft.com/microsoft-edge/webview2/\n\n'
+                'Or collect this payment as Cash / Cheque / UPI while IT installs it.',
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to open payment window: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
       return;
     }
@@ -2360,7 +2487,7 @@ class _StudentFeeCollectionScreenState
         } catch (_) {}
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Payment error: $e'), backgroundColor: Colors.red),
+            SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red),
           );
         }
       }

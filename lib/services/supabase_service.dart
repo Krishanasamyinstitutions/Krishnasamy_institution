@@ -258,12 +258,14 @@ class SupabaseService {
 
   // ==================== INSTITUTION ====================
 
-  /// Get all institution names for the login dropdown
+  /// Get all institution names for the login dropdown.
+  /// Includes inslogo so the login form can render the selected
+  /// institution's logo without a second round-trip.
   static Future<List<Map<String, dynamic>>> getInstitutionNames() async {
     try {
       final result = await client
           .from('institution')
-          .select('ins_id, insname')
+          .select('ins_id, insname, inslogo')
           .order('insname');
       return List<Map<String, dynamic>>.from(result);
     } catch (e) {
@@ -527,6 +529,33 @@ class SupabaseService {
   }
 
   /// Get distinct class names for an institution
+  /// Map of course → list of classes within that course, derived from
+  /// the live students table. Empty course names map under "Other" so
+  /// nothing is silently dropped.
+  static Future<Map<String, List<String>>> getCourseClassMap(int insId) async {
+    try {
+      final response = await fromSchema('students')
+          .select('courname, stuclass')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1);
+      final map = <String, Set<String>>{};
+      for (final r in response as List) {
+        final cls = r['stuclass']?.toString() ?? '';
+        if (cls.isEmpty) continue;
+        final course = (r['courname']?.toString() ?? '').trim().isEmpty
+            ? 'Other'
+            : r['courname'].toString();
+        map.putIfAbsent(course, () => <String>{}).add(cls);
+      }
+      return {
+        for (final e in map.entries) e.key: (e.value.toList()..sort()),
+      };
+    } catch (e) {
+      debugPrint('Error fetching course/class map: $e');
+      return {};
+    }
+  }
+
   static Future<List<String>> getClasses(int insId) async {
     try {
       final response = await fromSchema('students')
@@ -565,6 +594,33 @@ class SupabaseService {
       return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       debugPrint('Error fetching concessions: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdmissionTypes(int insId) async {
+    try {
+      final response = await fromSchema('admissiontype')
+          .select('adm_id, admname')
+          .eq('activestatus', 1)
+          .order('adm_id', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching admission types: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getQuotas(int insId) async {
+    try {
+      final response = await fromSchema('quota')
+          .select('quo_id, quoname')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .order('quo_id', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching quotas: $e');
       return [];
     }
   }

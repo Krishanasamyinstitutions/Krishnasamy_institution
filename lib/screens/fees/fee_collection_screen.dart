@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 import '../../models/fee_model.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/receipt_widget.dart';
@@ -831,8 +832,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ? _payments.where((p) => _extractDate(p['paydate']) == todayStr).toList()
         : List<Map<String, dynamic>>.from(_payments);
 
-    // Get unique methods and classes for dropdowns (before applying filters)
-    final methods = basePayments.map((p) => p['paymethod']?.toString() ?? 'Unknown').toSet().toList()..sort();
+    // Classes for dropdown (method filter is a fixed Cash/Bank list above,
+    // no longer derived from the payment rows).
     // Get classes from student map via stu_id -> demand stuclass
     final classSet = <String>{};
     for (final p in basePayments) {
@@ -847,7 +848,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     // Apply filters
     final filtered = basePayments.where((p) {
-      if (_collectionMethodFilter != null && (p['paymethod']?.toString() ?? 'Unknown') != _collectionMethodFilter) return false;
+      if (_collectionMethodFilter != null) {
+        final raw = (p['paymethod']?.toString() ?? '').toLowerCase();
+        final bucket = raw == 'cash' ? 'Cash' : 'Bank';
+        if (bucket != _collectionMethodFilter) return false;
+      }
       if (_collectionClassFilter != null) {
         final stuId = p['stu_id'] as int?;
         if (stuId == null) return false;
@@ -972,9 +977,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     icon: AppIcon.linear('Chevron Down', size: 18),
                     isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
-                      ...methods.map((m) => DropdownMenuItem<String?>(value: m, child: Text(m))),
+                    // Cash vs Bank matches the Method-wise Summary grouping.
+                    items: const [
+                      DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                      DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
+                      DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
                     ],
                     onChanged: (v) => setState(() => _collectionMethodFilter = v),
                   ),
@@ -2819,11 +2826,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         value: _dateDrilldownMethodFilter,
                         hint: Text('All Methods', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                         style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                        items: [
-                          const DropdownMenuItem(value: null, child: Text('All Methods')),
-                          ...{for (final p in group.payments) p['paymethod']?.toString() ?? '-'}.map(
-                            (m) => DropdownMenuItem(value: m, child: Text(m)),
-                          ),
+                        // Only Cash vs Bank — matches the Method-wise
+                        // Summary buckets above. Listing raw methods
+                        // (qr_upi, razorpay, cheque…) was confusing for
+                        // accountants who just want cash-hand totals.
+                        items: const [
+                          DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                          DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
+                          DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
                         ],
                         onChanged: (v) => setState(() { _dateDrilldownMethodFilter = v; _dateDrilldownPage = 0; }),
                       ),
@@ -2836,7 +2846,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 LayoutBuilder(builder: (context, constraints) {
                   final searchLower = _dateDrilldownSearch.toLowerCase();
                   final allFiltered = group.payments.where((p) {
-                    if (_dateDrilldownMethodFilter != null && (p['paymethod']?.toString() ?? '-') != _dateDrilldownMethodFilter) return false;
+                    if (_dateDrilldownMethodFilter != null) {
+                      final raw = (p['paymethod']?.toString() ?? '').toLowerCase();
+                      final bucket = raw == 'cash' ? 'Cash' : 'Bank';
+                      if (bucket != _dateDrilldownMethodFilter) return false;
+                    }
                     if (searchLower.isNotEmpty) {
                       final s = p['students'] as Map<String, dynamic>?;
                       final name = (s?['stuname']?.toString() ?? '').toLowerCase();
@@ -3454,7 +3468,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Receipt saved successfully'), backgroundColor: Colors.green));
                           }
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error));
                         }
                       },
                       icon: AppIcon('document-download', size: 18),
@@ -3471,7 +3485,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             name: 'Receipt_${receiptData.receiptNo.replaceAll('/', '_')}',
                           );
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error));
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error));
                         }
                       },
                       icon: AppIcon('printer', size: 18),

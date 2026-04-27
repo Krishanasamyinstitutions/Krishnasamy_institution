@@ -1,24 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 
-import '../../widgets/app_icon.dart';
+class _TealPalette {
+  static const Color dark = Color(0xFF001530);
+  static const Color deep = Color(0xFF002147);
+  static const Color amber = Color(0xFFD2913C);
+  static const Color amberPale = Color(0xFFF0D2A5);
+
+  static const LinearGradient backgroundGradient = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFF002147), Color(0xFF001F42), Color(0xFF00152E)],
+  );
+
+  static const LinearGradient buttonGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE5A85C), Color(0xFFB5752A)],
+  );
+}
+
+class FeatureItem {
+  final String title;
+  final String subtitle;
+  const FeatureItem({required this.title, required this.subtitle});
+}
+
 class OnboardingData {
   final String title;
   final String subtitle;
   final String description;
-  final String icon;
-  final Color iconColor;
-  final List<String> features;
+  final IconData icon;
+  final List<FeatureItem> features;
 
   const OnboardingData({
     required this.title,
     required this.subtitle,
     required this.description,
     required this.icon,
-    required this.iconColor,
     required this.features,
   });
 }
@@ -34,18 +55,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<OnboardingData> _pages = [
+  final List<OnboardingData> _pages = const [
     OnboardingData(
       title: 'Student\nManagement',
       subtitle: 'Organize Everything',
       description:
           'Effortlessly manage student records, admissions, attendance, and academic performance — all from one centralized platform.',
-      icon: 'people',
-      iconColor: AppColors.accent,
+      icon: Icons.people_alt_rounded,
       features: [
-        'Digital Student Profiles',
-        'Attendance Tracking',
-        'Grade Management',
+        FeatureItem(
+          title: 'Digital Student Profiles',
+          subtitle: 'Complete records, photos, and documents in one place',
+        ),
+        FeatureItem(
+          title: 'Attendance Tracking',
+          subtitle: 'Daily attendance with automated reports',
+        ),
+        FeatureItem(
+          title: 'Grade Management',
+          subtitle: 'Track academic performance across terms',
+        ),
       ],
     ),
     OnboardingData(
@@ -53,12 +82,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Streamline Operations',
       description:
           'Manage faculty information, create timetables, assign duties, and track leave requests with intelligent scheduling tools.',
-      icon: 'calendar-1',
-      iconColor: AppColors.secondary,
+      icon: Icons.calendar_month_rounded,
       features: [
-        'Smart Timetables',
-        'Leave Management',
-        'Duty Assignments',
+        FeatureItem(
+          title: 'Smart Timetables',
+          subtitle: 'Auto-generate class schedules effortlessly',
+        ),
+        FeatureItem(
+          title: 'Leave Management',
+          subtitle: 'Approve or decline staff leave requests',
+        ),
+        FeatureItem(
+          title: 'Duty Assignments',
+          subtitle: 'Allocate responsibilities across your team',
+        ),
       ],
     ),
     OnboardingData(
@@ -66,12 +103,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       subtitle: 'Data-Driven Decisions',
       description:
           'Generate comprehensive reports, track performance trends, and gain actionable insights to improve educational outcomes.',
-      icon: 'chart-21',
-      iconColor: AppColors.info,
+      icon: Icons.insights_rounded,
       features: [
-        'Performance Analytics',
-        'Custom Reports',
-        'Trend Visualization',
+        FeatureItem(
+          title: 'Performance Analytics',
+          subtitle: 'Understand student and staff performance trends',
+        ),
+        FeatureItem(
+          title: 'Custom Reports',
+          subtitle: 'Build reports tailored to your institution',
+        ),
+        FeatureItem(
+          title: 'Trend Visualization',
+          subtitle: 'Charts and dashboards that tell the story',
+        ),
       ],
     ),
   ];
@@ -103,189 +148,204 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final isDesktop = size.width > 600;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Stack(
-        children: [
-          // Background decoration
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300.w,
-              height: 300.h,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accent.withValues(alpha: 0.05),
+      backgroundColor: _TealPalette.deep,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: _TealPalette.backgroundGradient,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300.w,
+                height: 300.h,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _TealPalette.amber.withValues(alpha: 0.07),
+                ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: -50,
-            left: -50,
-            child: Container(
-              width: 200.w,
-              height: 200.h,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.secondary.withValues(alpha: 0.05),
+            Positioned(
+              bottom: -50,
+              left: -50,
+              child: Container(
+                width: 200.w,
+                height: 200.h,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _TealPalette.amberPale.withValues(alpha: 0.05),
+                ),
               ),
             ),
-          ),
-
-          // Main content
-          Column(
-            children: [
-              // Top bar
-              Padding(
-                padding:
-                    EdgeInsets.symmetric(horizontal: 32.w, vertical: 24.h),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 32.w,
+                      vertical: 24.h,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 40.w,
-                          height: 40.h,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: AppIcon('teacher',
-                            color: AppColors.accent,
-                            size: 18,
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Text(
-                          'EduDesk',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    TextButton(
-                      onPressed: _skip,
-                      child: Row(
-                        children: [
-                          Text(
-                            'Skip',
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                          ),
-                          SizedBox(width: 4.w),
-                          AppIcon.linear('Chevron Right',
-                            color: AppColors.textSecondary,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Page view
-              Expanded(
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _pages.length,
-                  onPageChanged: (index) {
-                    setState(() => _currentPage = index);
-                  },
-                  itemBuilder: (context, index) {
-                    return _OnboardingPage(
-                      data: _pages[index],
-                      isDesktop: isDesktop,
-                    );
-                  },
-                ),
-              ),
-
-              // Bottom navigation
-              Padding(
-                padding:
-                    EdgeInsets.symmetric(horizontal: 32.w, vertical: 32.h),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Page indicators
-                    Row(
-                      children: List.generate(
-                        _pages.length,
-                        (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: EdgeInsets.only(right: 8.w),
-                          height: 6.h,
-                          width: _currentPage == index ? 32.w : 6.w,
-                          decoration: BoxDecoration(
-                            color: _currentPage == index
-                                ? AppColors.accent
-                                : AppColors.border,
-                            borderRadius: BorderRadius.circular(3.r),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Next button
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: _nextPage,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: EdgeInsets.symmetric(
-                            horizontal:
-                                _currentPage == _pages.length - 1 ? 32.w : 24.w,
-                            vertical: 16.h,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.accentGradient,
-                            borderRadius: BorderRadius.circular(10.r),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
+                        Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12.r),
+                              child: Container(
+                                width: 40.w,
+                                height: 40.h,
+                                color: Colors.white,
+                                padding: EdgeInsets.all(2.w),
+                                child: Image.asset(
+                                  'assets/images/educore360_logo.png',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.school_rounded,
+                                    color: _TealPalette.amber,
+                                    size: 22,
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                            SizedBox(width: 12.w),
+                            Text(
+                              'EduCore360',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ],
+                        ),
+                        TextButton(
+                          onPressed: _skip,
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _currentPage == _pages.length - 1
-                                    ? 'Get Started'
-                                    : 'Next',
+                                'Skip',
                                 style: Theme.of(context)
                                     .textTheme
-                                    .labelLarge
+                                    .bodyLarge
                                     ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
+                                      color: _TealPalette.amberPale,
                                     ),
                               ),
-                              SizedBox(width: 8.w),
-                              AppIcon.linear('Chevron Right',
-                                color: Colors.white,
+                              SizedBox(width: 4.w),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: _TealPalette.amberPale,
                                 size: 20,
                               ),
                             ],
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pageController,
+                      itemCount: _pages.length,
+                      onPageChanged: (index) {
+                        setState(() => _currentPage = index);
+                      },
+                      itemBuilder: (context, index) {
+                        return _OnboardingPage(
+                          data: _pages[index],
+                          isDesktop: isDesktop,
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 32.w,
+                      vertical: 32.h,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: List.generate(
+                            _pages.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: EdgeInsets.only(right: 8.w),
+                              height: 6.h,
+                              width: _currentPage == index ? 32.w : 6.w,
+                              decoration: BoxDecoration(
+                                color: _currentPage == index
+                                    ? _TealPalette.amber
+                                    : Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(3.r),
+                              ),
+                            ),
+                          ),
+                        ),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: _nextPage,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _currentPage == _pages.length - 1
+                                    ? 32.w
+                                    : 24.w,
+                                vertical: 16.h,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: _TealPalette.buttonGradient,
+                                borderRadius: BorderRadius.circular(12.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _TealPalette.amber
+                                        .withValues(alpha: 0.4),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _currentPage == _pages.length - 1
+                                        ? 'Get Started'
+                                        : 'Next',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -304,7 +364,6 @@ class _OnboardingPage extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 64.w),
         child: Row(
           children: [
-            // Left: illustration
             Expanded(
               flex: 5,
               child: FadeInLeft(
@@ -313,7 +372,6 @@ class _OnboardingPage extends StatelessWidget {
               ),
             ),
             SizedBox(width: 64.w),
-            // Right: content
             Expanded(
               flex: 5,
               child: FadeInRight(
@@ -351,17 +409,23 @@ class _OnboardingPage extends StatelessWidget {
         width: 280.w,
         height: 280.h,
         decoration: BoxDecoration(
-          color: data.iconColor.withValues(alpha: 0.08),
+          color: _TealPalette.dark.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(40.r),
           border: Border.all(
-            color: data.iconColor.withValues(alpha: 0.15),
+            color: _TealPalette.amber.withValues(alpha: 0.25),
             width: 2,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: _TealPalette.amber.withValues(alpha: 0.15),
+              blurRadius: 40,
+              spreadRadius: 4,
+            ),
+          ],
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Background decorative circles
             Positioned(
               top: 30,
               right: 30,
@@ -369,7 +433,7 @@ class _OnboardingPage extends StatelessWidget {
                 width: 40.w,
                 height: 40.h,
                 decoration: BoxDecoration(
-                  color: data.iconColor.withValues(alpha: 0.1),
+                  color: _TealPalette.amber.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -381,15 +445,15 @@ class _OnboardingPage extends StatelessWidget {
                 width: 24.w,
                 height: 24.h,
                 decoration: BoxDecoration(
-                  color: data.iconColor.withValues(alpha: 0.15),
+                  color: _TealPalette.amberPale.withValues(alpha: 0.25),
                   shape: BoxShape.circle,
                 ),
               ),
             ),
-            AppIcon(
+            Icon(
               data.icon,
               size: 100.sp,
-              color: data.iconColor,
+              color: _TealPalette.amber,
             ),
           ],
         ),
@@ -402,77 +466,119 @@ class _OnboardingPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Subtitle chip
         Container(
           padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
           decoration: BoxDecoration(
-            color: data.iconColor.withValues(alpha: 0.1),
+            color: _TealPalette.amber.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20.r),
+            border: Border.all(
+              color: _TealPalette.amber.withValues(alpha: 0.4),
+            ),
           ),
           child: Text(
             data.subtitle,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: data.iconColor,
+                  color: _TealPalette.amber,
                   fontWeight: FontWeight.w600,
                   fontSize: 13.sp,
                 ),
           ),
         ),
-
         SizedBox(height: 20.h),
-
-        // Title
         Text(
           data.title,
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 height: 1.2,
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
         ),
-
         SizedBox(height: 16.h),
-
-        // Description
         Text(
           data.description,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 height: 1.6,
-                color: AppColors.textSecondary,
+                color: Colors.white.withValues(alpha: 0.75),
               ),
         ),
-
-        SizedBox(height: 32.h),
-
-        // Feature list
+        SizedBox(height: 28.h),
         ...data.features.map(
           (feature) => Padding(
             padding: EdgeInsets.only(bottom: 12.h),
-            child: Row(
-              children: [
-                Container(
-                  width: 28.w,
-                  height: 28.h,
-                  decoration: BoxDecoration(
-                    color: data.iconColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: AppIcon('tick-circle',
-                    color: data.iconColor,
-                    size: 16,
-                  ),
+            child: _FeatureCard(item: feature),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureCard extends StatelessWidget {
+  final FeatureItem item;
+  const _FeatureCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: _TealPalette.dark.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(
+          color: _TealPalette.amber.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 38.w,
+            height: 38.h,
+            decoration: BoxDecoration(
+              color: _TealPalette.amber,
+              borderRadius: BorderRadius.circular(10.r),
+              boxShadow: [
+                BoxShadow(
+                  color: _TealPalette.amber.withValues(alpha: 0.45),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                SizedBox(width: 12.w),
+              ],
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  feature,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
+                  item.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15.sp,
                       ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    color: _TealPalette.amberPale.withValues(alpha: 0.8),
+                    fontSize: 13.sp,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
