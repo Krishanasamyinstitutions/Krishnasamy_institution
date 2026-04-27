@@ -280,11 +280,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Without this the sidebar badge counted student notifications too,
       // showing 73 while the screen actually displays a much smaller list.
       final rows = await SupabaseService.fromSchema('notification')
-          .select('isread')
+          .select('notititle, notibody, notitype, isread')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
           .isFilter('stu_id', null);
-      final unread = (rows as List).where((n) => n['isread'] != true && n['isread'] != 1).length;
+      // Group by title+body+type. If ANY row in a group is read, the whole
+      // group is treated as read — matches the dedupe behavior on the
+      // notifications screen and keeps the badge in sync after the user
+      // opens a notification.
+      final allKeys = <String>{};
+      final readKeys = <String>{};
+      for (final n in (rows as List)) {
+        final key = '${n['notititle']}|${n['notibody']}|${n['notitype']}';
+        allKeys.add(key);
+        if (n['isread'] == true || n['isread'] == 1) {
+          readKeys.add(key);
+        }
+      }
+      final unread = allKeys.length - readKeys.length;
       if (mounted) setState(() => _unreadNotifCount = unread);
     } catch (_) {}
   }

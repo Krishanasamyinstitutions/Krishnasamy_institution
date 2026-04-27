@@ -152,7 +152,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final insId = auth.insId;
     if (insId == null) return;
     try {
-      // Mark all duplicates with same title+body+type as read
+      // Always mark the tapped row by its noti_id first — this guarantees
+      // the row the user actually opened is marked read even if its
+      // title/body/type are NULL or differ from siblings.
+      final notiId = notif['noti_id'];
+      if (notiId != null) {
+        await SupabaseService.fromSchema('notification')
+            .update({'isread': 1})
+            .eq('noti_id', notiId)
+            .eq('ins_id', insId);
+      }
+      // Also mark all duplicates with same title+body+type so the list
+      // doesn't show the same item again as unread on next fetch.
       var query = SupabaseService.fromSchema('notification').update({'isread': 1}).eq('ins_id', insId).eq('activestatus', 1);
       final title = notif['notititle']?.toString();
       final body = notif['notibody']?.toString();
