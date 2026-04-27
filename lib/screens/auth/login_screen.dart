@@ -84,10 +84,27 @@ class _LoginScreenState extends State<LoginScreen> {
         seen.add(label);
         years.add(y);
       }
+      // Default the dropdown to the year whose [iyrstadate, iyrenddate]
+      // contains today. Prevents accountants from silently logging into a
+      // past year and posting fees to the wrong schema. They can still
+      // pick historical years from the dropdown to view old data.
+      final today = DateTime.now();
+      String? currentYearLabel;
+      for (final y in years) {
+        final start = DateTime.tryParse(y['iyrstadate']?.toString() ?? '');
+        final end = DateTime.tryParse(y['iyrenddate']?.toString() ?? '');
+        if (start == null || end == null) continue;
+        final endInclusive = DateTime(end.year, end.month, end.day, 23, 59, 59);
+        if (!today.isBefore(start) && !today.isAfter(endInclusive)) {
+          currentYearLabel = y['yrlabel']?.toString();
+          break;
+        }
+      }
       if (mounted) {
         setState(() {
           _availableYears = years;
-          _selectedYear = years.isNotEmpty ? years.first['yrlabel']?.toString() : null;
+          _selectedYear = currentYearLabel
+              ?? (years.isNotEmpty ? years.first['yrlabel']?.toString() : null);
           _loadingYears = false;
         });
       }
@@ -186,16 +203,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInLeft(
-                    child: Container(
-                      width: 80.w,
-                      height: 80.h,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(22.r),
-                      ),
-                      child: AppIcon('teacher',
-                        size: 40.sp,
-                        color: AppColors.accent,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22.r),
+                      child: Container(
+                        width: 80.w,
+                        height: 80.h,
+                        color: Colors.white,
+                        padding: EdgeInsets.all(8.w),
+                        child: Image.asset(
+                          'assets/images/educore360_logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => AppIcon('teacher',
+                            size: 40.sp,
+                            color: AppColors.accent,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -203,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   FadeInLeft(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
-                      'Welcome to\nEduDesk',
+                      'Welcome to\nEduCore360',
                       textAlign: TextAlign.center,
                       style:
                           Theme.of(context).textTheme.displayMedium?.copyWith(

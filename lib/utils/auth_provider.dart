@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 import '../models/institution_user_model.dart';
@@ -8,6 +9,12 @@ const _kPassword = 'saved_password';
 const _kInsId = 'saved_ins_id';
 const _kIsSuperAdmin = 'saved_is_super_admin';
 const _kSchema = 'saved_schema';
+
+// Password is kept in the OS secure store (Keychain / Keystore / DPAPI /
+// libsecret). Other non-sensitive fields stay in SharedPreferences.
+const _secureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+);
 
 class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
@@ -89,9 +96,10 @@ class AuthProvider extends ChangeNotifier {
             final shortName = (insRow['inshortname'] as String).toLowerCase();
             _schema = '$shortName${selectedYear.replaceAll('-', '')}';
             SupabaseService.setSchema(_schema);
-
-            // Auto-expose all schemas (handles DB restarts)
-            try { await SupabaseService.client.rpc('expose_all_schemas'); } catch (_) {}
+            // Schema exposure used to run here on every login — moved to the
+            // registration flow only, so we don't hit the RPC thousands of
+            // times/day for schemas that are already exposed. If a schema
+            // isn't exposed PostgREST will surface a clear PGRST106 error.
           }
           notifyListeners();
         }
@@ -146,7 +154,14 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> tryAutoLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString(_kEmail);
-    final password = prefs.getString(_kPassword);
+    // One-time migration: old builds stored the password in SharedPreferences.
+    // Move it to secure storage and wipe the plaintext copy.
+    final legacyPassword = prefs.getString(_kPassword);
+    if (legacyPassword != null) {
+      await _secureStorage.write(key: _kPassword, value: legacyPassword);
+      await prefs.remove(_kPassword);
+    }
+    final password = await _secureStorage.read(key: _kPassword);
     final insId = prefs.getInt(_kInsId);
     final isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
     if (email == null || password == null) return false;
@@ -157,7 +172,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> saveCredentials(String email, String password, {int? insId, bool isSuperAdmin = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kEmail, email);
-    await prefs.setString(_kPassword, password);
+    await _secureStorage.write(key: _kPassword, value: password);
     await prefs.setBool(_kIsSuperAdmin, isSuperAdmin);
     if (insId != null) {
       await prefs.setInt(_kInsId, insId);
@@ -171,9 +186,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> clearCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kEmail);
-    await prefs.remove(_kPassword);
+    await prefs.remove(_kPassword); // remove any legacy plaintext copy too
     await prefs.remove(_kInsId);
     await prefs.remove(_kSchema);
+    await _secureStorage.delete(key: _kPassword);
   }
 
   Future<void> logout() async {

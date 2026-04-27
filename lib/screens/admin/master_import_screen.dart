@@ -376,8 +376,8 @@ Widget _buildImportCard({
             SizedBox(width: 12.w),
             ElevatedButton.icon(
               onPressed: onBrowse,
-              icon: AppIcon('folder-open', size: 16),
-              label: const Text('Browse'),
+              icon: AppIcon('document-upload', size: 16),
+              label: const Text('Import'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
@@ -605,7 +605,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Course Name *', 'Order'];
+  static const _headers = ['Course ID *', 'Course Name *', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -624,9 +624,9 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId).order('ordid');
+      final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId).order('cour_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['courname'] ?? '', r['ordid']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['cour_id']?.toString() ?? '', r['courname'] ?? '', r['ordid']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -637,15 +637,34 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
   void _validate() {
     final rowErrs = <int, String>{};
     for (int i = 0; i < _rows.length; i++) {
-      final name = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final idRaw = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final name = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      if (idRaw.isEmpty || int.tryParse(idRaw) == null) { rowErrs[i] = 'Invalid Course ID'; continue; }
       if (name.isEmpty) rowErrs[i] = 'Missing: Course Name';
     }
     setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
@@ -666,17 +685,20 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     final insId = auth.insId ?? 0;
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     for (final row in _rows) {
-      if (row.isEmpty || row[0].toString().trim().isEmpty) { _skipped++; continue; }
+      if (row.length < 2 || row[1].toString().trim().isEmpty) { _skipped++; continue; }
       try {
+        final courId = int.tryParse(row[0].toString().trim());
+        if (courId == null) { _skipped++; _errors.add('Row with name ${row[1]}: invalid Course ID'); continue; }
         await SupabaseService.fromSchema('course').insert({
-          'courname': row[0].toString().trim(),
-          'ordid': row.length > 1 ? int.tryParse(row[1].toString().trim()) : null,
+          'cour_id': courId,
+          'courname': row[1].toString().trim(),
+          'ordid': row.length > 2 ? int.tryParse(row[2].toString().trim()) : null,
           'ins_id': insId,
         });
         _imported++;
       } catch (e) {
         _skipped++;
-        _errors.add('${row[0]}: ${_friendlyError(e.toString())}');
+        _errors.add('${row[1]}: ${_friendlyError(e.toString())}');
       }
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
@@ -706,7 +728,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Course Name', 'Order'],
+      existingHeaders: const ['Course ID', 'Course Name', 'Order'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -731,7 +753,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Class Name *', 'Course *', 'Order'];
+  static const _headers = ['Class ID *', 'Class Name *', 'Course *', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -752,9 +774,9 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     try {
       final courses = await SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId);
       final courseMap = { for (final c in courses as List) c['cour_id'] as int: c['courname']?.toString() ?? '' };
-      final rows = await SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('ordid');
+      final rows = await SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('cla_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['claname'] ?? '', courseMap[r['cour_id']] ?? '${r['cour_id'] ?? ''}', r['ordid']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['cla_id']?.toString() ?? '', r['claname'] ?? '', courseMap[r['cour_id']] ?? '${r['cour_id'] ?? ''}', r['ordid']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -765,8 +787,25 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
@@ -774,8 +813,10 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     final rowErrs = <int, String>{};
     for (int i = 0; i < _rows.length; i++) {
       final missing = <String>[];
-      final name = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
-      final course = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      final idRaw = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      final name = _rows[i].length > 1 ? _rows[i][1]?.toString().trim() ?? '' : '';
+      final course = _rows[i].length > 2 ? _rows[i][2]?.toString().trim() ?? '' : '';
+      if (idRaw.isEmpty || int.tryParse(idRaw) == null) { rowErrs[i] = 'Invalid Class ID'; continue; }
       if (name.isEmpty) missing.add('Class Name');
       if (course.isEmpty) missing.add('Course');
       if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
@@ -798,22 +839,25 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     final insId = auth.insId ?? 0;
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     for (final row in _rows) {
-      if (row.length < 2 || row[0].toString().trim().isEmpty) { _skipped++; continue; }
+      if (row.length < 3 || row[1].toString().trim().isEmpty) { _skipped++; continue; }
       try {
-        final courseName = row[1].toString().trim();
+        final claId = int.tryParse(row[0].toString().trim());
+        if (claId == null) { _skipped++; _errors.add('Row: invalid Class ID'); continue; }
+        final courseName = row[2].toString().trim();
         final courseResult = await SupabaseService.fromSchema('course')
             .select('cour_id').eq('ins_id', insId).ilike('courname', courseName).limit(1).maybeSingle();
-        if (courseResult == null) { _skipped++; _errors.add('${row[0]}: Course "$courseName" not found'); continue; }
+        if (courseResult == null) { _skipped++; _errors.add('${row[1]}: Course "$courseName" not found'); continue; }
         await SupabaseService.fromSchema('class').insert({
-          'claname': row[0].toString().trim(),
+          'cla_id': claId,
+          'claname': row[1].toString().trim(),
           'cour_id': courseResult['cour_id'],
-          'ordid': row.length > 2 ? int.tryParse(row[2].toString().trim()) : null,
+          'ordid': row.length > 3 ? int.tryParse(row[3].toString().trim()) : null,
           'ins_id': insId,
         });
         _imported++;
       } catch (e) {
         _skipped++;
-        _errors.add('${row[0]}: ${_friendlyError(e.toString())}');
+        _errors.add('${row[1]}: ${_friendlyError(e.toString())}');
       }
     }
     setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
@@ -841,7 +885,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class Name', 'Course', 'Order'],
+      existingHeaders: const ['Class ID', 'Class Name', 'Course', 'Order'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -864,7 +908,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Group Name *', 'Year *'];
+  static const _headers = ['Fee Group ID *', 'Group Name *', 'Year *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -885,7 +929,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     try {
       final groups = await SupabaseService.getFeeGroups(insId);
       if (mounted) setState(() {
-        _existingRows = groups.map((g) => [g['fgdesc'] ?? '', g['yrlabel'] ?? '']).toList();
+        _existingRows = groups.map((g) => [g['fg_id']?.toString() ?? '', g['fgdesc'] ?? '', g['yrlabel'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -896,8 +940,25 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
@@ -930,7 +991,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      final result = await _stagingImport(insId: insId, impType: 'FEEGROUP', rows: _rows, colCount: 2);
+      final result = await _stagingImport(insId: insId, impType: 'FEEGROUP', rows: _rows, colCount: 3);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEEGROUP');
@@ -954,10 +1015,10 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Group', _headers),
       onSampleDownload: () => _exportSampleData('Fee Group', _headers, [
-        ['SCHOOL FEES', '2025-2026'],
-        ['VAN FEES', '2025-2026'],
-        ['HOSTEL FEES', '2025-2026'],
-        ['EXAM FEES', '2025-2026'],
+        ['1', 'SCHOOL FEES', '2025-2026'],
+        ['2', 'VAN FEES', '2025-2026'],
+        ['3', 'HOSTEL FEES', '2025-2026'],
+        ['4', 'EXAM FEES', '2025-2026'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -965,7 +1026,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Group Name', 'Year'],
+      existingHeaders: const ['Fee Group ID', 'Group Name', 'Year'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -991,7 +1052,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *', 'Fine Applicable *'];
+  static const _headers = ['Fee ID *', 'Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Optional *', 'Category *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1014,11 +1075,12 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       if (feeGroups.isEmpty) { if (mounted) setState(() => _isLoadingExisting = false); return; }
       final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
       final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
-      final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id');
+      final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id', ascending: true);
       if (mounted) setState(() {
         const fineLabels = {'1': 'Yes', '0': 'No'};
         _existingRows = (types as List).map((t) {
           return [
+            t['fee_id']?.toString() ?? '',
             t['feedesc'] ?? '',
             t['feeshort'] ?? '',
             fgNameMap[t['fg_id']] ?? '',
@@ -1038,8 +1100,25 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
@@ -1073,14 +1152,15 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       const fineMap = {'yes': '1', 'y': '1', 'true': '1', '1': '1', 'no': '0', 'n': '0', 'false': '0', '0': '0', '': '0'};
       final mappedRows = _rows.map((row) {
         final mapped = List<dynamic>.from(row);
-        while (mapped.length < 7) {
+        while (mapped.length < 8) {
           mapped.add('');
         }
-        final fine = mapped[6].toString().trim().toLowerCase();
-        mapped[6] = fineMap[fine] ?? mapped[6];
+        // Fine Applicable is now col 8 (index 7) after prepending Fee ID.
+        final fine = mapped[7].toString().trim().toLowerCase();
+        mapped[7] = fineMap[fine] ?? mapped[7];
         return mapped;
       }).toList();
-      final result = await _stagingImport(insId: insId, impType: 'FEETYPE', rows: mappedRows, colCount: 7);
+      final result = await _stagingImport(insId: insId, impType: 'FEETYPE', rows: mappedRows, colCount: 8);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'FEETYPE');
@@ -1104,10 +1184,10 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Fee Type', _headers),
       onSampleDownload: () => _exportSampleData('Fee Type', _headers, [
-        ['SCHOOL FEES', 'SCH', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
-        ['VAN FEES', 'VAN', 'VAN FEES', '2025-2026', '1', '1', 'No'],
-        ['TUITION FEES', 'TUI', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
-        ['BOOK FEES', 'BK', 'SCHOOL FEES', '2025-2026', '0', '1', 'No'],
+        ['1', 'SCHOOL FEES', 'SCH', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
+        ['2', 'VAN FEES', 'VAN', 'VAN FEES', '2025-2026', '1', '1', 'No'],
+        ['3', 'TUITION FEES', 'TUI', 'SCHOOL FEES', '2025-2026', '0', '1', 'Yes'],
+        ['4', 'BOOK FEES', 'BK', 'SCHOOL FEES', '2025-2026', '0', '1', 'No'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -1115,7 +1195,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Optional', 'Category', 'Fine Applicable'],
+      existingHeaders: const ['Fee ID', 'Fee Name', 'Short Name', 'Fee Group', 'Year', 'Optional', 'Category', 'Fine Applicable'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1141,7 +1221,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Concession Name *'];
+  static const _headers = ['Concession ID *', 'Concession Name *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1162,7 +1242,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     try {
       final concessions = await SupabaseService.getConcessions(insId);
       if (mounted) setState(() {
-        _existingRows = concessions.map((c) => [c['condesc'] ?? '']).toList();
+        _existingRows = concessions.map((c) => [c['con_id']?.toString() ?? '', c['condesc'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -1173,8 +1253,25 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
@@ -1205,7 +1302,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final insId = auth.insId ?? 0;
     try {
-      final result = await _stagingImport(insId: insId, impType: 'CONCESSION', rows: _rows, colCount: 1);
+      final result = await _stagingImport(insId: insId, impType: 'CONCESSION', rows: _rows, colCount: 2);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CONCESSION');
@@ -1229,10 +1326,10 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Concession', _headers),
       onSampleDownload: () => _exportSampleData('Concession', _headers, [
-        ['SC/ST'],
-        ['Staff Children'],
-        ['Merit Scholarship'],
-        ['Sibling Discount'],
+        ['1', 'SC/ST'],
+        ['2', 'Staff Children'],
+        ['3', 'Merit Scholarship'],
+        ['4', 'Sibling Discount'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -1240,7 +1337,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Concession Name'],
+      existingHeaders: const ['Concession ID', 'Concession Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1266,7 +1363,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'Admission Type *'];
+  static const _headers = ['CF ID *', 'Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'Admission Type *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -1297,6 +1394,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
         });
         const admTypeLabels = {'1': 'New', '2': 'Old', '3': 'Both'};
         _existingRows = sorted.map((r) => [
+          r['cf_id']?.toString() ?? '',
           r['cfclass'] ?? '',
           r['cfterm'] ?? '',
           r['cffeetype'] ?? '',
@@ -1314,17 +1412,36 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
   void _validate() {
     final rowErrs = <int, String>{};
-    final labels = ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'];
+    final labels = ['CF ID', 'Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'];
     for (int i = 0; i < _rows.length; i++) {
+      final idRaw = _rows[i].isNotEmpty ? _rows[i][0]?.toString().trim() ?? '' : '';
+      if (idRaw.isEmpty || int.tryParse(idRaw) == null) { rowErrs[i] = 'Invalid CF ID'; continue; }
       final missing = <String>[];
-      for (int j = 0; j < labels.length; j++) {
+      for (int j = 1; j < labels.length; j++) {
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
@@ -1349,12 +1466,13 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       const admTypeMap = {'new': '1', 'old': '2', 'both': '3', '1': '1', '2': '2', '3': '3'};
       final mappedRows = _rows.map((row) {
         final mapped = List<dynamic>.from(row);
-        while (mapped.length < 6) mapped.add('');
-        final adm = mapped[5].toString().trim().toLowerCase();
-        mapped[5] = admTypeMap[adm] ?? mapped[5];
+        while (mapped.length < 7) mapped.add('');
+        // Admission Type is now col 7 (index 6) after prepending CF ID.
+        final adm = mapped[6].toString().trim().toLowerCase();
+        mapped[6] = admTypeMap[adm] ?? mapped[6];
         return mapped;
       }).toList();
-      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: mappedRows, colCount: 6);
+      final result = await _stagingImport(insId: insId, impType: 'CLASSFEEDEMAND', rows: mappedRows, colCount: 7);
       _imported = result['imported'] ?? 0;
       _skipped = result['skipped'] ?? 0;
       if (_skipped > 0) _errors = await _getImportErrors(insId, 'CLASSFEEDEMAND');
@@ -1378,10 +1496,10 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Class Fee Demand', _headers),
       onSampleDownload: () => _exportSampleData('Class Fee Demand', _headers, [
-        ['I', 'I TERM', 'SCHOOL FEES', '10080', '2025-05-31', 'Both'],
-        ['I', 'JUNE', 'TUITION FEES', '700', '2025-06-30', 'Both'],
-        ['XII', 'I TERM', 'SCHOOL FEES', '15410', '2025-05-31', 'Both'],
-        ['XII', 'JUNE', 'VAN FEES', '810', '2025-06-30', 'Both'],
+        ['1', 'I', 'I TERM', 'SCHOOL FEES', '10080', '2025-05-31', 'Both'],
+        ['2', 'I', 'JUNE', 'TUITION FEES', '700', '2025-06-30', 'Both'],
+        ['3', 'XII', 'I TERM', 'SCHOOL FEES', '15410', '2025-05-31', 'Both'],
+        ['4', 'XII', 'JUNE', 'VAN FEES', '810', '2025-06-30', 'Both'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -1389,7 +1507,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
+      existingHeaders: const ['CF ID', 'Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1468,7 +1586,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
     if (auth.insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.fromSchema('admissiontype').select('adm_id, admname').eq('activestatus', 1).order('adm_id');
+      final rows = await SupabaseService.fromSchema('admissiontype').select('adm_id, admname').eq('activestatus', 1).order('adm_id', ascending: true);
       if (mounted) setState(() {
         _existingRows = (rows as List).map((r) => [r['adm_id']?.toString() ?? '', r['admname']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
@@ -1481,8 +1599,25 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
@@ -1580,7 +1715,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.fromSchema('quota').select('quo_id, quoname').eq('ins_id', insId).eq('activestatus', 1).order('quo_id');
+      final rows = await SupabaseService.fromSchema('quota').select('quo_id, quoname').eq('ins_id', insId).eq('activestatus', 1).order('quo_id', ascending: true);
       if (mounted) setState(() {
         _existingRows = (rows as List).map((r) => [r['quo_id']?.toString() ?? '', r['quoname']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
@@ -1593,8 +1728,25 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
   Future<void> _browse() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls', 'csv']);
     if (result == null) return;
-    final parsed = _parseExcel(result.files.single.path!);
-    if (parsed.length < 2) return;
+    List<List<dynamic>> parsed;
+    try {
+      parsed = _parseExcel(result.files.single.path!);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (parsed.length < 2) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File has no data rows. Add at least one row below the header.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
     setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
   }
 
