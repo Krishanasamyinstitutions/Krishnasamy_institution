@@ -832,11 +832,15 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ? _payments.where((p) => _extractDate(p['paydate']) == todayStr).toList()
         : List<Map<String, dynamic>>.from(_payments);
 
-    // Classes for dropdown (method filter is a fixed Cash/Bank list above,
-    // no longer derived from the payment rows).
-    // Get classes from student map via stu_id -> demand stuclass
+    // Method filter is a fixed Cash/Bank list (hardcoded in the dropdown
+    // items below). Classes are pulled from all demands so the filter is
+    // populated even on a day with no collections.
     final classSet = <String>{};
-    for (final p in basePayments) {
+    for (final d in _demands) {
+      final cls = d['stuclass']?.toString();
+      if (cls != null && cls.isNotEmpty) classSet.add(cls);
+    }
+    for (final p in _payments) {
       final stuId = p['stu_id'] as int?;
       if (stuId != null) {
         final demand = _demands.firstWhere((d) => d['stu_id'] == stuId, orElse: () => {});
