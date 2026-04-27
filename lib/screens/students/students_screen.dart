@@ -47,6 +47,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
   List<String> _classes = [];
   String? _selectedConId;
   List<Map<String, dynamic>> _concessions = [];
+  String? _selectedAdmName;
+  List<Map<String, dynamic>> _admissionTypes = [];
+  String? _selectedQuoName;
+  List<Map<String, dynamic>> _quotas = [];
+  final _batchController = TextEditingController();
   String? _photoUrl;
   String? _insName;
   String? _insLogo;
@@ -68,6 +73,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
   final _payMobileController = TextEditingController();
 
   bool _isUploadingPhoto = false;
+  bool _isImportingPhotos = false;
+  int _photoUploadDone = 0;
+  int _photoUploadTotal = 0;
   bool _isFormEnabled = true;
   List<StudentModel> _students = [];
   Map<String, int> _classCounts = {};
@@ -208,6 +216,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _guardianOccController.dispose();
     _payNameController.dispose();
     _payMobileController.dispose();
+    _batchController.dispose();
     _searchController.dispose();
     _globalSearchController.dispose();
     super.dispose();
@@ -255,6 +264,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       SupabaseService.getClasses(insId),
       SupabaseService.getInstitutionInfo(insId),
       SupabaseService.getStudentCountsByClass(insId),
+      SupabaseService.getAdmissionTypes(insId),
+      SupabaseService.getQuotas(insId),
     ]);
 
     if (!mounted) return;
@@ -263,6 +274,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final rawClasses = results[2] as List<String>;
     final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
     final classCounts = results[4] as Map<String, int>;
+    final admissionTypes = results[5] as List<Map<String, dynamic>>;
+    final quotas = results[6] as List<Map<String, dynamic>>;
     final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
     final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
 
@@ -270,6 +283,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
     setState(() {
       _years = years;
       _concessions = concessions;
+      _admissionTypes = admissionTypes;
+      _quotas = quotas;
       _classes = allClasses;
       _classCounts = classCounts;
       _insName = insInfo.name;
@@ -336,11 +351,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _guardianOccController.clear();
     _payNameController.clear();
     _payMobileController.clear();
+    _batchController.clear();
     setState(() {
       _selectedGender = null;
       _selectedBloodGroup = null;
       _selectedClass = null;
       _selectedConId = null;
+      _selectedAdmName = null;
+      _selectedQuoName = null;
       _admDate = null;
       _dob = null;
       _photoUrl = null;
@@ -361,6 +379,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _stateController.text = clean(s.stustate);
     _countryController.text = clean(s.stucountry);
     _pinController.text = clean(s.stupin);
+    _batchController.text = clean(s.batch);
 
     // Fetch parent data
     final parent = await SupabaseService.getStudentParent(s.stuId);
@@ -384,6 +403,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _selectedBloodGroup = _normalizeBloodGroup(s.stubloodgrp);
       _selectedClass = s.stuclass;
       _selectedConId = s.conId?.toString();
+      _selectedAdmName = s.admname;
+      _selectedQuoName = s.quoname;
       _admDate = s.stuadmdate;
       _dob = s.studob;
       _photoUrl = s.stuphoto;
@@ -412,11 +433,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _guardianOccController.clear();
     _payNameController.clear();
     _payMobileController.clear();
+    _batchController.clear();
     setState(() {
       _selectedGender = null;
       _selectedBloodGroup = null;
       _selectedClass = null;
       _selectedConId = null;
+      _selectedAdmName = null;
+      _selectedQuoName = null;
       _admDate = null;
       _dob = null;
       _photoUrl = null;
@@ -473,6 +497,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'stuclass': _selectedClass,
         'con_id': _selectedConId != null ? int.tryParse(_selectedConId!) : null,
         'stucondesc': _selectedConId != null ? _concessions.firstWhere((c) => c['con_id'].toString() == _selectedConId, orElse: () => {})['condesc'] : null,
+        'admname': _selectedAdmName,
+        'quoname': _selectedQuoName,
+        'batch': _batchController.text.trim().isNotEmpty ? _batchController.text.trim() : null,
         'stuphoto': _photoUrl,
         'stuser_id': _admNoController.text.trim(),
         'stuotpstatus': 0,
@@ -559,11 +586,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  // Per-institution bucket name. Each institution gets its own bucket
+  // (student-photos-kcet, student-photos-kcsam, …) so quotas / deletion
+  // are isolated per school.
+  String _photoBucket(String inscode) => 'student-photos-${inscode.toLowerCase()}';
+
   Future<void> _uploadPhoto() async {
     final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
     if (file.bytes == null) return;
+
+    final auth = context.read<AuthProvider>();
+    final inscode = auth.inscode ?? 'ins';
 
     setState(() => _isUploadingPhoto = true);
     try {
@@ -573,11 +608,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif',
       };
       final mimeType = mimeMap[ext] ?? 'image/jpeg';
+      final bucket = _photoBucket(inscode);
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
-      await SupabaseService.client.storage.from('student-photos').uploadBinary(
+      await SupabaseService.client.storage.from(bucket).uploadBinary(
         fileName, file.bytes!, fileOptions: FileOptions(contentType: mimeType),
       );
-      final url = SupabaseService.client.storage.from('student-photos').getPublicUrl(fileName);
+      final url = SupabaseService.client.storage.from(bucket).getPublicUrl(fileName);
       if (mounted) setState(() => _photoUrl = url);
     } catch (e) {
       if (mounted) {
@@ -587,6 +623,162 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  /// Bulk-upload student photos by filename convention:
+  /// the file's stem (e.g. "6522" in "6522.jpg") is treated as the Roll No
+  /// (stuadmno) and matched against the already-loaded students list for
+  /// this institution. Each matched student's stuphoto URL is updated.
+  /// Unmatched filenames are reported to the admin so they can fix the
+  /// mismatches on the next pass.
+  Future<void> _bulkImportPhotos() async {
+    // Pick a FOLDER (Windows desktop). The app then enumerates every image
+    // file inside and uploads them — much faster than Ctrl+A in the file
+    // picker when a school has hundreds of photos.
+    final folderPath = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Select folder of photos named by Roll No (e.g. 6522.jpg)',
+    );
+    if (folderPath == null) return;
+
+    const imageExts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'};
+    List<File> imageFiles;
+    try {
+      final dir = Directory(folderPath);
+      imageFiles = dir
+          .listSync(recursive: false)
+          .whereType<File>()
+          .where((f) {
+            final name = f.path.toLowerCase();
+            final dot = name.lastIndexOf('.');
+            if (dot < 0) return false;
+            return imageExts.contains(name.substring(dot));
+          })
+          .toList();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not read folder: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (imageFiles.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No image files found in that folder'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final inscode = auth.inscode ?? 'ins';
+    if (insId == null) return;
+
+    // Build a Roll No → stu_id lookup from the already-loaded students list.
+    // Case-insensitive match so "6522.jpg" and "6522.JPG" both work.
+    final rollToStuId = <String, int>{
+      for (final s in _students) s.stuadmno.toLowerCase(): s.stuId,
+    };
+
+    final successes = <String>[];
+    final unmatched = <String>[];
+    final failed = <String>[];
+
+    setState(() {
+      _isImportingPhotos = true;
+      _photoUploadDone = 0;
+      _photoUploadTotal = imageFiles.length;
+    });
+
+    const mimeMap = {
+      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+      'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif',
+    };
+
+    for (final file in imageFiles) {
+      final fileName = file.path.split(Platform.pathSeparator).last;
+      try {
+        final dot = fileName.lastIndexOf('.');
+        final stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+        final ext = dot > 0 ? fileName.substring(dot + 1).toLowerCase() : 'jpg';
+        final roll = stem.trim().toLowerCase();
+        final stuId = rollToStuId[roll];
+        if (stuId == null) {
+          unmatched.add(fileName);
+          continue;
+        }
+        final bytes = await file.readAsBytes();
+        final mimeType = mimeMap[ext] ?? 'image/jpeg';
+        // Per-institution bucket (student-photos-<inscode>); upsert so
+        // re-uploading a photo for the same Roll No overwrites cleanly.
+        final bucket = _photoBucket(inscode);
+        final path = '$roll.$ext';
+        await SupabaseService.client.storage.from(bucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mimeType, upsert: true),
+        );
+        final url = SupabaseService.client.storage.from(bucket).getPublicUrl(path);
+        await SupabaseService.fromSchema('students')
+            .update({'stuphoto': url})
+            .eq('stu_id', stuId)
+            .eq('ins_id', insId);
+        successes.add(fileName);
+      } catch (e) {
+        failed.add('$fileName: ${e.toString()}');
+      } finally {
+        if (mounted) setState(() => _photoUploadDone++);
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isImportingPhotos = false);
+      // Refresh the students list so new stuphoto URLs show in cards.
+      final refreshed = await SupabaseService.getStudents(insId);
+      if (mounted) setState(() => _students = refreshed);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Photo import complete'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Uploaded: ${successes.length}',
+                      style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 14.sp)),
+                  if (unmatched.isNotEmpty) ...[
+                    SizedBox(height: 8.h),
+                    Text('Unmatched (${unmatched.length}) — no student with this Roll No:',
+                        style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 13.sp)),
+                    for (final n in unmatched.take(20))
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('• $n', style: TextStyle(fontSize: 12.sp))),
+                    if (unmatched.length > 20)
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('… and ${unmatched.length - 20} more', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic))),
+                  ],
+                  if (failed.isNotEmpty) ...[
+                    SizedBox(height: 8.h),
+                    Text('Failed (${failed.length}):',
+                        style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 13.sp)),
+                    for (final n in failed.take(10))
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('• $n', style: TextStyle(fontSize: 12.sp))),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+        ),
+      );
     }
   }
 
@@ -962,6 +1154,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
+                  onPressed: _isImportingPhotos ? null : _bulkImportPhotos,
+                  icon: _isImportingPhotos
+                      ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.photo_library, size: 16),
+                  label: Text(_isImportingPhotos
+                      ? 'Uploading ${_photoUploadDone}/$_photoUploadTotal…'
+                      : 'Import Photos'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
                   onPressed: () => setState(() {
                     _showImport = !_showImport;
                     if (!_showImport) _resetImport();
@@ -994,18 +1207,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
               child: Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 100.w, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 30.w),
+                        Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('ROLL NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('CLASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -1021,17 +1235,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           onTap: () => _populateStudentForm(s),
                           child: Container(
                             color: index.isEven ? Colors.white : AppColors.surface,
-                            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
                             child: Row(
                               children: [
-                                SizedBox(width: 40.w, child: Text('$serialNo', style: cellStyle)),
-                                SizedBox(width: 100.w, child: Text(s.stuadmno, style: cellStyle)),
-                                Expanded(child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                                SizedBox(width: 100.w, child: Text(s.courname ?? '-', style: cellStyle)),
-                                SizedBox(width: 80.w, child: Text(s.stuclass, style: cellStyle)),
-                                SizedBox(width: 80.w, child: Text(s.stugender, style: cellStyle)),
-                                SizedBox(width: 120.w, child: Text(s.stumobile, style: cellStyle)),
-                                SizedBox(width: 30.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary)),
+                                Expanded(flex: 1, child: Text('$serialNo', style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 4, child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stuclass, textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 3, child: Text(s.stumobile, textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary))),
                               ],
                             ),
                           ),
@@ -1184,14 +1399,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       color: AppColors.tableHeadBg,
                       child: Row(
                         children: [
-                          SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          SizedBox(width: 16.w),
-                          SizedBox(width: 100.w, child: Text('ADM NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          SizedBox(width: 80.w, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          SizedBox(width: 120.w, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          SizedBox(width: 30.w),
+                          Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 2, child: Text('ADM NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 3, child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         ],
                       ),
                     ),
@@ -1215,13 +1430,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 50.w, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 16.w),
-                                        SizedBox(width: 100.w, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        SizedBox(width: 80.w, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 120.w, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        SizedBox(width: 30.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent)),
+                                        Expanded(flex: 1, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        Expanded(flex: 4, child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
+                                        Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        Expanded(flex: 3, child: Text(s.stumobile, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+                                        Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent))),
                                       ],
                                     ),
                                   ),
@@ -1759,6 +1975,37 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onChanged: (v) => setState(() {
               _selectedConId = v;
             }),
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _row3(
+          _fieldFull(label: 'Admission Type', child: DropdownButtonFormField<String>(
+            initialValue: _selectedAdmName,
+            isExpanded: true,
+            decoration: _dec('Select admission type'),
+            style: _inputStyle,
+            items: _admissionTypes.map((a) => DropdownMenuItem(
+              value: a['admname']?.toString(),
+              child: Text(a['admname']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+            )).toList(),
+            onChanged: (v) => setState(() => _selectedAdmName = v),
+          )),
+          _fieldFull(label: 'Quota', child: DropdownButtonFormField<String>(
+            initialValue: _selectedQuoName,
+            isExpanded: true,
+            decoration: _dec('Select quota'),
+            style: _inputStyle,
+            items: _quotas.map((q) => DropdownMenuItem(
+              value: q['quoname']?.toString(),
+              child: Text(q['quoname']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+            )).toList(),
+            onChanged: (v) => setState(() => _selectedQuoName = v),
+          )),
+          _fieldFull(label: 'Batch', child: TextFormField(
+            controller: _batchController,
+            decoration: _dec('e.g. 2024-2028'),
+            style: _inputStyle,
           )),
         ),
         SizedBox(height: 14.h),

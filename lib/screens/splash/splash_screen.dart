@@ -6,7 +6,6 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 
-import '../../widgets/app_icon.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -65,14 +64,22 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.splashGradient),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF003166),
+              Color(0xFF002147),
+              Color(0xFF00152E),
+            ],
+          ),
+        ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 3),
-
-              // Animated Logo
               FadeInDown(
                 duration: const Duration(milliseconds: 800),
                 child: AnimatedBuilder(
@@ -100,23 +107,26 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: AppIcon('teacher',
-                        size: 60.sp,
-                        color: AppColors.accent,
+                      padding: EdgeInsets.all(14.w),
+                      child: Image.asset(
+                        'assets/images/educore360_logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.school_rounded,
+                          size: 60.sp,
+                          color: AppColors.accent,
+                        ),
                       ),
                     );
                   },
                 ),
               ),
-
               SizedBox(height: 32.h),
-
-              // App Name
               FadeInUp(
                 delay: const Duration(milliseconds: 400),
                 duration: const Duration(milliseconds: 800),
                 child: Text(
-                  'EduDesk',
+                  'EduCore360',
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
@@ -124,9 +134,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                 ),
               ),
-
               SizedBox(height: 8.h),
-
               FadeInUp(
                 delay: const Duration(milliseconds: 600),
                 duration: const Duration(milliseconds: 800),
@@ -138,10 +146,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                 ),
               ),
-
               const Spacer(flex: 2),
-
-              // Loading indicator
               FadeInUp(
                 delay: const Duration(milliseconds: 800),
                 duration: const Duration(milliseconds: 600),
@@ -177,10 +182,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ],
                 ),
               ),
-
               const Spacer(),
-
-              // Version
               FadeIn(
                 delay: const Duration(milliseconds: 1000),
                 child: Text(
@@ -190,7 +192,6 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                 ),
               ),
-
               SizedBox(height: 32.h),
             ],
           ),

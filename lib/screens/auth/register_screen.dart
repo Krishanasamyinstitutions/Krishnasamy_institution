@@ -222,6 +222,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
 
+      // Create the per-institution student photo bucket. Runs via a
+      // SECURITY DEFINER RPC so anon can trigger it; logs but doesn't
+      // block registration if Supabase can't create the bucket.
+      if (regResult['inscode'] != null) {
+        try {
+          await SupabaseService.client.rpc('ensure_student_photo_bucket', params: {
+            'p_inscode': regResult['inscode'].toString(),
+          });
+          debugPrint('Photo bucket ready for inscode=${regResult['inscode']}');
+        } catch (e) {
+          debugPrint('ensure_student_photo_bucket skipped: $e');
+        }
+      }
+
       // Upload logo if selected
       if (_logoFile != null && regResult['inscode'] != null) {
         try {

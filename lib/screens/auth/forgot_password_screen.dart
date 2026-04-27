@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
-import '../../utils/auth_provider.dart';
-
+import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+
+/// Three-step forgot-password flow for institution users (admin/staff/
+/// accountant). The OTP is sent via the `send-password-reset-otp` Supabase
+/// Edge Function so the BulkSMSGateway credentials never live in the app
+/// binary. The Edge Function generates the OTP, stores it in
+/// institutionusers.usemobotp + mobotp_at, then sends the SMS.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -13,25 +18,138 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
+enum _Step { email, otp, password }
+
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  bool _emailSent = false;
+  final _otpController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  _Step _step = _Step.email;
+  bool _isLoading = false;
+  String? _errorMessage;
+  String? _maskedPhone;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _otpController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleReset() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _requestOtp() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMessage = 'Enter a valid email address');
+      return;
+    }
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final resp = await SupabaseService.client.functions.invoke(
+        'send-password-reset-otp', body: {'email': email},
+      );
+      final data = resp.data;
+      // Surface server-side detail when the function rejects the request
+      // — without it, "Could not send OTP" gives the user no clue whether
+      // it's a missing function deploy, missing secret, or gateway issue.
+      if (resp.status >= 400) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = data is Map
+              ? (data['error']?.toString() ?? 'Server error (${resp.status})')
+              : 'Server error (${resp.status})';
+        });
+        return;
+      }
+      if (data is Map && data['error'] != null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = data['error'].toString();
+        });
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _step = _Step.otp;
+        _maskedPhone = (data is Map ? data['masked'] : null)?.toString();
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'OTP request failed: $e';
+      });
+    }
+  }
 
-    final authProvider = context.read<AuthProvider>();
-    await authProvider.resetPassword(_emailController.text.trim());
+  Future<void> _verifyOtp() async {
+    final otp = int.tryParse(_otpController.text.trim());
+    if (otp == null || otp < 100000 || otp > 999999) {
+      setState(() => _errorMessage = 'Enter the 6-digit OTP from SMS');
+      return;
+    }
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final ok = await SupabaseService.client.rpc('verify_password_reset_otp', params: {
+        'p_email': _emailController.text.trim(),
+        'p_otp': otp,
+      });
+      if (ok == true) {
+        setState(() { _isLoading = false; _step = _Step.password; });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Invalid or expired OTP. Try again or request a new one.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Verification failed. Try again.';
+      });
+    }
+  }
 
-    if (mounted) {
-      setState(() => _emailSent = true);
+  Future<void> _resetPassword() async {
+    final pwd = _newPasswordController.text;
+    final confirm = _confirmPasswordController.text;
+    if (pwd.length < 6) {
+      setState(() => _errorMessage = 'Password must be at least 6 characters');
+      return;
+    }
+    if (pwd != confirm) {
+      setState(() => _errorMessage = 'Passwords do not match');
+      return;
+    }
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      final ok = await SupabaseService.client.rpc('complete_password_reset', params: {
+        'p_email': _emailController.text.trim(),
+        'p_new_password': pwd,
+      });
+      if (ok == true) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset successful. Please sign in with your new password.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Reset failed. Restart the process and try again.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Could not save the new password. Try again.';
+      });
     }
   }
 
@@ -64,160 +182,186 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                   ),
                 ),
-
-                SizedBox(height: 40.h),
-
-                // Icon
-                FadeInDown(
-                  delay: const Duration(milliseconds: 100),
-                  child: Center(
-                    child: Container(
-                      width: 80.w,
-                      height: 80.h,
-                      decoration: BoxDecoration(
-                        color: _emailSent
-                            ? AppColors.success.withValues(alpha: 0.1)
-                            : AppColors.secondary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(22.r),
-                      ),
-                      child: AppIcon(
-                        _emailSent
-                            ? 'sms-tracking'
-                            : 'password-check',
-                        size: 40.sp,
-                        color: _emailSent
-                            ? AppColors.success
-                            : AppColors.secondary,
-                      ),
-                    ),
-                  ),
-                ),
-
+                SizedBox(height: 30.h),
+                _buildIcon(),
+                SizedBox(height: 24.h),
+                _buildTitle(),
+                SizedBox(height: 10.h),
+                _buildSubtitle(),
                 SizedBox(height: 28.h),
-
-                FadeInDown(
-                  delay: const Duration(milliseconds: 200),
-                  child: Text(
-                    _emailSent ? 'Check Your Email' : 'Forgot Password?',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.displayMedium,
-                  ),
-                ),
-
-                SizedBox(height: 12.h),
-
-                FadeInDown(
-                  delay: const Duration(milliseconds: 300),
-                  child: Text(
-                    _emailSent
-                        ? 'We\'ve sent a password reset link to\n${_emailController.text.trim()}'
-                        : 'No worries! Enter your email address and we\'ll send you a link to reset your password.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.6,
-                        ),
-                  ),
-                ),
-
-                SizedBox(height: 36.h),
-
-                if (!_emailSent) ...[
-                  FadeInDown(
-                    delay: const Duration(milliseconds: 400),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Email Address',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(fontSize: 13.sp),
-                          ),
-                          SizedBox(height: 8.h),
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              hintText: 'you@school.edu',
-                              prefixIcon: AppIcon.linear('sms',
-                                  size: 20, color: AppColors.textLight),
-                              prefixIconConstraints:
-                                  BoxConstraints(minWidth: 52.w, minHeight: 0),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
+                if (_errorMessage != null) ...[
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                     ),
+                    child: Row(children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 18.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(child: Text(_errorMessage!,
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 13.sp))),
+                    ]),
                   ),
-                  SizedBox(height: 28.h),
-                  FadeInDown(
-                    delay: const Duration(milliseconds: 500),
-                    child: Consumer<AuthProvider>(
-                      builder: (context, auth, _) {
-                        return SizedBox(
-                          height: 54.h,
-                          child: ElevatedButton(
-                            onPressed: auth.isLoading ? null : _handleReset,
-                            child: auth.isLoading
-                                ? SizedBox(
-                                    width: 22.w,
-                                    height: 22.h,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Send Reset Link'),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ] else ...[
-                  FadeInUp(
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 54.h,
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() => _emailSent = false);
-                              _emailController.clear();
-                            },
-                            child: const Text('Try a Different Email'),
-                          ),
-                        ),
-                        SizedBox(height: 16.h),
-                        SizedBox(
-                          height: 54.h,
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Back to Sign In'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  SizedBox(height: 18.h),
                 ],
+                if (_step == _Step.email) _buildEmailForm(),
+                if (_step == _Step.otp) _buildOtpForm(),
+                if (_step == _Step.password) _buildPasswordForm(),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildIcon() {
+    final iconName = switch (_step) {
+      _Step.email => 'sms-tracking',
+      _Step.otp => 'shield-tick',
+      _Step.password => 'password-check',
+    };
+    return Center(
+      child: Container(
+        width: 80.w,
+        height: 80.w,
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: AppIcon(iconName, size: 40, color: AppColors.accent),
+      ),
+    );
+  }
+
+  Widget _buildTitle() {
+    final title = switch (_step) {
+      _Step.email => 'Forgot Password?',
+      _Step.otp => 'Enter the OTP',
+      _Step.password => 'Set a New Password',
+    };
+    return Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.displayMedium);
+  }
+
+  Widget _buildSubtitle() {
+    final text = switch (_step) {
+      _Step.email =>
+        'Enter your registered email. We\'ll send a 6-digit OTP to the mobile number on file.',
+      _Step.otp =>
+        _maskedPhone != null && _maskedPhone!.isNotEmpty
+            ? 'OTP sent to $_maskedPhone. Enter the 6-digit code below.'
+            : 'Enter the 6-digit code we sent to your mobile.',
+      _Step.password => 'Create a new password (minimum 6 characters).',
+    };
+    return Text(text,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5));
+  }
+
+  Widget _buildEmailForm() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Email Address', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8.h),
+      TextFormField(
+        controller: _emailController,
+        keyboardType: TextInputType.emailAddress,
+        decoration: InputDecoration(
+          hintText: 'you@school.edu',
+          prefixIcon: const AppIcon.linear('sms', size: 20, color: AppColors.textLight),
+          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+        ),
+      ),
+      SizedBox(height: 24.h),
+      SizedBox(
+        height: 52.h,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _requestOtp,
+          child: _isLoading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const Text('Send OTP'),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildOtpForm() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('OTP', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8.h),
+      TextFormField(
+        controller: _otpController,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(
+          hintText: '6-digit OTP',
+          counterText: '',
+          prefixIcon: const AppIcon.linear('shield-tick', size: 20, color: AppColors.textLight),
+          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+        ),
+      ),
+      SizedBox(height: 8.h),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          onPressed: _isLoading ? null : _requestOtp,
+          child: const Text('Resend OTP'),
+        ),
+      ),
+      SizedBox(height: 16.h),
+      SizedBox(
+        height: 52.h,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _verifyOtp,
+          child: _isLoading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const Text('Verify OTP'),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildPasswordForm() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('New Password', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8.h),
+      TextFormField(
+        controller: _newPasswordController,
+        obscureText: _obscurePassword,
+        decoration: InputDecoration(
+          hintText: 'At least 6 characters',
+          prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
+          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+          suffixIcon: IconButton(
+            icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+      ),
+      SizedBox(height: 16.h),
+      Text('Confirm Password', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8.h),
+      TextFormField(
+        controller: _confirmPasswordController,
+        obscureText: _obscurePassword,
+        decoration: InputDecoration(
+          hintText: 'Re-enter password',
+          prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
+          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+        ),
+      ),
+      SizedBox(height: 24.h),
+      SizedBox(
+        height: 52.h,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _resetPassword,
+          child: _isLoading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const Text('Reset Password'),
+        ),
+      ),
+    ]);
   }
 }

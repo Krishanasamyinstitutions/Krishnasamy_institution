@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -5,9 +7,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
-import 'dart:io';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 
 class BankReconciliationScreen extends StatefulWidget {
@@ -126,7 +128,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red),
         );
       }
     }
@@ -141,26 +143,62 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
 
     try {
       final file = File(result.files.single.path!);
-      final csvString = await file.readAsString();
-      final rows = const CsvToListConverter().convert(csvString, eol: '\n');
 
-      if (rows.length < 2) {
+      // Read bytes and decode robustly: strip UTF-8 / UTF-16 BOM, try UTF-8
+      // first, fall back to Latin-1 on decode failure. Covers HDFC/ICICI CSV
+      // downloads that arrive as Windows-1252.
+      final bytes = await file.readAsBytes();
+      String csvString = _decodeBankBytes(bytes);
+      csvString = csvString.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+      // Auto-detect delimiter by scanning the first few lines — comma,
+      // semicolon, or tab. Some co-op and European bank exports use ';'
+      // or '\t' as the field separator.
+      final delimiter = _detectDelimiter(csvString);
+
+      final allRows = CsvToListConverter(
+        fieldDelimiter: delimiter,
+        eol: '\n',
+        shouldParseNumbers: false,
+      ).convert(csvString);
+
+      // Find the header row. Preamble rows ("Account: 12345", "Statement
+      // from...") push the real header below row 0. Accept the first row
+      // that has both a date-like column and a particular/narration column.
+      final headerRowIdx = _findHeaderRow(allRows);
+      if (headerRowIdx < 0 || allRows.length - headerRowIdx < 2) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('CSV file is empty or has no data rows'), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text('Could not find a recognisable header row. Expected columns include Date, Narration/Description, Amount.'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
         return;
       }
 
-      // Parse CSV: handle Indian bank format
-      final headers = rows.first.map((h) => h.toString().toLowerCase().trim()).toList();
+      final headers = allRows[headerRowIdx].map((h) => h.toString().toLowerCase().trim()).toList();
+      final rows = allRows.sublist(headerRowIdx);
+
       final dateIdx = headers.indexWhere((h) => h.contains('date') && !h.contains('value'));
-      final refIdx = headers.indexWhere((h) => h.contains('ref') || h.contains('chq') || h.contains('transaction') || h.contains('utr'));
-      final narrationIdx = headers.indexWhere((h) => h.contains('narration') || h.contains('desc') || h.contains('particular'));
-      // Try Deposit/Credit column first, then Amount
-      int amountIdx = headers.indexWhere((h) => h.contains('deposit') || h.contains('credit'));
-      if (amountIdx < 0) amountIdx = headers.indexWhere((h) => h.contains('amount'));
+      final refIdx = headers.indexWhere((h) => h.contains('ref') || h.contains('chq') || h.contains('cheque') || h.contains('transaction') || h.contains('utr') || h.contains('instrument'));
+      final narrationIdx = headers.indexWhere((h) => h.contains('narration') || h.contains('desc') || h.contains('particular') || h.contains('remark'));
+
+      // Prefer distinct Deposit / Credit columns. Fall back to a generic
+      // Amount column only when no deposit column exists, so HDFC-style
+      // statements that have BOTH "Amount" and "Deposit Amt" don't pick
+      // the ambiguous Amount column.
+      int depositIdx = headers.indexWhere((h) =>
+          (h.contains('deposit') || h.contains('credit') || h.contains('cr amount')) &&
+          !h.contains('debit'));
+      int withdrawalIdx = headers.indexWhere((h) =>
+          h.contains('withdrawal') || h.contains('debit') || h.contains('dr amount'));
+      int amountIdx = depositIdx >= 0 ? depositIdx : headers.indexWhere((h) => h == 'amount' || h.endsWith(' amount') || h.startsWith('amount '));
+
+      // Dr/Cr marker column: when banks report amounts in a single column
+      // with a separate type flag, we need to skip debits.
+      final drCrIdx = headers.indexWhere((h) => h == 'dr/cr' || h == 'cr/dr' || h == 'type' || h == 'txn type');
 
       final bankRows = <Map<String, dynamic>>[];
       final usedPayIds = <int>{};
@@ -168,10 +206,22 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       for (int i = 1; i < rows.length; i++) {
         final row = rows[i];
         if (row.length < 2) continue;
+
+        // If a separate withdrawal column is populated, skip — it's a debit.
+        if (withdrawalIdx >= 0 && withdrawalIdx < row.length) {
+          final w = _parseAmount(row[withdrawalIdx].toString());
+          if (w > 0) continue;
+        }
+        // If a Dr/Cr marker says Dr, skip.
+        if (drCrIdx >= 0 && drCrIdx < row.length) {
+          final t = row[drCrIdx].toString().trim().toLowerCase();
+          if (t == 'dr' || t == 'debit' || t == 'd') continue;
+        }
+
         final amount = amountIdx >= 0 && amountIdx < row.length
-            ? double.tryParse(row[amountIdx].toString().replaceAll(',', '').trim()) ?? 0
-            : 0;
-        if (amount <= 0) continue; // Skip withdrawals/zero entries
+            ? _parseAmount(row[amountIdx].toString())
+            : 0.0;
+        if (amount <= 0) continue; // zero rows, blanks, or unparseable
 
         bankRows.add({
           'date': dateIdx >= 0 && dateIdx < row.length ? row[dateIdx].toString().trim() : '',
@@ -262,7 +312,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error reading CSV: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('CSV could not be read. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     }
@@ -306,20 +356,49 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       }).eq('pay_id', payId).eq('ins_id', insId)
     ));
     try {
-      final demands = await SupabaseService.fromSchema('feedemand')
-          .select('dem_id, balancedue')
+      // Resolve affected demands via paymentdetails, NOT feedemand.pay_id:
+      // a demand with two partial payments overwrites pay_id with the
+      // latest one, so a pay_id-based lookup misses earlier partials.
+      final details = await SupabaseService.fromSchema('paymentdetails')
+          .select('dem_id')
           .eq('ins_id', insId)
           .inFilter('pay_id', payIds);
-      if ((demands as List).isNotEmpty) {
-        await Future.wait(demands.map((d) {
-          final demId = d['dem_id'];
-          return demId != null
-              ? SupabaseService.fromSchema('feedemand')
-                  .update({'reconbalancedue': d['balancedue']})
-                  .eq('dem_id', demId)
-                  .eq('ins_id', insId)
-              : Future.value();
-        }));
+      final demIds = (details as List)
+          .map((d) => d['dem_id'])
+          .where((id) => id != null)
+          .toSet()
+          .toList();
+
+      for (final demId in demIds) {
+        // Recompute reconbalancedue as feeamount - conamount - sum of all
+        // reconciled+captured payments on this demand. Matches the
+        // reconcile_payments_batch RPC formula so UI fallback and RPC
+        // paths converge on the same number.
+        final fdRow = await SupabaseService.fromSchema('feedemand')
+            .select('feeamount, conamount')
+            .eq('dem_id', demId)
+            .eq('ins_id', insId)
+            .maybeSingle();
+        if (fdRow == null) continue;
+        final feeAmount = (fdRow['feeamount'] as num?)?.toDouble() ?? 0;
+        final conAmount = (fdRow['conamount'] as num?)?.toDouble() ?? 0;
+
+        final reconciledDetails = await SupabaseService.fromSchema('paymentdetails')
+            .select('transtotalamount, payment!inner(paystatus, recon_status)')
+            .eq('dem_id', demId)
+            .eq('ins_id', insId)
+            .eq('payment.paystatus', 'C')
+            .eq('payment.recon_status', 'R');
+        double reconciledTotal = 0;
+        for (final r in (reconciledDetails as List)) {
+          reconciledTotal += (r['transtotalamount'] as num?)?.toDouble() ?? 0;
+        }
+
+        final newReconBal = (feeAmount - conAmount - reconciledTotal).clamp(0.0, double.infinity);
+        await SupabaseService.fromSchema('feedemand')
+            .update({'reconbalancedue': newReconBal})
+            .eq('dem_id', demId)
+            .eq('ins_id', insId);
       }
     } catch (e) {
       debugPrint('Fallback feedemand update error: $e');
@@ -907,6 +986,100 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
 
   String _normalizeReference(String value) {
     return value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+  }
+
+  /// Strip UTF-8 BOM, try strict UTF-8, fall back to Latin-1 (Windows-1252)
+  /// when the bytes don't decode cleanly. Covers HDFC/ICICI CSVs that ship
+  /// as Windows-1252 with Indian rupee / special characters.
+  String _decodeBankBytes(List<int> bytes) {
+    var data = bytes;
+    if (data.length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) {
+      data = data.sublist(3);
+    }
+    try {
+      return utf8.decode(data, allowMalformed: false);
+    } catch (_) {
+      return latin1.decode(data, allowInvalid: true);
+    }
+  }
+
+  /// Pick the delimiter (',', ';', or '\t') that appears most consistently
+  /// in the first few non-blank lines.
+  String _detectDelimiter(String text) {
+    final lines = text.split('\n').where((l) => l.trim().isNotEmpty).take(10).toList();
+    if (lines.isEmpty) return ',';
+    int commaTotal = 0, semiTotal = 0, tabTotal = 0;
+    for (final l in lines) {
+      commaTotal += ','.allMatches(l).length;
+      semiTotal += ';'.allMatches(l).length;
+      tabTotal += '\t'.allMatches(l).length;
+    }
+    if (tabTotal > commaTotal && tabTotal > semiTotal) return '\t';
+    if (semiTotal > commaTotal) return ';';
+    return ',';
+  }
+
+  /// Find the real header row. Banks often prefix the statement with
+  /// preamble rows (account number, period, branch). Accept the first row
+  /// whose cells contain a Date keyword AND at least one of
+  /// Narration/Particular/Description/Remark.
+  int _findHeaderRow(List<List<dynamic>> rows) {
+    for (int i = 0; i < rows.length && i < 20; i++) {
+      final cells = rows[i].map((c) => c.toString().toLowerCase().trim()).toList();
+      if (cells.length < 3) continue;
+      final hasDate = cells.any((c) => c.contains('date') && !c.contains('value'));
+      final hasNarr = cells.any((c) =>
+          c.contains('narration') || c.contains('particular') || c.contains('desc') || c.contains('remark'));
+      final hasAmount = cells.any((c) =>
+          c.contains('amount') || c.contains('deposit') || c.contains('credit') ||
+          c.contains('withdrawal') || c.contains('debit'));
+      if (hasDate && (hasNarr || hasAmount)) return i;
+    }
+    return rows.isNotEmpty ? 0 : -1; // best-effort fallback
+  }
+
+  /// Parse an amount cell. Handles:
+  ///   - thousand separators ("1,200.00", "1.200,00" European style)
+  ///   - currency symbols (₹ $ £ € Rs.)
+  ///   - trailing Dr/Cr suffix ("1,200.00 Cr")
+  ///   - accounting parentheses for negatives ("(1,200.00)" -> -1200)
+  ///   - non-breaking spaces
+  double _parseAmount(String raw) {
+    var s = raw.trim();
+    if (s.isEmpty) return 0;
+    // Drop explicit Cr / Dr suffix, keep the sign via caller's column logic.
+    s = s.replaceAll(RegExp(r'\s+(cr|dr)\.?$', caseSensitive: false), '');
+    // Remove currency symbols, non-breaking spaces, and common Rs. prefix.
+    s = s
+        .replaceAll(RegExp(r'(₹|\$|£|€|Rs\.?|INR| )', caseSensitive: false), '')
+        .trim();
+    bool negative = false;
+    if (s.startsWith('(') && s.endsWith(')')) {
+      negative = true;
+      s = s.substring(1, s.length - 1);
+    }
+    // European "1.234,56" → "1234.56"; standard "1,234.56" → "1234.56".
+    final lastComma = s.lastIndexOf(',');
+    final lastDot = s.lastIndexOf('.');
+    if (lastComma >= 0 && lastDot >= 0) {
+      if (lastComma > lastDot) {
+        s = s.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        s = s.replaceAll(',', '');
+      }
+    } else if (lastComma >= 0) {
+      // Ambiguous — assume comma is a thousands separator unless there are
+      // exactly 2 digits after it (then treat as decimal).
+      final afterComma = s.substring(lastComma + 1);
+      if (afterComma.length == 2 && !afterComma.contains(',')) {
+        s = s.replaceAll(',', '.');
+      } else {
+        s = s.replaceAll(',', '');
+      }
+    }
+    s = s.replaceAll(RegExp(r'\s+'), '');
+    final v = double.tryParse(s) ?? 0;
+    return negative ? -v : v;
   }
 
   List<Map<String, dynamic>> _filteredPayments(List<Map<String, dynamic>> payments) {
