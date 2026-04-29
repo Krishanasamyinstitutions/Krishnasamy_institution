@@ -1293,30 +1293,46 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                     decoration: _fieldDecoration(hint: _fineType == 'FIXED' ? '50' : '2'),
                   ),
                   SizedBox(height: 22.h),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _saveRule,
-                          icon: Icon(_editingId != null ? Icons.save_rounded : Icons.add_rounded, size: 18.sp),
-                          label: Text(_editingId != null ? 'Update' : 'Add Rule', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 14.h),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  Builder(builder: (_) {
+                    const btnHeight = 48.0;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: btnHeight,
+                            child: ElevatedButton.icon(
+                              onPressed: _saveRule,
+                              icon: Icon(_editingId != null ? Icons.save_rounded : Icons.add_rounded, size: 18.sp),
+                              label: Text(_editingId != null ? 'Update' : 'Add Rule', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.accent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 18),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      if (_editingId != null) ...[
-                        SizedBox(width: 8.w),
-                        TextButton(
-                          onPressed: () => setState(() => _clearForm()),
-                          child: const Text('Cancel'),
-                        ),
+                        if (_editingId != null) ...[
+                          SizedBox(width: 8.w),
+                          SizedBox(
+                            height: btnHeight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => setState(() => _clearForm()),
+                              icon: const AppIcon('refresh', size: 16, color: AppColors.textPrimary),
+                              label: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.textPrimary,
+                                side: const BorderSide(color: AppColors.border),
+                                padding: EdgeInsets.symmetric(horizontal: 18.w),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),
