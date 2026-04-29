@@ -198,78 +198,80 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     return Column(
       children: [
-        // Header
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              AppIcon('notification', color: AppColors.accent, size: 18),
-              SizedBox(width: 10.w),
-              Text('Notifications', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
-              if (_unreadCount > 0) ...[
+        // List-view header: hidden when drilled into a single notification
+        // (the detail builder renders its own "Notification Details" header).
+        if (_selectedNotification == null) ...[
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                AppIcon('notification', color: AppColors.accent, size: 18),
                 SizedBox(width: 10.w),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10.r),
+                Text('Notifications', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                if (_unreadCount > 0) ...[
+                  SizedBox(width: 10.w),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Text('$_unreadCount new', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.error)),
                   ),
-                  child: Text('$_unreadCount new', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.error)),
-                ),
-              ],
-              const Spacer(),
-              // Filter chips
-              ...['All', 'Unread', 'Read'].map((f) {
-                final isActive = _filter == f;
-                return Padding(
-                  padding: EdgeInsets.only(left: 6.w),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _filter = f),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        color: isActive ? AppColors.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8.r),
-                        border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
+                ],
+                const Spacer(),
+                ...['All', 'Unread', 'Read'].map((f) {
+                  final isActive = _filter == f;
+                  return Padding(
+                    padding: EdgeInsets.only(left: 6.w),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _filter = f),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.accent : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8.r),
+                          border: Border.all(color: isActive ? AppColors.accent : AppColors.border),
+                        ),
+                        child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textSecondary)),
                       ),
-                      child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: isActive ? Colors.white : AppColors.textSecondary)),
+                    ),
+                  );
+                }),
+                SizedBox(width: 10.w),
+                if (_unreadCount > 0)
+                  TextButton.icon(
+                    onPressed: _markAllAsRead,
+                    icon: AppIcon('task-square', size: 16),
+                    label: Text('Mark all read', style: TextStyle(fontSize: 13.sp)),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
+                  ),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: _fetchNotifications,
+                    icon: AppIcon('refresh', size: 16, color: Colors.white),
+                    label: const Text('Refresh'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
-                );
-              }),
-              SizedBox(width: 10.w),
-              if (_unreadCount > 0)
-                TextButton.icon(
-                  onPressed: _markAllAsRead,
-                  icon: AppIcon('task-square', size: 16),
-                  label: Text('Mark all read', style: TextStyle(fontSize: 13.sp)),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
                 ),
-              SizedBox(
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: _fetchNotifications,
-                  icon: AppIcon('refresh', size: 16, color: Colors.white),
-                  label: const Text('Refresh'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 16.h),
+          SizedBox(height: 16.h),
+        ],
 
         // Content
         Expanded(
@@ -402,102 +404,137 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final body = notif['notibody']?.toString() ?? notif['body']?.toString() ?? notif['notidesc']?.toString() ?? '';
     final date = notif['createdat']?.toString();
     final type = notif['notitype']?.toString() ?? notif['type']?.toString();
+    final createdBy = notif['createdby']?.toString();
+    final target = notif['notitarget']?.toString() ?? notif['target']?.toString();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Back button
-          Padding(
-            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
-            child: InkWell(
-              onTap: () => setState(() => _selectedNotification = null),
-              borderRadius: BorderRadius.circular(6.r),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6.r),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Back header — matches the notice "Notice Details" header style
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10.r),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const AppIcon.linear('Chevron Left', size: 20),
+                onPressed: () => setState(() => _selectedNotification = null),
+                tooltip: 'Back to notifications',
+              ),
+              SizedBox(width: 4.w),
+              Text('Notification Details', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (type != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _typeColor(type).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(type, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: _typeColor(type))),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppIcon.linear('Chevron Left', size: 16, color: AppColors.accent),
-                    SizedBox(width: 6.w),
-                    Text('Back to Notifications', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            ],
+          ),
+        ),
+        SizedBox(height: 16.h),
+
+        // Detail card
+        Expanded(
+          child: SingleChildScrollView(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title row
+                  Row(
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: _typeColor(type).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6.r),
+                        ),
+                        child: AppIcon(_typeIcon(type), size: 12, color: _typeColor(type)),
+                      ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(title, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
+                            SizedBox(height: 4.h),
+                            Row(
+                              children: [
+                                if (type != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6.r),
+                                    ),
+                                    child: Text(type, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                                  ),
+                                  SizedBox(width: 10.w),
+                                ],
+                                Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                SizedBox(width: 8.w),
+                                Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.6))),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 32, color: AppColors.border),
+
+                  // Body
+                  if (body.isNotEmpty)
+                    Text(body, style: TextStyle(fontSize: 14.sp, height: 1.7, color: AppColors.textPrimary)),
+
+                  if (target != null && target.isNotEmpty) ...[
+                    SizedBox(height: 20.h),
+                    Row(
+                      children: [
+                        const AppIcon('people', size: 16, color: AppColors.textSecondary),
+                        SizedBox(width: 6.w),
+                        Text('Target: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text(target, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
                   ],
-                ),
+
+                  if (createdBy != null && createdBy.isNotEmpty) ...[
+                    SizedBox(height: 12.h),
+                    const Divider(color: AppColors.border),
+                    SizedBox(height: 12.h),
+                    Row(
+                      children: [
+                        const AppIcon('user', size: 16, color: AppColors.textSecondary),
+                        SizedBox(width: 6.w),
+                        Text('Posted by: ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                        Text(createdBy, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-          const Divider(color: AppColors.border),
-          // Detail content
-          Padding(
-            padding: EdgeInsets.all(24.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: _typeColor(type).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: AppIcon(_typeIcon(type), size: 16, color: _typeColor(type)),
-                    ),
-                    SizedBox(width: 16.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(title, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
-                          SizedBox(height: 4.h),
-                          Row(
-                            children: [
-                              if (type != null) ...[
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                                  decoration: BoxDecoration(
-                                    color: _typeColor(type).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6.r),
-                                  ),
-                                  child: Text(type, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _typeColor(type))),
-                                ),
-                                SizedBox(width: 10.w),
-                              ],
-                              AppIcon('calendar-1', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                              SizedBox(width: 4.w),
-                              Text(_formatDate(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                              SizedBox(width: 10.w),
-                              AppIcon('clock', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                              SizedBox(width: 4.w),
-                              Text(_timeAgo(date), style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (body.isNotEmpty) ...[
-                  SizedBox(height: 20.h),
-                  const Divider(color: AppColors.border),
-                  SizedBox(height: 16.h),
-                  Text(body, style: TextStyle(fontSize: 14.sp, color: AppColors.textPrimary, height: 1.6)),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

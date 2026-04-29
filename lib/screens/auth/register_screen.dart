@@ -380,10 +380,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return AppColors.textSecondary.withValues(alpha: 0.4);
     }
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final circleSize = isMobile ? 36.0 : 40.0;
+    final iconSize = isMobile ? 18.0 : 20.0;
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(32.w, 20.h, 32.w, 8.h),
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32.w, 20.h, isMobile ? 16 : 32.w, 8.h),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24.w, vertical: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -398,10 +402,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             final isActiveSegment = stepBefore == _currentStep - 1 || stepBefore == _currentStep;
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(top: 19.h),
+                padding: EdgeInsets.only(top: circleSize / 2 - 1.5),
                 child: Container(
                   height: 3,
-                  margin: EdgeInsets.symmetric(horizontal: 4.w),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
                     color: isDone
                         ? AppColors.success
@@ -428,8 +432,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 // Circle with icon
                 Container(
-                  width: 40.w,
-                  height: 40.h,
+                  width: circleSize,
+                  height: circleSize,
                   decoration: BoxDecoration(
                     color: isDone || isActive ? color : Colors.white,
                     shape: BoxShape.circle,
@@ -440,29 +444,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Center(
                     child: isDone
-                        ? AppIcon('tick-circle', size: 20, color: Colors.white)
+                        ? AppIcon('tick-circle', size: iconSize, color: Colors.white)
                         : AppIcon(
                             step['icon'] as String,
-                            size: 20,
+                            size: iconSize,
                             color: isActive ? Colors.white : color,
                           ),
                   ),
                 ),
-                SizedBox(height: 8.h),
+                const SizedBox(height: 8),
                 Text(
                   'STEP ${stepIndex + 1}',
-                  style: TextStyle(
-                    fontSize: 9.sp,
+                  style: const TextStyle(
+                    fontSize: 11,
                     color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 1.0,
                   ),
                 ),
-                SizedBox(height: 2.h),
+                const SizedBox(height: 2),
                 Text(
-                  step['label'] as String,
+                  isMobile ? (step['label'] as String).split(' ').first : step['label'] as String,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13.sp,
+                    fontSize: isMobile ? 12 : 13,
                     color: isActive || isDone ? AppColors.textPrimary : AppColors.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
@@ -478,10 +485,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Step 1: Institution Information
   Widget _buildStep1() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32.w, vertical: 20.h),
       child: Container(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(isMobile ? 16 : 20.w),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -508,18 +516,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('Institution Information',
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                       SizedBox(height: 2.h),
                       Text('Enter the basic details about your institution',
-                          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ],
               ),
               SizedBox(height: 20.h),
 
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _formRow(context, [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Type'),
                   SizedBox(
                     height: 48,
@@ -527,102 +535,94 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       initialValue: _institutionType,
                       decoration: _inputDec('Select institution type'),
                       isExpanded: true,
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary),
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
                       items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
                       onChanged: (v) => setState(() => _institutionType = v),
                     ),
                   ),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Name *'),
                   TextFormField(controller: _institutionNameController, decoration: _inputDec('Enter institution name'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                ])),
+                ]),
               ]),
               SizedBox(height: 16.h),
 
               // Logo picker + Short Name + Institution Code
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _fieldLabel('Institution Logo'),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _pickLogo,
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            height: 48,
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            decoration: BoxDecoration(
-                              color: _kFieldFill,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: _logoFile != null
-                                ? Row(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(_logoFile!, width: 36, height: 36, fit: BoxFit.cover),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text('Change',
-                                            style: TextStyle(
-                                                fontSize: 13.sp,
-                                                color: AppColors.textPrimary,
-                                                fontWeight: FontWeight.w600)),
-                                      ),
-                                      AppIcon('edit-2', size: 16, color: AppColors.primary),
-                                    ],
-                                  )
-                                : Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(7),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.accent.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: AppIcon('camera', size: 16, color: AppColors.accent),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Flexible(
-                                        child: Text('Upload Logo',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                                fontSize: 13.sp,
-                                                color: AppColors.textSecondary,
-                                                fontWeight: FontWeight.w600)),
-                                      ),
-                                    ],
-                                  ),
+              _formRow(context, [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _fieldLabel('Institution Logo'),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _pickLogo,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          height: 48,
+                          padding: EdgeInsets.symmetric(horizontal: 14.w),
+                          decoration: BoxDecoration(
+                            color: _kFieldFill,
+                            borderRadius: BorderRadius.circular(14),
                           ),
+                          child: _logoFile != null
+                              ? Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(_logoFile!, width: 36, height: 36, fit: BoxFit.cover),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text('Change',
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w600)),
+                                    ),
+                                    AppIcon('edit-2', size: 16, color: AppColors.primary),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(7),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: AppIcon('camera', size: 16, color: AppColors.accent),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Flexible(
+                                      child: Text('Upload Logo',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.textSecondary,
+                                              fontWeight: FontWeight.w600)),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
-                    ],
-                  ),
-                  ),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _fieldLabel('Short Name *'),
-                    TextFormField(controller: _institutionShortNameController, decoration: _inputDec('e.g. KCET'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _fieldLabel('Institution Code *'),
-                    TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
-                  ])),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _fieldLabel('Short Name *'),
+                  TextFormField(controller: _institutionShortNameController, decoration: _inputDec('e.g. KCET'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _fieldLabel('Institution Code *'),
+                  TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                ]),
+              ]),
               SizedBox(height: 16.h),
 
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _formRow(context, [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Start Date'),
                   InkWell(
                     onTap: _pickInstitutionStartDate,
@@ -630,31 +630,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: _inputDec('Select date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                       child: Text(
                         _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
-                        style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
+                        style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
                       ),
                     ),
                   ),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Authorized Username'),
                   TextFormField(controller: _authorizedUsernameController, decoration: _inputDec('Enter authorized username'), style: _fieldStyle()),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Designation'),
                   TextFormField(controller: _designationController, decoration: _inputDec('Enter designation'), style: _fieldStyle()),
-                ])),
+                ]),
               ]),
               SizedBox(height: 16.h),
 
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _formRow(context, [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Mobile Number'),
                   TextFormField(controller: _mobileNumberController, decoration: _inputDec('Enter mobile number'), style: _fieldStyle(), keyboardType: TextInputType.phone),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Recognized'),
                   SizedBox(
                     height: 48,
@@ -666,9 +663,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       onChanged: (v) { if (v != null) setState(() => _institutionRecognized = v); },
                     ),
                   ),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Email *'),
                   TextFormField(
                     controller: _emailController,
@@ -677,7 +673,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
                   ),
-                ])),
+                ]),
               ]),
             ],
           ),
@@ -688,13 +684,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Step 2: Affiliation & Address
   Widget _buildStep2() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32.w, vertical: 20.h),
       child: Column(
         children: [
           // Affiliation card
           Container(
-            padding: EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(isMobile ? 16 : 20.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -721,28 +718,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text('Affiliation Information',
-                              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                           SizedBox(height: 2.h),
                           Text('Enter affiliation and recognition details',
-                              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ],
                   ),
                   SizedBox(height: 20.h),
 
-                  Row(children: [
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _formRow(context, [
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Institution Affiliation'),
                       TextFormField(controller: _affiliationController, decoration: _inputDec('Enter affiliation'), style: _fieldStyle()),
-                    ])),
-                    SizedBox(width: 14.w),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    ]),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Affiliation Number'),
                       TextFormField(controller: _affiliationNumberController, decoration: _inputDec('Enter affiliation number'), style: _fieldStyle()),
-                    ])),
-                    SizedBox(width: 14.w),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    ]),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Affiliation Start Year'),
                       InkWell(
                         onTap: _pickAffiliationStartYear,
@@ -750,11 +745,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           decoration: _inputDec('Select year').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                           child: Text(
                             _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
-                            style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
+                            style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
                           ),
                         ),
                       ),
-                    ])),
+                    ]),
                   ]),
                 ],
               ),
@@ -764,7 +759,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Address card
           Container(
-            padding: EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(isMobile ? 16 : 20.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -789,53 +784,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text('Address',
-                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                         SizedBox(height: 2.h),
                         Text('Enter the institution address details',
-                            style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ],
                 ),
                 SizedBox(height: 20.h),
 
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 1 *'),
                     TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle()),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 2'),
                     TextFormField(controller: _address2Controller, decoration: _inputDec('Enter address line 2'), style: _fieldStyle()),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 3'),
                     TextFormField(controller: _address3Controller, decoration: _inputDec('Enter address line 3'), style: _fieldStyle()),
-                  ])),
+                  ]),
                 ]),
                 SizedBox(height: 14.h),
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Pin Code'),
                     TextFormField(controller: _pinCodeController, decoration: _inputDec('Enter pin code'), style: _fieldStyle(), keyboardType: TextInputType.number),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('City'),
                     TextFormField(controller: _cityController, decoration: _inputDec('Enter city'), style: _fieldStyle()),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('State'),
                     TextFormField(controller: _stateController, decoration: _inputDec('Enter state'), style: _fieldStyle()),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Country'),
                     TextFormField(controller: _countryController, decoration: _inputDec('Enter country'), style: _fieldStyle()),
-                  ])),
+                  ]),
                 ]),
               ],
             ),
@@ -844,7 +834,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           // Academic Year card
           Container(
-            padding: EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(isMobile ? 16 : 20.w),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -869,18 +859,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text('Academic Year',
-                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                         SizedBox(height: 2.h),
                         Text('Set up the academic year for your institution',
-                            style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ],
                 ),
                 SizedBox(height: 20.h),
 
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Year Label *'),
                     TextFormField(
                       controller: _yearLabelController,
@@ -888,9 +878,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: _fieldStyle(),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Start Date *'),
                     InkWell(
                       onTap: () async {
@@ -901,13 +890,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration: _inputDec('Select start date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearStartDate != null ? _formatDate(_yearStartDate!) : 'Select start date',
-                          style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
+                          style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
                         ),
                       ),
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('End Date *'),
                     InkWell(
                       onTap: () async {
@@ -918,11 +906,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration: _inputDec('Select end date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearEndDate != null ? _formatDate(_yearEndDate!) : 'Select end date',
-                          style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
+                          style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
                         ),
                       ),
                     ),
-                  ])),
+                  ]),
                 ]),
               ],
             ),
@@ -935,10 +923,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Step 3: Account Setup
   Widget _buildStep3() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 20.h),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32.w, vertical: 20.h),
       child: Container(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(isMobile ? 16 : 20.w),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -965,18 +954,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text('Account Setup',
-                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                         SizedBox(height: 2.h),
                         Text('Create an admin account for your institution',
-                            style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ],
                 ),
                 SizedBox(height: 20.h),
 
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Admin Name *'),
                     TextFormField(
                       controller: _adminNameController,
@@ -986,9 +975,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: _fieldStyle(),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Designation *'),
                     SizedBox(
                       height: 48,
@@ -1003,12 +991,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
                     ),
-                  ])),
+                  ]),
                 ]),
                 SizedBox(height: 14.h),
 
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Admin Email *'),
                     TextFormField(
                       controller: _adminEmailController,
@@ -1019,9 +1007,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Admin Phone *'),
                     TextFormField(
                       controller: _adminPhoneController,
@@ -1032,9 +1019,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                       validator: (v) => v == null || v.trim().isEmpty ? 'Phone is required' : null,
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Date of Birth *'),
                     SizedBox(
                       height: 48,
@@ -1056,17 +1042,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             _adminDob != null
                                 ? '${_adminDob!.day.toString().padLeft(2, '0')}/${_adminDob!.month.toString().padLeft(2, '0')}/${_adminDob!.year}'
                                 : 'Select date of birth',
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: _adminDob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6)),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _adminDob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6)),
                           ),
                         ),
                       ),
                     ),
-                  ])),
+                  ]),
                 ]),
                 SizedBox(height: 14.h),
 
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _formRow(context, [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Password *'),
                     TextFormField(
                       controller: _passwordController,
@@ -1085,9 +1071,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-                  ])),
-                  SizedBox(width: 14.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Confirm Password *'),
                     TextFormField(
                       controller: _confirmPasswordController,
@@ -1105,7 +1090,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-                  ])),
+                  ]),
                 ]),
                 SizedBox(height: 32.h),
 
@@ -1140,19 +1125,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       padding: EdgeInsets.only(bottom: 8.h),
       child: Text(label,
           style: TextStyle(
-              fontSize: 13.sp,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary)),
     );
   }
 
-  TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary);
+  // Renders [fields] as a Row on desktop and stacks them vertically on mobile.
+  Widget _formRow(BuildContext context, List<Widget> fields, {double gap = 14, List<int>? flexes}) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    if (isMobile) {
+      final children = <Widget>[];
+      for (var i = 0; i < fields.length; i++) {
+        children.add(fields[i]);
+        if (i < fields.length - 1) children.add(SizedBox(height: gap));
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
+    }
+    final children = <Widget>[];
+    for (var i = 0; i < fields.length; i++) {
+      children.add(Expanded(flex: flexes != null && i < flexes.length ? flexes[i] : 1, child: fields[i]));
+      if (i < fields.length - 1) children.add(SizedBox(width: gap));
+    }
+    return Row(children: children);
+  }
+
+  TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary);
 
   static const Color _kFieldFill = Color(0xFFF3F4F6);
 
   InputDecoration _inputDec(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13.sp, fontWeight: FontWeight.w500),
+    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13, fontWeight: FontWeight.w500),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),

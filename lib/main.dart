@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -50,10 +51,32 @@ class SchoolAdminApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,
+          scrollBehavior: const _AppScrollBehavior(),
           initialRoute: AppRoutes.splash,
           routes: AppRoutes.routes,
         );
       },
     );
   }
+}
+
+/// App-wide scroll behaviour:
+/// - Allows click-drag scrolling with mouse + trackpad on web/desktop (default
+///   only allows touch). Critical for horizontal tables that overflow.
+/// - Uses a smooth bouncing physics so wheel/drag inertia feels natural.
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
 }

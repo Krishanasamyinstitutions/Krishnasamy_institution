@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
@@ -73,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
           .eq('activestatus', 1)
           .order('iyr_id', ascending: false);
       final rawYears = List<Map<String, dynamic>>.from(result);
-      // Deduplicate by yrlabel — the Material DropdownButton crashes if two
+      // Deduplicate by yrlabel â€” the Material DropdownButton crashes if two
       // items share the same value. Defensive against duplicate rows in
       // public.institutionyear.
       final seen = <String>{};
@@ -186,8 +185,8 @@ class _LoginScreenState extends State<LoginScreen> {
               top: 60.0 + (row * 80),
               left: 40.0 + (col * 80),
               child: Container(
-                width: 3.w,
-                height: 3.h,
+                width: 3,
+                height: 3,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.06),
@@ -198,25 +197,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
           Center(
             child: Padding(
-              padding: EdgeInsets.all(64.w),
+              padding: EdgeInsets.all(64),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInLeft(
-                    child: SizedBox(
-                      width: 128.w,
-                      height: 128.h,
-                      child: Image.asset(
-                        'assets/images/educore360_logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => AppIcon('teacher',
-                          size: 56.sp,
-                          color: AppColors.accent,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.white,
+                        padding: EdgeInsets.all(8),
+                        child: Image.asset(
+                          'assets/images/educore360_logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => AppIcon('teacher',
+                            size: 40,
+                            color: AppColors.accent,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(height: 32.h),
+                  SizedBox(height: 32),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
@@ -229,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                     ),
                   ),
-                  SizedBox(height: 16.h),
+                  SizedBox(height: 16),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 400),
                     child: Text(
@@ -241,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                     ),
                   ),
-                  SizedBox(height: 48.h),
+                  SizedBox(height: 48),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 600),
                     child: _buildFeatureList(context),
@@ -265,16 +269,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       children: features.map((f) {
         return Padding(
-          padding: EdgeInsets.only(bottom: 16.h),
+          padding: EdgeInsets.only(bottom: 16),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36.w,
-                height: 36.h,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10.r),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: AppIcon(
                   f['icon'] as String,
@@ -282,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   size: 18,
                 ),
               ),
-              SizedBox(width: 14.w),
+              SizedBox(width: 14),
               Text(
                 f['text'] as String,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -301,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
       color: AppColors.surface,
       child: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(40.w),
+          padding: EdgeInsets.all(40),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Form(
@@ -320,14 +324,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           backgroundColor: Colors.white,
                           side: const BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.r),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                  SizedBox(height: 32.h),
+                  SizedBox(height: 32),
 
                   FadeInDown(
                     delay: const Duration(milliseconds: 100),
@@ -336,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: Theme.of(context).textTheme.displayMedium,
                     ),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 8),
                   FadeInDown(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
@@ -347,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 36.h),
+                  SizedBox(height: 36),
 
                   // Error message
                   Consumer<AuthProvider>(
@@ -355,11 +359,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (auth.errorMessage != null) {
                         return FadeInDown(
                           child: Container(
-                            padding: EdgeInsets.all(14.w),
-                            margin: EdgeInsets.only(bottom: 20.h),
+                            padding: EdgeInsets.all(14),
+                            margin: EdgeInsets.only(bottom: 20),
                             decoration: BoxDecoration(
                               color: AppColors.error.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12.r),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.3),
                               ),
@@ -368,7 +372,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 AppIcon.linear('info-circle',
                                     color: AppColors.error, size: 20),
-                                SizedBox(width: 10.w),
+                                SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     auth.errorMessage!,
@@ -399,9 +403,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: Theme.of(context)
                                 .textTheme
                                 .labelLarge
-                                ?.copyWith(fontSize: 13.sp),
+                                ?.copyWith(fontSize: 13),
                           ),
-                          SizedBox(height: 8.h),
+                          SizedBox(height: 8),
                           _loadingInstitutions
                               ? const LinearProgressIndicator()
                               : DropdownButtonFormField<int>(
@@ -412,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     prefixIcon: AppIcon.linear('teacher',
                                         size: 20, color: AppColors.textLight),
                                     prefixIconConstraints: BoxConstraints(
-                                        minWidth: 52.w, minHeight: 0),
+                                        minWidth: 52, minHeight: 0),
                                   ),
                                   items: _institutions.map((ins) {
                                     return DropdownMenuItem<int>(
@@ -438,7 +442,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20.h),
+                    SizedBox(height: 20),
                     // Year dropdown (shows after institution selected)
                     if (_availableYears.isNotEmpty)
                       FadeInDown(
@@ -446,8 +450,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Academic Year', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 13.sp)),
-                            SizedBox(height: 8.h),
+                            Text('Academic Year', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 13)),
+                            SizedBox(height: 8),
                             _loadingYears
                                 ? const LinearProgressIndicator()
                                 : DropdownButtonFormField<String>(
@@ -456,7 +460,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     decoration: InputDecoration(
                                       hintText: 'Select academic year',
                                       prefixIcon: AppIcon.linear('calendar', size: 20, color: AppColors.textLight),
-                                      prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+                                      prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
                                     ),
                                     items: _availableYears.map((y) {
                                       final label = y['yrlabel']?.toString() ?? '';
@@ -467,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                    if (_availableYears.isNotEmpty) SizedBox(height: 20.h),
+                    if (_availableYears.isNotEmpty) SizedBox(height: 20),
                   ],
 
                   // Email / Username field
@@ -481,9 +485,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(fontSize: 13.sp),
+                              ?.copyWith(fontSize: 13),
                         ),
-                        SizedBox(height: 8.h),
+                        SizedBox(height: 8),
                         TextFormField(
                           controller: _emailController,
                           keyboardType: _isSuperAdmin ? TextInputType.text : TextInputType.emailAddress,
@@ -493,7 +497,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _isSuperAdmin ? 'user' : 'sms',
                                 size: 20, color: AppColors.textLight),
                             prefixIconConstraints: BoxConstraints(
-                                minWidth: 52.w, minHeight: 0),
+                                minWidth: 52, minHeight: 0),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -509,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 20.h),
+                  SizedBox(height: 20),
 
                   // Password field
                   FadeInDown(
@@ -522,18 +526,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(fontSize: 13.sp),
+                              ?.copyWith(fontSize: 13),
                         ),
-                        SizedBox(height: 8.h),
+                        SizedBox(height: 8),
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           decoration: InputDecoration(
-                            hintText: '••••••••',
+                            hintText: 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢',
                             prefixIcon: AppIcon.linear('lock',
                                 size: 20, color: AppColors.textLight),
                             prefixIconConstraints: BoxConstraints(
-                                minWidth: 52.w, minHeight: 0),
+                                minWidth: 52, minHeight: 0),
                             suffixIcon: IconButton(
                               icon: AppIcon(
                                 _obscurePassword
@@ -563,7 +567,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 16.h),
+                  SizedBox(height: 16),
 
                   // Remember me & Forgot password
                   FadeInDown(
@@ -574,25 +578,25 @@ class _LoginScreenState extends State<LoginScreen> {
                         Row(
                           children: [
                             SizedBox(
-                              width: 20.w,
-                              height: 20.h,
+                              width: 20,
+                              height: 20,
                               child: Checkbox(
                                 value: _rememberMe,
                                 onChanged: (v) =>
                                     setState(() => _rememberMe = v ?? false),
                                 activeColor: AppColors.accent,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4.r),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
                               ),
                             ),
-                            SizedBox(width: 8.w),
+                            SizedBox(width: 8),
                             Text(
                               'Remember me',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(fontSize: 13.sp),
+                                  ?.copyWith(fontSize: 13),
                             ),
                           ],
                         ),
@@ -607,7 +611,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ?.copyWith(
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 13.sp,
+                                  fontSize: 13,
                                 ),
                           ),
                         ),
@@ -615,7 +619,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 28.h),
+                  SizedBox(height: 28),
 
                   // Sign in button
                   FadeInDown(
@@ -623,20 +627,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         return SizedBox(
-                          height: 54.h,
+                          height: 54,
                           child: ElevatedButton(
                             onPressed: auth.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
-                              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                              padding: EdgeInsets.symmetric(horizontal: 28, vertical: 20),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10.r),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: auth.isLoading
                                 ? SizedBox(
-                                    width: 22.w,
-                                    height: 22.h,
+                                    width: 22,
+                                    height: 22,
                                     child: const CircularProgressIndicator(
                                       strokeWidth: 2.5,
                                       color: Colors.white,
@@ -645,7 +649,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Text(
                                     'Sign In',
                                     style: TextStyle(
-                                      fontSize: 16.sp,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -655,18 +659,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 28.h),
+                  SizedBox(height: 28),
 
-                  SizedBox(height: 24.h),
+                  SizedBox(height: 24),
 
                   // Demo hint
                   FadeInDown(
                     delay: const Duration(milliseconds: 800),
                     child: Container(
-                      padding: EdgeInsets.all(14.w),
+                      padding: EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: AppColors.info.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12.r),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: AppColors.info.withValues(alpha: 0.15),
                         ),
@@ -675,8 +679,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           AppIcon.linear('info-circle',
                               color: AppColors.info.withValues(alpha: 0.7),
-                              size: 18.sp),
-                          SizedBox(width: 10.w),
+                              size: 18),
+                          SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               _isSuperAdmin
@@ -687,7 +691,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   .bodyMedium
                                   ?.copyWith(
                                     color: AppColors.info,
-                                    fontSize: 13.sp,
+                                    fontSize: 13,
                                   ),
                             ),
                           ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
@@ -54,7 +53,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       final data = resp.data;
       // Surface server-side detail when the function rejects the request
-      // — without it, "Could not send OTP" gives the user no clue whether
+      // â€” without it, "Could not send OTP" gives the user no clue whether
       // it's a missing function deploy, missing secret, or gateway issue.
       if (resp.status >= 400) {
         setState(() {
@@ -159,7 +158,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       backgroundColor: AppColors.surface,
       body: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(40.w),
+          padding: EdgeInsets.all(40),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
@@ -176,35 +175,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         backgroundColor: Colors.white,
                         side: const BorderSide(color: AppColors.border),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
                   ),
                 ),
-                SizedBox(height: 30.h),
+                SizedBox(height: 30),
                 _buildIcon(),
-                SizedBox(height: 24.h),
+                SizedBox(height: 24),
                 _buildTitle(),
-                SizedBox(height: 10.h),
+                SizedBox(height: 10),
                 _buildSubtitle(),
-                SizedBox(height: 28.h),
+                SizedBox(height: 28),
                 if (_errorMessage != null) ...[
                   Container(
-                    padding: EdgeInsets.all(12.w),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 18.sp),
-                      SizedBox(width: 8.w),
+                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                      SizedBox(width: 8),
                       Expanded(child: Text(_errorMessage!,
-                          style: TextStyle(color: Colors.red.shade700, fontSize: 13.sp))),
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 13))),
                     ]),
                   ),
-                  SizedBox(height: 18.h),
+                  SizedBox(height: 18),
                 ],
                 if (_step == _Step.email) _buildEmailForm(),
                 if (_step == _Step.otp) _buildOtpForm(),
@@ -225,11 +224,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     };
     return Center(
       child: Container(
-        width: 80.w,
-        height: 80.w,
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           color: AppColors.accent.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20.r),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: AppIcon(iconName, size: 40, color: AppColors.accent),
       ),
@@ -262,25 +261,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildEmailForm() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Email Address', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-      SizedBox(height: 8.h),
+      Text('Email Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8),
       TextFormField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
         decoration: InputDecoration(
           hintText: 'you@school.edu',
           prefixIcon: const AppIcon.linear('sms', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
-      SizedBox(height: 24.h),
+      SizedBox(height: 24),
       SizedBox(
-        height: 52.h,
-        child: ElevatedButton(
+        height: 48,
+        child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _requestOtp,
-          child: _isLoading
-              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-              : const Text('Send OTP'),
+          icon: _isLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const AppIcon('send', size: 16, color: Colors.white),
+          label: const Text('Send OTP'),
         ),
       ),
     ]);
@@ -288,8 +288,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildOtpForm() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('OTP', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-      SizedBox(height: 8.h),
+      Text('OTP', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8),
       TextFormField(
         controller: _otpController,
         keyboardType: TextInputType.number,
@@ -299,10 +299,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           hintText: '6-digit OTP',
           counterText: '',
           prefixIcon: const AppIcon.linear('shield-tick', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
-      SizedBox(height: 8.h),
+      SizedBox(height: 8),
       Align(
         alignment: Alignment.centerRight,
         child: TextButton(
@@ -310,14 +310,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: const Text('Resend OTP'),
         ),
       ),
-      SizedBox(height: 16.h),
+      SizedBox(height: 16),
       SizedBox(
-        height: 52.h,
-        child: ElevatedButton(
+        height: 48,
+        child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _verifyOtp,
-          child: _isLoading
-              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-              : const Text('Verify OTP'),
+          icon: _isLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const AppIcon('shield-tick', size: 16, color: Colors.white),
+          label: const Text('Verify OTP'),
         ),
       ),
     ]);
@@ -325,41 +326,42 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildPasswordForm() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('New Password', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-      SizedBox(height: 8.h),
+      Text('New Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8),
       TextFormField(
         controller: _newPasswordController,
         obscureText: _obscurePassword,
         decoration: InputDecoration(
           hintText: 'At least 6 characters',
           prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
           suffixIcon: IconButton(
             icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
         ),
       ),
-      SizedBox(height: 16.h),
-      Text('Confirm Password', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-      SizedBox(height: 8.h),
+      SizedBox(height: 16),
+      Text('Confirm Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      SizedBox(height: 8),
       TextFormField(
         controller: _confirmPasswordController,
         obscureText: _obscurePassword,
         decoration: InputDecoration(
           hintText: 'Re-enter password',
           prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52.w, minHeight: 0),
+          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
-      SizedBox(height: 24.h),
+      SizedBox(height: 24),
       SizedBox(
-        height: 52.h,
-        child: ElevatedButton(
+        height: 48,
+        child: ElevatedButton.icon(
           onPressed: _isLoading ? null : _resetPassword,
-          child: _isLoading
-              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-              : const Text('Reset Password'),
+          icon: _isLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : const AppIcon('lock', size: 16, color: Colors.white),
+          label: const Text('Reset Password'),
         ),
       ),
     ]);
