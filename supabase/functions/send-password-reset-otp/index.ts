@@ -65,24 +65,44 @@ Deno.serve(async (req) => {
 
     const conn = await pool.connect()
     try {
-      const lookup = await conn.queryObject<{ use_id: number; usephone: string }>(
-        `SELECT use_id, usephone
-           FROM public.institutionusers
-          WHERE LOWER(usemail) = LOWER($1)
-            AND activestatus = 1
-          LIMIT 1`,
+      // Rate-limit gate. start_password_reset_otp atomically applies the
+      // 5-OTP-per-hour throttle and returns the user_id + masked phone if
+      // allowed, or {ok:false, reason} if rejected. See migration
+      // `migrations/otp_rate_limit_and_lockout.sql`.
+      const gate = await conn.queryObject<{ result: Record<string, unknown> }>(
+        `SELECT public.start_password_reset_otp($1) AS result`,
         [email.trim()],
       )
+      const gateResult = gate.rows[0]?.result ?? {}
 
-      if (lookup.rows.length === 0) {
-        // Don't leak whether the email exists.
+      if (!gateResult['ok']) {
+        if (gateResult['reason'] === 'rate_limited') {
+          return new Response(
+            JSON.stringify({
+              error: 'Too many OTP requests. Try again later.',
+              retry_after_minutes: gateResult['retry_after_minutes'] ?? 60,
+            }),
+            {
+              status: 429,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        // Email not found / missing — don't leak existence.
         return new Response(JSON.stringify({ ok: true, masked: '****' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
 
-      const user = lookup.rows[0]
-      const phone = cleanMobile(user.usephone ?? '')
+      const useId = gateResult['use_id'] as number
+      // Pull the (real) phone number to send to. The masked value comes
+      // from the RPC and is what we return to the client.
+      const phoneRow = await conn.queryObject<{ usephone: string | null }>(
+        `SELECT usephone FROM public.institutionusers WHERE use_id = $1`,
+        [useId],
+      )
+      const user = { use_id: useId } as { use_id: number; usephone?: string }
+      const phone = cleanMobile(phoneRow.rows[0]?.usephone ?? '')
       if (phone.length !== 10) {
         return new Response(JSON.stringify({ error: 'no valid mobile on file' }), {
           status: 422,

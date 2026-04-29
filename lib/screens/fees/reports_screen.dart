@@ -841,17 +841,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             SizedBox(width: 12.w),
             SizedBox(
               width: 170.w,
-              child: DropdownButtonFormField<String?>(
-                value: _selectedPrefix,
+              child: Builder(builder: (_) {
+                final prefixes = _dailyPrefixes();
+                // Stale _selectedPrefix can survive a date change that drops
+                // its prefix from the list — guard against the assertion in
+                // DropdownButton requiring exactly one matching item.
+                final safeValue = (_selectedPrefix != null && prefixes.contains(_selectedPrefix))
+                    ? _selectedPrefix
+                    : null;
+                return DropdownButtonFormField<String?>(
+                value: safeValue,
                 isExpanded: true,
                 decoration: _filterDec('Prefix', icon: Icons.tag_rounded),
                 style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                 items: [
                   DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                  ..._dailyPrefixes().map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
+                  ...prefixes.map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
                 ],
                 onChanged: (v) => setState(() => _selectedPrefix = v),
-              ),
+              );
+              }),
             ),
           ],
                   ],
@@ -1577,9 +1586,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       totNetDemand += demand - conc;
       final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
       final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
-      totCollection += paid - fine;
-      totFine += fine;
-      totBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+      // Recon-aware: only count collection/fine after the row's payment is
+      // reconciled (reconbalancedue drops to 0). Falls back to balancedue.
+      final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+          ?? (d['balancedue'] as num?)?.toDouble() ?? demand;
+      final isReconciled = reconBal <= 0;
+      totCollection += isReconciled ? (paid - fine) : 0;
+      totFine += isReconciled ? fine : 0;
+      totBalance += reconBal;
     }
 
     return Column(
@@ -1647,6 +1661,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 ),
               ),
               SizedBox(width: 8.w),
+              if (_ledgerStudent != null) ...[
+                _miniExportBtn(
+                  onPressed: () => setState(() {
+                    _ledgerStuAdmNo = null;
+                    _ledgerStudent = null;
+                    _ledgerDemands = [];
+                    _ledgerPayments = {};
+                  }),
+                  icon: Icons.close_rounded,
+                  label: 'Clear',
+                  color: AppColors.textSecondary,
+                ),
+                SizedBox(width: 8.w),
+              ],
               _miniExportBtn(
                 onPressed: _ledgerDemands.isEmpty ? () {} : _exportStudentLedgerExcel,
                 icon: Icons.table_chart_rounded,
@@ -1699,11 +1727,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     final net = demand - conc;
                     final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
                     final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                    final collection = paid - fine;
-                    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                    final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+                        ?? (d['balancedue'] as num?)?.toDouble() ?? demand;
+                    final isReconciled = reconBal <= 0;
+                    final collection = isReconciled ? (paid - fine) : 0.0;
+                    final fineDisplay = isReconciled ? fine : 0.0;
+                    final bal = reconBal;
                     final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-                    final docNo = pay?['paynumber']?.toString() ?? '';
-                    final docDate = pay?['paydate']?.toString() ?? '';
+                    // Show DOC.NO / DOC.DATE only after reconciliation —
+                    // unreconciled payments don't surface here yet.
+                    final docNo = isReconciled ? (pay?['paynumber']?.toString() ?? '') : '';
+                    final docDate = isReconciled ? (pay?['paydate']?.toString() ?? '') : '';
                     return [
                       '',
                       d['demfeetype']?.toString() ?? '',
@@ -1711,7 +1745,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       conc > 0 ? _formatNumber(conc) : '',
                       net > 0 ? _formatNumber(net) : '',
                       collection > 0 ? _formatNumber(collection) : '',
-                      fine > 0 ? _formatNumber(fine) : '',
+                      fineDisplay > 0 ? _formatNumber(fineDisplay) : '',
                       docNo,
                       docDate.length >= 10 ? docDate.substring(0, 10) : docDate,
                       bal > 0 ? _formatNumber(bal) : '0',
@@ -1732,8 +1766,59 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               numericCols: const {2, 3, 4, 5, 6, 9},
             ),
           ),
+        ] else if (_selectedCourse != null && _selectedClass != null && students.isNotEmpty) ...[
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  Container(
+                    color: AppColors.tableHeadBg,
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 2, child: Text('ROLL NO', style: headerStyle)),
+                        Expanded(flex: 5, child: Text('STUDENT NAME', style: headerStyle)),
+                        Expanded(flex: 3, child: Text('COURSE', style: headerStyle)),
+                        Expanded(flex: 2, child: Text('CLASS', style: headerStyle)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: students.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (ctx, i) {
+                        final s = students[i];
+                        return InkWell(
+                          onTap: () => _loadStudentLedger(s['stuadmno']),
+                          child: Container(
+                            color: i.isOdd ? AppColors.surface : Colors.white,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            child: Row(
+                              children: [
+                                Expanded(flex: 2, child: Text(s['stuadmno'] ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                Expanded(flex: 5, child: Text(s['stuname'] ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                Expanded(flex: 3, child: Text(s['courname'] ?? '-', style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s['stuclass'] ?? '-', style: cellStyle)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ] else
-          Expanded(child: _emptyState('Select a student to view ledger')),
+          Expanded(child: _emptyState('Select course and class, or search a student')),
       ],
     );
   }
@@ -1795,10 +1880,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
           final net = demand - conc;
           final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
-          final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
-          final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+          final fineRaw = (d['fineamount'] as num?)?.toDouble() ?? 0;
+          final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+              ?? (d['balancedue'] as num?)?.toDouble() ?? demand;
+          final isReconciled = reconBal <= 0;
+          final fine = isReconciled ? fineRaw : 0.0;
+          final bal = reconBal;
           final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-          final collection = paid - fine;
+          final collection = isReconciled ? (paid - fineRaw) : 0.0;
           totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += collection; totFine += fine; totBalance += bal;
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(d['demfeetype']?.toString() ?? '');
           if (demand > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.DoubleCellValue(demand); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).cellStyle = numStyle; }
@@ -1806,8 +1895,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           if (net > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.DoubleCellValue(net); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).cellStyle = numStyle; }
           if (collection > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(collection); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).cellStyle = numStyle; }
           if (fine > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(fine); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).cellStyle = numStyle; }
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(pay?['paynumber']?.toString() ?? '');
-          final pd = pay?['paydate']?.toString() ?? '';
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(isReconciled ? (pay?['paynumber']?.toString() ?? '') : '');
+          final pd = isReconciled ? (pay?['paydate']?.toString() ?? '') : '';
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.TextCellValue(pd.length >= 10 ? pd.substring(0, 10) : pd);
           if (bal > 0) { sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = xl.DoubleCellValue(bal); sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).cellStyle = numStyle; }
           row++;
@@ -1855,12 +1944,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           final conc = (d['conamount'] as num?)?.toDouble() ?? 0;
           final net = demand - conc;
           final paid = (d['paidamount'] as num?)?.toDouble() ?? 0;
-          final fine = (d['fineamount'] as num?)?.toDouble() ?? 0;
-          final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+          final fineRaw = (d['fineamount'] as num?)?.toDouble() ?? 0;
+          final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+              ?? (d['balancedue'] as num?)?.toDouble() ?? demand;
+          final isReconciled = reconBal <= 0;
+          final fine = isReconciled ? fineRaw : 0.0;
+          final bal = reconBal;
           final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-          final collection = paid - fine;
+          final collection = isReconciled ? (paid - fineRaw) : 0.0;
           totDemand += demand; totConcess += conc; totNetDemand += net; totCollection += collection; totFine += fine; totBalance += bal;
-          final pd = pay?['paydate']?.toString() ?? '';
+          final pd = isReconciled ? (pay?['paydate']?.toString() ?? '') : '';
           rows.add([
             '',
             d['demfeetype']?.toString() ?? '',
@@ -1869,7 +1962,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             net > 0 ? _formatNumber(net) : '',
             collection > 0 ? _formatNumber(collection) : '',
             fine > 0 ? _formatNumber(fine) : '',
-            pay?['paynumber']?.toString() ?? '',
+            isReconciled ? (pay?['paynumber']?.toString() ?? '') : '',
             pd.length >= 10 ? pd.substring(0, 10) : pd,
             bal > 0 ? _formatNumber(bal) : '0',
           ]);
