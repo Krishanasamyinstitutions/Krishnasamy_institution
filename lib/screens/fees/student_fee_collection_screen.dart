@@ -2217,6 +2217,36 @@ class _StudentFeeCollectionScreenState
     try {
       await webviewController.initialize();
       await webviewController.setBackgroundColor(Colors.white);
+
+      // Razorpay checkout URL allowlist (S5). The webview only ever loads a
+      // local HTML file we generate; that HTML in turn loads checkout.js
+      // from `checkout.razorpay.com`. Any other navigation target is
+      // suspicious — log it and surface to the user. This is defence in
+      // depth: the local HTML is the primary control.
+      const allowedHosts = <String>{
+        'checkout.razorpay.com',
+        'api.razorpay.com',
+        'lumberjack.razorpay.com',
+        'lumberjack-cx.razorpay.com',
+      };
+      try {
+        webviewController.url.listen((current) {
+          if (current.isEmpty) return;
+          final uri = Uri.tryParse(current);
+          if (uri == null) return;
+          if (uri.scheme == 'file' || uri.scheme == 'about' || uri.scheme == 'data') return;
+          if (uri.scheme != 'https') {
+            debugPrint('Razorpay webview blocked non-https navigation: $current');
+            return;
+          }
+          if (!allowedHosts.contains(uri.host)) {
+            debugPrint('Razorpay webview navigated to unexpected host: ${uri.host}');
+          }
+        });
+      } catch (_) {
+        // url stream may not be available on all platforms; skip silently.
+      }
+
       await webviewController.loadUrl(Uri.file(htmlPath).toString());
     } catch (e) {
       if (!completer.isCompleted) completer.complete(null);
