@@ -692,7 +692,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
+                              AppIcon(
+                                tabIcons[i],
+                                size: 16,
+                                color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 tabLabels[i],
@@ -754,11 +758,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight, fontWeight: FontWeight.w600),
         isDense: true,
         prefixIcon: icon != null
-            ? Icon(icon, size: 16.sp, color: AppColors.accent)
+            ? Icon(icon, size: 16, color: AppColors.accent)
             : null,
-        prefixIconConstraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
-        contentPadding:
-            EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        // 10px vertical + 16px content + ~2px border ≈ 40px total — matches
+        // the Refresh / Excel / PDF action buttons next to these dropdowns.
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.r),
           borderSide: const BorderSide(color: AppColors.border),
@@ -903,16 +908,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     required String label,
     required Color color,
   }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 12.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+    return SizedBox(
+      height: 40,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: EdgeInsets.symmetric(horizontal: 18.w),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

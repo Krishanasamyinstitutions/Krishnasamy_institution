@@ -475,46 +475,57 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             ),
             SizedBox(height: 24.h),
 
-            // Buttons
+            // Buttons — full-width pair (Clear + Create User) sharing the
+            // form row 50/50.
             Builder(builder: (context) {
-              final compact = MediaQuery.of(context).size.width <= 1366;
-              final btnPadding = EdgeInsets.symmetric(horizontal: compact ? 20.w : 28.w, vertical: 20.h);
+              const btnHeight = 48.0;
+              const btnPadding = EdgeInsets.symmetric(horizontal: 32);
               return Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _clearForm,
-                    style: OutlinedButton.styleFrom(
-                      padding: btnPadding,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r)),
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: btnHeight,
+                      child: OutlinedButton.icon(
+                        onPressed: _clearForm,
+                        icon: const AppIcon('refresh', size: 16, color: AppColors.textPrimary),
+                        label: const Text('Clear', style: TextStyle(fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textPrimary,
+                          side: const BorderSide(color: AppColors.border),
+                          padding: btnPadding,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.r)),
+                        ),
+                      ),
                     ),
-                    child: const Text('Clear'),
                   ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _createUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.white,
-                      padding: btnPadding,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r)),
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            width: 20.w,
-                            height: 20.h,
-                            child: const CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Text('Create User',
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: SizedBox(
+                      height: btnHeight,
+                      child: ElevatedButton.icon(
+                        onPressed: _isLoading ? null : _createUser,
+                        icon: _isLoading
+                            ? SizedBox(
+                                width: 18.w,
+                                height: 18.h,
+                                child: const CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const AppIcon('user-add', size: 16, color: Colors.white),
+                        label: const Text('Create User',
                             style: TextStyle(fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: Colors.white,
+                          padding: btnPadding,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10.r)),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            );
+                ],
+              );
             }),
           ],
         ),
