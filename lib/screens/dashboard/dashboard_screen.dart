@@ -494,20 +494,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8.r),
-                  child: Container(
-                    width: 32.w,
-                    height: 32.h,
-                    color: Colors.white,
-                    padding: EdgeInsets.all(2.w),
-                    child: Image.asset(
-                      'assets/images/educore360_logo.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => AppIcon('teacher',
-                        color: AppColors.primary,
-                        size: 16,
-                      ),
+                SizedBox(
+                  width: 56.w,
+                  height: 56.h,
+                  child: Image.asset(
+                    'assets/images/educore360_logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => AppIcon('teacher',
+                      color: AppColors.primary,
+                      size: 16,
                     ),
                   ),
                 ),

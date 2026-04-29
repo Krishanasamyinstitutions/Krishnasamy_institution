@@ -156,6 +156,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   bool _showPendingFees = false;
   bool _showTotalCollection = false;
   bool _showTodayCollection = false;
+  bool _showPendingApproval = false;
   String? _selectedPendingFeeGroup; // null = group list, non-null = course+class list
   String? _selectedPendingCourseClass; // "COURSE|CLASS"; null = course+class list, non-null = student drilldown
   List<Map<String, dynamic>> _demands = [];
@@ -419,22 +420,26 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     // Cash auto-reconciles (recon_status='R'); other methods stay 'P' until
     // bank reconciliation. Pending-approval money is shown on its own card.
     double totalCollectionFromPayments = 0;
+    double totalCollectionPending = 0;
     double todayCollection = 0;
+    double todayCollectionPending = 0;
     double pendingApprovalAmt = 0;
     final List<int> todayPayIds = [];
     final List<int> allPayIds = [];
     for (final p in payments) {
       final reconStatus = p['recon_status']?.toString() ?? 'P';
       final amt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+      final payDate = _extractDate(p['paydate']);
       if (reconStatus == 'P') {
         pendingApprovalAmt += amt;
+        totalCollectionPending += amt;
+        if (payDate == todayStr) todayCollectionPending += amt;
         continue;
       }
       if (reconStatus != 'R') continue; // skip any other non-approved
       totalCollectionFromPayments += amt;
       final pid = p['pay_id'] as int?;
       if (pid != null) allPayIds.add(pid);
-      final payDate = _extractDate(p['paydate']);
       if (payDate == todayStr) {
         todayCollection += amt;
         if (pid != null) todayPayIds.add(pid);
@@ -474,13 +479,18 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final dateGroups = grouped.entries.map((e) {
       double total = 0;
       double fine = 0;
+      // Date-wise summary counts only reconciled (recon_status='R') payments
+      // so it matches the Total Collection card's reconciled portion.
+      final reconciledPayments = <Map<String, dynamic>>[];
       for (final p in e.value) {
+        if ((p['recon_status']?.toString() ?? 'P') != 'R') continue;
+        reconciledPayments.add(p);
         total += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
         final pid = p['pay_id'] as int?;
         if (pid != null) fine += payFineMap[pid] ?? 0;
       }
-      return _DateGroup(date: e.key, payments: e.value, totalAmount: total, totalFine: fine);
-    }).toList();
+      return _DateGroup(date: e.key, payments: reconciledPayments, totalAmount: total, totalFine: fine);
+    }).toList()..removeWhere((g) => g.payments.isEmpty);
     dateGroups.sort((a, b) => b.date.compareTo(a.date));
 
     double todayFine = 0;
@@ -506,6 +516,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         // breakdown comes from the same payFineMap for consistency.
         _totalCollection = totalCollectionFromPayments;
         _totalFine = totalFineFromPayments;
+        _totalCollectionPending = totalCollectionPending;
+        _todayCollectionPending = todayCollectionPending;
         _pendingApproval = pendingApprovalAmt;
         _pendingFees = feeTotals['totalPending'] ?? 0;
         _isLoading = false;
@@ -629,6 +641,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
   double _pendingFees = 0;
   double _todayCollection = 0;
+  double _totalCollectionPending = 0;
+  double _todayCollectionPending = 0;
   double _todayFine = 0;
   double _totalCollection = 0;
   double _totalFine = 0;
@@ -780,8 +794,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   const Color(0xFFFB8C00),
                   _formatCurrency(_pendingApproval),
                   'Pending Approval',
-                  () {},
-                  hasDrilldown: false,
+                  () {
+                    setState(() {
+                      _showPendingApproval = true;
+                      _showTotalCollection = false;
+                      _showTodayCollection = false;
+                      _showPendingFees = false;
+                      _selectedDate = null;
+                      _selectedPayId = null;
+                    });
+                  },
                 ),
                 SizedBox(width: 8.w),
                 _buildClickableSummaryCard('timer', Colors.orange, _isLoadingDemands ? 'Loading...' : _formatCurrency(_pendingFees), 'Pending Fees', () {
@@ -806,6 +828,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               _buildCollectionDrilldown(false)
             else if (_showTodayCollection)
               _buildCollectionDrilldown(true)
+            else if (_showPendingApproval)
+              _buildPendingApprovalDrilldown()
             else if (_showPendingFees)
               _buildPendingFeesView()
             else if (_selectedPayId != null && _selectedDate != null)
@@ -850,8 +874,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }
     final classes = classSet.toList()..sort(_compareClass);
 
-    // Apply filters
+    // Apply filters — Total/Today drilldown shows only reconciled payments;
+    // pending-approval rows live behind the Pending Approval card.
     final filtered = basePayments.where((p) {
+      if ((p['recon_status']?.toString() ?? 'P') != 'R') return false;
       if (_collectionMethodFilter != null) {
         final raw = (p['paymethod']?.toString() ?? '').toLowerCase();
         final bucket = raw == 'cash' ? 'Cash' : 'Bank';
@@ -884,7 +910,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }
     final methodKeys = byMethod.keys.toList()..sort();
 
-    // Totals
+    // Totals — Total/Today drilldown only includes reconciled rows (filtered
+    // earlier) so the totals card just shows the rolled-up amount.
     double total = 0;
     int totalCount = 0;
     final allStuIds = <String>{};
@@ -988,33 +1015,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
                     ],
                     onChanged: (v) => setState(() => _collectionMethodFilter = v),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 8.w),
-            // Class dropdown
-            SizedBox(
-              height: 40,
-              child: DropdownButtonHideUnderline(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: DropdownButton<String?>(
-                    value: _collectionClassFilter,
-                    hint: Text('All Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
-                      ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
-                    ],
-                    onChanged: (v) => setState(() => _collectionClassFilter = v),
                   ),
                 ),
               ),
@@ -1271,6 +1271,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     String? subtitle,
     String? feeAmount,
     String? fineAmount,
+    String feeLabel = 'Fee',
+    String fineLabel = 'Fine',
     bool hasDrilldown = true,
   }) {
     final showBreakdown = feeAmount != null || fineAmount != null;
@@ -1341,7 +1343,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                         child: Row(
                           children: [
-                            Text('Fee: ', style: TextStyle(fontSize: 11.sp, color: AppColors.success, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                            Text('$feeLabel: ', style: TextStyle(fontSize: 11.sp, color: AppColors.success, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
                             Flexible(child: Text(feeAmount ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.success, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
                           ],
                         ),
@@ -1356,7 +1358,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                         child: Row(
                           children: [
-                            Text('Fine: ', style: TextStyle(fontSize: 11.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                            Text('$fineLabel: ', style: TextStyle(fontSize: 11.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
                             Flexible(child: Text(fineAmount ?? '-', style: TextStyle(fontSize: 13.sp, color: Colors.orange.shade800, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
                           ],
                         ),
@@ -2719,23 +2721,25 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   }
 
   Future<void> _onPaymentTap(Map<String, dynamic> payment) async {
+    // Replaced the per-payment semester drilldown with a direct receipt
+    // download — clicking a row in the date-wise drilldown saves the PDF.
+    await _downloadReceiptForPayment(payment);
+  }
+
+  Future<void> _downloadReceiptForPayment(Map<String, dynamic> payment) async {
     final payId = payment['pay_id'] as int?;
     if (payId == null) return;
-
-    setState(() {
-      _selectedPayId = payId;
-      _selectedPayment = payment;
-      _loadingFeeDetails = true;
-      _feeDetails = null;
-    });
-
     final auth = context.read<AuthProvider>();
-    final details = await SupabaseService.getFeeDetailsByPayId(payId, insId: auth.insId);
-    if (mounted) {
-      setState(() {
-        _feeDetails = details;
-        _loadingFeeDetails = false;
-      });
+    try {
+      final details = await SupabaseService.getFeeDetailsByPayId(payId, insId: auth.insId);
+      if (!mounted) return;
+      _showReceiptDialog(payment, details);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -2931,14 +2935,18 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 DataCell(Text(_formatCurrency(totalAmt), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
                                 DataCell(Align(
                                   alignment: Alignment.centerRight,
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
-                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                      Text('View', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                                      SizedBox(width: 4.w),
-                                      AppIcon.linear('Chevron Right', color: Colors.white, size: 12),
-                                    ]),
+                                  child: InkWell(
+                                    onTap: () => _downloadReceiptForPayment(p),
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                      decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        AppIcon.linear('document-download', color: Colors.white, size: 14),
+                                        SizedBox(width: 6.w),
+                                        Text('Receipt', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                      ]),
+                                    ),
                                   ),
                                 )),
                               ],
@@ -3189,7 +3197,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text('Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
+                        pw.Text(data.reconStatus == 'P' ? 'Acknowledgement' : 'Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
                         pw.SizedBox(height: 12),
                         labelValue('Receipt No:', data.receiptNo),
                         pw.SizedBox(height: 6),
@@ -3339,8 +3347,32 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           ),
                       ],
                     ),
-                    // PAID stamp overlay
-                    if (data.status == 'paid')
+                    // Stamp overlay: SUBJECT TO REALIZATION when the
+                    // payment is awaiting bank reconciliation, otherwise PAID.
+                    if (data.reconStatus == 'P')
+                      pw.Positioned(
+                        left: 90, top: 40,
+                        child: pw.Opacity(
+                          opacity: 0.55,
+                          child: pw.Transform.rotateBox(
+                            angle: -0.40,
+                            child: pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                              decoration: pw.BoxDecoration(
+                                color: const PdfColor.fromInt(0x66ffe7b5),
+                                borderRadius: pw.BorderRadius.circular(10.r),
+                                border: pw.Border.all(color: const PdfColor.fromInt(0xffe09100), width: 2.5),
+                              ),
+                              child: pw.Text(
+                                'SUBJECT TO\nREALIZATION',
+                                style: pw.TextStyle(font: fontSemiBold, fontSize: 16, color: const PdfColor.fromInt(0xffb86b00)),
+                                textAlign: pw.TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (data.status == 'paid')
                       pw.Positioned(
                         left: 120, top: 40,
                         child: pw.Opacity(
@@ -3528,6 +3560,178 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Drilldown for the Pending Approval card. Shows every payment with
+  /// recon_status='P' in a table identical to the date-wise drilldown,
+  /// with a Receipt button per row. Receipts rendered for these rows show
+  /// the "SUBJECT TO REALIZATION" stamp because their reconStatus is 'P'.
+  Widget _buildPendingApprovalDrilldown() {
+    final pending = _payments.where((p) =>
+        (p['recon_status']?.toString() ?? 'P') == 'P').toList();
+
+    final double grandTotal = pending.fold(0.0, (s, p) => s + ((p['transtotalamount'] as num?)?.toDouble() ?? 0));
+    final double grandFine = pending.fold(0.0, (s, p) => s + (_payFineMap[p['pay_id'] as int?] ?? 0.0));
+    final double grandCollection = grandTotal - grandFine;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Breadcrumb
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => setState(() => _showPendingApproval = false),
+                  borderRadius: BorderRadius.circular(10.r),
+                  child: Container(
+                    height: 40,
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                      SizedBox(width: 6.w),
+                      Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ]),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Container(width: 1, height: 18, color: AppColors.border),
+                SizedBox(width: 12.w),
+                Text('Fee Collection', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                SizedBox(width: 6.w),
+                AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                SizedBox(width: 6.w),
+                Text('Pending Approval', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                SizedBox(width: 8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text('${pending.length} payments',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.orange.shade800)),
+                ),
+              ],
+            ),
+          ),
+          // Table
+          if (pending.isEmpty)
+            Padding(
+              padding: EdgeInsets.all(32.w),
+              child: Text('No payments awaiting approval',
+                  style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary)),
+            )
+          else
+            LayoutBuilder(builder: (context, constraints) {
+              return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Container(
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: SizedBox(
+                            width: constraints.maxWidth - 32,
+                            child: DataTable(
+                              dividerThickness: 0,
+                              showCheckboxColumn: false,
+                              headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
+                              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+                              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                              columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                              columns: const [
+                                DataColumn(label: Text('S No.')),
+                                DataColumn(label: Text('PAY NO')),
+                                DataColumn(label: Text('TIME')),
+                                DataColumn(label: Text('ROLL NO')),
+                                DataColumn(label: Text('STUDENT NAME')),
+                                DataColumn(label: Text('COURSE')),
+                                DataColumn(label: Text('CLASS')),
+                                DataColumn(label: Text('METHOD')),
+                                DataColumn(label: Text('COLLECTION'), numeric: true),
+                                DataColumn(label: Text('FINE'), numeric: true),
+                                DataColumn(label: Text('TOTAL'), numeric: true),
+                                DataColumn(label: Text('ACTION'), numeric: true),
+                              ],
+                              rows: [
+                                ...List.generate(pending.length, (i) {
+                                  final p = pending[i];
+                                  final student = p['students'] as Map<String, dynamic>?;
+                                  final timeStr = _formatTime(p['createdat'] ?? p['paydate']);
+                                  final totalAmt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                                  final fine = _payFineMap[p['pay_id'] as int?] ?? 0.0;
+                                  final collection = totalAmt - fine;
+                                  return DataRow(
+                                    color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
+                                    onSelectChanged: (_) => _downloadReceiptForPayment(p),
+                                    cells: [
+                                      DataCell(Text('${i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                      DataCell(Text(timeStr, style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(Text(student?['stuadmno']?.toString() ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(student?['stuname']?.toString() ?? '-', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
+                                      DataCell(Text(student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : (_stuIdToCourse[p['stu_id'] as int?] ?? '-'), style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(Text(student?['stuclass']?.toString() ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(Text(p['paymethod'] ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
+                                      DataCell(Text(_formatCurrency(collection), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                      DataCell(Text(fine > 0 ? _formatCurrency(fine) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: fine > 0 ? Colors.orange : AppColors.textSecondary))),
+                                      DataCell(Text(_formatCurrency(totalAmt), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
+                                      DataCell(Align(
+                                        alignment: Alignment.centerRight,
+                                        child: InkWell(
+                                          onTap: () => _downloadReceiptForPayment(p),
+                                          borderRadius: BorderRadius.circular(8.r),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                              AppIcon.linear('document-download', color: Colors.white, size: 14),
+                                              SizedBox(width: 6.w),
+                                              Text('Receipt', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                            ]),
+                                          ),
+                                        ),
+                                      )),
+                                    ],
+                                  );
+                                }),
+                                DataRow(color: WidgetStateProperty.all(AppColors.tableHeadBg), cells: [
+                                  const DataCell(Text('')),
+                                  DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  DataCell(Text(_formatCurrency(grandCollection), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                                  DataCell(Text(_formatCurrency(grandFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                                  DataCell(Text(_formatCurrency(grandTotal), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                                  const DataCell(Text('')),
+                                ]),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+        ],
       ),
     );
   }
@@ -5173,10 +5377,15 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           return false;
         }
       }
-      // Status filter
+      // Status filter — uses reconciliation status, not paidstatus, so the
+      // class-wise tab only marks rows Paid after bank reconciliation.
       if (_studentStatusFilter != null) {
-        final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
-        final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+        bool isReconciled(Map d) {
+          final r = (d['reconbalancedue'] as num?)?.toDouble();
+          return r != null && r <= 0;
+        }
+        final allPaid = studentDemands.isNotEmpty && studentDemands.every(isReconciled);
+        final anyPaid = studentDemands.any(isReconciled);
         final status = allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid';
         if (status != _studentStatusFilter) return false;
       }
@@ -5398,17 +5607,24 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     final studentDemands = byStudent[admNo]!;
                     final stuName = studentDemands.first['_stuname']?.toString() ?? '-';
                     double sDemand = 0, sPaid = 0, sFine = 0, sBalance = 0;
+                    int reconciledCount = 0;
                     for (final d in studentDemands) {
-                      sDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
+                      final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
                       final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
                       final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                      final isPaid = pa > 0 || d['paidstatus'] == 'P';
-                      sPaid += pa - (isPaid ? fa : 0);
-                      sFine += isPaid ? fa : 0;
-                      sBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
+                      sDemand += amt;
+                      // Class-wise tab counts a row as paid only after the
+                      // payment is reconciled (reconbalancedue drops to 0).
+                      final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+                          ?? (d['balancedue'] as num?)?.toDouble() ?? amt;
+                      final isFullyReconciled = reconBal <= 0;
+                      sPaid += isFullyReconciled ? (pa - fa) : 0;
+                      sFine += isFullyReconciled ? fa : 0;
+                      sBalance += reconBal;
+                      if (isFullyReconciled) reconciledCount++;
                     }
-                    final allPaid = studentDemands.every((d) => d['paidstatus'] == 'P');
-                    final anyPaid = studentDemands.any((d) => d['paidstatus'] == 'P');
+                    final allPaid = studentDemands.isNotEmpty && reconciledCount == studentDemands.length;
+                    final anyPaid = reconciledCount > 0;
                     stuBodyChildren.add(InkWell(
                       onTap: () => setState(() {
                         _drilldownAdmNo = admNo;

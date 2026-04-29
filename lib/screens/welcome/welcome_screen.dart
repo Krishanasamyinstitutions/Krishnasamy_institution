@@ -381,18 +381,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     FadeInLeft(
                       child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10.r),
-                            child: Container(
-                              width: 48.w,
-                              height: 48.w,
-                              color: Colors.white,
-                              child: Image.asset(
-                                'assets/images/educore360_logo.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(Icons.school_rounded,
-                                    color: const Color(0xFF002147), size: 26.sp),
-                              ),
+                          SizedBox(
+                            width: 80.w,
+                            height: 80.w,
+                            child: Image.asset(
+                              'assets/images/educore360_logo.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(Icons.school_rounded,
+                                  color: const Color(0xFF002147), size: 36.sp),
                             ),
                           ),
                           SizedBox(width: 10.w),
