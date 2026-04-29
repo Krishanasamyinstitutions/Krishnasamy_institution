@@ -8,6 +8,7 @@ import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/ledger_logic.dart' as ledger;
 import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
 
@@ -138,7 +139,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       final parentFuture = SupabaseService.getStudentParent(student.stuId, stuadmno: student.stuadmno);
 
       // Try stuadmno first (primary key used in feedemand)
-      const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, fineamount, balancedue, duedate, paidstatus, pay_id';
+      const selectFields = 'dem_id, demno, demfeetype, demfeeterm, feeamount, conamount, paidamount, fineamount, balancedue, reconbalancedue, duedate, paidstatus, pay_id';
       final demandsByAdmno = await SupabaseService.fromSchema('feedemand')
           .select(selectFields)
           .eq('ins_id', insId)
@@ -202,9 +203,12 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     }
   }
 
-  double get _totalDemand => _demands.fold(0.0, (s, d) => s + ((d['feeamount'] as num?)?.toDouble() ?? 0));
-  double get _totalPaid => _demands.fold(0.0, (s, d) => s + ((d['paidamount'] as num?)?.toDouble() ?? 0));
-  double get _totalPending => _demands.fold(0.0, (s, d) => s + ((d['balancedue'] as num?)?.toDouble() ?? 0));
+  // Card totals are derived by the pure helper in lib/utils/ledger_logic.dart
+  // so the formula is unit-tested and stays consistent with the dashboard.
+  ledger.LedgerTotals get _totals => ledger.computeLedgerTotals(_demands);
+  double get _totalDemand => _totals.demand;
+  double get _totalPaid => _totals.paid;
+  double get _totalPending => _totals.pending;
 
   // Ledger rows from feedemand: unpaid = debit only, paid = debit + credit
   List<Map<String, dynamic>> get _ledgerRows {
@@ -228,8 +232,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         'type': 'demand',
       });
 
-      // Payment row (credit) — for paid and partially paid demands
-      if (hasPaid && payment is Map) {
+      // Payment row (credit) — only show for reconciled rows so RECEIVED
+      // entries match the Paid card. Unreconciled rows surface as a Demand
+      // with Pending balance only.
+      final amt = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
+      final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+          ?? (d['balancedue'] as num?)?.toDouble() ?? amt;
+      final isReconciled = reconBal <= 0;
+      if (hasPaid && payment is Map && isReconciled) {
         final payDate = payment['paydate']?.toString() ?? raw;
         final payNumber = payment['paynumber']?.toString() ?? '-';
         final payMethod = payment['paymethod']?.toString() ?? '-';
@@ -723,10 +733,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
   Widget _buildDemandsTab() {
     final rows = _ledgerRows;
-    final totalDebit   = rows.fold(0.0, (s, r) => s + (r['debit']  as double));
-    final totalCredit  = rows.fold(0.0, (s, r) => s + (r['credit'] as double));
-    final totalFine    = rows.fold(0.0, (s, r) => s + ((r['fine'] as num?)?.toDouble() ?? 0));
-    final closingBalance = totalDebit - totalCredit;
+    // Footer totals must agree with the Demand/Paid/Pending cards above:
+    //   DUE     = total demand (sum of feeamount)
+    //   RECEIVED = recon-aware paid (only reconciled portion)
+    //   FINE    = recon-aware fine
+    //   CLOSING = recon-aware pending
+    final totalDebit  = _totalDemand;
+    final totalCredit = _totalPaid;
+    final totalFine   = _demands.fold(0.0, (s, d) {
+      final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
+      final reconBal = (d['reconbalancedue'] as num?)?.toDouble()
+          ?? (d['balancedue'] as num?)?.toDouble() ?? amt;
+      final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+      return s + (reconBal <= 0 ? fa : 0);
+    });
+    final closingBalance = _totalPending;
 
     return Padding(
       padding: EdgeInsets.all(16.w),

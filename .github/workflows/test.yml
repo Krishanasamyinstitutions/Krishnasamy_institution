@@ -1,0 +1,52 @@
+name: test
+
+on:
+  push:
+    branches: [ main, dev, feature-branch-1, feature-branch-2 ]
+  pull_request:
+
+jobs:
+  analyze-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze (advisory — info/warn don't fail the build)
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos lib test
+        continue-on-error: true
+
+      - name: Run unit + widget tests
+        run: flutter test --coverage test/
+
+      - name: Coverage summary
+        shell: pwsh
+        run: |
+          if (Test-Path coverage/lcov.info) {
+            $lines = (Get-Content coverage/lcov.info | Select-String '^DA:').Count
+            $hits = (Get-Content coverage/lcov.info | Select-String '^DA:.*,[1-9]').Count
+            if ($lines -gt 0) {
+              $pct = [math]::Round(($hits / $lines) * 100, 1)
+              Write-Host "Coverage: $hits / $lines lines ($pct %)"
+            }
+          }
+
+      - name: Upload coverage as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14

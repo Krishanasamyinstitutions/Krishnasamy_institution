@@ -203,20 +203,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInLeft(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22.r),
-                      child: Container(
-                        width: 80.w,
-                        height: 80.h,
-                        color: Colors.white,
-                        padding: EdgeInsets.all(8.w),
-                        child: Image.asset(
-                          'assets/images/educore360_logo.png',
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => AppIcon('teacher',
-                            size: 40.sp,
-                            color: AppColors.accent,
-                          ),
+                    child: SizedBox(
+                      width: 128.w,
+                      height: 128.h,
+                      child: Image.asset(
+                        'assets/images/educore360_logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => AppIcon('teacher',
+                          size: 56.sp,
+                          color: AppColors.accent,
                         ),
                       ),
                     ),

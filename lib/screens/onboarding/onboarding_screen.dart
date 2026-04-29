@@ -192,21 +192,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       children: [
                         Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12.r),
-                              child: Container(
-                                width: 40.w,
-                                height: 40.h,
-                                color: Colors.white,
-                                padding: EdgeInsets.all(2.w),
-                                child: Image.asset(
-                                  'assets/images/educore360_logo.png',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.school_rounded,
-                                    color: _TealPalette.amber,
-                                    size: 22,
-                                  ),
+                            SizedBox(
+                              width: 64.w,
+                              height: 64.h,
+                              child: Image.asset(
+                                'assets/images/educore360_logo.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.school_rounded,
+                                  color: _TealPalette.amber,
+                                  size: 28,
                                 ),
                               ),
                             ),

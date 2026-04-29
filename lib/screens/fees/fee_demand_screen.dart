@@ -1104,19 +1104,21 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       final g = grouped[admNo]!;
       final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
       final con = (d['conamount'] as num?)?.toDouble() ?? 0;
-      final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
       final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
       final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-      final status = d['paidstatus']?.toString() ?? 'U';
-      final isPaid = pa > 0 || status == 'P' || status == 'Paid';
-      final paid = pa - (isPaid ? fa : 0);
+      // Use reconbalancedue (post-recon outstanding); fall back to balancedue.
+      // Paid = paidamount - fineamount when reconciled, else 0.
+      final bal = (d['reconbalancedue'] as num?)?.toDouble()
+          ?? (d['balancedue'] as num?)?.toDouble() ?? amt;
+      final isFullyReconciled = bal <= 0;
+      final paid = isFullyReconciled ? (pa - fa) : 0.0;
       g['total_demand'] = (g['total_demand'] as double) + amt;
       g['total_concession'] = (g['total_concession'] as double) + con;
       g['total_paid'] = (g['total_paid'] as double) + paid;
-      g['total_fine'] = (g['total_fine'] as double) + (isPaid ? fa : 0);
+      g['total_fine'] = (g['total_fine'] as double) + (isFullyReconciled ? fa : 0);
       g['total_pending'] = (g['total_pending'] as double) + bal;
       g['demand_count'] = (g['demand_count'] as int) + 1;
-      if (status == 'Paid' || status == 'P') {
+      if (isFullyReconciled) {
         g['paid_count'] = (g['paid_count'] as int) + 1;
       } else {
         g['unpaid_count'] = (g['unpaid_count'] as int) + 1;
@@ -1182,6 +1184,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   Expanded(child: Text('STUDENTS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.center)),
                   Expanded(child: Text('TOTAL DEMAND', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
                   Expanded(child: Text('COLLECTED', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
+                  Expanded(child: Text('FINE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
                   Expanded(child: Text('PENDING', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
                   SizedBox(width: 32.w),
                 ],
@@ -1199,6 +1202,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   final studentCount = (s['student_count'] as num?)?.toInt() ?? 0;
                   final totalDemand = (s['total_demand'] as num?)?.toDouble() ?? 0;
                   final totalPaid = (s['total_paid'] as num?)?.toDouble() ?? 0;
+                  final totalFine = (s['total_fine'] as num?)?.toDouble() ?? 0;
                   final totalPending = (s['total_pending'] as num?)?.toDouble() ?? 0;
 
                   return InkWell(
@@ -1219,6 +1223,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                           Expanded(child: Text('$studentCount', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), textAlign: TextAlign.center)),
                           Expanded(child: Text('₹${_formatAmount(totalDemand)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), textAlign: TextAlign.right)),
                           Expanded(child: Text('₹${_formatAmount(totalPaid)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right)),
+                          Expanded(child: Text(totalFine > 0 ? '₹${_formatAmount(totalFine)}' : '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: totalFine > 0 ? Colors.orange : AppColors.textSecondary), textAlign: TextAlign.right)),
                           Expanded(child: Text('₹${_formatAmount(totalPending)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.warning), textAlign: TextAlign.right)),
                           SizedBox(width: 32.w, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary)),
                         ],
@@ -1242,6 +1247,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   Expanded(child: Text('${summaries.fold<int>(0, (sum, s) => sum + ((s['student_count'] as num?)?.toInt() ?? 0))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_demand'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.right)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_paid'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.success), textAlign: TextAlign.right)),
+                  Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_fine'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.orange), textAlign: TextAlign.right)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_pending'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.warning), textAlign: TextAlign.right)),
                   SizedBox(width: 32.w),
                 ],

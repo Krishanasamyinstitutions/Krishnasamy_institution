@@ -86,8 +86,8 @@ class _SplashScreenState extends State<SplashScreen>
                   animation: _pulseController,
                   builder: (context, child) {
                     return Container(
-                      width: 120.w,
-                      height: 120.h,
+                      width: 200.w,
+                      height: 200.h,
                       decoration: BoxDecoration(
                         color: AppColors.accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(32.r),
@@ -107,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      padding: EdgeInsets.all(14.w),
+                      padding: EdgeInsets.all(20.w),
                       child: Image.asset(
                         'assets/images/educore360_logo.png',
                         fit: BoxFit.contain,

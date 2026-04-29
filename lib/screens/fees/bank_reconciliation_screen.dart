@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,6 +8,7 @@ import '../../widgets/app_icon.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/bank_parsers.dart' as parsers;
 import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 
@@ -27,6 +27,10 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   bool _isLoading = false;
   final Set<int> _selectedForRecon = {};
   String _methodFilter = 'All';
+  String _selectedBank = 'Auto detect';
+  int _reconciledPage = 0;
+  static const int _reconciledPageSize = 20;
+  static const List<String> _bankOptions = ['Auto detect', 'HDFC', 'ICICI', 'SBI', 'IOB'];
 
   @override
   void initState() {
@@ -144,6 +148,23 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     try {
       final file = File(result.files.single.path!);
 
+      // Reject anything obviously larger than a real bank statement so a
+      // malformed multi-MB file can't lock the UI parsing it.
+      const maxBytes = 5 * 1024 * 1024; // 5 MB
+      final size = await file.length();
+      if (size > maxBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'CSV is ${(size / 1024 / 1024).toStringAsFixed(1)} MB — limit is 5 MB. Please trim the file.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       // Read bytes and decode robustly: strip UTF-8 / UTF-16 BOM, try UTF-8
       // first, fall back to Latin-1 on decode failure. Covers HDFC/ICICI CSV
       // downloads that arrive as Windows-1252.
@@ -182,7 +203,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       final rows = allRows.sublist(headerRowIdx);
 
       final dateIdx = headers.indexWhere((h) => h.contains('date') && !h.contains('value'));
-      final refIdx = headers.indexWhere((h) => h.contains('ref') || h.contains('chq') || h.contains('cheque') || h.contains('transaction') || h.contains('utr') || h.contains('instrument'));
+      final refIdx = headers.indexWhere((h) => h.contains('ref') || h.contains('chq') || h.contains('cheque') || h.contains('transaction') || h.contains('utr') || h.contains('instrument') || h.contains('inst'));
       final narrationIdx = headers.indexWhere((h) => h.contains('narration') || h.contains('desc') || h.contains('particular') || h.contains('remark'));
 
       // Prefer distinct Deposit / Credit columns. Fall back to a generic
@@ -254,16 +275,48 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             final payAmount = (payment['transtotalamount'] as num?)?.toDouble() ?? 0;
             final isAmountMatch = (payAmount - amount).abs() < 0.01;
 
-            // Bank and Razorpay references: reference and amount must both match
+            // Bank and Razorpay references: reference must match, and the
+            // total of all receipts sharing this reference must match the
+            // bank amount (handles a single UTR split across multiple
+            // receipts the same way cheques are grouped below).
             if ((payMethod == 'qr_upi' || payMethod == 'razorpay') &&
-                isAmountMatch &&
                 _normalizeReference(payRef).contains(normalizedBankRef)) {
-              bankRow['matched_pay_id'] = payment['pay_id'];
-              bankRow['match_type'] = payMethod == 'razorpay'
-                  ? 'Razorpay + Amount Match'
-                  : 'UTR + Amount Match';
-              usedPayIds.add(payment['pay_id'] as int);
-              break;
+              final refPayments = _pendingPayments
+                  .where((p) {
+                    final pm = p['paymethod']?.toString() ?? '';
+                    final pr = p['payreference']?.toString() ?? '';
+                    return (pm == 'qr_upi' || pm == 'razorpay') &&
+                        !usedPayIds.contains(p['pay_id']) &&
+                        _normalizeReference(pr).contains(normalizedBankRef);
+                  })
+                  .toList();
+              final refPayIds = refPayments
+                  .map((p) => p['pay_id'] as int)
+                  .toList();
+              final refTotal = refPayments.fold<double>(
+                0,
+                (sum, p) => sum + ((p['transtotalamount'] as num?)?.toDouble() ?? 0),
+              );
+
+              if ((refTotal - amount).abs() < 0.01 && refPayIds.isNotEmpty) {
+                bankRow['matched_pay_id'] = payment['pay_id'];
+                bankRow['matched_pay_ids'] = refPayIds;
+                final label = payMethod == 'razorpay' ? 'Razorpay' : 'UTR';
+                bankRow['match_type'] = refPayIds.length == 1
+                    ? '$label + Amount Match'
+                    : '$label + Amount Match (${refPayIds.length} receipts)';
+                usedPayIds.addAll(refPayIds);
+                break;
+              }
+              // Fall through to single-receipt amount-match for legacy data
+              if (isAmountMatch) {
+                bankRow['matched_pay_id'] = payment['pay_id'];
+                bankRow['match_type'] = payMethod == 'razorpay'
+                    ? 'Razorpay + Amount Match'
+                    : 'UTR + Amount Match';
+                usedPayIds.add(payment['pay_id'] as int);
+                break;
+              }
             }
 
             // Cheque: cheque number must match, and total of grouped receipts must match bank amount
@@ -328,6 +381,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     String? bankDate,
   }) async {
     if (payIds.isEmpty) return 0;
+    final isoBankDate = _toIsoDate(bankDate);
     final schema = SupabaseService.currentSchema;
     try {
       if (schema != null) {
@@ -337,7 +391,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
           'p_pay_ids': payIds,
           'p_user': userName,
           'p_bank_ref': bankRef,
-          'p_bank_date': bankDate,
+          'p_bank_date': isoBankDate,
         });
         return (result as num?)?.toInt() ?? payIds.length;
       }
@@ -352,7 +406,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         'reconciled_by': userName,
         'reconciled_date': now,
         if (bankRef != null) 'bank_reference': bankRef,
-        if (bankDate != null) 'bank_date': bankDate,
+        if (isoBankDate != null) 'bank_date': isoBankDate,
       }).eq('pay_id', payId).eq('ins_id', insId)
     ));
     try {
@@ -448,25 +502,32 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
 
     setState(() => _isLoading = true);
     int count = 0;
+    String? failureMessage;
 
-    // One batch call per bank-statement row (may cover multiple pay_ids).
-    for (final row in matched) {
-      final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
-      count += await _reconcilePaymentsBatch(
-        insId: insId,
-        userName: userName,
-        payIds: payIds,
-        bankRef: row['reference']?.toString(),
-        bankDate: row['date']?.toString(),
-      );
+    try {
+      // One batch call per bank-statement row (may cover multiple pay_ids).
+      for (final row in matched) {
+        final payIds = row['matched_pay_ids'] as List<int>? ?? [row['matched_pay_id'] as int];
+        count += await _reconcilePaymentsBatch(
+          insId: insId,
+          userName: userName,
+          payIds: payIds,
+          bankRef: row['reference']?.toString(),
+          bankDate: row['date']?.toString(),
+        );
+      }
+    } catch (e) {
+      failureMessage = friendlyError(e);
     }
 
     await _loadPayments();
-    setState(() => _bankStatementRows.clear());
+    if (mounted) setState(() => _bankStatementRows.clear());
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$count payment(s) reconciled from bank statement'), backgroundColor: AppColors.success),
+        failureMessage != null
+            ? SnackBar(content: Text('Reconcile failed: $failureMessage'), backgroundColor: Colors.red)
+            : SnackBar(content: Text('$count payment(s) reconciled from bank statement'), backgroundColor: AppColors.success),
       );
     }
   }
@@ -745,6 +806,31 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
               const Spacer(),
               SizedBox(
                 height: 40,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedBank,
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                      items: _bankOptions
+                          .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setState(() => _selectedBank = v);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              SizedBox(
+                height: 40,
                 child: ElevatedButton.icon(
                   onPressed: _uploadBankStatement,
                   icon: AppIcon('document-upload', size: 16, color: Colors.white),
@@ -883,6 +969,19 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   // ── Tab 3: Reconciled Payments ──
   Widget _buildReconciledTab() {
     final filteredReconciled = _filteredPayments(_reconciledPayments);
+    // Sort by reconciled_date desc so the newest reconciliations appear first.
+    filteredReconciled.sort((a, b) {
+      final da = a['reconciled_date']?.toString() ?? '';
+      final db = b['reconciled_date']?.toString() ?? '';
+      return db.compareTo(da);
+    });
+    final totalPages = (filteredReconciled.length / _reconciledPageSize).ceil().clamp(1, 9999);
+    if (_reconciledPage >= totalPages) _reconciledPage = totalPages - 1;
+    final pageStart = _reconciledPage * _reconciledPageSize;
+    final pageEnd = (pageStart + _reconciledPageSize).clamp(0, filteredReconciled.length);
+    final pageRows = filteredReconciled.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : filteredReconciled.sublist(pageStart, pageEnd);
     return Padding(
       padding: EdgeInsets.zero,
       child: Container(
@@ -939,15 +1038,16 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          ...filteredReconciled.asMap().entries.map((entry) {
+                          ...pageRows.asMap().entries.map((entry) {
                             final idx = entry.key;
                             final p = entry.value;
+                            final globalIdx = pageStart + idx;
                             return Container(
                               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
                               color: idx.isEven ? Colors.white : AppColors.surface,
                               child: Row(
                                 children: [
-                                  SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 40.w, child: Text('${globalIdx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
@@ -963,6 +1063,31 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                       ),
                     ),
                   ),
+                  if (filteredReconciled.length > _reconciledPageSize)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border(top: BorderSide(color: AppColors.border)),
+                      ),
+                      child: Row(
+                        children: [
+                          Text('${pageStart + 1}–$pageEnd of ${filteredReconciled.length}',
+                              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: _reconciledPage > 0 ? () => setState(() => _reconciledPage--) : null,
+                          ),
+                          Text('Page ${_reconciledPage + 1} of $totalPages',
+                              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: _reconciledPage < totalPages - 1 ? () => setState(() => _reconciledPage++) : null,
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
                 ),
@@ -984,59 +1109,15 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     }
   }
 
-  String _normalizeReference(String value) {
-    return value.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
-  }
+  String _normalizeReference(String value) => parsers.normalizeReference(value);
 
-  /// Strip UTF-8 BOM, try strict UTF-8, fall back to Latin-1 (Windows-1252)
-  /// when the bytes don't decode cleanly. Covers HDFC/ICICI CSVs that ship
-  /// as Windows-1252 with Indian rupee / special characters.
-  String _decodeBankBytes(List<int> bytes) {
-    var data = bytes;
-    if (data.length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) {
-      data = data.sublist(3);
-    }
-    try {
-      return utf8.decode(data, allowMalformed: false);
-    } catch (_) {
-      return latin1.decode(data, allowInvalid: true);
-    }
-  }
+  String? _toIsoDate(String? raw) => parsers.toIsoDate(raw);
 
-  /// Pick the delimiter (',', ';', or '\t') that appears most consistently
-  /// in the first few non-blank lines.
-  String _detectDelimiter(String text) {
-    final lines = text.split('\n').where((l) => l.trim().isNotEmpty).take(10).toList();
-    if (lines.isEmpty) return ',';
-    int commaTotal = 0, semiTotal = 0, tabTotal = 0;
-    for (final l in lines) {
-      commaTotal += ','.allMatches(l).length;
-      semiTotal += ';'.allMatches(l).length;
-      tabTotal += '\t'.allMatches(l).length;
-    }
-    if (tabTotal > commaTotal && tabTotal > semiTotal) return '\t';
-    if (semiTotal > commaTotal) return ';';
-    return ',';
-  }
+  String _decodeBankBytes(List<int> bytes) => parsers.decodeBankBytes(bytes);
 
-  /// Find the real header row. Banks often prefix the statement with
-  /// preamble rows (account number, period, branch). Accept the first row
-  /// whose cells contain a Date keyword AND at least one of
-  /// Narration/Particular/Description/Remark.
-  int _findHeaderRow(List<List<dynamic>> rows) {
-    for (int i = 0; i < rows.length && i < 20; i++) {
-      final cells = rows[i].map((c) => c.toString().toLowerCase().trim()).toList();
-      if (cells.length < 3) continue;
-      final hasDate = cells.any((c) => c.contains('date') && !c.contains('value'));
-      final hasNarr = cells.any((c) =>
-          c.contains('narration') || c.contains('particular') || c.contains('desc') || c.contains('remark'));
-      final hasAmount = cells.any((c) =>
-          c.contains('amount') || c.contains('deposit') || c.contains('credit') ||
-          c.contains('withdrawal') || c.contains('debit'));
-      if (hasDate && (hasNarr || hasAmount)) return i;
-    }
-    return rows.isNotEmpty ? 0 : -1; // best-effort fallback
-  }
+  String _detectDelimiter(String text) => parsers.detectDelimiter(text);
+
+  int _findHeaderRow(List<List<dynamic>> rows) => parsers.findHeaderRow(rows);
 
   /// Parse an amount cell. Handles:
   ///   - thousand separators ("1,200.00", "1.200,00" European style)
@@ -1044,43 +1125,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
   ///   - trailing Dr/Cr suffix ("1,200.00 Cr")
   ///   - accounting parentheses for negatives ("(1,200.00)" -> -1200)
   ///   - non-breaking spaces
-  double _parseAmount(String raw) {
-    var s = raw.trim();
-    if (s.isEmpty) return 0;
-    // Drop explicit Cr / Dr suffix, keep the sign via caller's column logic.
-    s = s.replaceAll(RegExp(r'\s+(cr|dr)\.?$', caseSensitive: false), '');
-    // Remove currency symbols, non-breaking spaces, and common Rs. prefix.
-    s = s
-        .replaceAll(RegExp(r'(₹|\$|£|€|Rs\.?|INR| )', caseSensitive: false), '')
-        .trim();
-    bool negative = false;
-    if (s.startsWith('(') && s.endsWith(')')) {
-      negative = true;
-      s = s.substring(1, s.length - 1);
-    }
-    // European "1.234,56" → "1234.56"; standard "1,234.56" → "1234.56".
-    final lastComma = s.lastIndexOf(',');
-    final lastDot = s.lastIndexOf('.');
-    if (lastComma >= 0 && lastDot >= 0) {
-      if (lastComma > lastDot) {
-        s = s.replaceAll('.', '').replaceAll(',', '.');
-      } else {
-        s = s.replaceAll(',', '');
-      }
-    } else if (lastComma >= 0) {
-      // Ambiguous — assume comma is a thousands separator unless there are
-      // exactly 2 digits after it (then treat as decimal).
-      final afterComma = s.substring(lastComma + 1);
-      if (afterComma.length == 2 && !afterComma.contains(',')) {
-        s = s.replaceAll(',', '.');
-      } else {
-        s = s.replaceAll(',', '');
-      }
-    }
-    s = s.replaceAll(RegExp(r'\s+'), '');
-    final v = double.tryParse(s) ?? 0;
-    return negative ? -v : v;
-  }
+  double _parseAmount(String raw) => parsers.parseAmount(raw);
 
   List<Map<String, dynamic>> _filteredPayments(List<Map<String, dynamic>> payments) {
     if (_methodFilter == 'All') return payments;

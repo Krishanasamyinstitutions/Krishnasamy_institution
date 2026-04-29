@@ -753,7 +753,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
-  static const _headers = ['Class ID *', 'Class Name *', 'Course *', 'Order'];
+  static const _headers = ['Class ID *', 'Class Name *', 'Succeeding Class', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
 
@@ -772,11 +772,9 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final courses = await SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId);
-      final courseMap = { for (final c in courses as List) c['cour_id'] as int: c['courname']?.toString() ?? '' };
       final rows = await SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('cla_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['cla_id']?.toString() ?? '', r['claname'] ?? '', courseMap[r['cour_id']] ?? '${r['cour_id'] ?? ''}', r['ordid']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['cla_id']?.toString() ?? '', r['claname'] ?? '', r['succeedingclass']?.toString() ?? '', r['ordid']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -818,8 +816,11 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       final course = _rows[i].length > 2 ? _rows[i][2]?.toString().trim() ?? '' : '';
       if (idRaw.isEmpty || int.tryParse(idRaw) == null) { rowErrs[i] = 'Invalid Class ID'; continue; }
       if (name.isEmpty) missing.add('Class Name');
-      if (course.isEmpty) missing.add('Course');
+      // Succeeding Class is optional (terminal class has no successor)
       if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+      // Suppress unused variable warning
+      // ignore: unused_local_variable
+      final _ = course;
     }
     setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
@@ -839,18 +840,15 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     final insId = auth.insId ?? 0;
     setState(() { _saving = true; _errors = []; _imported = 0; _skipped = 0; });
     for (final row in _rows) {
-      if (row.length < 3 || row[1].toString().trim().isEmpty) { _skipped++; continue; }
+      if (row.isEmpty || row[1].toString().trim().isEmpty) { _skipped++; continue; }
       try {
         final claId = int.tryParse(row[0].toString().trim());
         if (claId == null) { _skipped++; _errors.add('Row: invalid Class ID'); continue; }
-        final courseName = row[2].toString().trim();
-        final courseResult = await SupabaseService.fromSchema('course')
-            .select('cour_id').eq('ins_id', insId).ilike('courname', courseName).limit(1).maybeSingle();
-        if (courseResult == null) { _skipped++; _errors.add('${row[1]}: Course "$courseName" not found'); continue; }
+        final succeedingRaw = row.length > 2 ? row[2].toString().trim() : '';
         await SupabaseService.fromSchema('class').insert({
           'cla_id': claId,
           'claname': row[1].toString().trim(),
-          'cour_id': courseResult['cour_id'],
+          'succeedingclass': succeedingRaw.isEmpty ? null : succeedingRaw,
           'ordid': row.length > 3 ? int.tryParse(row[3].toString().trim()) : null,
           'ins_id': insId,
         });
@@ -875,9 +873,9 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       onSave: _rows.isNotEmpty && _isValidated ? _save : null,
       onTemplate: () => _exportTemplate('Class', _headers),
       onSampleDownload: () => _exportSampleData('Class', _headers, [
-        ['Section A', 'LKG', '1'],
-        ['Section B', 'LKG', '2'],
-        ['Section A', 'UKG', '1'],
+        ['1', 'I Year', 'II Year', '1'],
+        ['2', 'II Year', 'III Year', '2'],
+        ['3', 'III Year', '', '3'],
       ]),
       saving: _saving, fileName: _fileName, imported: _imported, skipped: _skipped, errors: _errors, showResult: false,
       onDismissResult: () {},
@@ -885,7 +883,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class ID', 'Class Name', 'Course', 'Order'],
+      existingHeaders: const ['Class ID', 'Class Name', 'Succeeding Class', 'Order'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
