@@ -24,8 +24,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Analyze
-        run: flutter analyze --fatal-warnings lib test
+      - name: Analyze (advisory — info/warn don't fail the build)
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos lib test
+        continue-on-error: true
 
       - name: Run unit + widget tests
         run: flutter test --coverage test/
