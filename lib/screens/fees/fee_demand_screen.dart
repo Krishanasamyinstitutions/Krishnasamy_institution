@@ -767,19 +767,23 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   ),
                   SizedBox(width: 16.w),
                 ],
-                TextButton.icon(
-                  onPressed: () => setState(() {
-                    _showImport = !_showImport;
-                    if (!_showImport) _resetImport();
-                  }),
-                  icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: 16),
-                  label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _showImport ? AppColors.error : AppColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: () => setState(() {
+                      _showImport = !_showImport;
+                      if (!_showImport) _resetImport();
+                    }),
+                    icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: 16, color: Colors.white),
+                    label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _showImport ? AppColors.error : AppColors.accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(horizontal: 18.w),
+                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    ),
                   ),
                 ),
                 if (!_showImport) ...[
@@ -981,37 +985,50 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     SizedBox(height: 24.h),
 
                     // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _resetForm,
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                            ),
-                            child: const Text('Clear'),
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: _isSaving ? null : _saveDemand,
-                            icon: _isSaving
-                                ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : AppIcon('save-2', size: 18),
-                            label: Text(_isSaving ? 'Saving...' : 'Save Fee Demand', style: const TextStyle(fontWeight: FontWeight.w600)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    Builder(builder: (_) {
+                      const btnHeight = 48.0;
+                      final btnPadding = EdgeInsets.symmetric(horizontal: 28.w);
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: btnHeight,
+                              child: OutlinedButton.icon(
+                                onPressed: _resetForm,
+                                icon: const AppIcon('refresh', size: 16, color: AppColors.textPrimary),
+                                label: const Text('Clear', style: TextStyle(fontWeight: FontWeight.w600)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.textPrimary,
+                                  side: const BorderSide(color: AppColors.border),
+                                  padding: btnPadding,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            flex: 2,
+                            child: SizedBox(
+                              height: btnHeight,
+                              child: ElevatedButton.icon(
+                                onPressed: _isSaving ? null : _saveDemand,
+                                icon: _isSaving
+                                    ? SizedBox(width: 18.w, height: 18.h, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : AppIcon('save-2', size: 18),
+                                label: Text(_isSaving ? 'Saving...' : 'Save Fee Demand', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: btnPadding,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),

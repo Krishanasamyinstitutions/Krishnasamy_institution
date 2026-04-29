@@ -35,6 +35,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<_InstitutionFinanceSummary> _institutionSummaries = [];
   List<_SuperAdminTransactionRow> _recentTransactions = [];
 
+  // Body-area drilldown state — stays inside the dashboard layout (header
+  // and sidebar remain visible) instead of pushing a new route.
+  String? _aggregateDrilldownMode;
+  _InstitutionFinanceSummary? _courseWiseSummary;
+  String? _courseWiseMode;
+
+  final Set<int> _expandedInsIds = <int>{};
+
   @override
   void initState() {
     super.initState();
@@ -322,7 +330,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      drawer: !isDesktop ? Drawer(child: _buildSidebar(context, false)) : null,
       body: Row(
         children: [
           if (isDesktop)
@@ -341,7 +348,76 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           ),
         ],
       ),
+      bottomNavigationBar: isDesktop ? null : _buildMobileBottomNav(),
     );
+  }
+
+  Widget _buildMobileBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: List.generate(_navItems.length, (i) {
+              final item = _navItems[i];
+              final selected = _selectedNavIndex == i;
+              return Expanded(
+                child: InkWell(
+                  onTap: () {
+                    final prev = _selectedNavIndex;
+                    setState(() {
+                      _selectedNavIndex = i;
+                      _aggregateDrilldownMode = null;
+                      _courseWiseSummary = null;
+                      _courseWiseMode = null;
+                    });
+                    if (i == 0 && prev != 0) _refreshDashboard();
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AppIcon(
+                        selected ? item.icon : (item.unselectedIcon ?? item.icon),
+                        style: selected ? AppIconStyle.bold : AppIconStyle.linear,
+                        color: selected ? AppColors.accent : AppColors.textSecondary,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _bottomNavLabel(item.label),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                          color: selected ? AppColors.accent : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _bottomNavLabel(String label) {
+    switch (label) {
+      case 'Register Institution':
+        return 'Register';
+      case 'Manage Institutions':
+        return 'Institutions';
+      default:
+        return label;
+    }
   }
 
   Widget _buildSidebar(BuildContext context, bool collapsed) {
@@ -356,9 +432,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       groupedIndices[section]!.add(i);
     }
 
-    final hPad = collapsed
-        ? 12.w
-        : (MediaQuery.of(context).size.width < 1100 ? 10.w : 14.w);
+    final hPad = collapsed ? 12.0 : 14.0;
 
     return Container(
       color: AppColors.surfaceSidebar,
@@ -366,29 +440,44 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 16.w : (MediaQuery.of(context).size.width < 1100 ? 14.w : 24.w),
-              vertical: 20.h,
+              horizontal: collapsed ? 16 : 20,
+              vertical: 20,
             ),
             child: Row(
               children: [
                 Container(
-                  width: 32.w,
-                  height: 32.h,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8.r),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: AppIcon('teacher', color: AppColors.primary, size: 16),
+                  child: AppIcon('teacher', color: AppColors.primary, size: 18),
                 ),
                 if (!collapsed) ...[
-                  SizedBox(width: 10.w),
-                  Text(
+                  const SizedBox(width: 10),
+                  const Text(
                     'EduDesk',
                     style: TextStyle(
-                      fontSize: 16.sp,
+                      fontSize: 17,
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  const Spacer(),
+                  Builder(
+                    builder: (ctx) {
+                      final scaffold = Scaffold.maybeOf(ctx);
+                      if (scaffold == null || !scaffold.isEndDrawerOpen) {
+                        return const SizedBox.shrink();
+                      }
+                      return IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: const AppIcon('Close_SM', size: 22),
+                        tooltip: 'Close',
+                        splashRadius: 20,
+                      );
+                    },
                   ),
                 ],
               ],
@@ -402,14 +491,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   if (!collapsed)
                     Padding(
                       padding: EdgeInsets.only(
-                        top: s == 0 ? 4.h : 18.h,
-                        bottom: 8.h,
-                        left: 10.w,
+                        top: s == 0 ? 4 : 18,
+                        bottom: 8,
+                        left: 10,
                       ),
                       child: Text(
                         orderedSections[s],
-                        style: TextStyle(
-                          fontSize: 11.sp,
+                        style: const TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
                           color: AppColors.accent,
@@ -417,11 +506,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       ),
                     )
                   else
-                    SizedBox(height: s == 0 ? 4.h : 18.h),
+                    SizedBox(height: s == 0 ? 4 : 18),
                   for (final idx in groupedIndices[orderedSections[s]]!)
                     _buildNavTile(context, idx, collapsed),
                 ],
-                SizedBox(height: 16.h),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -438,11 +527,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     const selectedFg = AppColors.textOnPrimary;
     const unselectedFg = AppColors.textSecondary;
 
-    final iconSize =
-        MediaQuery.of(context).size.width <= 1366 ? 18.sp : 20.sp;
-
     return Padding(
-      padding: EdgeInsets.only(bottom: 4.h),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -452,17 +538,22 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             if (index == 0 && prevIndex != 0) {
               _refreshDashboard();
             }
+            // Close drawer on mobile after selection
+            final scaffold = Scaffold.maybeOf(context);
+            if (scaffold != null && scaffold.isEndDrawerOpen) {
+              scaffold.closeEndDrawer();
+            }
           },
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 4.w : 14.w,
-              vertical: 11.h,
+              horizontal: collapsed ? 4 : 14,
+              vertical: 12,
             ),
             decoration: BoxDecoration(
               color: isSelected ? selectedBg : Colors.transparent,
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisAlignment: collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
@@ -471,17 +562,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   isSelected ? item.icon : (item.unselectedIcon ?? item.icon),
                   style: isSelected ? AppIconStyle.bold : AppIconStyle.linear,
                   color: isSelected ? selectedFg : unselectedFg,
-                  size: iconSize,
+                  size: 20,
                 ),
                 if (!collapsed) ...[
-                  SizedBox(width: 12.w),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       item.label,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: TextStyle(
-                        fontSize: 13.sp,
+                        fontSize: 14,
                         color: isSelected ? selectedFg : unselectedFg,
                         fontWeight:
                             isSelected ? FontWeight.w700 : FontWeight.w600,
@@ -499,6 +590,38 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildTopBar(BuildContext context, bool isDesktop) {
     final auth = context.watch<AuthProvider>();
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+    final inDrilldown = _aggregateDrilldownMode != null || _courseWiseSummary != null;
+
+    // Mobile drilldown: minimal header — just an icon-only back button.
+    if (isMobile && inDrilldown) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => setState(() {
+                _aggregateDrilldownMode = null;
+                _courseWiseSummary = null;
+                _courseWiseMode = null;
+              }),
+              icon: AppIcon.linear('Chevron Left', size: 22, color: Colors.white),
+              tooltip: 'Back',
+              style: IconButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.all(8),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isDesktop ? (MediaQuery.of(context).size.width < 1100 ? 12 : MediaQuery.of(context).size.width < 1400 ? 16 : 24) : 16,
@@ -510,49 +633,105 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       ),
       child: Row(
         children: [
-          if (!isDesktop && MediaQuery.of(context).size.width <= 500)
-            IconButton(
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              icon: const AppIcon('menu'),
-            ),
           if (isDesktop)
             _softIconButton(
               icon: _sidebarCollapsed ? 'menu-open' : 'menu-close',
               onTap: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             ),
-          SizedBox(width: 14.w),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _navItems[_selectedNavIndex].label,
-                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.2, height: 1.1),
-              ),
-              SizedBox(height: 5.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppIcon('security-user', size: 14, color: AppColors.accent),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'Super Admin Console',
-                      style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+          if (isMobile)
+            // Profile pill on the LEFT (mobile only): avatar + name + email
+            Expanded(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.18),
+                    child: Text(
+                      (auth.userName ?? 'S')[0].toUpperCase(),
+                      style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w800, fontSize: 14),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          auth.userName ?? 'Super Admin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w700, height: 1.15),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          auth.userEmail ?? 'Super Admin',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500, height: 1.15),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const Spacer(),
+            )
+          else ...[
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _navItems[_selectedNavIndex].label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                        height: 1.1),
+                  ),
+                  SizedBox(height: 5.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon('security-user', size: 14, color: AppColors.accent),
+                        SizedBox(width: 6.w),
+                        Text(
+                          'Super Admin Console',
+                          style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           SizedBox(width: 12.w),
+          if (isMobile)
+            IconButton(
+              onPressed: () async {
+                await auth.logout();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+                }
+              },
+              icon: const AppIcon('logout', size: 22, color: AppColors.textSecondary),
+              tooltip: 'Sign out',
+            )
+          else
           PopupMenuButton<String>(
             tooltip: 'Profile options',
             position: PopupMenuPosition.under,
@@ -587,7 +766,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ],
             child: Container(
-              padding: EdgeInsets.only(left: 4.w, right: 12.w, top: 4.h, bottom: 4.h),
+              padding: isMobile
+                  ? const EdgeInsets.all(2)
+                  : EdgeInsets.only(left: 4.w, right: 12.w, top: 4.h, bottom: 4.h),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(999),
@@ -596,43 +777,45 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircleAvatar(
-                    radius: 26,
+                    radius: isMobile ? 18 : 26,
                     backgroundColor: AppColors.accent.withValues(alpha: 0.18),
                     child: Text(
                       (auth.userName ?? 'S')[0].toUpperCase(),
                       style: TextStyle(
                         color: AppColors.accent,
                         fontWeight: FontWeight.w800,
-                        fontSize: 20.sp,
+                        fontSize: isMobile ? 14 : 20,
                       ),
                     ),
                   ),
-                  SizedBox(width: 12.w),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: isDesktop ? 220 : 140),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          auth.userName ?? 'Super Admin',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 16.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.2),
-                        ),
-                        SizedBox(height: 2.h),
-                        Text(
-                          auth.userEmail ?? 'Super Admin',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500, height: 1.15),
-                        ),
-                      ],
+                  if (!isMobile) ...[
+                    SizedBox(width: 12.w),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: isDesktop ? 220 : 140),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            auth.userName ?? 'Super Admin',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 16, color: AppColors.textPrimary, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -0.2),
+                          ),
+                          SizedBox(height: 2.h),
+                          Text(
+                            auth.userEmail ?? 'Super Admin',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500, height: 1.15),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 8.w),
-                  AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
+                    SizedBox(width: 8.w),
+                    AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
+                  ],
                 ],
               ),
             ),
@@ -674,6 +857,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildContent(BuildContext context) {
+    if (_courseWiseSummary != null && _courseWiseMode != null) {
+      return _CourseWiseCollectionPage(
+        summary: _courseWiseSummary!,
+        mode: _courseWiseMode!,
+        onBack: () => setState(() {
+          _courseWiseSummary = null;
+          _courseWiseMode = null;
+        }),
+      );
+    }
+    if (_aggregateDrilldownMode != null) {
+      return _AggregateDrilldownPage(
+        summaries: _institutionSummaries,
+        mode: _aggregateDrilldownMode!,
+        onBack: () => setState(() => _aggregateDrilldownMode = null),
+      );
+    }
     switch (_selectedNavIndex) {
       case 1:
         return RegisterScreen(onRegistered: _refreshDashboard);
@@ -687,6 +887,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildDashboardHome(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+    if (isMobile) {
+      return _buildMobileDashboardHome(context);
+    }
     return Padding(
       padding: EdgeInsets.all(16.w),
       child: Column(
@@ -699,7 +903,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 child: Center(
                     child: Text('No institutions found',
                         style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 14.sp, fontWeight: FontWeight.w600))))
+                            color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600))))
           else ...[
             _buildSummaryRow(),
             SizedBox(height: 16.h),
@@ -721,10 +925,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           AppIcon('buildings-2', size: 18, color: AppColors.accent),
                           SizedBox(width: 8.w),
                           Text('Institutions Overview',
-                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                           const Spacer(),
                           Text('${_institutionSummaries.length} institutes',
-                              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
@@ -752,6 +956,414 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
+  Widget _buildMobileDashboardHome(BuildContext context) {
+    if (_loadingFinanceData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_institutionSummaries.isEmpty) {
+      return const Center(
+        child: Text('No institutions found',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
+      );
+    }
+
+    final activeCount = _institutionSummaries.where((s) => s.activeStatus).length;
+    final totalDemand = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalDemand);
+    final totalCollection = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalCollected);
+    final totalPendingApproval = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.pendingApproval);
+    final totalPending = _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalPending);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Page name (shown in body since header has profile + hamburger)
+        Row(
+          children: [
+            Text(_navItems[_selectedNavIndex].label,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.3)),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon('security-user', size: 12, color: AppColors.accent),
+                  const SizedBox(width: 4),
+                  const Text('Super Admin',
+                      style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text("Here's a snapshot of all institutions",
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 24),
+
+        // Hero balance card — Total Demand
+        Center(
+          child: Column(
+            children: [
+              const Text('Total Demand',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Text(_formatAmount(totalDemand),
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Action buttons
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _selectedNavIndex = 1),
+                  icon: AppIcon('add', size: 16, color: Colors.white),
+                  label: const Text('Register'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _selectedNavIndex = 2),
+                  icon: AppIcon('buildings-2', size: 16, color: Colors.white),
+                  label: const Text('Manage'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.textPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+
+        // Quick Stats — horizontal scroll cards
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Quick Stats',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            Text('$activeCount active',
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 110,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: [
+              _miniStatCard('tick-circle', 'Collection', _formatAmount(totalCollection), AppColors.success,
+                  onTap: () => _showAggregateDrilldown(context, 'collection')),
+              const SizedBox(width: 12),
+              _miniStatCard('clock', 'Pending Approval', _formatAmount(totalPendingApproval), AppColors.warning,
+                  onTap: () => _showAggregateDrilldown(context, 'approval')),
+              const SizedBox(width: 12),
+              _miniStatCard('timer', 'Total Pending', _formatAmount(totalPending), AppColors.error,
+                  onTap: () => _showAggregateDrilldown(context, 'pending')),
+              const SizedBox(width: 12),
+              _miniStatCard('buildings-2', 'Institutes', '$activeCount of ${_institutionSummaries.length}', AppColors.accent,
+                  onTap: () => _showAggregateDrilldown(context, 'active')),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+
+        // Institutions list (compact)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Institutions',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            InkWell(
+              onTap: () => setState(() => _selectedNavIndex = 2),
+              child: const Text('View all',
+                  style: TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ..._institutionSummaries.take(4).map((s) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _mobileInstitutionRow(s),
+            )),
+      ],
+    );
+  }
+
+  Widget _miniStatCard(String icon, String label, String value, Color color, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 160,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: AppIcon(icon, color: color, size: 16),
+                ),
+                const Spacer(),
+                if (onTap != null)
+                  AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                const SizedBox(height: 2),
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileInstitutionRow(_InstitutionFinanceSummary s) {
+    final expanded = _expandedInsIds.contains(s.insId);
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() {
+              if (expanded) {
+                _expandedInsIds.remove(s.insId);
+              } else {
+                _expandedInsIds.add(s.insId);
+              }
+            }),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    backgroundImage: (s.insLogo != null && s.insLogo!.isNotEmpty)
+                        ? NetworkImage(s.insLogo!)
+                        : null,
+                    child: (s.insLogo == null || s.insLogo!.isEmpty)
+                        ? Text(s.insName[0],
+                            style: const TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.w800))
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(s.insName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        const SizedBox(height: 2),
+                        Text('Code: ${s.insCode}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_formatAmount(s.totalCollected),
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      Text(s.activeStatus ? 'Active' : 'Inactive',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: s.activeStatus ? AppColors.success : AppColors.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(width: 6),
+                  AnimatedRotation(
+                    duration: const Duration(milliseconds: 180),
+                    turns: expanded ? 0.5 : 0,
+                    child: AppIcon.linear('Chevron Down', size: 18, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Column(
+                      children: [
+                        Container(height: 1, color: AppColors.border),
+                        const SizedBox(height: 12),
+                        _institutionMetricsGrid(s),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _institutionMetricsGrid(_InstitutionFinanceSummary s) {
+    return LayoutBuilder(builder: (context, c) {
+      final cardWidth = (c.maxWidth - 10) / 2;
+      Widget cell({
+        required String icon,
+        required Color color,
+        required String value,
+        required String label,
+        VoidCallback? onTap,
+      }) {
+        return SizedBox(
+          width: cardWidth,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: AppIcon(icon, color: color, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(value,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                        const SizedBox(height: 2),
+                        Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 4),
+                    AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          cell(
+            icon: 'wallet-1',
+            color: AppColors.accent,
+            value: _formatAmount(s.totalDemand),
+            label: 'Total Demand',
+            onTap: () => _showCourseWiseDemand(context, s),
+          ),
+          cell(
+            icon: 'tick-circle',
+            color: AppColors.accent,
+            value: _formatAmount(s.totalCollected),
+            label: 'Total Collection',
+            onTap: () => _showCourseWiseCollection(context, s),
+          ),
+          cell(
+            icon: 'timer',
+            color: AppColors.accent,
+            value: _formatAmount(s.pendingApproval),
+            label: 'Pending Approval',
+            onTap: () => _showCourseWiseApproval(context, s),
+          ),
+          cell(
+            icon: 'timer',
+            color: AppColors.accent,
+            value: _formatAmount(s.totalPending),
+            label: 'Total Pending',
+            onTap: () => _showCourseWisePending(context, s),
+          ),
+        ],
+      );
+    });
+  }
+
   Widget _buildSummaryRow() {
     final activeCount =
         _institutionSummaries.where((s) => s.activeStatus).length;
@@ -764,45 +1376,59 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final totalPending = _institutionSummaries.fold<double>(
         0, (sum, s) => sum + s.totalPending);
 
-    return Row(
-      children: [
-        _buildSummaryCard('buildings-2', AppColors.accent, '$activeCount', 'Active Institutes',
-            onTap: () => _showAggregateDrilldown(context, 'active')),
-        SizedBox(width: 12.w),
-        _buildSummaryCard('wallet-1', AppColors.accent, _formatAmount(totalDemand), 'Total Demand',
-            onTap: () => _showAggregateDrilldown(context, 'demand')),
-        SizedBox(width: 12.w),
-        _buildSummaryCard('tick-circle', AppColors.accent, _formatAmount(totalCollection), 'Total Collection',
-            onTap: () => _showAggregateDrilldown(context, 'collection')),
-        SizedBox(width: 12.w),
-        _buildSummaryCard('clock', AppColors.accent, _formatAmount(totalPendingApproval), 'Pending Approval',
-            onTap: () => _showAggregateDrilldown(context, 'approval')),
-        SizedBox(width: 12.w),
-        _buildSummaryCard('timer', AppColors.accent, _formatAmount(totalPending), 'Total Pending',
-            onTap: () => _showAggregateDrilldown(context, 'pending')),
-      ],
-    );
+    return LayoutBuilder(builder: (context, c) {
+      // Adaptive columns: 1 on mobile (< 600), 2 on small tablet (< 900),
+      // 3 on tablet (< 1200), 5 on desktop.
+      final w = c.maxWidth;
+      int cols;
+      if (w < 600) {
+        cols = 1;
+      } else if (w < 900) {
+        cols = 2;
+      } else if (w < 1200) {
+        cols = 3;
+      } else {
+        cols = 5;
+      }
+      const gap = 12.0;
+      final cardWidth = (w - gap * (cols - 1)) / cols;
+      final cards = <Widget>[
+        SizedBox(width: cardWidth, child: _buildSummaryCard('buildings-2', AppColors.accent, '$activeCount', 'Active Institutes',
+            onTap: () => _showAggregateDrilldown(context, 'active'))),
+        SizedBox(width: cardWidth, child: _buildSummaryCard('wallet-1', AppColors.accent, _formatAmount(totalDemand), 'Total Demand',
+            onTap: () => _showAggregateDrilldown(context, 'demand'))),
+        SizedBox(width: cardWidth, child: _buildSummaryCard('tick-circle', AppColors.accent, _formatAmount(totalCollection), 'Total Collection',
+            onTap: () => _showAggregateDrilldown(context, 'collection'))),
+        SizedBox(width: cardWidth, child: _buildSummaryCard('clock', AppColors.accent, _formatAmount(totalPendingApproval), 'Pending Approval',
+            onTap: () => _showAggregateDrilldown(context, 'approval'))),
+        SizedBox(width: cardWidth, child: _buildSummaryCard('timer', AppColors.accent, _formatAmount(totalPending), 'Total Pending',
+            onTap: () => _showAggregateDrilldown(context, 'pending'))),
+      ];
+      return Wrap(spacing: gap, runSpacing: gap, children: cards);
+    });
   }
 
   Widget _buildSummaryCard(String icon, Color iconColor, String value, String label, {VoidCallback? onTap}) {
+    // Raw pixel sizes — don't scale with screenutil so cards stay readable
+    // on narrow phone screens where .sp values would shrink below 5px.
     final card = Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(10.w),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: AppIcon(icon, color: iconColor, size: 22),
           ),
-          SizedBox(width: 12.w),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,12 +1437,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 Text(value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2)),
-                SizedBox(height: 6.h),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2)),
+                const SizedBox(height: 4),
                 Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -825,26 +1451,17 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ],
       ),
     );
-    return Expanded(
-      child: onTap != null
-          ? InkWell(
-              borderRadius: BorderRadius.circular(12.r),
-              onTap: onTap,
-              child: card,
-            )
-          : card,
-    );
+    return onTap != null
+        ? InkWell(
+            borderRadius: BorderRadius.circular(12.r),
+            onTap: onTap,
+            child: card,
+          )
+        : card;
   }
 
   void _showAggregateDrilldown(BuildContext context, String mode) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _AggregateDrilldownPage(
-          summaries: _institutionSummaries,
-          mode: mode,
-        ),
-      ),
-    );
+    setState(() => _aggregateDrilldownMode = mode);
   }
 
   String _formatAmount(double amount) {
@@ -860,7 +1477,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildInstitutionCard(
       BuildContext context, _InstitutionFinanceSummary s) {
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -870,42 +1487,47 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 42.w,
-                height: 42.h,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10.r),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
                     child: Text(s.insCode.isNotEmpty ? s.insCode[0] : 'I',
-                        style: TextStyle(
-                            fontSize: 18.sp,
+                        style: const TextStyle(
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary))),
               ),
-              SizedBox(width: 12.w),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(s.insName,
-                        style: TextStyle(
-                            fontSize: 16.sp,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary)),
-                    SizedBox(height: 2.h),
+                    const SizedBox(height: 2),
                     Text(s.insCode,
-                        style: TextStyle(
-                            fontSize: 12.sp,
+                        style: const TextStyle(
+                            fontSize: 12,
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: s.activeStatus
                       ? AppColors.success.withValues(alpha: 0.1)
@@ -915,7 +1537,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 child: Text(
                   s.activeStatus ? 'Active' : 'Inactive',
                   style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: s.activeStatus
                           ? AppColors.success
@@ -924,62 +1546,106 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ],
           ),
-          SizedBox(height: 14.h),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 80.w,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(color: AppColors.border),
-                    color: Colors.white,
-                  ),
-                  child: s.insLogo != null && s.insLogo!.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(9.r),
-                          child: Image.network(
-                            s.insLogo!,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(s.insName[0],
-                                  style: TextStyle(
-                                      fontSize: 22.sp,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primary)),
-                            ),
-                          ),
-                        )
-                      : Center(
+          const SizedBox(height: 14),
+          LayoutBuilder(builder: (context, c) {
+            final w = c.maxWidth;
+            // Adaptive layout: stack vertically on mobile, 2-col on tablet,
+            // single row on desktop.
+            const gap = 12.0;
+            final logoBox = Container(
+              width: 80.w,
+              height: 80.w,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: AppColors.border),
+                color: Colors.white,
+              ),
+              child: s.insLogo != null && s.insLogo!.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(9.r),
+                      child: Image.network(
+                        s.insLogo!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(
                           child: Text(s.insName[0],
                               style: TextStyle(
-                                  fontSize: 22.sp,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.primary)),
                         ),
-                ),
-                SizedBox(width: 12.w),
-                _buildFinanceTile('Total Demand', s.totalDemand, AppColors.accent,
-                    icon: 'wallet-1',
-                    onTap: () => _showCourseWiseDemand(context, s)),
-                SizedBox(width: 12.w),
-                _buildFinanceTile(
-                    'Total Collection', s.totalCollected, AppColors.success,
-                    icon: 'tick-circle',
-                    onTap: () => _showCourseWiseCollection(context, s)),
-                SizedBox(width: 12.w),
-                _buildFinanceTile(
-                    'Pending Approval', s.pendingApproval, AppColors.warning,
-                    icon: 'clock'),
-                SizedBox(width: 12.w),
-                _buildFinanceTile(
-                    'Total Pending', s.totalPending, AppColors.error,
-                    icon: 'timer',
-                    onTap: () => _showCourseWisePending(context, s)),
-              ],
-            ),
-          ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(s.insName[0],
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary)),
+                    ),
+            );
+            final demand = _buildFinanceTile('Total Demand', s.totalDemand, AppColors.accent,
+                icon: 'wallet-1', onTap: () => _showCourseWiseDemand(context, s));
+            final collection = _buildFinanceTile('Total Collection', s.totalCollected, AppColors.success,
+                icon: 'tick-circle', onTap: () => _showCourseWiseCollection(context, s));
+            final approval = _buildFinanceTile('Pending Approval', s.pendingApproval, AppColors.warning,
+                icon: 'clock');
+            final pending = _buildFinanceTile('Total Pending', s.totalPending, AppColors.error,
+                icon: 'timer', onTap: () => _showCourseWisePending(context, s));
+
+            if (w < 600) {
+              // Mobile: stack vertically
+              return Column(
+                children: [
+                  logoBox,
+                  SizedBox(height: gap),
+                  demand,
+                  SizedBox(height: gap),
+                  collection,
+                  SizedBox(height: gap),
+                  approval,
+                  SizedBox(height: gap),
+                  pending,
+                ],
+              );
+            } else if (w < 1000) {
+              // Tablet: 2-column grid for finance tiles, logo full width
+              final tileWidth = (w - gap) / 2;
+              return Column(
+                children: [
+                  Row(children: [
+                    logoBox,
+                    SizedBox(width: gap),
+                    Expanded(child: demand),
+                  ]),
+                  SizedBox(height: gap),
+                  Row(children: [
+                    SizedBox(width: tileWidth, child: collection),
+                    SizedBox(width: gap),
+                    SizedBox(width: tileWidth, child: approval),
+                  ]),
+                  SizedBox(height: gap),
+                  pending,
+                ],
+              );
+            }
+            // Desktop: single row, original layout
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  logoBox,
+                  SizedBox(width: gap),
+                  Expanded(child: demand),
+                  SizedBox(width: gap),
+                  Expanded(child: collection),
+                  SizedBox(width: gap),
+                  Expanded(child: approval),
+                  SizedBox(width: gap),
+                  Expanded(child: pending),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -996,9 +1662,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
             child: Column(
               children: [
-                Text(label, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: Colors.black)),
+                Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black)),
                 SizedBox(height: 6.h),
-                Text(value, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: color)),
+                Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
               ],
             ),
           ),
@@ -1027,23 +1693,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Widget _buildFinanceTile(String label, double amount, Color color,
       {String icon = 'wallet-1', VoidCallback? onTap}) {
     final tile = Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10.r),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(10.w),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: AppIcon(icon, color: AppColors.accent, size: 22),
           ),
-          SizedBox(width: 12.w),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1052,12 +1718,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 Text(_formatAmount(amount),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2)),
-                SizedBox(height: 6.h),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2)),
+                const SizedBox(height: 4),
                 Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -1066,41 +1732,44 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ],
       ),
     );
-    return Expanded(
-      child: onTap != null
-          ? InkWell(
-              borderRadius: BorderRadius.circular(10.r),
-              onTap: onTap,
-              child: tile)
-          : tile,
-    );
+    return onTap != null
+        ? InkWell(
+            borderRadius: BorderRadius.circular(10.r),
+            onTap: onTap,
+            child: tile)
+        : tile;
   }
 
   void _showCourseWiseCollection(
       BuildContext context, _InstitutionFinanceSummary s) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (_) =>
-              _CourseWiseCollectionPage(summary: s, mode: 'collection')),
-    );
+    setState(() {
+      _courseWiseSummary = s;
+      _courseWiseMode = 'collection';
+    });
   }
 
   void _showCourseWisePending(
       BuildContext context, _InstitutionFinanceSummary s) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (_) =>
-              _CourseWiseCollectionPage(summary: s, mode: 'pending')),
-    );
+    setState(() {
+      _courseWiseSummary = s;
+      _courseWiseMode = 'pending';
+    });
   }
 
   void _showCourseWiseDemand(
       BuildContext context, _InstitutionFinanceSummary s) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-          builder: (_) =>
-              _CourseWiseCollectionPage(summary: s, mode: 'demand')),
-    );
+    setState(() {
+      _courseWiseSummary = s;
+      _courseWiseMode = 'demand';
+    });
+  }
+
+  void _showCourseWiseApproval(
+      BuildContext context, _InstitutionFinanceSummary s) {
+    setState(() {
+      _courseWiseSummary = s;
+      _courseWiseMode = 'approval';
+    });
   }
 
   Widget _buildStatCard(BuildContext context, String title, String value,
@@ -1241,7 +1910,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                               color: item.activeStatus
                                   ? AppColors.success
                                   : AppColors.error,
-                              fontSize: 12.sp,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1346,7 +2015,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             statusText,
                             style: TextStyle(
                               color: statusColor,
-                              fontSize: 12.sp,
+                              fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1378,7 +2047,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildManageInstitutions(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.all(16.w),
+      padding: const EdgeInsets.all(16),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -1390,19 +2059,19 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
                       AppIcon('buildings-2', size: 18, color: AppColors.accent),
-                      SizedBox(width: 8.w),
-                      Text('All Institutions',
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                      SizedBox(width: 10.w),
+                      const SizedBox(width: 8),
+                      const Text('All Institutions',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const SizedBox(width: 10),
                       Text('${_institutions.length} institutes',
-                          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   SizedBox(
@@ -1415,9 +2084,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 18.w),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -1429,11 +2098,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   ? const Center(child: CircularProgressIndicator())
                   : _institutions.isEmpty
                       ? Center(child: Text('No institutions found',
-                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)))
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)))
                       : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           itemCount: _institutions.length,
-                          separatorBuilder: (_, __) => SizedBox(height: 10.h),
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final ins = _institutions[index];
                             return Container(
@@ -1443,93 +2112,78 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                 border: Border.all(color: AppColors.border),
                               ),
                               child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 16.w, vertical: 14.h),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
                                 child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 22.r,
-                                    backgroundColor: AppColors.primary
-                                        .withValues(alpha: 0.1),
-                                    child: Text(
-                                      (ins['insname'] as String? ?? 'I')[0]
-                                          .toUpperCase(),
-                                      style: TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 16.sp),
-                                    ),
-                                  ),
-                                  SizedBox(width: 14.w),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          ins['insname'] ?? '',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 15.sp,
-                                              color: AppColors.textPrimary),
-                                        ),
-                                        SizedBox(height: 6.h),
-                                        Text(
-                                          'Code: ${ins['inscode'] ?? ''}',
-                                          style: TextStyle(
-                                              fontSize: 13.sp,
-                                              color: Colors.black),
-                                        ),
-                                        SizedBox(height: 2.h),
-                                        Text(
-                                          '${ins['insmail'] ?? ''}',
-                                          style: TextStyle(
-                                              fontSize: 13.sp,
-                                              color: Colors.black),
-                                        ),
-                                        if ((ins['inscity'] ?? '')
-                                                .toString()
-                                                .isNotEmpty ||
-                                            (ins['insstate'] ?? '')
-                                                .toString()
-                                                .isNotEmpty) ...[
-                                          SizedBox(height: 2.h),
-                                          Text(
-                                            '${ins['inscity'] ?? ''}${(ins['inscity'] ?? '').toString().isNotEmpty && (ins['insstate'] ?? '').toString().isNotEmpty ? ', ' : ''}${ins['insstate'] ?? ''}',
-                                            style: TextStyle(
-                                                fontSize: 13.sp,
-                                                color: Colors.black),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(width: 12.w),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 12.w, vertical: 6.h),
-                                    decoration: BoxDecoration(
-                                      color: ins['activestatus'] == 1
-                                          ? AppColors.success
-                                              .withValues(alpha: 0.1)
-                                          : AppColors.error
-                                              .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(20.r),
-                                    ),
-                                    child: Text(
-                                      ins['activestatus'] == 1
-                                          ? 'Active'
-                                          : 'Inactive',
-                                      style: TextStyle(
-                                        color: ins['activestatus'] == 1
-                                            ? AppColors.success
-                                            : AppColors.error,
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w600,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
+                                        style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 18),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            ins['insname'] ?? '',
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14,
+                                                color: AppColors.textPrimary,
+                                                height: 1.2),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Code: ${ins['inscode'] ?? ''}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: ins['activestatus'] == 1
+                                            ? AppColors.success.withValues(alpha: 0.12)
+                                            : AppColors.error.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        ins['activestatus'] == 1 ? 'Active' : 'Inactive',
+                                        style: TextStyle(
+                                          color: ins['activestatus'] == 1
+                                              ? AppColors.success
+                                              : AppColors.error,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -1689,7 +2343,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                             children: [
                               Text('Total Collection',
                                   style: TextStyle(
-                                      fontSize: 13.sp,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       color: collectionColor)),
                               SizedBox(height: 6.h),
@@ -1700,7 +2354,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                           sum +
                                           ((r['collection'] as double?) ?? 0))),
                                   style: TextStyle(
-                                      fontSize: 22.sp,
+                                      fontSize: 22,
                                       fontWeight: FontWeight.w800,
                                       color: collectionColor)),
                             ],
@@ -1721,7 +2375,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                             children: [
                               Text('Total Pending',
                                   style: TextStyle(
-                                      fontSize: 13.sp,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       color: pendingColor)),
                               SizedBox(height: 6.h),
@@ -1732,7 +2386,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                           sum +
                                           ((r['pending'] as double?) ?? 0))),
                                   style: TextStyle(
-                                      fontSize: 22.sp,
+                                      fontSize: 22,
                                       fontWeight: FontWeight.w800,
                                       color: pendingColor)),
                             ],
@@ -1760,26 +2414,26 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                 padding: EdgeInsets.fromLTRB(16.w, 0, 24.w, 0),
                                 child: Text('Course - Class',
                                     style: TextStyle(
-                                        fontSize: 13.sp,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w700)))),
                         Expanded(
                             child: Text('Students',
                                 style: TextStyle(
-                                    fontSize: 13.sp,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.accent),
                                 textAlign: TextAlign.right)),
                         Expanded(
                             child: Text('Collection',
                                 style: TextStyle(
-                                    fontSize: 13.sp,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: collectionColor),
                                 textAlign: TextAlign.right)),
                         Expanded(
                             child: Text('Pending',
                                 style: TextStyle(
-                                    fontSize: 13.sp,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: pendingColor),
                                 textAlign: TextAlign.right)),
@@ -1804,7 +2458,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                               child: Text('No data',
                                   style: TextStyle(
                                       color: Colors.black,
-                                      fontSize: 13.sp)))
+                                      fontSize: 13)))
                           : ListView.separated(
                               itemCount: _classWiseData.length,
                               separatorBuilder: (_, __) =>
@@ -1825,27 +2479,27 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                           flex: 3,
                                           child: Text(cls,
                                               style: TextStyle(
-                                                  fontSize: 13.sp,
+                                                  fontSize: 13,
                                                   fontWeight:
                                                       FontWeight.w600))),
                                       Expanded(
                                           child: Text('${row['students'] ?? 0}',
                                               style: TextStyle(
-                                                  fontSize: 13.sp,
+                                                  fontSize: 13,
                                                   fontWeight: FontWeight.w600,
                                                   color: AppColors.accent),
                                               textAlign: TextAlign.right)),
                                       Expanded(
                                           child: Text(_fmt(collection),
                                               style: TextStyle(
-                                                  fontSize: 13.sp,
+                                                  fontSize: 13,
                                                   fontWeight: FontWeight.w700,
                                                   color: collectionColor),
                                               textAlign: TextAlign.right)),
                                       Expanded(
                                           child: Text(_fmt(pending),
                                               style: TextStyle(
-                                                  fontSize: 13.sp,
+                                                  fontSize: 13,
                                                   fontWeight: FontWeight.w700,
                                                   color: pendingColor),
                                               textAlign: TextAlign.right)),
@@ -1866,8 +2520,9 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
 class _CourseWiseCollectionPage extends StatefulWidget {
   final _InstitutionFinanceSummary summary;
   final String mode; // 'collection' or 'pending'
+  final VoidCallback? onBack;
   const _CourseWiseCollectionPage(
-      {required this.summary, this.mode = 'collection'});
+      {required this.summary, this.mode = 'collection', this.onBack});
 
   @override
   State<_CourseWiseCollectionPage> createState() =>
@@ -1897,7 +2552,9 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      if (widget.mode == 'collection' &&
+      if (widget.mode == 'approval') {
+        await _loadApprovalFromPayments();
+      } else if (widget.mode == 'collection' &&
           (_filterFrom != null || _filterTo != null)) {
         await _loadCollectionFromPayments();
       } else {
@@ -2035,6 +2692,116 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
         .toList();
   }
 
+  Future<void> _loadApprovalFromPayments() async {
+    final schema = await _resolveSchema();
+    if (schema == null) {
+      _rows = [];
+      return;
+    }
+    final payments = await SupabaseService.client
+        .schema(schema)
+        .from('payment')
+        .select('pay_id, stu_id, transtotalamount')
+        .eq('paystatus', 'C')
+        .eq('recon_status', 'P')
+        .eq('activestatus', 1);
+    final paymentList = List<Map<String, dynamic>>.from(payments as List);
+    if (paymentList.isEmpty) {
+      _rows = [];
+      return;
+    }
+    final payIds = paymentList
+        .map((p) => p['pay_id'])
+        .whereType<int>()
+        .toList();
+    final demFineByPay = <int, double>{};
+    for (int i = 0; i < payIds.length; i += 200) {
+      final chunk = payIds.sublist(i, (i + 200).clamp(0, payIds.length));
+      final pd = await SupabaseService.client
+          .schema(schema)
+          .from('paymentdetails')
+          .select('pay_id, dem_id')
+          .inFilter('pay_id', chunk);
+      final demIds = (pd as List)
+          .map((r) => r['dem_id'])
+          .whereType<int>()
+          .toSet()
+          .toList();
+      final demFine = <int, double>{};
+      for (int j = 0; j < demIds.length; j += 200) {
+        final dchunk = demIds.sublist(j, (j + 200).clamp(0, demIds.length));
+        final fd = await SupabaseService.client
+            .schema(schema)
+            .from('feedemand')
+            .select('dem_id, fineamount')
+            .inFilter('dem_id', dchunk);
+        for (final r in (fd as List)) {
+          demFine[r['dem_id'] as int] =
+              (demFine[r['dem_id'] as int] ?? 0) +
+                  ((r['fineamount'] as num?)?.toDouble() ?? 0);
+        }
+      }
+      for (final r in pd) {
+        final pid = r['pay_id'] as int?;
+        final did = r['dem_id'] as int?;
+        if (pid == null) continue;
+        demFineByPay[pid] =
+            (demFineByPay[pid] ?? 0) + (did != null ? (demFine[did] ?? 0) : 0);
+      }
+    }
+
+    final stuIds = paymentList
+        .map((p) => p['stu_id'])
+        .where((id) => id != null)
+        .toSet()
+        .toList();
+    final students = await SupabaseService.client
+        .schema(schema)
+        .from('students')
+        .select('stu_id, stuclass, courname')
+        .inFilter('stu_id', stuIds);
+    final stuMap = <int, Map<String, dynamic>>{};
+    for (final s in (students as List)) {
+      final id = s['stu_id'];
+      if (id is int) stuMap[id] = Map<String, dynamic>.from(s as Map);
+    }
+
+    final groups = <String, Map<String, dynamic>>{};
+    for (final p in paymentList) {
+      final stuId = p['stu_id'];
+      final s = stuMap[stuId is int ? stuId : int.tryParse('$stuId')];
+      final course = (s?['courname'] ?? 'Other').toString();
+      final cls = (s?['stuclass'] ?? '').toString();
+      final key = '$course|$cls';
+      final amt = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+      final pid = p['pay_id'] as int?;
+      final fine = pid != null ? (demFineByPay[pid] ?? 0) : 0;
+      final net = (amt - fine).clamp(0, double.infinity).toDouble();
+      final g = groups.putIfAbsent(
+          key,
+          () => {
+                'course': course,
+                'class': cls,
+                'approval': 0.0,
+                '_stu_ids': <dynamic>{},
+              });
+      g['approval'] = (g['approval'] as double) + net;
+      (g['_stu_ids'] as Set).add(stuId);
+    }
+
+    final result = groups.values.map((g) {
+      final count = (g['_stu_ids'] as Set).length;
+      g.remove('_stu_ids');
+      g['approval_students'] = count;
+      return g;
+    }).toList()
+      ..sort(
+          (a, b) => (a['course'] as String).compareTo(b['course'] as String));
+    _rows = result
+        .where((r) => ((r['approval'] as num?)?.toDouble() ?? 0) > 0)
+        .toList();
+  }
+
   Future<void> _computeStudentCounts() async {
     try {
       final now = DateTime.now();
@@ -2149,7 +2916,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                       border: Border.all(color: AppColors.border),
                     ),
                     child: Text(label,
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                   ),
                 ),
               );
@@ -2181,7 +2948,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                           ? '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}'
                           : hint,
                       style: TextStyle(
-                          fontSize: 13.sp,
+                          fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: value != null ? AppColors.textPrimary : AppColors.textSecondary),
                     ),
@@ -2193,7 +2960,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
 
           Widget sectionLabel(String text) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
+                child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
               );
 
           return AlertDialog(
@@ -2202,7 +2969,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
             titlePadding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
             title: Row(
               children: [
-                Text('Filters', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                Text('Filters', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -2258,7 +3025,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
             actions: [
               TextButton(
                 onPressed: () => setStateDialog(() { from = null; to = null; }),
-                child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                child: Text('Clear', style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -2311,6 +3078,11 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
         totalLabel = 'Total Demand';
         titleIcon = 'wallet-1';
         break;
+      case 'approval':
+        valueLabel = 'Approval';
+        totalLabel = 'Pending Approval';
+        titleIcon = 'timer';
+        break;
       default:
         valueLabel = 'Collection';
         totalLabel = 'Total Collection';
@@ -2322,133 +3094,188 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
     } else if (widget.mode == 'pending') {
       total = _rows.fold<double>(
           0, (sum, r) => sum + ((r['pending'] as num?)?.toDouble() ?? 0));
+    } else if (widget.mode == 'approval') {
+      total = _rows.fold<double>(
+          0, (sum, r) => sum + ((r['approval'] as num?)?.toDouble() ?? 0));
     } else {
       total = widget.summary.totalDemand;
     }
+
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+    final studentsHeader = isMobile
+        ? (widget.mode == 'pending'
+            ? 'UNPAID'
+            : widget.mode == 'collection'
+                ? 'PAID'
+                : widget.mode == 'approval'
+                    ? 'PEND.'
+                    : 'STU')
+        : (widget.mode == 'pending'
+            ? 'UNPAID STUDENTS'
+            : widget.mode == 'collection'
+                ? 'PAID STUDENTS'
+                : widget.mode == 'approval'
+                    ? 'PENDING STUDENTS'
+                    : 'STUDENTS');
+    final rowPadH = isMobile ? 12.0 : 16.0;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
+                  LayoutBuilder(builder: (context, c) {
+                    final isMobile = c.maxWidth < 700;
+                    final backButton = InkWell(
+                      onTap: widget.onBack ?? () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                            const SizedBox(width: 6),
+                            const Text('Back',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    );
+                    final totalPill = Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('$totalLabel: ',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                          Text(_fmt(total),
+                              style: const TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    );
+                    final dateBtn = SizedBox(
+                      height: 40,
+                      child: OutlinedButton.icon(
+                        onPressed: _openDateFilter,
+                        icon: AppIcon('calendar-1', size: 16, color: AppColors.textPrimary),
+                        label: const Text('Date',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.border),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    );
+                    final refreshBtn = SizedBox(
+                      height: 40,
+                      child: ElevatedButton.icon(
+                        onPressed: _load,
+                        icon: AppIcon('refresh', size: 16, color: Colors.white),
+                        label: const Text('Refresh'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    );
+                    final breadcrumbText = Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        InkWell(
-                          onTap: () => Navigator.of(context).pop(),
-                          borderRadius: BorderRadius.circular(10.r),
-                          child: Container(
-                            height: 40,
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(10.r),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                        Flexible(
+                          child: Text(widget.summary.insName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                        ),
+                        const SizedBox(width: 6),
+                        AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text('Course-wise $valueLabel',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      ],
+                    );
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: isMobile
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                AppIcon.linear('Chevron Left',
-                                    size: 14, color: Colors.white),
-                                SizedBox(width: 6.w),
-                                Text('Back',
-                                    style: TextStyle(
-                                        fontSize: 13.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white)),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(widget.summary.insName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text('Course-wise $valueLabel',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    totalPill,
+                                    if (widget.mode == 'collection') dateBtn,
+                                    if (widget.mode == 'collection') refreshBtn,
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                backButton,
+                                const SizedBox(width: 12),
+                                Container(width: 1, height: 18, color: AppColors.border),
+                                const SizedBox(width: 12),
+                                breadcrumbText,
+                                const Spacer(),
+                                totalPill,
+                                if (widget.mode == 'collection') ...[
+                                  const SizedBox(width: 12),
+                                  dateBtn,
+                                  const SizedBox(width: 8),
+                                  refreshBtn,
+                                ],
                               ],
                             ),
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Container(width: 1, height: 18, color: AppColors.border),
-                        SizedBox(width: 12.w),
-                        Text(widget.summary.insName,
-                            style: TextStyle(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary)),
-                        SizedBox(width: 6.w),
-                        AppIcon.linear('Chevron Right',
-                            size: 14, color: AppColors.textSecondary),
-                        SizedBox(width: 6.w),
-                        Text('Course-wise $valueLabel',
-                            style: TextStyle(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary)),
-                        const Spacer(),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 12.w, vertical: 6.h),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                                color: AppColors.accent.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('$totalLabel: ',
-                                  style: TextStyle(
-                                      fontSize: 12.sp,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600)),
-                              Text(_fmt(total),
-                                  style: TextStyle(
-                                      fontSize: 13.sp,
-                                      color: AppColors.accent,
-                                      fontWeight: FontWeight.w800)),
-                            ],
-                          ),
-                        ),
-                        if (widget.mode == 'collection') ...[
-                          SizedBox(width: 12.w),
-                          SizedBox(
-                            height: 40,
-                            child: OutlinedButton.icon(
-                              onPressed: _openDateFilter,
-                              icon: AppIcon('calendar-1', size: 16, color: AppColors.textPrimary),
-                              label: Text('Date',
-                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.border),
-                                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                          SizedBox(
-                            height: 40,
-                            child: ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: AppIcon('refresh', size: 16, color: Colors.white),
-                              label: const Text('Refresh'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(horizontal: 18.w),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                                textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
+                    );
+                  }),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: Container(
                       clipBehavior: Clip.antiAlias,
@@ -2461,21 +3288,21 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                             child: Row(
                               children: [
                                 AppIcon(titleIcon,
                                     size: 18, color: AppColors.accent),
-                                SizedBox(width: 8.w),
-                                Text('Course-wise Breakdown',
+                                const SizedBox(width: 8),
+                                const Text('Course-wise Breakdown',
                                     style: TextStyle(
-                                        fontSize: 14.sp,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.textPrimary)),
                                 const Spacer(),
                                 Text('${_rows.length} ${_rows.length == 1 ? "course" : "courses"}',
-                                    style: TextStyle(
-                                        fontSize: 12.sp,
+                                    style: const TextStyle(
+                                        fontSize: 12,
                                         color: AppColors.textSecondary,
                                         fontWeight: FontWeight.w600)),
                               ],
@@ -2483,7 +3310,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                           ),
                           Expanded(
                             child: Padding(
-                              padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               child: Container(
                                 clipBehavior: Clip.antiAlias,
                                 decoration: BoxDecoration(
@@ -2496,14 +3323,14 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                     Container(
                                       color: AppColors.tableHeadBg,
                                       padding: EdgeInsets.symmetric(
-                                          horizontal: 16.w, vertical: 12.h),
+                                          horizontal: rowPadH, vertical: 12),
                                       child: Row(
                                         children: [
                                           Expanded(
-                                              flex: 2,
+                                              flex: 3,
                                               child: Text('COURSE',
                                                   style: TextStyle(
-                                                      fontSize: 12.sp,
+                                                      fontSize: 12,
                                                       fontWeight: FontWeight.w700,
                                                       color: AppColors.textPrimary,
                                                       letterSpacing: 0.4))),
@@ -2511,29 +3338,27 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                               flex: 2,
                                               child: Text('CLASS',
                                                   style: TextStyle(
-                                                      fontSize: 12.sp,
+                                                      fontSize: 12,
                                                       fontWeight: FontWeight.w700,
                                                       color: AppColors.textPrimary,
                                                       letterSpacing: 0.4))),
                                           Expanded(
+                                              flex: 2,
                                               child: Text(
-                                                  widget.mode == 'pending'
-                                                      ? 'UNPAID STUDENTS'
-                                                      : widget.mode == 'collection'
-                                                          ? 'PAID STUDENTS'
-                                                          : 'STUDENTS',
+                                                  studentsHeader,
                                                   textAlign: TextAlign.right,
                                                   style: TextStyle(
-                                                      fontSize: 12.sp,
+                                                      fontSize: 12,
                                                       fontWeight: FontWeight.w700,
                                                       color: AppColors.textPrimary,
                                                       letterSpacing: 0.4))),
                                           Expanded(
+                                              flex: 4,
                                               child: Text(
                                                   valueLabel.toUpperCase(),
                                                   textAlign: TextAlign.right,
                                                   style: TextStyle(
-                                                      fontSize: 12.sp,
+                                                      fontSize: 12,
                                                       fontWeight: FontWeight.w700,
                                                       color: AppColors.textPrimary,
                                                       letterSpacing: 0.4))),
@@ -2545,7 +3370,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                           ? Center(
                                               child: Text('No data',
                                                   style: TextStyle(
-                                                      fontSize: 13.sp,
+                                                      fontSize: 13,
                                                       color: AppColors.textSecondary,
                                                       fontWeight: FontWeight.w600)))
                                           : ListView.builder(
@@ -2560,41 +3385,51 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                                   students = (r['unpaid_students'] as num?)?.toInt() ?? 0;
                                                 } else if (widget.mode == 'collection') {
                                                   students = (r['paid_students'] as num?)?.toInt() ?? 0;
+                                                } else if (widget.mode == 'approval') {
+                                                  students = (r['approval_students'] as num?)?.toInt() ?? 0;
                                                 } else {
                                                   students = (r['students'] as num?)?.toInt() ?? 0;
                                                 }
                                                 final zebra = i.isOdd ? AppColors.surface : Colors.white;
                                                 return Container(
                                                   color: zebra,
-                                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                                                  padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
                                                   child: Row(
                                                     children: [
                                                       Expanded(
-                                                          flex: 2,
+                                                          flex: 3,
                                                           child: Text(courseLabel,
-                                                              style: TextStyle(
-                                                                  fontSize: 13.sp,
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: const TextStyle(
+                                                                  fontSize: 13,
                                                                   fontWeight: FontWeight.w600,
                                                                   color: AppColors.textSecondary))),
                                                       Expanded(
                                                           flex: 2,
                                                           child: Text(classLabel,
-                                                              style: TextStyle(
-                                                                  fontSize: 13.sp,
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: const TextStyle(
+                                                                  fontSize: 13,
                                                                   fontWeight: FontWeight.w600,
                                                                   color: AppColors.textSecondary))),
                                                       Expanded(
+                                                          flex: 2,
                                                           child: Text('$students',
                                                               textAlign: TextAlign.right,
-                                                              style: TextStyle(
-                                                                  fontSize: 13.sp,
+                                                              style: const TextStyle(
+                                                                  fontSize: 13,
                                                                   fontWeight: FontWeight.w600,
                                                                   color: AppColors.textSecondary))),
                                                       Expanded(
+                                                          flex: 4,
                                                           child: Text(_fmt(amount),
                                                               textAlign: TextAlign.right,
-                                                              style: TextStyle(
-                                                                  fontSize: 13.sp,
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                              style: const TextStyle(
+                                                                  fontSize: 13,
                                                                   fontWeight: FontWeight.w700,
                                                                   color: AppColors.textPrimary))),
                                                     ],
@@ -2720,16 +3555,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(text,
             style: TextStyle(
-                fontSize: 13.sp,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary)),
       );
 
-  TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary);
+  TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary);
 
   InputDecoration _inputDec(String hint, {Widget? suffix}) => InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13.sp, fontWeight: FontWeight.w500),
+        hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13, fontWeight: FontWeight.w500),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
@@ -2746,8 +3581,9 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width <= 800;
     return Padding(
-      padding: EdgeInsets.all(16.w),
+      padding: const EdgeInsets.all(16),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -2758,80 +3594,101 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 20.h),
+            padding: EdgeInsets.fromLTRB(isMobile ? 16 : 20, 20, isMobile ? 16 : 20, 20),
             children: [
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(8.w),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: AppIcon('setting-2', color: AppColors.accent, size: 18),
                   ),
-                  SizedBox(width: 12.w),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Account Settings',
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                      SizedBox(height: 2.h),
-                      Text('Manage your account credentials',
-                          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                    ],
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Account Settings',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        SizedBox(height: 2),
+                        Text('Manage your account credentials',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              SizedBox(height: 24.h),
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _label('Username'),
-                  TextFormField(
-                    controller: _usernameCtrl,
-                    decoration: _inputDec('Enter username'),
-                    style: _fieldStyle(),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
-                  ),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _label('Email'),
-                  TextFormField(
-                    controller: _emailCtrl,
-                    decoration: _inputDec('Enter email'),
-                    style: _fieldStyle(),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
-                  ),
-                ])),
-              ]),
-              SizedBox(height: 24.h),
+              const SizedBox(height: 24),
+              if (isMobile) ...[
+                _label('Username'),
+                TextFormField(
+                  controller: _usernameCtrl,
+                  decoration: _inputDec('Enter username'),
+                  style: _fieldStyle(),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
+                ),
+                const SizedBox(height: 14),
+                _label('Email'),
+                TextFormField(
+                  controller: _emailCtrl,
+                  decoration: _inputDec('Enter email'),
+                  style: _fieldStyle(),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+                ),
+              ] else
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('Username'),
+                    TextFormField(
+                      controller: _usernameCtrl,
+                      decoration: _inputDec('Enter username'),
+                      style: _fieldStyle(),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('Email'),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      decoration: _inputDec('Enter email'),
+                      style: _fieldStyle(),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+                    ),
+                  ])),
+                ]),
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(8.w),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppColors.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: AppIcon('lock', color: AppColors.accent, size: 18),
                   ),
-                  SizedBox(width: 12.w),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Change Password',
-                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                      SizedBox(height: 2.h),
-                      Text('Leave new password blank to keep your current one',
-                          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                    ],
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Change Password',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        SizedBox(height: 2),
+                        Text('Leave new password blank to keep current',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              SizedBox(height: 16.h),
+              const SizedBox(height: 16),
               _label('Current Password *'),
               TextFormField(
                 controller: _currentPwdCtrl,
@@ -2846,50 +3703,88 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 style: _fieldStyle(),
                 validator: (v) => (v == null || v.isEmpty) ? 'Required to confirm changes' : null,
               ),
-              SizedBox(height: 14.h),
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _label('New Password'),
-                  TextFormField(
-                    controller: _newPwdCtrl,
-                    obscureText: !_showNew,
-                    decoration: _inputDec(
-                      'Leave blank to keep current',
-                      suffix: IconButton(
-                        icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                        onPressed: () => setState(() => _showNew = !_showNew),
-                      ),
+              const SizedBox(height: 14),
+              if (isMobile) ...[
+                _label('New Password'),
+                TextFormField(
+                  controller: _newPwdCtrl,
+                  obscureText: !_showNew,
+                  decoration: _inputDec(
+                    'Leave blank to keep current',
+                    suffix: IconButton(
+                      icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
+                      onPressed: () => setState(() => _showNew = !_showNew),
                     ),
-                    style: _fieldStyle(),
-                    validator: (v) {
-                      if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
-                      return null;
-                    },
                   ),
-                ])),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  _label('Confirm New Password'),
-                  TextFormField(
-                    controller: _confirmPwdCtrl,
-                    obscureText: !_showConfirm,
-                    decoration: _inputDec(
-                      'Re-enter new password',
-                      suffix: IconButton(
-                        icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                        onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                      ),
+                  style: _fieldStyle(),
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                _label('Confirm New Password'),
+                TextFormField(
+                  controller: _confirmPwdCtrl,
+                  obscureText: !_showConfirm,
+                  decoration: _inputDec(
+                    'Re-enter new password',
+                    suffix: IconButton(
+                      icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
+                      onPressed: () => setState(() => _showConfirm = !_showConfirm),
                     ),
-                    style: _fieldStyle(),
-                    validator: (v) {
-                      if (_newPwdCtrl.text.isEmpty) return null;
-                      if (v != _newPwdCtrl.text) return 'Passwords do not match';
-                      return null;
-                    },
                   ),
-                ])),
-              ]),
-              SizedBox(height: 28.h),
+                  style: _fieldStyle(),
+                  validator: (v) {
+                    if (_newPwdCtrl.text.isEmpty) return null;
+                    if (v != _newPwdCtrl.text) return 'Passwords do not match';
+                    return null;
+                  },
+                ),
+              ] else
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('New Password'),
+                    TextFormField(
+                      controller: _newPwdCtrl,
+                      obscureText: !_showNew,
+                      decoration: _inputDec(
+                        'Leave blank to keep current',
+                        suffix: IconButton(
+                          icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
+                          onPressed: () => setState(() => _showNew = !_showNew),
+                        ),
+                      ),
+                      style: _fieldStyle(),
+                      validator: (v) {
+                        if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
+                        return null;
+                      },
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('Confirm New Password'),
+                    TextFormField(
+                      controller: _confirmPwdCtrl,
+                      obscureText: !_showConfirm,
+                      decoration: _inputDec(
+                        'Re-enter new password',
+                        suffix: IconButton(
+                          icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
+                          onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                        ),
+                      ),
+                      style: _fieldStyle(),
+                      validator: (v) {
+                        if (_newPwdCtrl.text.isEmpty) return null;
+                        if (v != _newPwdCtrl.text) return 'Passwords do not match';
+                        return null;
+                      },
+                    ),
+                  ])),
+                ]),
+              const SizedBox(height: 28),
               Center(
                 child: SizedBox(
                   height: 48,
@@ -2921,7 +3816,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
 class _AggregateDrilldownPage extends StatelessWidget {
   final List<_InstitutionFinanceSummary> summaries;
   final String mode; // active | demand | collection | approval | pending
-  const _AggregateDrilldownPage({required this.summaries, required this.mode});
+  final VoidCallback? onBack;
+  const _AggregateDrilldownPage({required this.summaries, required this.mode, this.onBack});
 
   String get _title {
     switch (mode) {
@@ -2994,74 +3890,105 @@ class _AggregateDrilldownPage extends StatelessWidget {
         ? filtered.length.toString()
         : _formatAmount(filtered.fold<double>(0, (sum, s) => sum + _value(s)));
 
+    final isMobile = MediaQuery.of(context).size.width <= 800;
+    final mobileColLabel = mode == 'approval' ? 'APPROVAL' : _columnLabel;
+    final columnLabel = isMobile ? mobileColLabel : _columnLabel;
+    final rowPadH = isMobile ? 12.0 : 16.0;
+
+    final backButton = InkWell(
+      onTap: onBack ?? () => Navigator.of(context).pop(),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+            const SizedBox(width: 6),
+            const Text('Back',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+    final totalPill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Total: ',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          Text(aggregate,
+              style: const TextStyle(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Padding(
-        padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(10.r),
-                    child: Container(
-                      height: 40,
-                      padding: EdgeInsets.symmetric(horizontal: 14.w),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                          SizedBox(width: 6.w),
-                          Text('Back',
-                              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Container(width: 1, height: 18, color: AppColors.border),
-                  SizedBox(width: 12.w),
-                  Text('Dashboard',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                  SizedBox(width: 6.w),
-                  AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
-                  SizedBox(width: 6.w),
-                  Text(_title,
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  const Spacer(),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+              child: isMobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total: ',
-                            style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                        Text(aggregate,
-                            style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w800)),
+                        Row(
+                          children: [
+                            const Text('Dashboard',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                            const SizedBox(width: 6),
+                            AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(_title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        totalPill,
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        backButton,
+                        const SizedBox(width: 12),
+                        Container(width: 1, height: 18, color: AppColors.border),
+                        const SizedBox(width: 12),
+                        const Text('Dashboard',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                        const SizedBox(width: 6),
+                        AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text(_title,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        const Spacer(),
+                        totalPill,
                       ],
                     ),
-                  ),
-                ],
-              ),
             ),
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
             Expanded(
               child: Container(
                 clipBehavior: Clip.antiAlias,
@@ -3074,22 +4001,22 @@ class _AggregateDrilldownPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                       child: Row(
                         children: [
                           AppIcon('buildings-2', size: 18, color: AppColors.accent),
-                          SizedBox(width: 8.w),
-                          Text('Institution Breakdown',
-                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          const SizedBox(width: 8),
+                          const Text('Institution Breakdown',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                           const Spacer(),
                           Text('${filtered.length} institutes',
-                              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
                     Expanded(
                       child: Padding(
-                      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Container(
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
@@ -3101,21 +4028,21 @@ class _AggregateDrilldownPage extends StatelessWidget {
                           children: [
                             Container(
                               color: AppColors.tableHeadBg,
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                              padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 12),
                               child: Row(
                                 children: [
-                                  SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
-                                  Expanded(child: Text('INSTITUTION', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
-                                  SizedBox(width: 100.w, child: Text('CODE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
-                                  SizedBox(width: 180.w, child: Text(_columnLabel, textAlign: TextAlign.right, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
+                                  const SizedBox(width: 28, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
+                                  const Expanded(flex: 5, child: Text('INSTITUTION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
+                                  Expanded(flex: 2, child: Text('CODE', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
+                                  Expanded(flex: 4, child: Text(columnLabel, textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.4))),
                                 ],
                               ),
                             ),
                             Expanded(
                               child: filtered.isEmpty
-                                  ? Center(
+                                  ? const Center(
                                       child: Text('No data',
-                                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                                     )
                                   : ListView.builder(
                                       itemCount: filtered.length,
@@ -3124,19 +4051,19 @@ class _AggregateDrilldownPage extends StatelessWidget {
                                         final zebra = i.isOdd ? AppColors.surface : Colors.white;
                                         return Container(
                                           color: zebra,
-                                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                                          padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
                                           child: Row(
                                             children: [
-                                              SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                              Expanded(child: Text(s.insName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                              SizedBox(width: 100.w, child: Text(s.insCode, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                              SizedBox(
-                                                width: 180.w,
+                                              SizedBox(width: 28, child: Text('${i + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                              Expanded(flex: 5, child: Text(s.insName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                              Expanded(flex: 2, child: Text(s.insCode, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                              Expanded(
+                                                flex: 4,
                                                 child: mode == 'active'
                                                     ? Align(
                                                         alignment: Alignment.centerRight,
                                                         child: Container(
-                                                          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                           decoration: BoxDecoration(
                                                             color: s.activeStatus
                                                                 ? AppColors.success.withValues(alpha: 0.1)
@@ -3146,7 +4073,7 @@ class _AggregateDrilldownPage extends StatelessWidget {
                                                           child: Text(
                                                             s.activeStatus ? 'Active' : 'Inactive',
                                                             style: TextStyle(
-                                                                fontSize: 11.sp,
+                                                                fontSize: 11,
                                                                 fontWeight: FontWeight.w700,
                                                                 color: s.activeStatus ? AppColors.success : AppColors.textSecondary),
                                                           ),
@@ -3154,7 +4081,9 @@ class _AggregateDrilldownPage extends StatelessWidget {
                                                       )
                                                     : Text(_formatAmount(_value(s)),
                                                         textAlign: TextAlign.right,
-                                                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                                               ),
                                             ],
                                           ),

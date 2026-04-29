@@ -171,17 +171,20 @@ class _NoticesScreenState extends State<NoticesScreen> {
                 child: Text('${_notices.length} notices', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
               ),
               SizedBox(width: 8.w),
-              ElevatedButton.icon(
-                onPressed: () => setState(() => _showCreateForm = true),
-                icon: const AppIcon('add', size: 18),
-                label: Text('Create Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  elevation: 0,
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _showCreateForm = true),
+                  icon: const AppIcon('add', size: 16, color: Colors.white),
+                  label: Text('Create Notice', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 18.w),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    elevation: 0,
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               SizedBox(width: 8.w),

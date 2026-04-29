@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_routes.dart';
@@ -46,6 +44,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _obscurePassword = true;
 
   bool _isSuperAdmin = false;
+  bool _appliedMobileDefault = false;
 
   List<Map<String, dynamic>> _institutions = [];
   int? _selectedInsId;
@@ -59,6 +58,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   void initState() {
     super.initState();
     _loadInstitutions();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_appliedMobileDefault) {
+      _appliedMobileDefault = true;
+      final width = MediaQuery.of(context).size.width;
+      if (width <= 900) {
+        // Mobile: only Super Admin login is available, so default the form there.
+        _isSuperAdmin = true;
+      }
+    }
   }
 
   @override
@@ -160,26 +172,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 900;
-    final baseTheme = Theme.of(context);
 
-    return Theme(
-      data: baseTheme.copyWith(
-        textTheme: GoogleFonts.robotoCondensedTextTheme(baseTheme.textTheme),
-        primaryTextTheme:
-            GoogleFonts.robotoCondensedTextTheme(baseTheme.primaryTextTheme),
-        inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
-          hintStyle: GoogleFonts.robotoCondensed(
-            color: Colors.grey.shade400,
-            fontSize: 17,
-          ),
-          labelStyle: GoogleFonts.robotoCondensed(),
-        ),
-      ),
-      child: DefaultTextStyle.merge(
-        style: GoogleFonts.robotoCondensed(color: _PinkPalette.frame),
-        child: Scaffold(
-          backgroundColor: _PinkPalette.frame,
-          body: Stack(
+    return Scaffold(
+      backgroundColor: _PinkPalette.frame,
+      body: Stack(
             children: [
               // Gradient backdrop
               Positioned.fill(
@@ -199,42 +195,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
 
-              // Abstract decorative elements
-              Positioned.fill(
-                child: CustomPaint(painter: _AbstractBackgroundPainter()),
-              ),
-
-              // Soft amber glow — top right
+              // Single soft amber accent glow — top right (subtle dimension)
               Positioned(
-                top: -120,
-                right: -120,
+                top: -160,
+                right: -160,
                 child: Container(
-                  width: 360,
-                  height: 360,
+                  width: 420,
+                  height: 420,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        _PinkPalette.accent.withValues(alpha: 0.28),
+                        _PinkPalette.accent.withValues(alpha: 0.18),
                         _PinkPalette.accent.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Soft navy glow — bottom left
-              Positioned(
-                bottom: -160,
-                left: -160,
-                child: Container(
-                  width: 460,
-                  height: 460,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF003E80).withValues(alpha: 0.45),
-                        const Color(0xFF003E80).withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -244,7 +217,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               SafeArea(
                 child: Center(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.all(isDesktop ? 40.w : 16.w),
+                    padding: EdgeInsets.all(isDesktop ? 40 : 16),
                     child: ConstrainedBox(
                       constraints:
                           BoxConstraints(maxWidth: isDesktop ? 720 : 520),
@@ -252,22 +225,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         duration: const Duration(milliseconds: 500),
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24.r),
+                            borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.22),
-                                blurRadius: 80,
-                                spreadRadius: 4,
-                              ),
-                              BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                blurRadius: 30,
-                                spreadRadius: 1,
+                                color: Colors.black.withValues(alpha: 0.32),
+                                blurRadius: 36,
+                                offset: const Offset(0, 14),
                               ),
                             ],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24.r),
+                            borderRadius: BorderRadius.circular(20),
                             child: Container(
                               decoration: const BoxDecoration(
                                 color: Colors.white,
@@ -279,7 +247,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                             CrossAxisAlignment.stretch,
                                         children: [
                                           SizedBox(
-                                            width: 280.w,
+                                            width: 280,
                                             child: _buildTabPanel(),
                                           ),
                                           Expanded(child: _buildFormPanel()),
@@ -288,7 +256,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     : Column(
                                         children: [
                                           SizedBox(
-                                            height: 180.h,
+                                            height: 110,
                                             child:
                                                 _buildTabPanel(compact: true),
                                           ),
@@ -306,8 +274,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 
@@ -317,58 +283,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         Container(
           decoration: const BoxDecoration(gradient: _PinkPalette.panelGradient),
         ),
-        // Decorative geometric shapes (triangles)
-        Positioned(
-          top: -60,
-          left: -60,
-          child: Transform.rotate(
-            angle: 0.785,
-            child: Container(
-              width: 220.w,
-              height: 220.w,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(28.r),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -80,
-          left: -40,
-          child: Transform.rotate(
-            angle: 0.785,
-            child: Container(
-              width: 260.w,
-              height: 260.w,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(32.r),
-              ),
-            ),
-          ),
-        ),
         if (!compact)
           Positioned(
             right: -1,
             top: 0,
             bottom: 0,
             child: CustomPaint(
-              size: Size(60.w, double.infinity),
+              size: Size(60, double.infinity),
               painter: _ArrowCutPainter(color: Colors.white),
             ),
           ),
         // Tabs
         Padding(
-          padding: EdgeInsets.all(compact ? 20.w : 28.w),
+          padding: EdgeInsets.all(compact ? 20 : 28),
           child: compact
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildTab('Institute\nLogin', !_isSuperAdmin,
-                        () => _switchTab(false),
-                        compact: true),
-                    SizedBox(width: 12.w),
+                    _buildTab('Institute\nLogin', false,
+                        () {},
+                        compact: true, disabled: true),
+                    SizedBox(width: 12),
                     _buildTab('Super Admin\nLogin', _isSuperAdmin,
                         () => _switchTab(true),
                         compact: true),
@@ -381,24 +316,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     FadeInLeft(
                       child: Row(
                         children: [
-                          SizedBox(
-                            width: 80.w,
-                            height: 80.w,
-                            child: Image.asset(
-                              'assets/images/educore360_logo.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(Icons.school_rounded,
-                                  color: const Color(0xFF002147), size: 36.sp),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              width: 48,
+                              height: 48,
+                              color: Colors.white,
+                              child: Image.asset(
+                                'assets/images/educore360_logo.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Icon(Icons.school_rounded,
+                                    color: const Color(0xFF002147), size: 26),
+                              ),
                             ),
                           ),
-                          SizedBox(width: 10.w),
+                          SizedBox(width: 10),
                           Text(
                             'EduCore360',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 20.sp,
+                              fontSize: 20,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                              letterSpacing: -0.3,
                             ),
                           ),
                         ],
@@ -406,18 +345,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     ),
                     const Spacer(),
                     Transform.translate(
-                      offset: Offset(-24.w, 0),
+                      offset: Offset(-24, 0),
                       child: SizedBox(
-                        width: 180.w,
+                        width: 180,
                         child: _buildTab('INSTITUTE\nLOGIN', !_isSuperAdmin,
                             () => _switchTab(false)),
                       ),
                     ),
-                    SizedBox(height: 24.h),
+                    SizedBox(height: 24),
                     Transform.translate(
-                      offset: Offset(-24.w, 0),
+                      offset: Offset(-24, 0),
                       child: SizedBox(
-                        width: 180.w,
+                        width: 180,
                         child: _buildTab('SUPER ADMIN\nLOGIN', _isSuperAdmin,
                             () => _switchTab(true)),
                       ),
@@ -429,7 +368,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         'Empowering Education\nThrough Intelligent\nAdministration',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 12.sp,
+                          fontSize: 12,
                           height: 1.5,
                         ),
                       ),
@@ -442,85 +381,87 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Widget _buildTab(String label, bool isActive, VoidCallback onTap,
-      {bool compact = false}) {
+      {bool compact = false, bool disabled = false}) {
+    final tab = AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 22,
+        vertical: compact ? 10 : 16,
+      ),
+      decoration: BoxDecoration(
+        color: isActive ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(30),
+          bottomLeft: Radius.circular(30),
+          topRight: Radius.circular(compact ? 30 : 8),
+          bottomRight: Radius.circular(compact ? 30 : 8),
+        ),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(-2, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            child: isActive
+                ? Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Container(
+                      width: compact ? 18 : 22,
+                      height: compact ? 18 : 22,
+                      decoration: const BoxDecoration(
+                        gradient: _PinkPalette.buttonGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        color: Colors.white,
+                        size: compact ? 12 : 14,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isActive ? _PinkPalette.primary : Colors.white,
+                fontSize: compact ? 12 : 14,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (disabled) {
+      return Opacity(opacity: 0.4, child: IgnorePointer(child: tab));
+    }
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 14.w : 22.w,
-            vertical: compact ? 10.h : 16.h,
-          ),
-          decoration: BoxDecoration(
-            color: isActive ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(30.r),
-              bottomLeft: Radius.circular(30.r),
-              topRight: Radius.circular(compact ? 30.r : 8.r),
-              bottomRight: Radius.circular(compact ? 30.r : 8.r),
-            ),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(-2, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedSize(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                child: isActive
-                    ? Padding(
-                        padding: EdgeInsets.only(right: 8.w),
-                        child: Container(
-                          width: compact ? 18.w : 22.w,
-                          height: compact ? 18.w : 22.w,
-                          decoration: const BoxDecoration(
-                            gradient: _PinkPalette.buttonGradient,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.arrow_forward_rounded,
-                            color: Colors.white,
-                            size: compact ? 12.sp : 14.sp,
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              Flexible(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isActive ? _PinkPalette.primary : Colors.white,
-                    fontSize: compact ? 12.sp : 14.sp,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: GestureDetector(onTap: onTap, child: tab),
     );
   }
 
   Widget _buildFormPanel() {
     return Container(
       color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 36.h),
+      padding: EdgeInsets.symmetric(horizontal: 40, vertical: 36),
       child: Form(
         key: _formKey,
         child: Column(
@@ -531,8 +472,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             Center(
               child: FadeInDown(
                 child: Container(
-                  width: 82.w,
-                  height: 82.w,
+                  width: 82,
+                  height: 82,
                   decoration: BoxDecoration(
                     gradient: _PinkPalette.avatarGradient,
                     shape: BoxShape.circle,
@@ -558,13 +499,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       return ClipOval(
                         child: Image.network(
                           logoUrl,
-                          width: 82.w,
-                          height: 82.w,
+                          width: 82,
+                          height: 82,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Icon(
                             Icons.person_rounded,
                             color: Colors.white,
-                            size: 44.sp,
+                            size: 44,
                           ),
                         ),
                       );
@@ -574,63 +515,63 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           ? Icons.admin_panel_settings_rounded
                           : Icons.person_rounded,
                       color: Colors.white,
-                      size: 44.sp,
+                      size: 44,
                     );
                   }),
                 ),
               ),
             ),
-            SizedBox(height: 14.h),
+            SizedBox(height: 14),
             Center(
               child: Text(
                 'LOGIN',
                 style: TextStyle(
                   color: _PinkPalette.primary,
-                  fontSize: 22.sp,
+                  fontSize: 24,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 4,
+                  letterSpacing: 1.5,
                 ),
               ),
             ),
-            SizedBox(height: 6.h),
+            SizedBox(height: 6),
             Center(
               child: Text(
                 _isSuperAdmin ? 'Super Admin Access' : 'Institution Access',
                 style: TextStyle(
-                  color: _PinkPalette.accent.withValues(alpha: 0.7),
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+                  color: _PinkPalette.accent.withValues(alpha: 0.85),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
                 ),
               ),
             ),
-            SizedBox(height: 28.h),
+            SizedBox(height: 28),
 
             // Error
             Consumer<AuthProvider>(
               builder: (context, auth, _) {
                 if (auth.errorMessage == null) return const SizedBox.shrink();
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 14.h),
+                  padding: EdgeInsets.only(bottom: 14),
                   child: Container(
-                    padding: EdgeInsets.all(12.w),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                       border:
                           Border.all(color: Colors.red.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
                         Icon(Icons.error_outline_rounded,
-                            color: Colors.red.shade600, size: 18.sp),
-                        SizedBox(width: 8.w),
+                            color: Colors.red.shade600, size: 18),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             auth.errorMessage!,
                             style: TextStyle(
                               color: Colors.red.shade700,
-                              fontSize: 13.sp,
+                              fontSize: 13,
                             ),
                           ),
                         ),
@@ -645,7 +586,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             if (!_isSuperAdmin) ...[
               _loadingInstitutions
                   ? Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      padding: EdgeInsets.symmetric(vertical: 8),
                       child: const LinearProgressIndicator(
                         color: _PinkPalette.accent,
                         backgroundColor: _PinkPalette.soft,
@@ -673,7 +614,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       validator: (value) =>
                           value == null ? 'Please select an institution' : null,
                     ),
-              SizedBox(height: 16.h),
+              SizedBox(height: 16),
               if (_availableYears.isNotEmpty) ...[
                 _loadingYears
                     ? const LinearProgressIndicator(
@@ -694,7 +635,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         onChanged: (value) =>
                             setState(() => _selectedYear = value),
                       ),
-                SizedBox(height: 16.h),
+                SizedBox(height: 16),
               ],
             ],
 
@@ -721,7 +662,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 return null;
               },
             ),
-            SizedBox(height: 20.h),
+            SizedBox(height: 20),
 
             // Password
             _buildUnderlineField(
@@ -738,7 +679,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   _obscurePassword
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
-                  size: 18.sp,
+                  size: 18,
                   color: _PinkPalette.accent.withValues(alpha: 0.6),
                 ),
                 onPressed: () =>
@@ -754,7 +695,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 return null;
               },
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 16),
 
             // Forgot password (right aligned, on its own row)
             Align(
@@ -763,20 +704,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 onPressed: () =>
                     Navigator.pushNamed(context, AppRoutes.forgotPassword),
                 style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 ),
                 child: Text(
                   'Forgot Password?',
                   style: TextStyle(
                     color: _PinkPalette.accent,
-                    fontSize: 13.sp,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
 
-            SizedBox(height: 18.h),
+            SizedBox(height: 18),
 
             // Full-width LOGIN button (replaces the old Explore Demo slot)
             Consumer<AuthProvider>(
@@ -786,10 +727,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: GestureDetector(
                     onTap: auth.isLoading ? null : _handleLogin,
                     child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
+                      padding: EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         gradient: _PinkPalette.buttonGradient,
-                        borderRadius: BorderRadius.circular(30.r),
+                        borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
                             color: _PinkPalette.accent.withValues(alpha: 0.4),
@@ -801,8 +742,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       child: Center(
                         child: auth.isLoading
                             ? SizedBox(
-                                width: 22.w,
-                                height: 22.w,
+                                width: 22,
+                                height: 22,
                                 child: const CircularProgressIndicator(
                                   color: Colors.white,
                                   strokeWidth: 2.5,
@@ -812,9 +753,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 'LOGIN',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 15.sp,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  letterSpacing: 2.0,
+                                  letterSpacing: 1.0,
                                 ),
                               ),
                       ),
@@ -847,7 +788,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       textInputAction: textInputAction,
       onFieldSubmitted: onFieldSubmitted,
       style: TextStyle(
-        fontSize: 17.sp,
+        fontSize: 15,
         color: _PinkPalette.frame,
         fontWeight: FontWeight.w500,
       ),
@@ -855,13 +796,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         hintText: hint,
         hintStyle: TextStyle(
           color: Colors.grey.shade400,
-          fontSize: 17.sp,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
         ),
         prefixIcon: Icon(icon,
-            size: 22.sp, color: _PinkPalette.accent.withValues(alpha: 0.7)),
+            size: 20, color: _PinkPalette.accent.withValues(alpha: 0.7)),
         suffixIcon: suffixIcon,
         filled: false,
-        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+        contentPadding: EdgeInsets.symmetric(vertical: 16),
         border: const UnderlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFE0E0E0)),
         ),
@@ -891,19 +833,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       value: value,
       isExpanded: true,
       style: TextStyle(
-        fontSize: 17.sp,
+        fontSize: 15,
         color: _PinkPalette.frame,
         fontWeight: FontWeight.w500,
       ),
       icon: Icon(Icons.keyboard_arrow_down_rounded,
-          size: 24.sp, color: _PinkPalette.accent.withValues(alpha: 0.7)),
+          size: 24, color: _PinkPalette.accent.withValues(alpha: 0.7)),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 17.sp),
+        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 15, fontWeight: FontWeight.w500),
         prefixIcon: Icon(icon,
-            size: 22.sp, color: _PinkPalette.accent.withValues(alpha: 0.7)),
+            size: 20, color: _PinkPalette.accent.withValues(alpha: 0.7)),
         filled: false,
-        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+        contentPadding: EdgeInsets.symmetric(vertical: 16),
         border: const UnderlineInputBorder(
           borderSide: BorderSide(color: Color(0xFFE0E0E0)),
         ),
@@ -944,68 +886,3 @@ class _ArrowCutPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Faint abstract decoration drawn behind the welcome card: dot grid,
-/// rotated outline squares, and a couple of thin diagonal accent lines.
-class _AbstractBackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Dot grid
-    final dotPaint = Paint()..color = Colors.white.withValues(alpha: 0.05);
-    const spacing = 36.0;
-    for (double y = spacing; y < size.height; y += spacing) {
-      for (double x = spacing; x < size.width; x += spacing) {
-        canvas.drawCircle(Offset(x, y), 1.2, dotPaint);
-      }
-    }
-
-    // Rotated outline squares
-    final outlinePaint = Paint()
-      ..color = const Color(0xFFD2913C).withValues(alpha: 0.18)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    void drawRotatedSquare(Offset center, double side, double radians) {
-      canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(radians);
-      final r = side / 2;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(-r, -r, side, side),
-          const Radius.circular(12),
-        ),
-        outlinePaint,
-      );
-      canvas.restore();
-    }
-
-    drawRotatedSquare(Offset(size.width * 0.12, size.height * 0.78), 140, 0.6);
-    drawRotatedSquare(Offset(size.width * 0.88, size.height * 0.18), 110, -0.5);
-    drawRotatedSquare(Offset(size.width * 0.78, size.height * 0.86), 80, 0.4);
-
-    // Thin diagonal accent strokes
-    final linePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.06)
-      ..strokeWidth = 1.0;
-    canvas.drawLine(
-      Offset(0, size.height * 0.3),
-      Offset(size.width * 0.55, -40),
-      linePaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.45, size.height + 40),
-      Offset(size.width, size.height * 0.4),
-      linePaint,
-    );
-
-    // A subtle amber arc top-left
-    final arcPaint = Paint()
-      ..color = const Color(0xFFD2913C).withValues(alpha: 0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawCircle(const Offset(-60, -60), 220, arcPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

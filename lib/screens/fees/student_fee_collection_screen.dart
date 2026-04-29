@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
-import 'package:webview_windows/webview_windows.dart';
+import 'package:webview_windows/webview_windows.dart'
+    if (dart.library.html) 'webview_windows_stub.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
@@ -367,7 +368,9 @@ class _StudentFeeCollectionScreenState
       _remarksController.clear();
       _studentSuggestions = [];
       _classSuggestions = [];
+      _selectedCourse = null;
       _selectedClass = null;
+      _classList = List<String>.from(_allClasses);
       _student = null;
       _parent = null;
       _allDemands = [];
@@ -716,12 +719,33 @@ class _StudentFeeCollectionScreenState
                         child: TextField(
                           controller: _admNoController,
                           onSubmitted: (_) => _search(),
-                          decoration: _inputDec('Roll No'),
+                          decoration: _inputDec('Roll No').copyWith(
+                            border: const OutlineInputBorder(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                bottomLeft: Radius.circular(8),
+                              ),
+                              borderSide: BorderSide(color: AppColors.border),
+                            ),
+                            enabledBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                bottomLeft: Radius.circular(8),
+                              ),
+                              borderSide: BorderSide(color: AppColors.border),
+                            ),
+                            focusedBorder: const OutlineInputBorder(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                bottomLeft: Radius.circular(8),
+                              ),
+                              borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                            ),
+                          ),
                           style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                         ),
                       ),
                     ),
-                    SizedBox(width: 8.w),
                     SizedBox(
                       height: 40,
                       width: 40,
@@ -730,9 +754,14 @@ class _StudentFeeCollectionScreenState
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.accent,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.r)),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.only(
+                              topRight: Radius.circular(8),
+                              bottomRight: Radius.circular(8),
+                            ),
+                          ),
                           padding: EdgeInsets.zero,
+                          elevation: 0,
                         ),
                         child: _searching
                             ? SizedBox(

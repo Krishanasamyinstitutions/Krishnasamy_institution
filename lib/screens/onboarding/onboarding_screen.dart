@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_routes.dart';
 
 class _TealPalette {
@@ -60,7 +59,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Student\nManagement',
       subtitle: 'Organize Everything',
       description:
-          'Effortlessly manage student records, admissions, attendance, and academic performance — all from one centralized platform.',
+          'Effortlessly manage student records, admissions, attendance, and academic performance â€” all from one centralized platform.',
       icon: Icons.people_alt_rounded,
       features: [
         FeatureItem(
@@ -159,8 +158,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               top: -100,
               right: -100,
               child: Container(
-                width: 300.w,
-                height: 300.h,
+                width: 300,
+                height: 300,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _TealPalette.amber.withValues(alpha: 0.07),
@@ -171,8 +170,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               bottom: -50,
               left: -50,
               child: Container(
-                width: 200.w,
-                height: 200.h,
+                width: 200,
+                height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: _TealPalette.amberPale.withValues(alpha: 0.05),
@@ -184,28 +183,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: 32.w,
-                      vertical: 24.h,
+                      horizontal: 32,
+                      vertical: 24,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            SizedBox(
-                              width: 64.w,
-                              height: 64.h,
-                              child: Image.asset(
-                                'assets/images/educore360_logo.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.school_rounded,
-                                  color: _TealPalette.amber,
-                                  size: 28,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                color: Colors.white,
+                                padding: EdgeInsets.all(2),
+                                child: Image.asset(
+                                  'assets/images/educore360_logo.png',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.school_rounded,
+                                    color: _TealPalette.amber,
+                                    size: 22,
+                                  ),
                                 ),
                               ),
                             ),
-                            SizedBox(width: 12.w),
+                            SizedBox(width: 12),
                             Text(
                               'EduCore360',
                               style: Theme.of(context)
@@ -231,7 +235,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       color: _TealPalette.amberPale,
                                     ),
                               ),
-                              SizedBox(width: 4.w),
+                              SizedBox(width: 4),
                               const Icon(
                                 Icons.chevron_right_rounded,
                                 color: _TealPalette.amberPale,
@@ -260,8 +264,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: 32.w,
-                      vertical: 32.h,
+                      horizontal: 32,
+                      vertical: 32,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -271,14 +275,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             _pages.length,
                             (index) => AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              margin: EdgeInsets.only(right: 8.w),
-                              height: 6.h,
-                              width: _currentPage == index ? 32.w : 6.w,
+                              margin: EdgeInsets.only(right: 8),
+                              height: 6,
+                              width: _currentPage == index ? 32 : 6,
                               decoration: BoxDecoration(
                                 color: _currentPage == index
                                     ? _TealPalette.amber
                                     : Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(3.r),
+                                borderRadius: BorderRadius.circular(3),
                               ),
                             ),
                           ),
@@ -291,13 +295,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               duration: const Duration(milliseconds: 300),
                               padding: EdgeInsets.symmetric(
                                 horizontal: _currentPage == _pages.length - 1
-                                    ? 32.w
-                                    : 24.w,
-                                vertical: 16.h,
+                                    ? 32
+                                    : 24,
+                                vertical: 16,
                               ),
                               decoration: BoxDecoration(
                                 gradient: _TealPalette.buttonGradient,
-                                borderRadius: BorderRadius.circular(12.r),
+                                borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
                                     color: _TealPalette.amber
@@ -322,7 +326,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                           fontWeight: FontWeight.w600,
                                         ),
                                   ),
-                                  SizedBox(width: 8.w),
+                                  SizedBox(width: 8),
                                   const Icon(
                                     Icons.chevron_right_rounded,
                                     color: Colors.white,
@@ -356,7 +360,7 @@ class _OnboardingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isDesktop) {
       return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 64.w),
+        padding: EdgeInsets.symmetric(horizontal: 64),
         child: Row(
           children: [
             Expanded(
@@ -366,7 +370,7 @@ class _OnboardingPage extends StatelessWidget {
                 child: _buildIllustration(context),
               ),
             ),
-            SizedBox(width: 64.w),
+            SizedBox(width: 64),
             Expanded(
               flex: 5,
               child: FadeInRight(
@@ -380,15 +384,15 @@ class _OnboardingPage extends StatelessWidget {
     }
 
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      padding: EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
-          SizedBox(height: 24.h),
+          SizedBox(height: 24),
           FadeInDown(
             duration: const Duration(milliseconds: 600),
             child: _buildIllustration(context),
           ),
-          SizedBox(height: 40.h),
+          SizedBox(height: 40),
           FadeInUp(
             duration: const Duration(milliseconds: 600),
             child: _buildContent(context),
@@ -401,11 +405,11 @@ class _OnboardingPage extends StatelessWidget {
   Widget _buildIllustration(BuildContext context) {
     return Center(
       child: Container(
-        width: 280.w,
-        height: 280.h,
+        width: 280,
+        height: 280,
         decoration: BoxDecoration(
           color: _TealPalette.dark.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(40.r),
+          borderRadius: BorderRadius.circular(40),
           border: Border.all(
             color: _TealPalette.amber.withValues(alpha: 0.25),
             width: 2,
@@ -425,8 +429,8 @@ class _OnboardingPage extends StatelessWidget {
               top: 30,
               right: 30,
               child: Container(
-                width: 40.w,
-                height: 40.h,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: _TealPalette.amber.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
@@ -437,8 +441,8 @@ class _OnboardingPage extends StatelessWidget {
               bottom: 40,
               left: 30,
               child: Container(
-                width: 24.w,
-                height: 24.h,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
                   color: _TealPalette.amberPale.withValues(alpha: 0.25),
                   shape: BoxShape.circle,
@@ -447,7 +451,7 @@ class _OnboardingPage extends StatelessWidget {
             ),
             Icon(
               data.icon,
-              size: 100.sp,
+              size: 100,
               color: _TealPalette.amber,
             ),
           ],
@@ -462,10 +466,10 @@ class _OnboardingPage extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
             color: _TealPalette.amber.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(20.r),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: _TealPalette.amber.withValues(alpha: 0.4),
             ),
@@ -475,11 +479,11 @@ class _OnboardingPage extends StatelessWidget {
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: _TealPalette.amber,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13.sp,
+                  fontSize: 13,
                 ),
           ),
         ),
-        SizedBox(height: 20.h),
+        SizedBox(height: 20),
         Text(
           data.title,
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
@@ -488,7 +492,7 @@ class _OnboardingPage extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
         ),
-        SizedBox(height: 16.h),
+        SizedBox(height: 16),
         Text(
           data.description,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -496,10 +500,10 @@ class _OnboardingPage extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.75),
               ),
         ),
-        SizedBox(height: 28.h),
+        SizedBox(height: 28),
         ...data.features.map(
           (feature) => Padding(
-            padding: EdgeInsets.only(bottom: 12.h),
+            padding: EdgeInsets.only(bottom: 12),
             child: _FeatureCard(item: feature),
           ),
         ),
@@ -515,10 +519,10 @@ class _FeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: _TealPalette.dark.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14.r),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: _TealPalette.amber.withValues(alpha: 0.2),
         ),
@@ -527,11 +531,11 @@ class _FeatureCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 38.w,
-            height: 38.h,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: _TealPalette.amber,
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
                   color: _TealPalette.amber.withValues(alpha: 0.45),
@@ -546,7 +550,7 @@ class _FeatureCard extends StatelessWidget {
               size: 22,
             ),
           ),
-          SizedBox(width: 12.w),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,15 +561,15 @@ class _FeatureCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize: 15.sp,
+                        fontSize: 15,
                       ),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 2),
                 Text(
                   item.subtitle,
                   style: TextStyle(
                     color: _TealPalette.amberPale.withValues(alpha: 0.8),
-                    fontSize: 13.sp,
+                    fontSize: 13,
                     height: 1.4,
                   ),
                 ),
