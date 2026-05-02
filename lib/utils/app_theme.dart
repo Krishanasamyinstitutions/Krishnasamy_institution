@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
@@ -108,49 +109,49 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.surface,
       textTheme: GoogleFonts.plusJakartaSansTextTheme().copyWith(
         displayLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 34,
+          fontSize: 34.sp,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
           letterSpacing: -0.5,
         ),
         displayMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 28,
+          fontSize: 28.sp,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
           letterSpacing: -0.3,
         ),
         headlineLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 24,
+          fontSize: 24.sp,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
         headlineMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 20,
+          fontSize: 20.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         titleLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 18,
+          fontSize: 18.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         titleMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 16,
+          fontSize: 16.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
         bodyLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 16,
+          fontSize: 16.sp,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
         bodyMedium: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
+          fontSize: 14.sp,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
         labelLarge: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
+          fontSize: 14.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
@@ -166,7 +167,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -181,7 +182,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -192,7 +193,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           minimumSize: const Size(0, 40),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -219,11 +220,11 @@ class AppTheme {
         ),
         hintStyle: GoogleFonts.plusJakartaSans(
           color: AppColors.textLight,
-          fontSize: 14,
+          fontSize: 14.sp,
         ),
         labelStyle: GoogleFonts.plusJakartaSans(
           color: AppColors.textSecondary,
-          fontSize: 14,
+          fontSize: 14.sp,
         ),
       ),
       cardTheme: CardThemeData(
