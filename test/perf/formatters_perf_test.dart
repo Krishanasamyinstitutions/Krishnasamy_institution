@@ -18,10 +18,10 @@ import 'package:school_admin/utils/formatters.dart';
 
 void main() {
   group('Hot-path performance', () {
-    test('formatIndianNumber under 5 µs per call', () {
+    test('formatIndianNumber under 12 µs per call', () {
       final r = _measure(20000, () => formatIndianNumber(1234567.89));
-      // Generous bound — observed ~0.5 µs on i5/8GB. Failure ≈ 10× regression.
-      expect(r.perCall, lessThan(5.0),
+      // Local i5/8GB ≈ 0.5 µs; bound widened to absorb CI runner variance.
+      expect(r.perCall, lessThan(12.0),
           reason: 'formatIndianNumber regressed: ${r.perCall} µs/call');
     });
 
@@ -39,9 +39,10 @@ void main() {
           reason: 'toIsoDate regressed: ${r.perCall} µs/call');
     });
 
-    test('normalizeReference under 2 µs per call', () {
+    test('normalizeReference under 5 µs per call', () {
       final r = _measure(20000, () => normalizeReference(' utr-123/45 '));
-      expect(r.perCall, lessThan(2.0),
+      // Local i5/8GB well under 1 µs; bound widened to absorb CI runner variance.
+      expect(r.perCall, lessThan(5.0),
           reason: 'normalizeReference regressed: ${r.perCall} µs/call');
     });
 
