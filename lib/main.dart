@@ -42,7 +42,12 @@ class SchoolAdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
-      designSize: const Size(1920, 1080),
+      // Design baseline tuned so 1366×768 renders at ~78% scale
+      // (1366/1750 ≈ 0.78). On 1920×1080 things scale up to ~110%, so the
+      // UI feels proportional on both common laptop and desktop sizes.
+      // Mobile screens (welcome/onboarding/login/forgot) use fixed pixel
+      // values, so they aren't affected.
+      designSize: const Size(1750, 984),
       minTextAdapt: true,
       builder: (context, child) {
         return MaterialApp(
@@ -61,8 +66,9 @@ class SchoolAdminApp extends StatelessWidget {
 }
 
 /// App-wide scroll behaviour:
-/// - Allows click-drag scrolling with mouse + trackpad on web/desktop (default
-///   only allows touch). Critical for horizontal tables that overflow.
+/// - Adds trackpad and stylus to the default drag set (mouse is intentionally
+///   omitted — enabling it makes mouse-drag inside TextFields a scroll
+///   gesture, which breaks click-drag text selection).
 /// - Uses a smooth bouncing physics so wheel/drag inertia feels natural.
 class _AppScrollBehavior extends MaterialScrollBehavior {
   const _AppScrollBehavior();
@@ -70,7 +76,6 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
         PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
         PointerDeviceKind.trackpad,
         PointerDeviceKind.stylus,
         PointerDeviceKind.invertedStylus,

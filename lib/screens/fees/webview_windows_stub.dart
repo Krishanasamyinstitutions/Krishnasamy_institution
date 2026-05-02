@@ -5,6 +5,7 @@ class WebviewController {
   Future<void> initialize() async => throw UnsupportedError('Webview is not available on this platform.');
   Future<void> setBackgroundColor(Color color) async {}
   Future<void> loadUrl(String url) async {}
+  Stream<String> get url => const Stream<String>.empty();
   void dispose() {}
 }
 
