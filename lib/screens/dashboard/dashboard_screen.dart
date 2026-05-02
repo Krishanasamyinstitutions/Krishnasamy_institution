@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
@@ -33,6 +34,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedNavIndex = 0;
+  int _selectedSubIndex = 0;
+  int? _expandedNavIndex;
   bool _sidebarCollapsed = false;
 
   // Notification unread count
@@ -51,7 +54,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem('element-3', 'Dashboard', section: 'MAIN MENU'),
-    _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true),
+    _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true, subItems: [
+      _NavSubItem('teacher', 'Course'),
+      _NavSubItem('book-1', 'Class'),
+      _NavSubItem('category-2', 'Fee Group'),
+      _NavSubItem('receipt-1', 'Fee Type'),
+      _NavSubItem('receipt-discount', 'Concession'),
+      _NavSubItem('note-2', 'Class Fee Demand'),
+      _NavSubItem('user-tick', 'Admission Type'),
+      _NavSubItem('ticket', 'Quota'),
+    ]),
     _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
     _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),
     _NavItem('people', 'Students', section: 'STUDENTS', adminOnly: true),
@@ -561,6 +573,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildNavTile(BuildContext context, int index, bool collapsed) {
     final item = _navItems[index];
     final isSelected = _selectedNavIndex == index;
+    final hasSubItems = item.subItems.isNotEmpty;
+    final isExpanded = !collapsed && hasSubItems && _expandedNavIndex == index;
     final badge = item.label == 'Notifications' && _unreadNotifCount > 0
         ? _unreadNotifCount.toString()
         : null;
@@ -574,66 +588,184 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Padding(
       padding: EdgeInsets.only(bottom: 4.h),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() => _selectedNavIndex = index);
-            _loadUnreadNotifCount();
-          },
-          borderRadius: BorderRadius.circular(12.r),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 12.w : 14.w,
-              vertical: 11.h,
-            ),
-            decoration: BoxDecoration(
-              color: isSelected ? selectedBg : Colors.transparent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedNavIndex = index;
+                  if (hasSubItems && !collapsed) {
+                    _expandedNavIndex = isExpanded ? null : index;
+                  } else {
+                    _expandedNavIndex = null;
+                  }
+                });
+                _loadUnreadNotifCount();
+              },
               borderRadius: BorderRadius.circular(12.r),
-            ),
-            child: Row(
-              children: [
-                AppIcon(
-                  isSelected ? item.icon : (item.unselectedIcon ?? item.icon),
-                  style: isSelected
-                      ? AppIconStyle.bold
-                      : AppIconStyle.linear,
-                  color: isSelected ? selectedFg : unselectedFg,
-                  size: iconSize,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: EdgeInsets.symmetric(
+                  horizontal: collapsed ? 12.w : 14.w,
+                  vertical: 11.h,
                 ),
-                if (!collapsed) ...[
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: isSelected ? selectedFg : unselectedFg,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                decoration: BoxDecoration(
+                  color: isSelected ? selectedBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Row(
+                  children: [
+                    AppIcon(
+                      isSelected ? item.icon : (item.unselectedIcon ?? item.icon),
+                      style: isSelected
+                          ? AppIconStyle.bold
+                          : AppIconStyle.linear,
+                      color: isSelected ? selectedFg : unselectedFg,
+                      size: iconSize,
+                    ),
+                    if (!collapsed) ...[
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: isSelected ? selectedFg : unselectedFg,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (badge != null)
+                        Text(
+                          badge,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.7)
+                                : unselectedFg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      if (hasSubItems)
+                        Container(
+                          width: 22.w,
+                          height: 22.w,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withValues(alpha: 0.18)
+                                : AppColors.accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            transitionBuilder: (child, anim) =>
+                                ScaleTransition(scale: anim, child: child),
+                            child: AppIcon(
+                              isExpanded ? 'Remove_Minus' : 'Add_Plus',
+                              key: ValueKey(isExpanded),
+                              style: AppIconStyle.bold,
+                              size: 12.sp,
+                              color: isSelected ? selectedFg : AppColors.accent,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isExpanded) _buildSubMenu(context, index, item),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubMenu(BuildContext context, int parentIndex, _NavItem item) {
+    const selectedFg = AppColors.primary;
+    const unselectedFg = AppColors.textSecondary;
+    final isParentSelected = _selectedNavIndex == parentIndex;
+
+    return Padding(
+      padding: EdgeInsets.only(top: 6.h, left: 22.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var s = 0; s < item.subItems.length; s++) ...[
+            Builder(builder: (context) {
+              final sub = item.subItems[s];
+              final selected = isParentSelected && _selectedSubIndex == s;
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedNavIndex = parentIndex;
+                      _selectedSubIndex = s;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        children: [
+                          // Left accent rail on selected
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 3.w,
+                            margin: EdgeInsets.symmetric(vertical: 6.h),
+                            decoration: BoxDecoration(
+                              color: selected ? selectedFg : Colors.transparent,
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                          SizedBox(width: 10.w),
+                          AppIcon(
+                            sub.icon,
+                            size: 15.sp,
+                            color: selected ? selectedFg : unselectedFg,
+                            style: selected ? AppIconStyle.bold : AppIconStyle.linear,
+                          ),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.h),
+                              child: Text(
+                                sub.label,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5.sp,
+                                  color: selected ? selectedFg : unselectedFg,
+                                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                        ],
                       ),
                     ),
                   ),
-                  if (badge != null)
-                    Text(
-                      badge,
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: isSelected
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : unselectedFg,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                ],
-              ],
-            ),
-          ),
-        ),
+                ),
+              );
+            }),
+            if (s < item.subItems.length - 1) SizedBox(height: 2.h),
+          ],
+        ],
       ),
     );
   }
@@ -944,7 +1076,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return NotificationScreen(onReadChanged: _loadUnreadNotifCount);
     }
     if (selectedMenu == 'Master Data') {
-      return const MasterImportScreen();
+      return MasterImportScreen(
+        initialTabIndex: _selectedSubIndex,
+        showInternalTabs: false,
+      );
     }
     if (selectedMenu == 'Sequence Creation') {
       return const SettingsScreen();
@@ -969,6 +1104,36 @@ class _NavItem {
   final bool adminOnly;
   final bool accountantOnly;
   final bool hideForAccountant;
-  const _NavItem(this.icon, this.label, {this.section = 'MAIN', this.adminOnly = false, this.accountantOnly = false, this.hideForAccountant = false, this.unselectedIcon});
+  final List<_NavSubItem> subItems;
+  const _NavItem(this.icon, this.label, {this.section = 'MAIN', this.adminOnly = false, this.accountantOnly = false, this.hideForAccountant = false, this.unselectedIcon, this.subItems = const []});
+}
+
+class _NavSubItem {
+  final String icon;
+  final String label;
+  const _NavSubItem(this.icon, this.label);
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  const _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dashHeight = 3.0;
+    const dashGap = 3.0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    double y = 0;
+    while (y < size.height) {
+      canvas.drawLine(Offset(0, y), Offset(0, y + dashHeight), paint);
+      y += dashHeight + dashGap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) => oldDelegate.color != color;
 }
 

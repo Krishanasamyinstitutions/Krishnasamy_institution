@@ -66,7 +66,9 @@ void _showImportResultDialog(BuildContext context, {required int imported, requi
 }
 
 class MasterImportScreen extends StatefulWidget {
-  const MasterImportScreen({super.key});
+  final int initialTabIndex;
+  final bool showInternalTabs;
+  const MasterImportScreen({super.key, this.initialTabIndex = 0, this.showInternalTabs = true});
   @override
   State<MasterImportScreen> createState() => _MasterImportScreenState();
 }
@@ -77,7 +79,16 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 8, vsync: this);
+    _tabCtrl = TabController(length: 8, vsync: this, initialIndex: widget.initialTabIndex.clamp(0, 7));
+  }
+
+  @override
+  void didUpdateWidget(covariant MasterImportScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabIndex != oldWidget.initialTabIndex) {
+      final i = widget.initialTabIndex.clamp(0, 7);
+      if (_tabCtrl.index != i) _tabCtrl.animateTo(i);
+    }
   }
 
   @override
@@ -91,63 +102,65 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tabs (pill style, same as Reports)
-        ListenableBuilder(
-          listenable: _tabCtrl,
-          builder: (context, _) {
-            final selected = _tabCtrl.index;
-            final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand', 'Admission Type', 'Quota'];
-            final tabIcons = ['teacher', 'book-1', 'category-2', 'receipt-1', 'receipt-discount', 'note-2', 'user-tick', 'ticket'];
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < tabLabels.length; i++) ...[
-                      GestureDetector(
-                        onTap: () => _tabCtrl.animateTo(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
-                              const SizedBox(width: 8),
-                              Text(
-                                tabLabels[i],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+        // Tabs (pill style, same as Reports) — hidden when driven by sidebar sub-menu
+        if (widget.showInternalTabs)
+          ListenableBuilder(
+            listenable: _tabCtrl,
+            builder: (context, _) {
+              final selected = _tabCtrl.index;
+              final tabLabels = ['Course', 'Class', 'Fee Group', 'Fee Type', 'Concession', 'Class Fee Demand', 'Admission Type', 'Quota'];
+              final tabIcons = ['teacher', 'book-1', 'category-2', 'receipt-1', 'receipt-discount', 'note-2', 'user-tick', 'ticket'];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < tabLabels.length; i++) ...[
+                        GestureDetector(
+                          onTap: () => _tabCtrl.animateTo(i),
+                          behavior: HitTestBehavior.opaque,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: selected == i ? AppColors.tabSelected : Colors.transparent,
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  tabLabels[i],
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                        if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         // Content (white card)
         Expanded(
           child: Container(
             decoration: AppCard.decoration(),
             clipBehavior: Clip.antiAlias,
-            margin: const EdgeInsets.only(top: 8),
+            margin: EdgeInsets.only(top: widget.showInternalTabs ? 8 : 0),
             child: TabBarView(
               controller: _tabCtrl,
+              physics: const NeverScrollableScrollPhysics(),
               children: const [
                 _CourseTab(),
                 _ClassTab(),
