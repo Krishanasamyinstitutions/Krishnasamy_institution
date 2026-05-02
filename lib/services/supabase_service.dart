@@ -265,7 +265,7 @@ class SupabaseService {
     try {
       final result = await client
           .from('institution')
-          .select('ins_id, insname, inslogo')
+          .select('ins_id, insname, inslogo, inscode')
           .order('insname');
       return List<Map<String, dynamic>>.from(result);
     } catch (e) {
