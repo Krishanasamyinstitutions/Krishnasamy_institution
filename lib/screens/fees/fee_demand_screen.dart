@@ -95,7 +95,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     'duedate': 'Due Date',
   };
 
-  static const _requiredFields = {'stuadmno', 'stuclass', 'demfeetype', 'yr_id', 'demfeeterm', 'con_id', 'feeamount', 'conamount', 'duedate'};
+  static const _requiredFields = {'stuadmno', 'stuclass', 'demfeetype', 'yr_id', 'demfeeterm', 'feeamount', 'duedate'};
 
   @override
   void initState() {
@@ -368,7 +368,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       'course': 'courname', 'courname': 'courname', 'coursename': 'courname',
       'feetype': 'demfeetype', 'demfeetype': 'demfeetype', 'type': 'demfeetype',
       'feeyear': 'yr_id', 'yrid': 'yr_id', 'year': 'yr_id',
-      'feeterm': 'demfeeterm', 'demfeeterm': 'demfeeterm', 'term': 'demfeeterm',
+      'feeterm': 'demfeeterm', 'demfeeterm': 'demfeeterm', 'term': 'demfeeterm', 'semester': 'demfeeterm', 'sem': 'demfeeterm',
       'concession': 'con_id', 'conid': 'con_id', 'concessioncategory': 'con_id', 'con': 'con_id',
       'feeamount': 'feeamount', 'amount': 'feeamount', 'fee': 'feeamount', 'feeamt': 'feeamount', 'fee amount': 'feeamount', 'fee amt': 'feeamount',
       'concessionamount': 'conamount', 'conamount': 'conamount', 'conamt': 'conamount', 'con amt': 'conamount', 'con. amt': 'conamount', 'concession amount': 'conamount',
@@ -475,14 +475,26 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       _importErrors = [];
     });
 
-    // 1. Pre-fetch all student admno -> stu_id mappings
+    // 1. Pre-fetch all student admno -> stu_id mappings.
+    // Index under multiple normalisations because Excel often loses
+    // leading zeros and adds whitespace to admission numbers.
     final stuList = await SupabaseService.fromSchema('students')
         .select('stu_id, stuadmno')
         .eq('ins_id', insId)
         .eq('activestatus', 1);
     final stuMap = <String, int>{};
     for (final s in stuList) {
-      stuMap[s['stuadmno']?.toString() ?? ''] = s['stu_id'] as int;
+      final raw = s['stuadmno']?.toString().trim() ?? '';
+      final id  = s['stu_id'] as int?;
+      if (raw.isEmpty || id == null) continue;
+      // Original, lowercase, leading-zero stripped, leading-zero stripped+lower.
+      stuMap.putIfAbsent(raw, () => id);
+      stuMap.putIfAbsent(raw.toLowerCase(), () => id);
+      final stripped = raw.replaceFirst(RegExp(r'^0+'), '');
+      if (stripped.isNotEmpty) {
+        stuMap.putIfAbsent(stripped, () => id);
+        stuMap.putIfAbsent(stripped.toLowerCase(), () => id);
+      }
     }
 
     // 2. Pre-fetch concession name -> con_id mappings
@@ -551,8 +563,20 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           yrLabel = _years.first['yrlabel']?.toString();
         }
 
-        final admNoRaw = _cellByKey(row, 'stuadmno');
-        final stuId = stuMap[admNoRaw];
+        final admNoRaw = _cellByKey(row, 'stuadmno')?.trim() ?? '';
+        // Try direct, lowercase, and leading-zero-stripped variants
+        // before giving up — same normalisations applied to the map.
+        int? stuId = stuMap[admNoRaw];
+        if (stuId == null && admNoRaw.isNotEmpty) {
+          stuId = stuMap[admNoRaw.toLowerCase()];
+          stuId ??= stuMap[admNoRaw.replaceFirst(RegExp(r'^0+'), '')];
+          stuId ??= stuMap[admNoRaw.replaceFirst(RegExp(r'^0+'), '').toLowerCase()];
+        }
+        if (stuId == null) {
+          _skipped++;
+          _importErrors.add('Row ${i + 2}: Roll No "$admNoRaw" not found in active students');
+          continue;
+        }
 
         final conName = _cellByKey(row, 'con_id');
         int? conId;
@@ -1618,8 +1642,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickFile,
-                icon: AppIcon('folder-open', size: 16),
-                label: const Text('Browse'),
+                icon: AppIcon('document-upload', size: 16),
+                label: const Text('Import'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
@@ -1674,7 +1698,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   // Header row
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C8EEF),
+                      color: AppColors.tableHeadBg,
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(7.r),
                         topRight: Radius.circular(7.r),
@@ -1696,11 +1720,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Semester *', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Concession *', flex: 2),
+                        _gridHeaderCell('Concession', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Amt *', flex: 2, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Con. Amt *', flex: 2, center: true),
+                        _gridHeaderCell('Con. Amt', flex: 2, center: true),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Due Date *', flex: 2, center: true),
                       ],
@@ -1817,13 +1841,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
+      child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
 
   Widget _gridHeaderDivider() {
-    return Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.15));
+    return Container(width: 1, height: 36, color: AppColors.border);
   }
 
   Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {

@@ -1273,7 +1273,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               child: Row(
                 children: [
                   SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
-                  SizedBox(width: widths[1], child: Text(t.paynumber ?? '${t.payId}', style: cellStyle)),
+                  SizedBox(width: widths[1], child: Text(t.paynumber ?? '—', style: cellStyle)),
                   SizedBox(width: widths[2], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
                   SizedBox(width: widths[3], child: Text(stu?.courname ?? '-', style: cellStyle)),
                   SizedBox(width: widths[4], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
