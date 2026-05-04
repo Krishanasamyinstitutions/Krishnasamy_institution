@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -555,34 +556,13 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                 child: Row(
                   children: [
                     for (var i = 0; i < tabLabels.length; i++) ...[
-                      GestureDetector(
+                      PillTab(
+                        icon: tabIcons[i],
+                        label: tabLabels[i],
+                        selected: selected == i,
                         onTap: () => _tabController.animateTo(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
-                              const SizedBox(width: 8),
-                              Text(
-                                tabLabels[i],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
-                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                      if (i < tabLabels.length - 1) SizedBox(width: PillTab.gap(context)),
                     ],
                   ],
                 ),
@@ -634,35 +614,29 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                   Text('${_selectedForRecon.length} selected', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   const Spacer(),
                   SizedBox(
-                    height: 40,
+                    height: AppBtn.height(context),
                     child: ElevatedButton.icon(
                       onPressed: _selectedForRecon.isEmpty ? null : _reconcileSelected,
-                      icon: AppIcon('tick-circle', size: 16, color: Colors.white),
+                      icon: AppIcon('tick-circle', size: AppBtn.iconSize(context), color: Colors.white),
                       label: Text('Approve Selected', style: TextStyle(fontSize: 13.sp)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 18.w),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
-                  SizedBox(width: 8.w),
+                  SizedBox(width: AppBtn.gap(context)),
                   SizedBox(
-                    height: 40,
+                    height: AppBtn.height(context),
                     child: ElevatedButton.icon(
                       onPressed: _loadPayments,
-                      icon: AppIcon('refresh', size: 16, color: Colors.white),
+                      icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                       label: const Text('Refresh'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 18.w),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -686,7 +660,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                           children: [
                         // Header
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                           color: AppColors.tableHeadBg,
                           child: Row(
                             children: [
@@ -705,15 +679,16 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                                 },
                                 activeColor: AppColors.accent,
                               )),
-                              Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                              Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                              Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                              Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                              Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                              Expanded(flex: 2, child: Text('REFERENCE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                              Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                              Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                              Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                              Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                              Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                              Expanded(flex: 2, child: Text('REFERENCE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                             ],
                           ),
                         ),
+                        const Divider(height: 1),
                         // Rows
                         Expanded(
                           child: SingleChildScrollView(
@@ -725,7 +700,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                                   final payId = p['pay_id'] as int;
                                   final isSelected = _selectedForRecon.contains(payId);
                                   return Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                                     color: isSelected ? AppColors.accent.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
                                     child: Row(
                                       children: [
@@ -738,12 +713,12 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                                           },
                                           activeColor: AppColors.accent,
                                         )),
-                                        Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(_formatDate(p['paydate']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(p['payreference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                                        Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                        Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text(_formatDate(p['paydate']?.toString()), style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text(p['payreference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
                                       ],
                                     ),
                                   );
@@ -787,18 +762,15 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                 Text('${_bankStatementRows.where((r) => r['matched_pay_id'] != null).length} matched', style: TextStyle(fontSize: 13.sp, color: AppColors.success, fontWeight: FontWeight.w600)),
                 SizedBox(width: 16.w),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: ElevatedButton.icon(
                     onPressed: _reconcileFromBankMatch,
-                    icon: AppIcon('tick-circle', size: 16, color: Colors.white),
+                    icon: AppIcon('tick-circle', size: AppBtn.iconSize(context), color: Colors.white),
                     label: Text('Reconcile Matched', style: TextStyle(fontSize: 13.sp)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -828,37 +800,31 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                   ),
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: AppBtn.gap(context)),
               SizedBox(
-                height: 40,
+                height: AppBtn.height(context),
                 child: ElevatedButton.icon(
                   onPressed: _uploadBankStatement,
-                  icon: AppIcon('document-upload', size: 16, color: Colors.white),
+                  icon: AppIcon('document-upload', size: AppBtn.iconSize(context), color: Colors.white),
                   label: Text('Upload Bank Statement (CSV)', style: TextStyle(fontSize: 13.sp)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: AppBtn.gap(context)),
               SizedBox(
-                height: 40,
+                height: AppBtn.height(context),
                 child: ElevatedButton.icon(
                   onPressed: _downloadSampleTemplate,
-                  icon: AppIcon('element-4', size: 16, color: Colors.white),
+                  icon: AppIcon('element-4', size: AppBtn.iconSize(context), color: Colors.white),
                   label: Text('Format to Excel', style: TextStyle(fontSize: 13.sp)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -880,19 +846,20 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                 children: [
                   // Table header
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('S.NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('REFERENCE/UTR', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('MATCHED WITH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 1, child: Text('MATCH TYPE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        SizedBox(width: 40.w, child: Text('S.NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('REFERENCE/UTR', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('MATCHED WITH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('MATCH TYPE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
+                  const Divider(height: 1),
                   Expanded(
                     child: _bankStatementRows.isEmpty
                         ? Center(
@@ -914,14 +881,14 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                                   final isMatched = row['matched_pay_id'] != null;
 
                                   return Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                                     color: isMatched ? AppColors.success.withValues(alpha: 0.05) : (idx.isEven ? Colors.white : AppColors.surface),
                                     child: Row(
                                       children: [
-                                        SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(row['date']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(row['reference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text('Rs.${(row['amount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text(row['date']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text(row['reference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                        Expanded(flex: 2, child: Text('Rs.${(row['amount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
                                         Expanded(
                                           flex: 2,
                                           child: isMatched
@@ -1019,21 +986,22 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             : Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('#', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('RECONCILED BY', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('RECONCILED DATE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
-                        Expanded(flex: 2, child: Text('BANK REF', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                        SizedBox(width: 40.w, child: Text('#', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('PAY NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('STUDENT', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('AMOUNT', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('METHOD', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('RECONCILED BY', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('RECONCILED DATE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BANK REF', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
+                  const Divider(height: 1),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
@@ -1043,18 +1011,18 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                             final p = entry.value;
                             final globalIdx = pageStart + idx;
                             return Container(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                               color: idx.isEven ? Colors.white : AppColors.surface,
                               child: Row(
                                 children: [
-                                  SizedBox(width: 40.w, child: Text('${globalIdx + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(p['reconciled_by']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(_formatDate(p['reconciled_date']?.toString()), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(p['bank_reference']?.toString() ?? '-', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  SizedBox(width: 40.w, child: Text('${globalIdx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text(p['paynumber']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                  Expanded(flex: 3, child: Text(p['student_display']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text('Rs.${(p['transtotalamount'] as num?)?.toStringAsFixed(2) ?? '0'}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text(_methodLabel(p['paymethod']?.toString()), style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text(p['reconciled_by']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text(_formatDate(p['reconciled_date']?.toString()), style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                                  Expanded(flex: 2, child: Text(p['bank_reference']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
                                 ],
                               ),
                             );

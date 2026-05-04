@@ -69,6 +69,28 @@ class AppColors {
   );
 }
 
+/// Project-wide responsive sizing helpers for action buttons.
+/// Use [AppBtn.iconSize] and [AppBtn.gap] for icon sizes inside buttons
+/// and the SizedBox between sibling buttons. Height/padding/radius/text
+/// are handled by the theme override applied in main.dart at <= 1366.
+class AppBtn {
+  /// Icon size to pass to AppIcon / Icon inside an action button.
+  /// 1920+ → 16, 1366 → 12.
+  static double iconSize(BuildContext context) =>
+      MediaQuery.of(context).size.width <= 1366 ? 12.0 : 16.0;
+
+  /// Gap to insert as a SizedBox between sibling action buttons.
+  /// 1920+ → 10, 1366 → 6.
+  static double gap(BuildContext context) =>
+      MediaQuery.of(context).size.width <= 1366 ? 6.0 : 10.0;
+
+  /// Standard action-button height for SizedBox wrappers.
+  /// 1920+ → 40, 1366 → 30. Theme also enforces minimumSize, so callers
+  /// that don't wrap in SizedBox still get the right height.
+  static double height(BuildContext context) =>
+      MediaQuery.of(context).size.width <= 1366 ? 30.0 : 40.0;
+}
+
 /// Shared card treatment matching the minimal reference design:
 /// white fill, 16px radius, soft diffused shadow (no border).
 class AppCard {
@@ -167,7 +189,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13.sp,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -182,7 +204,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13.sp,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -193,7 +215,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           minimumSize: const Size(0, 40),
           textStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 13.sp,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -242,6 +264,54 @@ class AppTheme {
     return lightTheme.copyWith(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.surfaceDark,
+    );
+  }
+
+  /// Project-wide button shrink applied at width <= 1366 only.
+  /// Mirrors the import-action button compact spec so all stock
+  /// ElevatedButton/OutlinedButton/TextButton instances pick up the
+  /// same look without per-call MediaQuery overrides.
+  static ThemeData compactButtons(ThemeData base) {
+    const compactPadding = EdgeInsets.symmetric(horizontal: 10, vertical: 6);
+    const compactMinSize = Size(0, 30);
+    final compactShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(6),
+    );
+    final compactTextStyle = GoogleFonts.plusJakartaSans(
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    );
+
+    return base.copyWith(
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: compactPadding,
+          minimumSize: compactMinSize,
+          shape: compactShape,
+          textStyle: compactTextStyle,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+          padding: compactPadding,
+          minimumSize: compactMinSize,
+          shape: compactShape,
+          textStyle: compactTextStyle,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.textSecondary,
+          padding: compactPadding,
+          minimumSize: compactMinSize,
+          textStyle: compactTextStyle,
+        ),
+      ),
     );
   }
 }

@@ -733,18 +733,15 @@ class _StudentFeeCollectionScreenState
                       )),
               const Spacer(),
               SizedBox(
-                height: 40,
+                height: AppBtn.height(context),
                 child: ElevatedButton.icon(
                   onPressed: _clear,
-                  icon: AppIcon('refresh', size: 16, color: Colors.white),
+                  icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                   label: const Text('Clear'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -1847,12 +1844,11 @@ class _StudentFeeCollectionScreenState
                 _clear();
                 if (payId != null) _downloadReceipt(payId, payNumber);
               },
-              icon: AppIcon('document-download', size: 16),
+              icon: AppIcon('document-download', size: AppBtn.iconSize(context)),
               label: const Text('Download Receipt'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.accent,
                 side: const BorderSide(color: AppColors.accent),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
               ),
             ),
           ],
