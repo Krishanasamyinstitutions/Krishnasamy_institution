@@ -109,13 +109,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static const _importGridKeys = [
     'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
     'stumobile', 'stuemail', 'concession',
-    'admname', 'quoname', 'batch',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
     'fathername', 'fathermobile', 'fatheroccupation',
     'mothername', 'mothermobile', 'motheroccupation',
     'guardianname', 'guardianmobile', 'guardianoccupation',
     'payincharge', 'payinchargemob',
+    'admname', 'quoname', 'batch', 'admittyear',
   ];
 
   static const Map<String, String> _importGridLabels = {
@@ -126,12 +126,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'stuadmdate': 'Adm Date',
     'stuclass': 'Class *',
     'courname': 'Course',
-    'stumobile': 'Mobile *',
+    'stumobile': 'Mobile',
     'stuemail': 'Email',
     'concession': 'Concession *',
     'admname': 'Admission Type',
     'quoname': 'Quota',
     'batch': 'Batch',
+    'admittyear': 'Admitted Year',
     'stuaddress': 'Address',
     'stucity': 'City',
     'stustate': 'State',
@@ -153,7 +154,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   final ScrollController _importScrollController = ScrollController();
 
-  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'stumobile', 'stuclass', 'payincharge', 'payinchargemob'};
+  static const _importRequiredFields = {'stuadmno', 'stuname', 'stugender', 'stuclass', 'payincharge', 'payinchargemob'};
 
   static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: const Color(0xFF555555));
 
@@ -276,8 +277,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final classCounts = results[4] as Map<String, int>;
     final admissionTypes = results[5] as List<Map<String, dynamic>>;
     final quotas = results[6] as List<Map<String, dynamic>>;
-    final ordered = _classOrder.where((c) => rawClasses.contains(c)).toList();
-    final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList();
+    // Dedupe rawClasses while preserving first-seen order — the class table
+    // sometimes has multiple rows with the same claname (different cour_id),
+    // which would otherwise crash DropdownButton with duplicate values.
+    final seen = <String>{};
+    final dedupedRaw = <String>[];
+    for (final c in rawClasses) {
+      if (c.isNotEmpty && seen.add(c)) dedupedRaw.add(c);
+    }
+    final ordered = _classOrder.where((c) => dedupedRaw.contains(c)).toList();
+    final extra = dedupedRaw.where((c) => !_classOrder.contains(c)).toList();
 
     final allClasses = [...ordered, ...extra];
     setState(() {
@@ -401,7 +410,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _selectedStudent = s;
       _selectedGender = s.gender;
       _selectedBloodGroup = _normalizeBloodGroup(s.stubloodgrp);
-      _selectedClass = s.stuclass;
+      _selectedClass = s.stuclass.trim();
       _selectedConId = s.conId?.toString();
       _selectedAdmName = s.admname;
       _selectedQuoName = s.quoname;
@@ -1936,7 +1945,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             keyboardType: TextInputType.emailAddress,
           )),
           _fieldFull(label: 'Class *', child: DropdownButtonFormField<String>(
-            initialValue: _selectedClass,
+            initialValue: _classes.contains(_selectedClass) ? _selectedClass : null,
             decoration: _dec('Select class'),
             dropdownColor: Colors.white,
             style: _inputStyle,
@@ -2135,6 +2144,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     'stupin': 'PIN',
     'stubloodgrp': 'Blood Group',
     'stuadmdate': 'Admission Date',
+    'admittyear': 'Admitted Year',
     'fathername': 'Father Name',
     'fathermobile': 'Father Mobile',
     'fatheroccupation': 'Father Occupation',
@@ -2170,6 +2180,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'pin': 'stupin', 'pincode': 'stupin', 'pin code': 'stupin', 'zip': 'stupin', 'zip code': 'stupin',
       'blood group': 'stubloodgrp', 'bloodgroup': 'stubloodgrp',
       'admission date': 'stuadmdate', 'adm date': 'stuadmdate',
+      'admitted year': 'admittyear', 'admittedyear': 'admittyear', 'admittyear': 'admittyear', 'adm year': 'admittyear', 'admndate': 'admittyear',
       'father name': 'fathername', 'fathername': 'fathername',
       'father mobile': 'fathermobile', 'fathermobile': 'fathermobile', 'father phone': 'fathermobile',
       'father occupation': 'fatheroccupation', 'fatheroccupation': 'fatheroccupation',
@@ -2312,7 +2323,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
-      'Admission Type', 'Quota', 'Batch',
+      'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2368,13 +2379,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
       'Payment In Charge', 'Payment Mobile',
-      'Admission Type', 'Quota', 'Batch',
+      'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
     final sampleRows = [
-      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210'],
-      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'I Year', 'BSC-CS', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220'],
-      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'II Year', 'BBA', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230'],
-      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'I Year', 'MCA', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240'],
+      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'I Year', 'BSC-CS', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'II Year', 'BBA', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'I Year', 'MCA', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240', 'GEN', 'GQ', '2025-2026', '25-26'],
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2439,6 +2450,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
     if (v == null) return null;
     final trimmed = v.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String? _truncate(String? v, int maxLen) {
+    if (v == null) return null;
+    return v.length <= maxLen ? v : v.substring(0, maxLen);
   }
 
   /// Validates email format; returns null if invalid
@@ -2547,6 +2563,35 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _importErrors = [];
     });
 
+    // Pre-fetch class + course masters so each staging row gets the matching
+    // cla_id and cour_id resolved from the canonical master tables.
+    final classMasterRaw = await SupabaseService.fromSchema('class')
+        .select('cla_id, claname')
+        .eq('ins_id', insId)
+        .eq('activestatus', 1);
+    final courseMasterRaw = await SupabaseService.fromSchema('course')
+        .select('cour_id, courname')
+        .eq('ins_id', insId);
+    String _normKey(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    final claIdByName = <String, int>{};
+    final claNameById = <int, String>{};
+    for (final c in (classMasterRaw as List)) {
+      final id = c['cla_id'] as int?;
+      final name = (c['claname'] ?? '').toString().trim();
+      if (id == null || name.isEmpty) continue;
+      claIdByName.putIfAbsent(_normKey(name), () => id);
+      claNameById[id] = name;
+    }
+    final courIdByName = <String, int>{};
+    final courNameById = <int, String>{};
+    for (final c in (courseMasterRaw as List)) {
+      final id = c['cour_id'] as int?;
+      final name = (c['courname'] ?? '').toString().trim();
+      if (id == null || name.isEmpty) continue;
+      courIdByName.putIfAbsent(_normKey(name), () => id);
+      courNameById[id] = name;
+    }
+
     // 1. Validate and build staging rows
     final stagingRows = <Map<String, dynamic>>[];
     for (int i = 0; i < _importRows.length; i++) {
@@ -2559,6 +2604,41 @@ class _StudentsScreenState extends State<StudentsScreen> {
       final row = _importRows[i];
       final dob = _parseDate(_importCellByKey(row, 'studob'));
       final admDate = _parseDate(_importCellByKey(row, 'stuadmdate'));
+      // Resolve class/course names against the master. Excel may carry the
+      // class as either a numeric id (e.g. "53") OR the name (e.g. "B.E ECE -II").
+      // Always write the canonical claname/courname from the master back into
+      // stuclass / courname so downstream JOINs and dashboards work.
+      final classRaw = (_importCellByKey(row, 'stuclass') ?? '').trim();
+      int? claId;
+      String claNameCanon = classRaw;
+      final classAsInt = int.tryParse(classRaw);
+      if (classAsInt != null && claNameById.containsKey(classAsInt)) {
+        // Excel had a valid cla_id → resolve to canonical name
+        claId = classAsInt;
+        claNameCanon = claNameById[claId]!;
+      } else {
+        // Excel had a name (or a number that isn't in the master) → name lookup
+        final byName = claIdByName[_normKey(classRaw)];
+        if (byName != null) {
+          claId = byName;
+          claNameCanon = claNameById[claId] ?? classRaw;
+        }
+      }
+
+      final courseRaw = (_importCellByKey(row, 'courname') ?? '').trim();
+      int? courId;
+      String? courNameCanon = _nullIfEmpty(courseRaw);
+      final courseAsInt = int.tryParse(courseRaw);
+      if (courseAsInt != null && courNameById.containsKey(courseAsInt)) {
+        courId = courseAsInt;
+        courNameCanon = courNameById[courId];
+      } else {
+        final byName = courIdByName[_normKey(courseRaw)];
+        if (byName != null) {
+          courId = byName;
+          courNameCanon = courNameById[courId];
+        }
+      }
       stagingRows.add({
         'ins_id': insId,
         'inscode': inscode,
@@ -2569,8 +2649,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'stugender': _normalizeGender(_importCellByKey(row, 'stugender')),
         'studob': dob?.toIso8601String().split('T').first,
         'stuadmdate': (admDate ?? DateTime.now()).toIso8601String().split('T').first,
-        'stuclass': _importCellByKey(row, 'stuclass'),
-        'courname': _nullIfEmpty(_importCellByKey(row, 'courname')),
+        'stuclass': claNameCanon,
+        'cla_id': claId,
+        'courname': courNameCanon,
+        'cour_id': courId,
         'stumobile': _importCellByKey(row, 'stumobile'),
         'stuemail': _validEmail(_importCellByKey(row, 'stuemail')),
         'concession': _nullIfEmpty(_importCellByKey(row, 'concession')),
@@ -2593,7 +2675,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
         'payinchargemob': _nullIfEmpty(_importCellByKey(row, 'payinchargemob')),
         'admname': _nullIfEmpty(_importCellByKey(row, 'admname')),
         'quoname': _nullIfEmpty(_importCellByKey(row, 'quoname')),
-        'batch': _nullIfEmpty(_importCellByKey(row, 'batch')),
+        'batch': _truncate(_nullIfEmpty(_importCellByKey(row, 'batch')), 9),
+        'admittyear': _truncate(_nullIfEmpty(_importCellByKey(row, 'admittyear')), 9),
         'status': 'PENDING',
       });
     }
@@ -2684,8 +2767,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
               SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed: _pickImportFile,
-                icon: AppIcon('folder-open', size: 16),
-                label: const Text('Browse'),
+                icon: AppIcon('document-upload', size: 16),
+                label: const Text('Import'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
@@ -2748,11 +2831,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       children: [
                         // Header row
                         Container(
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF6C8EEF),
+                          decoration: BoxDecoration(
+                            color: AppColors.tableHeadBg,
                             borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(7),
-                              topRight: Radius.circular(7),
+                              topLeft: Radius.circular(7.r),
+                              topRight: Radius.circular(7.r),
                             ),
                           ),
                           child: Row(
@@ -2973,6 +3056,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       case 'fatheroccupation': case 'motheroccupation': case 'guardianoccupation': return 120;
       case 'payincharge': return 130;
       case 'payinchargemob': return 120;
+      case 'admittyear': return 120;
       default: return 110;
     }
   }
@@ -2981,13 +3065,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3.w)),
+      child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
 
   Widget _gridHeaderDivider() {
-    return Container(width: 1.w, height: 36.h, color: Colors.white.withValues(alpha: 0.15));
+    return Container(width: 1, height: 36.h, color: AppColors.border);
   }
 
   Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
