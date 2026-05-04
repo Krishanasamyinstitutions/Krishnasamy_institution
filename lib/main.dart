@@ -59,6 +59,25 @@ class SchoolAdminApp extends StatelessWidget {
           scrollBehavior: const _AppScrollBehavior(),
           initialRoute: AppRoutes.splash,
           routes: AppRoutes.routes,
+          builder: (context, child) {
+            // Apply project-wide compact button styling at <= 1366 only.
+            // Inline ElevatedButton.styleFrom() calls in screens still win
+            // (they don't inherit theme), but every "stock" button picks
+            // this up without per-call MediaQuery checks.
+            final compact = MediaQuery.of(context).size.width <= 1366;
+            if (compact) {
+              // Re-initialize ScreenUtil with a tighter design baseline so
+              // .sp/.w/.h/.r values render at ~85% at 1366 instead of ~78%.
+              // 1366 / 1607 ≈ 0.85. The outer ScreenUtilInit(1750, 984) keeps
+              // applying at 1920+, so this only affects 1366.
+              ScreenUtil.init(context, designSize: const Size(1607, 904), minTextAdapt: true);
+            }
+            if (!compact || child == null) return child ?? const SizedBox.shrink();
+            return Theme(
+              data: AppTheme.compactButtons(Theme.of(context)),
+              child: child,
+            );
+          },
         );
       },
     );

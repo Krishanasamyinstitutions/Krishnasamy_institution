@@ -950,18 +950,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: AppColors.accent.withValues(alpha: 0.18),
-                    child: Text(
-                      (auth.userName ?? 'U')[0].toUpperCase(),
-                      style: TextStyle(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20.sp,
+                  Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    return CircleAvatar(
+                      radius: compact ? 18 : 26,
+                      backgroundColor: AppColors.accent.withValues(alpha: 0.18),
+                      child: Text(
+                        (auth.userName ?? 'U')[0].toUpperCase(),
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: compact ? 16.sp : 20.sp,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   SizedBox(width: 12.w),
                   ConstrainedBox(
                     constraints: BoxConstraints(
@@ -1010,24 +1013,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final bg = filled ? AppColors.primary : Colors.white;
     final fg = filled ? Colors.white : AppColors.textSecondary;
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final size = compact ? 36.0 : 44.0;
+    final iconSize = compact ? 22.0 : 28.0;
+    final radius = compact ? 10.0 : 12.0;
     return Material(
       color: bg,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(radius),
       elevation: 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
-          width: 44,
-          height: 44,
+          width: size,
+          height: size,
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(radius),
           ),
           alignment: Alignment.center,
           child: iconLinear
-              ? AppIcon.linear(icon, size: 28, color: fg)
-              : AppIcon(icon, size: 28, color: fg),
+              ? AppIcon.linear(icon, size: iconSize, color: fg)
+              : AppIcon(icon, size: iconSize, color: fg),
         ),
       ),
     );

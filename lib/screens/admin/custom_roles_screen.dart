@@ -235,18 +235,15 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                         Text('${_roles.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         SizedBox(width: 12.w),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: _fetchRoles,
-                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Refresh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),

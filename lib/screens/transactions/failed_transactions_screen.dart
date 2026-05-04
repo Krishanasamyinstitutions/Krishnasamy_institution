@@ -711,6 +711,14 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               filteredFailed.length,
             ];
 
+            final compact = MediaQuery.of(context).size.width <= 1366;
+            final pillHPad = compact ? 14.0 : 18.0;
+            final pillVPad = compact ? 8.0 : 10.0;
+            final pillRadius = compact ? 18.0 : 22.0;
+            final pillIconSize = compact ? 14.0 : 16.0;
+            final pillTextSize = compact ? 12.0 : 13.0;
+            final pillGap = compact ? 6.0 : 8.0;
+            final badgeHPad = compact ? 8.0 : 10.0;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -721,41 +729,41 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       behavior: HitTestBehavior.opaque,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        padding: EdgeInsets.symmetric(horizontal: pillHPad, vertical: pillVPad),
                         decoration: BoxDecoration(
                           color: selected == i ? tabColors[i] : Colors.transparent,
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(pillRadius),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            AppIcon(tabIcons[i], size: 16, color: selected == i ? Colors.white : tabColors[i]),
-                            SizedBox(width: 8.w),
+                            AppIcon(tabIcons[i], size: pillIconSize, color: selected == i ? Colors.white : tabColors[i]),
+                            SizedBox(width: pillGap),
                             Text(
                               tabLabels[i],
                               style: TextStyle(
-                                fontSize: 13.sp,
+                                fontSize: pillTextSize,
                                 fontWeight: FontWeight.w600,
                                 color: selected == i ? Colors.white : AppColors.textPrimary,
                               ),
                             ),
-                            SizedBox(width: 8.w),
+                            SizedBox(width: pillGap),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                              padding: EdgeInsets.symmetric(horizontal: badgeHPad, vertical: 2),
                               decoration: BoxDecoration(
                                 color: selected == i ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${tabCounts[i]}',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: selected == i ? Colors.white : tabColors[i]),
+                                style: TextStyle(fontSize: pillTextSize, fontWeight: FontWeight.w700, color: selected == i ? Colors.white : tabColors[i]),
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    if (i < 2) const SizedBox(width: 8),
+                    if (i < 2) SizedBox(width: pillGap),
                   ],
                 ],
               ),
@@ -814,12 +822,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                               )
                             : null,
                       ),
-                      SizedBox(width: 8.w),
+                      SizedBox(width: AppBtn.gap(context)),
                       SizedBox(
-                        height: 40,
+                        height: AppBtn.height(context),
                         child: OutlinedButton.icon(
                           onPressed: _openDateRangeDialog,
-                          icon: const AppIcon.linear('calendar', size: 16, color: AppColors.textPrimary),
+                          icon: AppIcon.linear('calendar', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                           label: Text(
                             _dateRangeLabel(),
                             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
@@ -827,24 +835,20 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                           style: OutlinedButton.styleFrom(
                             padding: EdgeInsets.symmetric(horizontal: 14.w),
                             side: const BorderSide(color: AppColors.border),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                           ),
                         ),
                       ),
-                      SizedBox(width: 8.w),
+                      SizedBox(width: AppBtn.gap(context)),
                       SizedBox(
-                        height: 40,
+                        height: AppBtn.height(context),
                         child: ElevatedButton.icon(
                           onPressed: _fetchData,
-                          icon: AppIcon('refresh', size: 16, color: Colors.white),
+                          icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                           label: const Text('Refresh'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: EdgeInsets.symmetric(horizontal: 18.w),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                            textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),

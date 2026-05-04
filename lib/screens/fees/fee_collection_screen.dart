@@ -1,6 +1,7 @@
 import 'dart:io';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -76,34 +77,13 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
                     child: Row(
                       children: [
                         for (var i = 0; i < tabLabels.length; i++) ...[
-                          GestureDetector(
+                          PillTab(
+                            icon: tabIcons[i],
+                            label: tabLabels[i],
+                            selected: selected == i,
                             onTap: () => _tabController.animateTo(i),
-                            behavior: HitTestBehavior.opaque,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    tabLabels[i],
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
-                          if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                          if (i < tabLabels.length - 1) SizedBox(width: PillTab.gap(context)),
                         ],
                       ],
                     ),
@@ -944,22 +924,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 _collectionSearchQuery = '';
               }),
               borderRadius: BorderRadius.circular(10.r),
-              child: Container(
-                height: 40,
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(10.r),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                    SizedBox(width: 6.w),
-                    Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                  ],
-                ),
-              ),
+              child: Builder(builder: (context) {
+                final compact = MediaQuery.of(context).size.width <= 1366;
+                final hPad = compact ? 10.0 : 14.0;
+                final radius = compact ? 6.0 : 10.0;
+                final textSize = compact ? 11.0 : 13.0;
+                final innerGap = compact ? 4.0 : 6.0;
+                return Container(
+                  height: AppBtn.height(context),
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(radius),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                      SizedBox(width: innerGap),
+                      Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ],
+                  ),
+                );
+              }),
             ),
             SizedBox(width: 12.w),
             Container(width: 1, height: 18, color: AppColors.border),
@@ -992,47 +979,50 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             ),
             SizedBox(width: 8.w),
             // Payment Method dropdown
-            SizedBox(
-              height: 40,
-              child: DropdownButtonHideUnderline(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: DropdownButton<String?>(
-                    value: _collectionMethodFilter,
-                    hint: Text('All Methods', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    // Cash vs Bank matches the Method-wise Summary grouping.
-                    items: const [
-                      DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
-                      DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
-                      DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
-                    ],
-                    onChanged: (v) => setState(() => _collectionMethodFilter = v),
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final hPad = compact ? 10.0 : 14.0;
+              final radius = compact ? 6.0 : 10.0;
+              final textSize = compact ? 11.0 : 13.0;
+              return SizedBox(
+                height: AppBtn.height(context),
+                child: DropdownButtonHideUnderline(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(radius),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: DropdownButton<String?>(
+                      value: _collectionMethodFilter,
+                      hint: Text('All Methods', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      isDense: true,
+                      // Cash vs Bank matches the Method-wise Summary grouping.
+                      items: const [
+                        DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                        DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
+                        DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
+                      ],
+                      onChanged: (v) => setState(() => _collectionMethodFilter = v),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: 8.w),
+              );
+            }),
+            SizedBox(width: AppBtn.gap(context)),
             SizedBox(
-              height: 40,
+              height: AppBtn.height(context),
               child: ElevatedButton.icon(
                 onPressed: filtered.isNotEmpty ? () => _exportCollectionSummaryExcel(filtered) : null,
-                icon: AppIcon('document-download', size: 16, color: Colors.white),
+                icon: AppIcon('document-download', size: AppBtn.iconSize(context), color: Colors.white),
                 label: const Text('Export'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: EdgeInsets.symmetric(horizontal: 18.w),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -1094,12 +1084,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 0,
+                      child: DataTable(dividerThickness: 1,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                         headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                        columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 40, dataRowMaxHeight: 44, headingRowHeight: 42,
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                         columns: const [
                           DataColumn(label: Text('S No.')),
                           DataColumn(label: Text('PAYMENT METHOD')),
@@ -1188,12 +1178,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 0,
+                      child: DataTable(dividerThickness: 1,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                         headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                        columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                         columns: const [
                           DataColumn(label: Text('S No.')),
                           DataColumn(label: Text('PAY NO')),
@@ -1463,15 +1453,23 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 _selectedStudentDemands = null;
               }),
               borderRadius: BorderRadius.circular(8.r),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                  SizedBox(width: 6.w),
-                  Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                ]),
-              ),
+              child: Builder(builder: (context) {
+                final compact = MediaQuery.of(context).size.width <= 1366;
+                final hPad = compact ? 10.0 : 14.0;
+                final radius = compact ? 6.0 : 10.0;
+                final textSize = compact ? 11.0 : 13.0;
+                final innerGap = compact ? 4.0 : 6.0;
+                return Container(
+                  height: AppBtn.height(context),
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(radius)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                    SizedBox(width: innerGap),
+                    Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ]),
+                );
+              }),
             ),
             SizedBox(width: 12.w),
             Container(width: 1, height: 18, color: AppColors.border),
@@ -1488,61 +1486,73 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               onChanged: (v) => setState(() => _pendingSearchQuery = v),
               width: 220,
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: AppBtn.gap(context)),
             // Fee Type dropdown
-            SizedBox(
-              height: 40,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _pendingFeeTypeFilter,
-                    hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
-                      ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
-                    ],
-                    onChanged: (v) => setState(() => _pendingFeeTypeFilter = v),
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final hPad = compact ? 10.0 : 14.0;
+              final radius = compact ? 6.0 : 10.0;
+              final textSize = compact ? 11.0 : 13.0;
+              return SizedBox(
+                height: AppBtn.height(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: feeTypes.contains(_pendingFeeTypeFilter) ? _pendingFeeTypeFilter : null,
+                      hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      isDense: true,
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
+                        ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
+                      ],
+                      onChanged: (v) => setState(() => _pendingFeeTypeFilter = v),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: 8.w),
+              );
+            }),
+            SizedBox(width: AppBtn.gap(context)),
             // Class dropdown
-            SizedBox(
-              height: 40,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _pendingClassFilter,
-                    hint: Text('All Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
-                      ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
-                    ],
-                    onChanged: (v) => setState(() => _pendingClassFilter = v),
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final hPad = compact ? 10.0 : 14.0;
+              final radius = compact ? 6.0 : 10.0;
+              final textSize = compact ? 11.0 : 13.0;
+              return SizedBox(
+                height: AppBtn.height(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: classes.contains(_pendingClassFilter) ? _pendingClassFilter : null,
+                      hint: Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      isDense: true,
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
+                        ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+                      ],
+                      onChanged: (v) => setState(() => _pendingClassFilter = v),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: 8.w),
+              );
+            }),
+            SizedBox(width: AppBtn.gap(context)),
             TextButton.icon(
               onPressed: filtered.isNotEmpty ? () {
                 final pendingFiltered = filtered.where((d) => d['paidstatus']?.toString() == 'U').toList();
@@ -1578,12 +1588,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         LayoutBuilder(builder: (context, constraints) {
           return Scrollbar(controller: _feeGroupScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeGroupScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 0,
+            child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('FEE GROUP')),
@@ -1687,15 +1697,23 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 _selectedStudentDemands = null;
               }),
               borderRadius: BorderRadius.circular(8.r),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                  SizedBox(width: 6.w),
-                  Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                ]),
-              ),
+              child: Builder(builder: (context) {
+                final compact = MediaQuery.of(context).size.width <= 1366;
+                final hPad = compact ? 10.0 : 14.0;
+                final radius = compact ? 6.0 : 10.0;
+                final textSize = compact ? 11.0 : 13.0;
+                final innerGap = compact ? 4.0 : 6.0;
+                return Container(
+                  height: AppBtn.height(context),
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(radius)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                    SizedBox(width: innerGap),
+                    Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ]),
+                );
+              }),
             ),
             SizedBox(width: 12.w),
             Container(width: 1, height: 18, color: AppColors.border),
@@ -1725,12 +1743,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         LayoutBuilder(builder: (context, constraints) {
           return Scrollbar(controller: _studentFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 0,
+            child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('SEMESTER')),
@@ -1864,15 +1882,23 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 _selectedPendingCourseClass = null;
               }),
               borderRadius: BorderRadius.circular(8.r),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                  SizedBox(width: 6.w),
-                  Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                ]),
-              ),
+              child: Builder(builder: (context) {
+                final compact = MediaQuery.of(context).size.width <= 1366;
+                final hPad = compact ? 10.0 : 14.0;
+                final radius = compact ? 6.0 : 10.0;
+                final textSize = compact ? 11.0 : 13.0;
+                final innerGap = compact ? 4.0 : 6.0;
+                return Container(
+                  height: AppBtn.height(context),
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(radius)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                    SizedBox(width: innerGap),
+                    Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                  ]),
+                );
+              }),
             ),
             SizedBox(width: 12.w),
             Container(width: 1, height: 18, color: AppColors.border),
@@ -1890,12 +1916,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(
-              dividerThickness: 0,
+              dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('COURSE')),
@@ -2096,60 +2122,72 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     )
                   : null,
             ),
-            SizedBox(width: 8.w),
+            SizedBox(width: AppBtn.gap(context)),
             // Fee Type dropdown
-            SizedBox(
-              height: 40,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _pendingFeeTypeFilter,
-                    hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
-                      ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
-                    ],
-                    onChanged: (v) => setState(() { _pendingFeeTypeFilter = v; _pendingPage = 0; }),
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final hPad = compact ? 10.0 : 14.0;
+              final radius = compact ? 6.0 : 10.0;
+              final textSize = compact ? 11.0 : 13.0;
+              return SizedBox(
+                height: AppBtn.height(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: feeTypes.contains(_pendingFeeTypeFilter) ? _pendingFeeTypeFilter : null,
+                      hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      isDense: true,
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
+                        ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
+                      ],
+                      onChanged: (v) => setState(() { _pendingFeeTypeFilter = v; _pendingPage = 0; }),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            SizedBox(width: 8.w),
+              );
+            }),
+            SizedBox(width: AppBtn.gap(context)),
             // Class dropdown
-            SizedBox(
-              height: 40,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String?>(
-                    value: _pendingClassFilter,
-                    hint: Text('All Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    icon: AppIcon.linear('Chevron Down', size: 18),
-                    isDense: true,
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
-                      ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
-                    ],
-                    onChanged: (v) => setState(() { _pendingClassFilter = v; _pendingPage = 0; }),
+            Builder(builder: (context) {
+              final compact = MediaQuery.of(context).size.width <= 1366;
+              final hPad = compact ? 10.0 : 14.0;
+              final radius = compact ? 6.0 : 10.0;
+              final textSize = compact ? 11.0 : 13.0;
+              return SizedBox(
+                height: AppBtn.height(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: classes.contains(_pendingClassFilter) ? _pendingClassFilter : null,
+                      hint: Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      isDense: true,
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
+                        ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+                      ],
+                      onChanged: (v) => setState(() { _pendingClassFilter = v; _pendingPage = 0; }),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
           ],
         ),
         SizedBox(height: 12.h),
@@ -2170,12 +2208,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         LayoutBuilder(builder: (context, constraints) {
           return Scrollbar(controller: _studentListScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentListScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 0,
+            child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('ROLL NO')),
@@ -2495,7 +2533,6 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
                   setState(() {
@@ -2541,32 +2578,28 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 Text('${_dateGroups.length} days', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 const Spacer(),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: OutlinedButton.icon(
                     onPressed: _openDateMethodFilter,
-                    icon: AppIcon.linear('calendar-1', size: 16, color: AppColors.textPrimary),
+                    icon: AppIcon.linear('calendar-1', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                     label: Text('Date & Method', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.border),
                       padding: EdgeInsets.symmetric(horizontal: 14.w),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                     ),
                   ),
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: AppBtn.gap(context)),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: ElevatedButton.icon(
                     onPressed: _fetchData,
-                    icon: AppIcon('refresh', size: 16, color: Colors.white),
+                    icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                     label: const Text('Refresh'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -2620,16 +2653,16 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       scrollDirection: Axis.horizontal,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                        child: DataTable(dividerThickness: 0,
+                        child: DataTable(dividerThickness: 1,
                           showCheckboxColumn: false,
                           headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                           headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                          columnSpacing: 20,
-                          horizontalMargin: 16,
-                          dataRowMinHeight: 40,
-                          dataRowMaxHeight: 44,
-                          headingRowHeight: 42,
+                          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                          columnSpacing: 24,
+                          horizontalMargin: 20,
+                          dataRowMinHeight: 43.h,
+                          dataRowMaxHeight: 43.h,
+                          headingRowHeight: 44.h,
                           columns: const [
                             DataColumn(label: Text('S No.')),
                             DataColumn(label: Text('DATE')),
@@ -2767,22 +2800,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _dateDrilldownMethodFilter = null;
                   }),
                   borderRadius: BorderRadius.circular(10.r),
-                  child: Container(
-                    height: 40,
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                        SizedBox(width: 6.w),
-                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                      ],
-                    ),
-                  ),
+                  child: Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    final hPad = compact ? 10.0 : 14.0;
+                    final radius = compact ? 6.0 : 10.0;
+                    final textSize = compact ? 11.0 : 13.0;
+                    final innerGap = compact ? 4.0 : 6.0;
+                    return Container(
+                      height: AppBtn.height(context),
+                      padding: EdgeInsets.symmetric(horizontal: hPad),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(radius),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                          SizedBox(width: innerGap),
+                          Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
+                    );
+                  }),
                 ),
                 SizedBox(width: 12.w),
                 Container(width: 1, height: 18, color: AppColors.border),
@@ -2820,34 +2860,40 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   onChanged: (v) => setState(() { _dateDrilldownSearch = v; _dateDrilldownPage = 0; }),
                   width: 240,
                 ),
-                SizedBox(width: 8.w),
-                SizedBox(
-                  height: 40,
-                  child: DropdownButtonHideUnderline(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 14.w),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                      child: DropdownButton<String?>(
-                        value: _dateDrilldownMethodFilter,
-                        hint: Text('All Methods', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                        // Only Cash vs Bank — matches the Method-wise
-                        // Summary buckets above. Listing raw methods
-                        // (qr_upi, razorpay, cheque…) was confusing for
-                        // accountants who just want cash-hand totals.
-                        items: const [
-                          DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
-                          DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
-                          DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
-                        ],
-                        onChanged: (v) => setState(() { _dateDrilldownMethodFilter = v; _dateDrilldownPage = 0; }),
+                SizedBox(width: AppBtn.gap(context)),
+                Builder(builder: (context) {
+                  final compact = MediaQuery.of(context).size.width <= 1366;
+                  final hPad = compact ? 10.0 : 14.0;
+                  final radius = compact ? 6.0 : 10.0;
+                  final textSize = compact ? 11.0 : 13.0;
+                  return SizedBox(
+                    height: AppBtn.height(context),
+                    child: DropdownButtonHideUnderline(
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: hPad),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(radius),
+                        ),
+                        child: DropdownButton<String?>(
+                          value: _dateDrilldownMethodFilter,
+                          hint: Text('All Methods', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          // Only Cash vs Bank — matches the Method-wise
+                          // Summary buckets above. Listing raw methods
+                          // (qr_upi, razorpay, cheque…) was confusing for
+                          // accountants who just want cash-hand totals.
+                          items: const [
+                            DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                            DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
+                            DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
+                          ],
+                          onChanged: (v) => setState(() { _dateDrilldownMethodFilter = v; _dateDrilldownPage = 0; }),
+                        ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               ],
             ),
           ),
@@ -2890,12 +2936,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ),
                         child: SizedBox(
                     width: constraints.maxWidth,
-                    child: DataTable(dividerThickness: 0,
+                    child: DataTable(dividerThickness: 1,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                         headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                        columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                        columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                         columns: const [
                           DataColumn(label: Text('S No.')),
                           DataColumn(label: Text('PAY NO')),
@@ -3593,19 +3639,26 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 InkWell(
                   onTap: () => setState(() => _showPendingApproval = false),
                   borderRadius: BorderRadius.circular(10.r),
-                  child: Container(
-                    height: 40,
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                      SizedBox(width: 6.w),
-                      Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                    ]),
-                  ),
+                  child: Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    final hPad = compact ? 10.0 : 14.0;
+                    final radius = compact ? 6.0 : 10.0;
+                    final textSize = compact ? 11.0 : 13.0;
+                    final innerGap = compact ? 4.0 : 6.0;
+                    return Container(
+                      height: AppBtn.height(context),
+                      padding: EdgeInsets.symmetric(horizontal: hPad),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(radius),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                        SizedBox(width: innerGap),
+                        Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ]),
+                    );
+                  }),
                 ),
                 SizedBox(width: 12.w),
                 Container(width: 1, height: 18, color: AppColors.border),
@@ -3649,12 +3702,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           child: SizedBox(
                             width: constraints.maxWidth - 32,
                             child: DataTable(
-                              dividerThickness: 0,
+                              dividerThickness: 1,
                               showCheckboxColumn: false,
                               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                              columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                              columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                               columns: const [
                                 DataColumn(label: Text('S No.')),
                                 DataColumn(label: Text('PAY NO')),
@@ -3763,22 +3816,29 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     _feeDetails = null;
                   }),
                   borderRadius: BorderRadius.circular(10.r),
-                  child: Container(
-                    height: 40,
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                        SizedBox(width: 6.w),
-                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                      ],
-                    ),
-                  ),
+                  child: Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    final hPad = compact ? 10.0 : 14.0;
+                    final radius = compact ? 6.0 : 10.0;
+                    final textSize = compact ? 11.0 : 13.0;
+                    final innerGap = compact ? 4.0 : 6.0;
+                    return Container(
+                      height: AppBtn.height(context),
+                      padding: EdgeInsets.symmetric(horizontal: hPad),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(radius),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                          SizedBox(width: innerGap),
+                          Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
+                    );
+                  }),
                 ),
                 SizedBox(width: 12.w),
                 Container(width: 1, height: 18, color: AppColors.border),
@@ -3832,12 +3892,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: LayoutBuilder(builder: (context, constraints) {
                   return Scrollbar(controller: _feeDetailScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeDetailScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: DataTable(dividerThickness: 0,
+                    child: DataTable(dividerThickness: 1,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                       headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                      dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                      columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+                      dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                      columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                       columns: const [
                         DataColumn(label: Text('S No.')), DataColumn(label: Text('SEMESTER')), DataColumn(label: Text('FEE TYPE')),
                         DataColumn(label: Text('AMOUNT'), numeric: true), DataColumn(label: Text('PAID'), numeric: true),
@@ -4775,40 +4835,46 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           onChanged: (v) => setState(() => _classSearchQuery = v.trim().toLowerCase()),
                           width: 240,
                         ),
-                        SizedBox(width: 8.w),
+                        SizedBox(width: AppBtn.gap(context)),
                         // Fee type filter dropdown
-                        SizedBox(
-                          height: 40,
-                          child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _classFilterFeeType,
-                              isDense: true,
-                              hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                              icon: AppIcon.linear('Chevron Down', size: 18),
-                              items: [
-                                DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp))),
-                                ...() {
-                                  final allFeeTypes = <String>{};
-                                  for (final g in _classGroups) {
-                                    allFeeTypes.addAll(g.feeTypes);
-                                  }
-                                  final sorted = allFeeTypes.toList()..sort();
-                                  return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: TextStyle(fontSize: 13.sp))));
-                                }(),
-                              ],
-                              onChanged: (v) => setState(() => _classFilterFeeType = v),
+                        Builder(builder: (context) {
+                          final compact = MediaQuery.of(context).size.width <= 1366;
+                          final hPad = compact ? 10.0 : 14.0;
+                          final radius = compact ? 6.0 : 10.0;
+                          final textSize = compact ? 11.0 : 13.0;
+                          return SizedBox(
+                            height: AppBtn.height(context),
+                            child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: hPad),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(radius),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _classFilterFeeType,
+                                isDense: true,
+                                hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                                items: [
+                                  DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: textSize))),
+                                  ...() {
+                                    final allFeeTypes = <String>{};
+                                    for (final g in _classGroups) {
+                                      allFeeTypes.addAll(g.feeTypes);
+                                    }
+                                    final sorted = allFeeTypes.toList()..sort();
+                                    return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: TextStyle(fontSize: textSize))));
+                                  }(),
+                                ],
+                                onChanged: (v) => setState(() => _classFilterFeeType = v),
+                              ),
                             ),
                           ),
-                        ),
-                        ),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -5208,22 +5274,29 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     _drilldownAdmNo = null;
                   }),
                   borderRadius: BorderRadius.circular(10.r),
-                  child: Container(
-                    height: 40,
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(10.r),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                        SizedBox(width: 6.w),
-                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                      ],
-                    ),
-                  ),
+                  child: Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    final hPad = compact ? 10.0 : 14.0;
+                    final radius = compact ? 6.0 : 10.0;
+                    final textSize = compact ? 11.0 : 13.0;
+                    final innerGap = compact ? 4.0 : 6.0;
+                    return Container(
+                      height: AppBtn.height(context),
+                      padding: EdgeInsets.symmetric(horizontal: hPad),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(radius),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                          SizedBox(width: innerGap),
+                          Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
+                    );
+                  }),
                 ),
                 SizedBox(width: 12.w),
                 Container(width: 1, height: 18, color: AppColors.border),
@@ -5276,12 +5349,12 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           }
           return SingleChildScrollView(child: Scrollbar(controller: _drilldownFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _drilldownFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 0,
+            child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20, horizontalMargin: 16, dataRowMinHeight: 36, dataRowMaxHeight: 40, headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('SEMESTER')),
@@ -5416,22 +5489,29 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         _studentStatusFilter = null;
                       }),
                       borderRadius: BorderRadius.circular(10.r),
-                      child: Container(
-                        height: 40,
-                        padding: EdgeInsets.symmetric(horizontal: 14.w),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                            SizedBox(width: 6.w),
-                            Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                          ],
-                        ),
-                      ),
+                      child: Builder(builder: (context) {
+                        final compact = MediaQuery.of(context).size.width <= 1366;
+                        final hPad = compact ? 10.0 : 14.0;
+                        final radius = compact ? 6.0 : 10.0;
+                        final textSize = compact ? 11.0 : 13.0;
+                        final innerGap = compact ? 4.0 : 6.0;
+                        return Container(
+                          height: AppBtn.height(context),
+                          padding: EdgeInsets.symmetric(horizontal: hPad),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(radius),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                              SizedBox(width: innerGap),
+                              Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                            ],
+                          ),
+                        );
+                      }),
                     ),
                     SizedBox(width: 12.w),
                     Container(width: 1, height: 18, color: AppColors.border),
@@ -6272,7 +6352,6 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
                   setState(() {
@@ -6546,74 +6625,73 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                           onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
                           width: 240,
                         ),
-                        SizedBox(width: 8.w),
-                        SizedBox(
-                          height: 40,
-                          child: DropdownButtonHideUnderline(
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 14.w),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.border),
-                                borderRadius: BorderRadius.circular(10.r),
-                              ),
-                              child: DropdownButton<String?>(
-                                value: _filterFeeType,
-                                hint: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                                items: [
-                                  const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
-                                  ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft))),
-                                ],
-                                onChanged: (v) => setState(() => _filterFeeType = v),
+                        SizedBox(width: AppBtn.gap(context)),
+                        Builder(builder: (context) {
+                          final compact = MediaQuery.of(context).size.width <= 1366;
+                          final hPad = compact ? 10.0 : 14.0;
+                          final radius = compact ? 6.0 : 10.0;
+                          final textSize = compact ? 11.0 : 13.0;
+                          return SizedBox(
+                            height: AppBtn.height(context),
+                            child: DropdownButtonHideUnderline(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: hPad),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.border),
+                                  borderRadius: BorderRadius.circular(radius),
+                                ),
+                                child: DropdownButton<String?>(
+                                  value: _filterFeeType,
+                                  hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                  items: [
+                                    const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
+                                    ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft))),
+                                  ],
+                                  onChanged: (v) => setState(() => _filterFeeType = v),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
+                          );
+                        }),
+                        SizedBox(width: AppBtn.gap(context)),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: OutlinedButton.icon(
                             onPressed: _openDateMethodFilter,
-                            icon: AppIcon.linear('calendar-1', size: 16, color: AppColors.textPrimary),
+                            icon: AppIcon.linear('calendar-1', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                             label: Text('Date & Method', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: AppColors.border),
                               padding: EdgeInsets.symmetric(horizontal: 14.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                             ),
                           ),
                         ),
-                        SizedBox(width: 8.w),
+                        SizedBox(width: AppBtn.gap(context)),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: flatRows.isNotEmpty ? () => _exportToExcel(flatRows, activeDisplayFeeTypes, grandFeeTypeTotals, grandTotal) : null,
-                            icon: AppIcon('document-download', size: 16, color: Colors.white),
+                            icon: AppIcon('document-download', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Export'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
-                        SizedBox(width: 8.w),
+                        SizedBox(width: AppBtn.gap(context)),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: _fetchData,
-                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Refresh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),

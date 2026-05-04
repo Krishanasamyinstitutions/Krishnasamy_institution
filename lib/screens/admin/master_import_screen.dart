@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
@@ -117,34 +118,13 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
                   child: Row(
                     children: [
                       for (var i = 0; i < tabLabels.length; i++) ...[
-                        GestureDetector(
+                        PillTab(
+                          icon: tabIcons[i],
+                          label: tabLabels[i],
+                          selected: selected == i,
                           onTap: () => _tabCtrl.animateTo(i),
-                          behavior: HitTestBehavior.opaque,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  tabLabels[i],
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
-                        if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                        if (i < tabLabels.length - 1) SizedBox(width: PillTab.gap(context)),
                       ],
                     ],
                   ),

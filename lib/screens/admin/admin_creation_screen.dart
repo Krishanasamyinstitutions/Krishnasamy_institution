@@ -326,8 +326,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
               isExpanded: true,
-              decoration: _inputDecoration('Select designation'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Select designation'),
+              style: _inputTextStyle(context),
               items: [
                 ..._designationsList.map((d) => DropdownMenuItem(
                       value: d['desname'] as String,
@@ -372,8 +372,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
               isExpanded: true,
-              decoration: _inputDecoration('Select reporting person'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Select reporting person'),
+              style: _inputTextStyle(context),
               items: [
                 const DropdownMenuItem(value: 0, child: Text('None')),
                 ..._users.map((u) => DropdownMenuItem(
@@ -395,8 +395,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<String>(
               value: _selectedRole,
               isExpanded: true,
-              decoration: _inputDecoration('Select role'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Select role'),
+              style: _inputTextStyle(context),
               items: _rolesList
                   .where((r) => (r['urname'] as String) != 'Admin')
                   .map((r) => DropdownMenuItem(
@@ -417,8 +417,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _nameController,
-              decoration: _inputDecoration('Enter user name'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Enter user name'),
+              style: _inputTextStyle(context),
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
             ),
@@ -433,8 +433,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _emailController,
-              decoration: _inputDecoration('Enter email'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Enter email'),
+              style: _inputTextStyle(context),
               keyboardType: TextInputType.emailAddress,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -450,8 +450,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _phoneController,
-              decoration: _inputDecoration('Enter phone number'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Enter phone number'),
+              style: _inputTextStyle(context),
               keyboardType: TextInputType.phone,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -467,8 +467,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _passwordController,
-              decoration: _inputDecoration('Enter password'),
-              style: _inputStyle,
+              decoration: _inputDecoration(context, 'Enter password'),
+              style: _inputTextStyle(context),
               obscureText: true,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
@@ -477,79 +477,81 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
 
             // Buttons — full-width pair (Clear + Create User) sharing the
             // form row 50/50.
-            Builder(builder: (context) {
-              const btnHeight = 48.0;
-              const btnPadding = EdgeInsets.symmetric(horizontal: 32);
-              return Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: btnHeight,
-                      child: OutlinedButton.icon(
-                        onPressed: _clearForm,
-                        icon: const AppIcon('refresh', size: 16, color: AppColors.textPrimary),
-                        label: const Text('Clear', style: TextStyle(fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          side: const BorderSide(color: AppColors.border),
-                          padding: btnPadding,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.r)),
-                        ),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
+                    child: OutlinedButton.icon(
+                      onPressed: _clearForm,
+                      icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
+                      label: const Text('Clear'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.border),
                       ),
                     ),
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: SizedBox(
-                      height: btnHeight,
-                      child: ElevatedButton.icon(
-                        onPressed: _isLoading ? null : _createUser,
-                        icon: _isLoading
-                            ? SizedBox(
-                                width: 18.w,
-                                height: 18.h,
-                                child: const CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : const AppIcon('user-add', size: 16, color: Colors.white),
-                        label: const Text('Create User',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                          padding: btnPadding,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.r)),
-                        ),
+                ),
+                SizedBox(width: AppBtn.gap(context)),
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _createUser,
+                      icon: _isLoading
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: const CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : AppIcon('user-add', size: AppBtn.iconSize(context), color: Colors.white),
+                      label: const Text('Create User'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ),
-                ],
-              );
-            }),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  static final TextStyle _inputStyle = TextStyle(fontWeight: FontWeight.w500, fontSize: 13.sp, color: Color(0xFF555555));
+  TextStyle _inputTextStyle(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    return TextStyle(
+      fontWeight: FontWeight.w500,
+      fontSize: compact ? 11 : 14,
+      color: const Color(0xFF555555),
+    );
+  }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final textSize = compact ? 11.0 : 14.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
-      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: const BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(radius),
         borderSide: const BorderSide(color: AppColors.accent),
       ),
       filled: true,
@@ -590,18 +592,15 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                 ),
                 SizedBox(width: 8.w),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: ElevatedButton.icon(
                     onPressed: _fetchUsers,
-                    icon: AppIcon('refresh', size: 16, color: Colors.white),
+                    icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                     label: const Text('Refresh'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
