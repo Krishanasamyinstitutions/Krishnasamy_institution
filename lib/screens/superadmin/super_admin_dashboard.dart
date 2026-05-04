@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../models/fee_model.dart';
@@ -1365,8 +1366,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildSummaryRow() {
-    final activeCount =
-        _institutionSummaries.where((s) => s.activeStatus).length;
     final totalDemand =
         _institutionSummaries.fold<double>(0, (sum, s) => sum + s.totalDemand);
     final totalCollection = _institutionSummaries.fold<double>(
@@ -1377,24 +1376,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         0, (sum, s) => sum + s.totalPending);
 
     return LayoutBuilder(builder: (context, c) {
-      // Adaptive columns: 1 on mobile (< 600), 2 on small tablet (< 900),
-      // 3 on tablet (< 1200), 5 on desktop.
+      // Single-row layout for the 4 finance cards. On mobile (< 600) drop to
+      // 2-up grid so they stay legible; otherwise stretch evenly across the row.
       final w = c.maxWidth;
-      int cols;
-      if (w < 600) {
-        cols = 1;
-      } else if (w < 900) {
-        cols = 2;
-      } else if (w < 1200) {
-        cols = 3;
-      } else {
-        cols = 5;
-      }
       const gap = 12.0;
+      final cols = w < 600 ? 2 : 4;
       final cardWidth = (w - gap * (cols - 1)) / cols;
       final cards = <Widget>[
-        SizedBox(width: cardWidth, child: _buildSummaryCard('buildings-2', AppColors.accent, '$activeCount', 'Active Institutes',
-            onTap: () => _showAggregateDrilldown(context, 'active'))),
         SizedBox(width: cardWidth, child: _buildSummaryCard('wallet-1', AppColors.accent, _formatAmount(totalDemand), 'Total Demand',
             onTap: () => _showAggregateDrilldown(context, 'demand'))),
         SizedBox(width: cardWidth, child: _buildSummaryCard('tick-circle', AppColors.accent, _formatAmount(totalCollection), 'Total Collection',
@@ -1990,7 +1978,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   return DataRow(
                     cells: [
                       DataCell(Text(row.institutionName)),
-                      DataCell(Text(payment.paynumber ?? '${payment.payId}')),
+                      DataCell(Text(payment.paynumber ?? '—')),
                       DataCell(Text(_formatCurrency(payment.transtotalamount))),
                       DataCell(Text(payment.paymethod ?? '-')),
                       DataCell(
@@ -2571,7 +2559,11 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
               .where((r) => ((r[widget.mode] as num?)?.toDouble() ?? 0) > 0)
               .toList();
 
-          if (widget.mode == 'pending' || widget.mode == 'collection') {
+          // RPC now returns unpaid_students / paid_students directly
+          // (FILTER WHERE balancedue > 0 / paidamount > 0). Parallel query is
+          // no longer needed and was producing wrong counts when
+          // students.stuclass diverged from feedemand.stuclass.
+          if (widget.mode == 'approval') {
             await _computeStudentCounts();
           }
         }
@@ -3465,6 +3457,9 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
   final _formKey = GlobalKey<FormState>();
   final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _dobCtrl = TextEditingController();
+  DateTime? _dob;
   final _currentPwdCtrl = TextEditingController();
   final _newPwdCtrl = TextEditingController();
   final _confirmPwdCtrl = TextEditingController();
@@ -3479,12 +3474,56 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
     final auth = context.read<AuthProvider>();
     _usernameCtrl.text = auth.currentUser?.usename ?? '';
     _emailCtrl.text = auth.currentUser?.usemail ?? '';
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final auth = context.read<AuthProvider>();
+    final useId = auth.currentUser?.useId;
+    if (useId == null) return;
+    try {
+      final row = await SupabaseService.client
+          .from('institutionusers')
+          .select('usephone, usedob')
+          .eq('use_id', useId)
+          .maybeSingle();
+      if (!mounted || row == null) return;
+      setState(() {
+        _phoneCtrl.text = row['usephone']?.toString() ?? '';
+        final dobStr = row['usedob']?.toString();
+        if (dobStr != null && dobStr.isNotEmpty) {
+          _dob = DateTime.tryParse(dobStr);
+          if (_dob != null) {
+            _dobCtrl.text = '${_dob!.day.toString().padLeft(2, '0')}/'
+                '${_dob!.month.toString().padLeft(2, '0')}/${_dob!.year}';
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _pickDob() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dob ?? DateTime(2000, 1, 1),
+      firstDate: DateTime(1940),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dob = picked;
+        _dobCtrl.text =
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
+    }
   }
 
   @override
   void dispose() {
     _usernameCtrl.dispose();
     _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _dobCtrl.dispose();
     _currentPwdCtrl.dispose();
     _newPwdCtrl.dispose();
     _confirmPwdCtrl.dispose();
@@ -3522,6 +3561,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
       final updates = <String, dynamic>{
         'usename': _usernameCtrl.text.trim(),
         'usemail': _emailCtrl.text.trim(),
+        if (_phoneCtrl.text.trim().isNotEmpty) 'usephone': _phoneCtrl.text.trim(),
+        if (_dob != null) 'usedob': _dob!.toIso8601String().split('T').first,
       };
       if (_newPwdCtrl.text.isNotEmpty) {
         // DB trigger hashes plaintext on UPDATE.
@@ -3561,6 +3602,15 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
       );
 
   TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary);
+
+  String? _validateEmail(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Email required';
+    if (!RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$').hasMatch(t)) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
 
   InputDecoration _inputDec(String hint, {Widget? suffix}) => InputDecoration(
         hintText: hint,
@@ -3637,7 +3687,9 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                   controller: _emailCtrl,
                   decoration: _inputDec('Enter email'),
                   style: _fieldStyle(),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+                  keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
+                  validator: _validateEmail,
                 ),
               ] else
                 Row(children: [
@@ -3657,7 +3709,76 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                       controller: _emailCtrl,
                       decoration: _inputDec('Enter email'),
                       style: _fieldStyle(),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Email required' : null,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      validator: _validateEmail,
+                    ),
+                  ])),
+                ]),
+              const SizedBox(height: 14),
+              if (isMobile) ...[
+                _label('Mobile No'),
+                TextFormField(
+                  controller: _phoneCtrl,
+                  decoration: _inputDec('Enter 10-digit mobile number'),
+                  style: _fieldStyle(),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (v) {
+                    final t = (v ?? '').trim();
+                    if (t.isEmpty) return null; // optional
+                    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) {
+                      return 'Enter a valid 10-digit mobile number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+                _label('Date of Birth'),
+                TextFormField(
+                  controller: _dobCtrl,
+                  readOnly: true,
+                  onTap: _pickDob,
+                  decoration: _inputDec('Select date of birth',
+                      suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
+                  style: _fieldStyle(),
+                ),
+              ] else
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('Mobile No'),
+                    TextFormField(
+                      controller: _phoneCtrl,
+                      decoration: _inputDec('Enter 10-digit mobile number'),
+                      style: _fieldStyle(),
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      validator: (v) {
+                        final t = (v ?? '').trim();
+                        if (t.isEmpty) return null; // optional
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) {
+                          return 'Enter a valid 10-digit mobile number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ])),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _label('Date of Birth'),
+                    TextFormField(
+                      controller: _dobCtrl,
+                      readOnly: true,
+                      onTap: _pickDob,
+                      decoration: _inputDec('Select date of birth',
+                          suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
+                      style: _fieldStyle(),
                     ),
                   ])),
                 ]),

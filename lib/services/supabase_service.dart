@@ -563,7 +563,7 @@ class SupabaseService {
           .eq('ins_id', insId)
           .eq('activestatus', 1);
       final classes = (response as List)
-          .map((r) => r['stuclass']?.toString() ?? '')
+          .map((r) => r['stuclass']?.toString().trim() ?? '')
           .where((c) => c.isNotEmpty)
           .toSet()
           .toList();
