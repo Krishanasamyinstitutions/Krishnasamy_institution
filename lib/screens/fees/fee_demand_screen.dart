@@ -791,43 +791,59 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   ),
                   SizedBox(width: 16.w),
                 ],
-                SizedBox(
-                  height: 40,
-                  child: ElevatedButton.icon(
-                    onPressed: () => setState(() {
-                      _showImport = !_showImport;
-                      if (!_showImport) _resetImport();
-                    }),
-                    icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: 16, color: Colors.white),
-                    label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _showImport ? AppColors.error : AppColors.accent,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    ),
-                  ),
-                ),
-                if (!_showImport) ...[
-                  SizedBox(width: 8.w),
-                  SizedBox(
-                    height: 40,
+                Builder(builder: (context) {
+                  final compact = MediaQuery.of(context).size.width <= 1366;
+                  final btnHeight = compact ? 30.0 : 40.0;
+                  final iconSize = compact ? 12.0 : 16.0;
+                  final hPad = compact ? 10.0 : 18.0;
+                  final radius = compact ? 6.0 : 10.0;
+                  final textSize = compact ? 11.0 : 13.0;
+                  return SizedBox(
+                    height: btnHeight,
                     child: ElevatedButton.icon(
-                      onPressed: _loadFeeDemands,
-                      icon: AppIcon('refresh', size: 16, color: Colors.white),
-                      label: const Text('Refresh'),
+                      onPressed: () => setState(() {
+                        _showImport = !_showImport;
+                        if (!_showImport) _resetImport();
+                      }),
+                      icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: iconSize, color: Colors.white),
+                      label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: _showImport ? AppColors.error : AppColors.accent,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: EdgeInsets.symmetric(horizontal: 18.w),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                        padding: EdgeInsets.symmetric(horizontal: hPad),
+                        textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
                       ),
                     ),
-                  ),
+                  );
+                }),
+                if (!_showImport) ...[
+                  SizedBox(width: 8.w),
+                  Builder(builder: (context) {
+                    final compact = MediaQuery.of(context).size.width <= 1366;
+                    final btnHeight = compact ? 30.0 : 40.0;
+                    final iconSize = compact ? 12.0 : 16.0;
+                    final hPad = compact ? 10.0 : 18.0;
+                    final radius = compact ? 6.0 : 10.0;
+                    final textSize = compact ? 11.0 : 13.0;
+                    return SizedBox(
+                      height: btnHeight,
+                      child: ElevatedButton.icon(
+                        onPressed: _loadFeeDemands,
+                        icon: AppIcon('refresh', size: iconSize, color: Colors.white),
+                        label: const Text('Refresh'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(horizontal: hPad),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+                          textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    );
+                  }),
                 ],
               ],
             ),
@@ -1533,16 +1549,16 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(
-              dividerThickness: 0,
+              dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-              columnSpacing: 20,
-              horizontalMargin: 16,
-              dataRowMinHeight: 36,
-              dataRowMaxHeight: 40,
-              headingRowHeight: 42,
+              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              columnSpacing: 24,
+              horizontalMargin: 20,
+              dataRowMinHeight: 43.h,
+              dataRowMaxHeight: 43.h,
+              headingRowHeight: 44.h,
               columns: const [
                 DataColumn(label: Text('S No.')),
                 DataColumn(label: Text('SEMESTER')),

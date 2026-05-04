@@ -272,7 +272,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     if (!mounted) return;
     final years = results[0] as List<Map<String, dynamic>>;
     final concessions = results[1] as List<Map<String, dynamic>>;
-    final rawClasses = results[2] as List<String>;
+    final rawClasses = (results[2] as List<String>).toSet().toList();
     final insInfo = results[3] as ({String? name, String? logo, String? address, String? mobile, String? email});
     final classCounts = results[4] as Map<String, int>;
     final admissionTypes = results[5] as List<Map<String, dynamic>>;
@@ -1124,6 +1124,64 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
+  List<Widget> _buildImportActionButtons() {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final btnHeight = compact ? 30.0 : 40.0;
+    final iconSize = compact ? 12.0 : 16.0;
+    final hPad = compact ? 10.0 : 18.0;
+    final radius = compact ? 6.0 : 10.0;
+    final textSize = compact ? 11.0 : 13.0;
+    final gap = compact ? 6.0 : 10.0;
+
+    Widget importPhotos = SizedBox(
+      height: btnHeight,
+      child: ElevatedButton.icon(
+        onPressed: _isImportingPhotos ? null : _bulkImportPhotos,
+        icon: _isImportingPhotos
+            ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : Icon(Icons.photo_library, size: iconSize),
+        label: Text(_isImportingPhotos
+            ? 'Uploading ${_photoUploadDone}/$_photoUploadTotal…'
+            : 'Import Photos'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+          elevation: 0,
+        ),
+      ),
+    );
+
+    Widget importCsv = SizedBox(
+      height: btnHeight,
+      child: ElevatedButton.icon(
+        onPressed: () => setState(() {
+          _showImport = !_showImport;
+          if (!_showImport) _resetImport();
+        }),
+        icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: iconSize),
+        label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _showImport ? AppColors.error : AppColors.accent,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+          textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+          elevation: 0,
+        ),
+      ),
+    );
+
+    return [
+      SizedBox(width: gap),
+      importPhotos,
+      SizedBox(width: gap),
+      importCsv,
+    ];
+  }
+
   Widget _buildAllStudentsTable() {
     final q = _searchController.text.toLowerCase();
     final allStudents = q.isEmpty
@@ -1159,47 +1217,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 onChanged: (_) => setState(() => _studentPage = 0),
                 width: 240.w,
               ),
-              SizedBox(width: 10.w),
-              SizedBox(
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: _isImportingPhotos ? null : _bulkImportPhotos,
-                  icon: _isImportingPhotos
-                      ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.photo_library, size: 16),
-                  label: Text(_isImportingPhotos
-                      ? 'Uploading ${_photoUploadDone}/$_photoUploadTotal…'
-                      : 'Import Photos'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-              SizedBox(width: 10.w),
-              SizedBox(
-                height: 40,
-                child: ElevatedButton.icon(
-                  onPressed: () => setState(() {
-                    _showImport = !_showImport;
-                    if (!_showImport) _resetImport();
-                  }),
-                  icon: AppIcon(_showImport ? 'close-circle' : 'document-upload', size: 16),
-                  label: Text(_showImport ? 'Close Import' : 'Import CSV/Excel'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _showImport ? AppColors.error : AppColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                    elevation: 0,
-                  ),
-                ),
-              ),
+              ..._buildImportActionButtons(),
             ],
           ),
         ),
