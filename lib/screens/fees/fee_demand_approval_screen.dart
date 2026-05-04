@@ -532,13 +532,14 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                               SizedBox(width: 40.w),
                               _headerCell('Roll No', 3),
                               _headerCell('Student Name', 5),
-                              _headerCell('Class', 2, center: true),
+                              _headerCell('Class', 3),
                               _headerCell('Course', 2, center: true),
                               _headerCell('Year', 3, center: true),
                               _headerCell('Semester', 3, center: true),
                               _headerCell('Fee Type', 3),
                               _headerCell('Fee Amount', 3, right: true),
-                              _headerCell('Concession', 4),
+                              SizedBox(width: 16.w),
+                              _headerCell('Concession', 3, center: true),
                               _headerCell('Balance Due', 3, right: true),
                               SizedBox(width: 32.w),
                               _headerCell('Created By', 3),
@@ -806,10 +807,11 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               ),
               // Class
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Text(cls,
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                    textAlign: TextAlign.center),
+                    textAlign: TextAlign.left,
+                    overflow: TextOverflow.ellipsis),
               ),
               // Course
               Expanded(
@@ -848,15 +850,14 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.right),
               ),
+              SizedBox(width: 16.w),
               // Concession
               Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: EdgeInsets.only(left: 12.w),
-                  child: Text(concessionName,
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                      overflow: TextOverflow.ellipsis),
-                ),
+                flex: 3,
+                child: Text(concessionName,
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis),
               ),
               // Balance Due
               Expanded(

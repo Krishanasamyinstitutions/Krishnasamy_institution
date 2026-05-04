@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:excel/excel.dart' as xl;
@@ -1202,8 +1203,23 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         'p_schema': schema, 'p_ins_id': insId,
       });
       final results = await Future.wait([pendingFut, consoFut]);
-      final pending = results[0] is List
-          ? List<Map<String, dynamic>>.from(results[0] as List).map((r) => {
+      // RPC returns JSON (RETURNS json). Supabase may decode it as a List,
+      // or hand back a JSON-encoded String — handle both.
+      List _asList(dynamic v) {
+        if (v is List) return v;
+        if (v is String && v.isNotEmpty) {
+          final decoded = jsonDecode(v);
+          return decoded is List ? decoded : <dynamic>[];
+        }
+        return <dynamic>[];
+      }
+      debugPrint('Pending RPC result type: ${results[0].runtimeType}');
+      debugPrint('Conso   RPC result type: ${results[1].runtimeType}');
+      final pendingList = _asList(results[0]);
+      final consoList   = _asList(results[1]);
+      debugPrint('Pending rows: ${pendingList.length}, Conso rows: ${consoList.length}');
+      final pending = pendingList.isNotEmpty
+          ? List<Map<String, dynamic>>.from(pendingList).map((r) => {
               'course': r['courname']?.toString() ?? '',
               'class': r['stuclass']?.toString() ?? '',
               'semester': r['semester']?.toString() ?? '',
@@ -1216,8 +1232,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               'stumobile': r['stumobile']?.toString() ?? '',
             }).toList()
           : <Map<String, dynamic>>[];
-      final conso = results[1] is List
-          ? List<Map<String, dynamic>>.from(results[1] as List).map((r) => {
+      final conso = consoList.isNotEmpty
+          ? List<Map<String, dynamic>>.from(consoList).map((r) => {
               'course': r['courname']?.toString() ?? '',
               'class': r['stuclass']?.toString() ?? '',
               'strength': (r['strength'] as num?)?.toInt() ?? 0,
@@ -1775,7 +1791,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               numericCols: const {2, 3, 4, 5, 6, 9},
             ),
           ),
-        ] else if (_selectedCourse != null && _selectedClass != null && students.isNotEmpty) ...[
+        ] else if (students.isNotEmpty) ...[
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -2157,17 +2173,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     'NET AMT',
                   ];
                   final widths = <double>[
-                    120, 90, 180, 110, 90,
+                    130, 130, 200, 140, 150,
                     ...visibleFeeTypes.map((t) {
                       // Enough width for full uppercase label ("NEW ADMISSION FEES" etc.)
                       final len = t.length;
-                      return (len > 14 ? 180.0 : len > 10 ? 150.0 : 120.0);
+                      return (len > 14 ? 200.0 : len > 10 ? 170.0 : 140.0);
                     }),
-                    90, 110,
-                    if (showCash) 100,
-                    if (showCheque) 100,
-                    if (showBank) 100,
-                    110,
+                    100, 130,
+                    if (showCash) 120,
+                    if (showCheque) 120,
+                    if (showBank) 120,
+                    130,
                   ];
                   final numericStart = 5 + visibleFeeTypes.length - 1;
                   final numericCols = <int>{

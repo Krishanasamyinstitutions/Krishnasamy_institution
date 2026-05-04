@@ -305,11 +305,36 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
     try {
+      // Step 1: gather stu_ids in this class+course that still have at least
+      // one fee demand with balancedue > 0 — students who are fully paid up
+      // should not appear in the lookup at all.
+      var demQuery = SupabaseService.fromSchema('feedemand')
+          .select('stu_id')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .eq('stuclass', className)
+          .gt('balancedue', 0);
+      if (_selectedCourse != null) {
+        demQuery = demQuery.eq('courname', _selectedCourse!);
+      }
+      final demRows = await demQuery;
+      final pendingStuIds = <int>{};
+      for (final r in (demRows as List)) {
+        final id = r['stu_id'];
+        if (id is int) pendingStuIds.add(id);
+      }
+      if (pendingStuIds.isEmpty) {
+        setState(() => _classSuggestions = []);
+        return;
+      }
+
+      // Step 2: fetch only those students.
       var query = SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass, courname')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
-          .eq('stuclass', className);
+          .eq('stuclass', className)
+          .inFilter('stu_id', pendingStuIds.toList());
       if (_selectedCourse != null) {
         query = query.eq('courname', _selectedCourse!);
       }
@@ -384,6 +409,25 @@ class _StudentFeeCollectionScreenState
       _upiRefController.clear();
       _chequeDate = null;
     });
+  }
+
+  Future<void> _searchByAdmNo(String admno) async {
+    if (admno.trim().length < 2) {
+      setState(() => _studentSuggestions = []);
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final rows = await SupabaseService.fromSchema('students')
+          .select('stu_id, stuname, stuadmno, stuclass, courname')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .ilike('stuadmno', '${admno.trim()}%')
+          .limit(10);
+      setState(() => _studentSuggestions = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
   }
 
   Future<void> _searchByName(String name) async {
@@ -719,6 +763,7 @@ class _StudentFeeCollectionScreenState
                         child: TextField(
                           controller: _admNoController,
                           onSubmitted: (_) => _search(),
+                          onChanged: _searchByAdmNo,
                           decoration: _inputDec('Roll No').copyWith(
                             border: const OutlineInputBorder(
                               borderRadius: BorderRadius.only(
@@ -830,10 +875,7 @@ class _StudentFeeCollectionScreenState
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     isExpanded: true,
                     items: _classList.map((c) {
-                      final label = _selectedCourse != null && c.contains('-')
-                          ? '${c.split('-').first} Year'
-                          : c;
-                      return DropdownMenuItem(value: c, child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)));
+                      return DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)));
                     }).toList(),
                     onChanged: (val) {
                       setState(() {
