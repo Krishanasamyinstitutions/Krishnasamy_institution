@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/pill_tab.dart';
 
 const _termOrder = [
   'I SEMESTER', 'I TERM', 'II SEMESTER', 'II TERM', 'III SEMESTER', 'III TERM',
@@ -367,7 +368,6 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () {
                   setState(() {
@@ -680,38 +680,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 child: Row(
                   children: [
                     for (var i = 0; i < tabLabels.length; i++) ...[
-                      GestureDetector(
+                      PillTab(
+                        icon: tabIcons[i],
+                        label: tabLabels[i],
+                        selected: selected == i,
                         onTap: () => _tabController.animateTo(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppIcon(
-                                tabIcons[i],
-                                size: 16,
-                                color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                tabLabels[i],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
-                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                      if (i < tabLabels.length - 1) SizedBox(width: PillTab.gap(context)),
                     ],
                     const SizedBox(width: 16),
                     if (_loading)
@@ -876,7 +851,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             // Reset (right corner)
             SizedBox(width: 12.w),
             SizedBox(
-              height: 40,
+              height: AppBtn.height(context),
               child: ElevatedButton.icon(
                 onPressed: () => setState(() {
                   _selectedCourse = null;
@@ -884,15 +859,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   _selectedFeeType = null;
                   _selectedPrefix = null;
                 }),
-                icon: AppIcon('refresh', size: 16, color: Colors.white),
+                icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                 label: const Text('Refresh'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: EdgeInsets.symmetric(horizontal: 18.w),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -910,18 +882,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     required Color color,
   }) {
     return SizedBox(
-      height: 40,
+      height: AppBtn.height(context),
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 16),
+        icon: Icon(icon, size: AppBtn.iconSize(context)),
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: EdgeInsets.symmetric(horizontal: 18.w),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-          textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -971,7 +940,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   label: 'Excel',
                   color: const Color(0xFF10B981),
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: AppBtn.gap(context)),
                 _miniExportBtn(
                   onPressed: () => _exportConsolidatedPdf(rows, byClass),
                   icon: Icons.picture_as_pdf_rounded,
@@ -1305,7 +1274,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   label: 'Excel',
                   color: const Color(0xFF10B981),
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: AppBtn.gap(context)),
                 _miniExportBtn(
                   onPressed: () => _exportPendingPaymentPdf(rows, byClass, grandPending, grandConcess),
                   icon: Icons.picture_as_pdf_rounded,
@@ -1698,7 +1667,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   label: 'Clear',
                   color: AppColors.textSecondary,
                 ),
-                SizedBox(width: 8.w),
+                SizedBox(width: AppBtn.gap(context)),
               ],
               _miniExportBtn(
                 onPressed: _ledgerDemands.isEmpty ? () {} : _exportStudentLedgerExcel,
@@ -1706,7 +1675,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 label: 'Excel',
                 color: const Color(0xFF10B981),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: AppBtn.gap(context)),
               _miniExportBtn(
                 onPressed: _ledgerDemands.isEmpty ? () {} : _exportStudentLedgerPdf,
                 icon: Icons.picture_as_pdf_rounded,
@@ -2110,10 +2079,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               const Spacer(),
               SizedBox(
-                height: 40,
+                height: AppBtn.height(context),
                 child: OutlinedButton.icon(
                   onPressed: _openDailyDateMethodDialog,
-                  icon: const Icon(Icons.calendar_today, size: 16, color: AppColors.textPrimary),
+                  icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                   label: Text(
                     _dailyDateMethodLabel(),
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
@@ -2121,18 +2090,17 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.symmetric(horizontal: 14.w),
                     side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
                   ),
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: AppBtn.gap(context)),
               _miniExportBtn(
                 onPressed: _dailyRows.isEmpty ? () {} : () => _exportDailyCollectionExcel(),
                 icon: Icons.table_chart_rounded,
                 label: 'Excel',
                 color: const Color(0xFF10B981),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: AppBtn.gap(context)),
               _miniExportBtn(
                 onPressed: _dailyRows.isEmpty ? () {} : () => _exportDailyCollectionPdf(),
                 icon: Icons.picture_as_pdf_rounded,
@@ -2586,7 +2554,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             color: AppColors.textPrimary,
             letterSpacing: 0.3,
           ),
-          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+          dividerThickness: 1,
+          // Compact column/row sizing intentional — wide pivot with many term columns.
           columnSpacing: 14, horizontalMargin: 10, dataRowMinHeight: 30, dataRowMaxHeight: 34, headingRowHeight: 36,
           columns: [
             const DataColumn(label: Text('SNO')),

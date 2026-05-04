@@ -325,10 +325,10 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
 
         // Refresh
         SizedBox(
-          height: 40,
+          height: AppBtn.height(context),
           child: ElevatedButton.icon(
             onPressed: _loading ? null : _loadDemands,
-            icon: AppIcon('refresh', size: 16, color: Colors.white),
+            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
             label: const Text('Refresh'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF10B981),
@@ -336,9 +336,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               disabledBackgroundColor: const Color(0xFF10B981),
               disabledForegroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(horizontal: 18.w),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
             ),
           ),
         ),

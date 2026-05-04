@@ -252,18 +252,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     style: TextButton.styleFrom(foregroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
                   ),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: ElevatedButton.icon(
                     onPressed: _fetchNotifications,
-                    icon: AppIcon('refresh', size: 16, color: Colors.white),
+                    icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                     label: const Text('Refresh'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 18.w),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                      textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),

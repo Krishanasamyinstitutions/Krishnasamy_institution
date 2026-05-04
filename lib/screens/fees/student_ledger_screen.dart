@@ -700,10 +700,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                 _chip('Pending', '₹${_totalPending.toStringAsFixed(0)}', AppColors.error),
                 SizedBox(width: 12.w),
                 SizedBox(
-                  height: 40,
+                  height: AppBtn.height(context),
                   child: ElevatedButton.icon(
                   onPressed: _demands.isNotEmpty ? _exportToExcel : null,
-                  icon: AppIcon('document-download', size: 16, color: Colors.white),
+                  icon: AppIcon('document-download', size: AppBtn.iconSize(context), color: Colors.white),
                   label: const Text('Export'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
@@ -711,9 +711,6 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.4),
                     disabledForegroundColor: Colors.white,
                     elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 18.w),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                   ),
                 ),

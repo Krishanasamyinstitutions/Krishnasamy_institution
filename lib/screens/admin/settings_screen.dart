@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/pill_tab.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,34 +48,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                 child: Row(
                   children: [
                     for (var i = 0; i < tabLabels.length; i++) ...[
-                      GestureDetector(
+                      PillTab(
+                        icon: tabIcons[i],
+                        label: tabLabels[i],
+                        selected: selected == i,
                         onTap: () => _tabController.animateTo(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: selected == i ? AppColors.tabSelected : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppIcon(tabIcons[i], size: 16, color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary),
-                              const SizedBox(width: 8),
-                              Text(
-                                tabLabels[i],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: selected == i ? AppColors.textOnPrimary : AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
-                      if (i < tabLabels.length - 1) const SizedBox(width: 8),
+                      if (i < tabLabels.length - 1) SizedBox(width: PillTab.gap(context)),
                     ],
                   ],
                 ),
@@ -359,18 +339,15 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                         Text('${_designations.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                         SizedBox(width: 12.w),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: _fetchDesignations,
-                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Refresh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -389,6 +366,7 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                       ],
                     ),
                   ),
+                  const Divider(height: 1),
                   if (_isLoading)
                     Padding(padding: EdgeInsets.all(40.w), child: Center(child: CircularProgressIndicator()))
                   else if (_designations.isEmpty)
@@ -403,7 +381,7 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                         child: Row(
                           children: [
                             SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
-                            Expanded(flex: 3, child: Text(des['desname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                            Expanded(flex: 3, child: Text(des['desname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
                             Expanded(flex: 3, child: Text(_getDesignationName(des['desrepto'] as int?), style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
                             SizedBox(
                               width: 80.w,
@@ -665,18 +643,15 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                         Text('${_roles.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                         SizedBox(width: 12.w),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: _fetchRoles,
-                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Refresh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -695,6 +670,7 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                       ],
                     ),
                   ),
+                  const Divider(height: 1),
                   if (_isLoading)
                     Padding(padding: EdgeInsets.all(40.w), child: Center(child: CircularProgressIndicator()))
                   else if (_roles.isEmpty)
@@ -709,7 +685,7 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                         child: Row(
                           children: [
                             SizedBox(width: 40.w, child: Text('${idx + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
-                            Expanded(flex: 3, child: Text(role['urname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500))),
+                            Expanded(flex: 3, child: Text(role['urname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
                             Expanded(flex: 2, child: Text(role['inscode']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
                             SizedBox(
                               width: 80.w,
@@ -927,13 +903,16 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
                   child: SizedBox(
                     width: double.infinity,
                     child: DataTable(
-                dividerThickness: 0,
+                dividerThickness: 1,
                 headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                 headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary, letterSpacing: 0.3),
-                dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                columnSpacing: 20,
-                horizontalMargin: 16,
-                headingRowHeight: 42,
+                dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                columnSpacing: 24,
+                horizontalMargin: 20,
+                headingRowHeight: 44.h,
+                dataRowMinHeight: 43.h,
+                // dataRowMaxHeight intentionally not constrained — this table contains an
+                // editable prefix TextFormField that needs vertical breathing room.
                 columns: const [
                   DataColumn(label: Text('S NO.')),
                   DataColumn(label: Text('FEE GROUP')),
@@ -1218,7 +1197,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                   SizedBox(height: 6.h),
                   TextField(
                     controller: _ruleNameCtrl,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                    style: _fieldTextStyle(),
                     decoration: _fieldDecoration(hint: 'e.g., 1 Week Overdue'),
                   ),
                   SizedBox(height: 14.h),
@@ -1227,9 +1206,9 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                   DropdownButtonFormField<String>(
                     value: _feeType,
                     isExpanded: true,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                    style: _fieldTextStyle(),
                     decoration: _fieldDecoration(),
-                    items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp)))).toList(),
+                    items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: _fieldTextStyle()))).toList(),
                     onChanged: (v) => setState(() => _feeType = v ?? 'ALL'),
                   ),
                   SizedBox(height: 14.h),
@@ -1245,7 +1224,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                             TextField(
                               controller: _fromDaysCtrl,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                              style: _fieldTextStyle(),
                               decoration: _fieldDecoration(hint: '1'),
                             ),
                           ],
@@ -1261,7 +1240,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                             TextField(
                               controller: _toDaysCtrl,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                              style: _fieldTextStyle(),
                               decoration: _fieldDecoration(hint: '7'),
                             ),
                           ],
@@ -1275,7 +1254,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                   DropdownButtonFormField<String>(
                     value: _fineType,
                     isExpanded: true,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                    style: _fieldTextStyle(),
                     decoration: _fieldDecoration(),
                     items: const [
                       DropdownMenuItem(value: 'FIXED', child: Text('Fixed Amount (Rs.)')),
@@ -1289,50 +1268,43 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                   TextField(
                     controller: _fineValueCtrl,
                     keyboardType: TextInputType.number,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                    style: _fieldTextStyle(),
                     decoration: _fieldDecoration(hint: _fineType == 'FIXED' ? '50' : '2'),
                   ),
                   SizedBox(height: 22.h),
-                  Builder(builder: (_) {
-                    const btnHeight = 48.0;
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: btnHeight,
-                            child: ElevatedButton.icon(
-                              onPressed: _saveRule,
-                              icon: Icon(_editingId != null ? Icons.save_rounded : Icons.add_rounded, size: 18.sp),
-                              label: Text(_editingId != null ? 'Update' : 'Add Rule', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.accent,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 18),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: AppBtn.height(context),
+                          child: ElevatedButton.icon(
+                            onPressed: _saveRule,
+                            icon: Icon(_editingId != null ? Icons.save_rounded : Icons.add_rounded, size: AppBtn.iconSize(context)),
+                            label: Text(_editingId != null ? 'Update' : 'Add Rule'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
                             ),
                           ),
                         ),
-                        if (_editingId != null) ...[
-                          SizedBox(width: 8.w),
-                          SizedBox(
-                            height: btnHeight,
-                            child: OutlinedButton.icon(
-                              onPressed: () => setState(() => _clearForm()),
-                              icon: const AppIcon('refresh', size: 16, color: AppColors.textPrimary),
-                              label: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.textPrimary,
-                                side: const BorderSide(color: AppColors.border),
-                                padding: EdgeInsets.symmetric(horizontal: 18.w),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              ),
+                      ),
+                      if (_editingId != null) ...[
+                        SizedBox(width: AppBtn.gap(context)),
+                        SizedBox(
+                          height: AppBtn.height(context),
+                          child: OutlinedButton.icon(
+                            onPressed: () => setState(() => _clearForm()),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
+                            label: const Text('Cancel'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textPrimary,
+                              side: const BorderSide(color: AppColors.border),
                             ),
                           ),
-                        ],
+                        ),
                       ],
-                    );
-                  }),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1360,20 +1332,17 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                         Text('Fine Rules', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
                         const Spacer(),
                         Text('${_rules.length} rules', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
-                        SizedBox(width: 8.w),
+                        SizedBox(width: AppBtn.gap(context)),
                         SizedBox(
-                          height: 40,
+                          height: AppBtn.height(context),
                           child: ElevatedButton.icon(
                             onPressed: _loadRules,
-                            icon: AppIcon('refresh', size: 16, color: Colors.white),
+                            icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
                             label: const Text('Refresh'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              padding: EdgeInsets.symmetric(horizontal: 18.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                              textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
@@ -1404,17 +1373,17 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                 child: DataTable(
                                   headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                                   headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                                  dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                  dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                                   dataRowColor: WidgetStateProperty.resolveWith<Color?>((states) {
                                     if (states.contains(WidgetState.hovered)) return AppColors.primaryLight.withValues(alpha: 0.4);
                                     return null;
                                   }),
-                                  columnSpacing: 48.w,
-                                  horizontalMargin: 24.w,
-                                  headingRowHeight: 48,
-                                  dataRowMinHeight: 52,
-                                  dataRowMaxHeight: 52,
-                                  dividerThickness: 0.6,
+                                  columnSpacing: 24,
+                                  horizontalMargin: 20,
+                                  headingRowHeight: 44.h,
+                                  dataRowMinHeight: 43.h,
+                                  dataRowMaxHeight: 43.h,
+                                  dividerThickness: 1,
                                   columns: const [
                                     DataColumn(label: Text('RULE NAME')),
                                     DataColumn(label: Text('FEE TYPE')),
@@ -1503,14 +1472,24 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
     );
   }
 
+  TextStyle _fieldTextStyle() {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    return TextStyle(fontSize: compact ? 11 : 14, color: AppColors.textPrimary);
+  }
+
   InputDecoration _fieldDecoration({String? hint}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final textSize = compact ? 11.0 : 14.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
-      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.border)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.border)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent)),
       filled: true,
       fillColor: Colors.white,
     );
