@@ -981,7 +981,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ),
             Expanded(
               child: _stickyTable(
-            columnWidths: const [90, 90, 80, 100, 110, 90, 80, 110, 100, 110, 100, 110],
+            columnWidths: const [90, 110, 90, 110, 200, 100, 90, 110, 100, 120, 100, 110],
             headers: const ['COURSE', 'CLASS', 'STRENGTH', 'SEMESTER', 'CATEGORY', 'STUD COUNT', 'TYPE', 'DUE', 'CONCESS', 'NET DEMAND', 'PAID', 'BALANCE'],
             rows: [
               for (final r in rows.skip(_consolidatedPage * _tablePageSize).take(_tablePageSize))
@@ -1008,7 +1008,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               _formatNumber(rows.fold<double>(0, (s, r) => s + (r['paid'] as double))),
               _formatNumber(rows.fold<double>(0, (s, r) => s + (r['balance'] as double))),
             ],
-            numericCols: const {2, 5, 7, 8, 9, 10, 11},
+            numericCols: const {7, 8, 9, 10, 11},
+            centerCols: const {2, 5},
           ),
         ),
             _pagerBar(
@@ -1361,6 +1362,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     required List<List<String>> rows,
     required List<String> footer,
     Set<int> numericCols = const {},
+    Set<int> centerCols = const {},
   }) {
     return _StickyTable(
       columnWidths: columnWidths,
@@ -1368,6 +1370,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       rows: rows,
       footer: footer,
       numericCols: numericCols,
+      centerCols: centerCols,
     );
   }
 
@@ -3278,6 +3281,7 @@ class _StickyTable extends StatefulWidget {
     required this.rows,
     required this.footer,
     required this.numericCols,
+    this.centerCols = const {},
   });
 
   final List<double> columnWidths;
@@ -3285,6 +3289,7 @@ class _StickyTable extends StatefulWidget {
   final List<List<String>> rows;
   final List<String> footer;
   final Set<int> numericCols;
+  final Set<int> centerCols;
 
   @override
   State<_StickyTable> createState() => _StickyTableState();
@@ -3356,7 +3361,11 @@ class _StickyTableState extends State<_StickyTable> {
                   padding: EdgeInsets.symmetric(horizontal: 10.w),
                   child: Text(
                     values[i],
-                    textAlign: widget.numericCols.contains(i) ? TextAlign.right : TextAlign.left,
+                    textAlign: widget.centerCols.contains(i)
+                        ? TextAlign.center
+                        : widget.numericCols.contains(i)
+                            ? TextAlign.right
+                            : TextAlign.left,
                     style: style ?? cellStyle,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,

@@ -794,6 +794,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   SizedBox(width: 16.w),
                 ],
                 Builder(builder: (context) {
+                  // Hide the Import CSV/Excel button for institution Admin role.
+                  // Admins manage / approve demands; imports are an accountant
+                  // / super-admin action.
+                  final role = context.read<AuthProvider>().currentUser?.urname ?? '';
+                  if (role.toLowerCase() == 'admin') return const SizedBox.shrink();
                   final compact = MediaQuery.of(context).size.width <= 1366;
                   final btnHeight = compact ? 30.0 : 40.0;
                   final iconSize = compact ? 12.0 : 16.0;

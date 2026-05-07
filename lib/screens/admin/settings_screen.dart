@@ -918,8 +918,11 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
                 horizontalMargin: 20,
                 headingRowHeight: 44.h,
                 dataRowMinHeight: 43.h,
-                // dataRowMaxHeight intentionally not constrained — this table contains an
-                // editable prefix TextFormField that needs vertical breathing room.
+                // dataRowMaxHeight set to double.infinity so the editable prefix
+                // TextFormField can grow; without this, Flutter's default max
+                // (48px) clashes with `dataRowMinHeight` once ScreenUtil scales
+                // 43.h above 48 and triggers a NOT NORMALIZED constraint error.
+                dataRowMaxHeight: double.infinity,
                 columns: const [
                   DataColumn(label: Text('S NO.')),
                   DataColumn(label: Text('FEE GROUP')),
