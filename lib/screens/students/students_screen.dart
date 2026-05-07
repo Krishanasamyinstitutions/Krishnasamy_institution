@@ -79,6 +79,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
   bool _isFormEnabled = true;
   List<StudentModel> _students = [];
   Map<String, int> _classCounts = {};
+  // Master-table ordering: claname -> ordid, courname -> ordid.
+  // Used by _buildClassList to honour the institution's preferred sort.
+  Map<String, int> _classOrdMap = {};
+  Map<String, int> _courseOrdMap = {};
   Map<String, List<StudentModel>> _cachedClassStudents = {};
   bool _loadingClassStudents = false;
   StudentModel? _selectedStudent;
@@ -267,6 +271,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
       SupabaseService.getStudentCountsByClass(insId),
       SupabaseService.getAdmissionTypes(insId),
       SupabaseService.getQuotas(insId),
+      // class + course masters with ordid for the sidebar ordering.
+      SupabaseService.fromSchema('class').select('claname, ordid').eq('ins_id', insId).eq('activestatus', 1),
+      SupabaseService.fromSchema('course').select('courname, ordid').eq('ins_id', insId).eq('activestatus', 1),
     ]);
 
     if (!mounted) return;
@@ -277,6 +284,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final classCounts = results[4] as Map<String, int>;
     final admissionTypes = results[5] as List<Map<String, dynamic>>;
     final quotas = results[6] as List<Map<String, dynamic>>;
+    final classMaster = results[7] as List<dynamic>;
+    final courseMaster = results[8] as List<dynamic>;
+    final classOrdMap = <String, int>{
+      for (final r in classMaster)
+        if (r['claname'] != null && r['ordid'] != null)
+          r['claname'].toString().trim(): (r['ordid'] as num).toInt(),
+    };
+    final courseOrdMap = <String, int>{
+      for (final r in courseMaster)
+        if (r['courname'] != null && r['ordid'] != null)
+          r['courname'].toString().trim(): (r['ordid'] as num).toInt(),
+    };
     // Dedupe rawClasses while preserving first-seen order — the class table
     // sometimes has multiple rows with the same claname (different cour_id),
     // which would otherwise crash DropdownButton with duplicate values.
@@ -296,6 +315,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _quotas = quotas;
       _classes = allClasses;
       _classCounts = classCounts;
+      _classOrdMap = classOrdMap;
+      _courseOrdMap = courseOrdMap;
       _insName = insInfo.name;
       _insLogo = insInfo.logo;
       if (years.isNotEmpty) {
@@ -921,7 +942,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
     }
 
     final courseClassCounts = _getCoursewiseClassCounts();
-    final courseNames = courseClassCounts.keys.toList()..sort();
+    // Sort courses by master-table ordid (falls back to alphabetical).
+    int courseOrdOf(String name) =>
+        _courseOrdMap[name.trim()] ?? _courseOrdMap[name] ?? 1 << 30;
+    final courseNames = courseClassCounts.keys.toList()
+      ..sort((a, b) {
+        final oa = courseOrdOf(a);
+        final ob = courseOrdOf(b);
+        if (oa != ob) return oa.compareTo(ob);
+        return a.compareTo(b);
+      });
 
     return ListView.builder(
       padding: EdgeInsets.symmetric(vertical: 4.h),
@@ -947,7 +977,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
               AppIcon.linear('Chevron Down', size: 16, color: AppColors.textSecondary),
             ],
           ),
-          children: classCounts.keys.map((className) {
+          children: (classCounts.keys.toList()
+                ..sort((a, b) {
+                  // Sort classes within a course by master-table ordid;
+                  // unknown classes fall to the end alphabetically.
+                  int ordOf(String n) =>
+                      _classOrdMap[n.trim()] ?? _classOrdMap[n] ?? 1 << 30;
+                  final oa = ordOf(a);
+                  final ob = ordOf(b);
+                  if (oa != ob) return oa.compareTo(ob);
+                  return a.compareTo(b);
+                }))
+              .map((className) {
             final count = classCounts[className] ?? 0;
             final classColor = _getClassColor(className);
             final isSelected = _selectedClassFilter == className && _selectedCourseFilter == courseName;

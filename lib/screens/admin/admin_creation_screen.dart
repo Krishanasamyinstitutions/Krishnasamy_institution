@@ -24,6 +24,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   String? _selectedDesignation;
   int? _selectedDesId;
@@ -467,9 +468,19 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _passwordController,
-              decoration: _inputDecoration(context, 'Enter password'),
+              decoration: _inputDecoration(context, 'Enter password').copyWith(
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                  icon: AppIcon(
+                    _obscurePassword ? 'eye-slash' : 'eye',
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
               style: _inputTextStyle(context),
-              obscureText: true,
+              obscureText: _obscurePassword,
               validator: (v) =>
                   v == null || v.trim().isEmpty ? 'Required' : null,
             ),

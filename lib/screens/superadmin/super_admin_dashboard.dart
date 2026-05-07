@@ -36,6 +36,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<_InstitutionFinanceSummary> _institutionSummaries = [];
   List<_SuperAdminTransactionRow> _recentTransactions = [];
 
+  // Year filter — null means "latest per institution" (legacy behaviour).
+  // Populated lazily from public.get_super_admin_year_labels() on first
+  // load so we don't hold up dashboard rendering on slow networks.
+  List<String> _availableYears = [];
+  String? _selectedYear;
+
   // Body-area drilldown state — stays inside the dashboard layout (header
   // and sidebar remain visible) instead of pushing a new route.
   String? _aggregateDrilldownMode;
@@ -47,7 +53,94 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _loadAvailableYears();
     _loadInstitutions();
+  }
+
+  /// Pull the distinct yrlabels across all institutions and remember them
+  /// for the dropdown. Default the selection to the year covering today
+  /// (or the newest available, since the helper returns DESC). Failure is
+  /// non-fatal — without years the dropdown hides itself and the dashboard
+  /// keeps the existing latest-year totals.
+  Future<void> _loadAvailableYears() async {
+    try {
+      final res = await SupabaseService.client.rpc('get_super_admin_year_labels');
+      final list = res is List ? res.cast<String>() : <String>[];
+      if (!mounted || list.isEmpty) return;
+
+      // Pick a sensible default — the year label whose left half matches
+      // today's calendar year (e.g. today=2026 → '2026-2027'), falling
+      // back to the newest entry (list is already DESC-sorted).
+      final today = DateTime.now();
+      String? current;
+      for (final y in list) {
+        final left = y.split('-').first;
+        if (left == today.year.toString()) {
+          current = y;
+          break;
+        }
+      }
+      current ??= list.first;
+
+      final shouldReload = _selectedYear != current;
+      setState(() {
+        _availableYears = list;
+        _selectedYear = current;
+      });
+      if (shouldReload) _loadInstitutions();
+    } catch (e) {
+      debugPrint('get_super_admin_year_labels failed: $e');
+    }
+  }
+
+  /// Year-filter dropdown shown in the dashboard header. Includes an
+  /// "All years" sentinel (null value) which falls back to each
+  /// institution's latest year — the legacy behaviour. Selecting a
+  /// specific year re-runs the dashboard RPC with p_yrlabel set.
+  Widget _buildYearFilter() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w),
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedYear,
+          isDense: true,
+          icon: const AppIcon('arrow-down-1', size: 14, color: AppColors.textSecondary),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+          items: [
+            for (final y in _availableYears)
+              DropdownMenuItem<String>(
+                value: y,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AppIcon('calendar', size: 14, color: AppColors.accent),
+                    SizedBox(width: 6.w),
+                    Text(y),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: (v) {
+            if (v == null || v == _selectedYear) return;
+            setState(() {
+              _selectedYear = v;
+              _loadingFinanceData = true;
+            });
+            _loadInstitutions();
+          },
+        ),
+      ),
+    );
   }
 
   void _refreshDashboard() {
@@ -61,8 +154,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Future<void> _loadTodayCollections(
       List<_InstitutionFinanceSummary> summaries) async {
     // Try the v2 RPC first — single round-trip aggregation for everything.
+    // Pass _selectedYear so v2 picks the right per-institution schema; null
+    // falls back to each institution's latest year (legacy behaviour).
     try {
-      final v2 = await SupabaseService.client.rpc('get_super_admin_dashboard_v2');
+      final v2 = await SupabaseService.client.rpc(
+        'get_super_admin_dashboard_v2',
+        params: {'p_yrlabel': _selectedYear},
+      );
       if (v2 is List) {
         final byId = <int, Map<String, dynamic>>{};
         for (final r in v2) {
@@ -196,10 +294,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Future<void> _loadInstitutions() async {
     try {
-      // Single RPC call for all institution data with finance summary
-      debugPrint('[SuperAdmin] Calling get_super_admin_dashboard RPC...');
-      final rpcResult =
-          await SupabaseService.client.rpc('get_super_admin_dashboard');
+      // Single RPC call for all institution data with finance summary.
+      // Pass _selectedYear so the per-institution schema lookup matches the
+      // chosen academic year. Null = each institution's latest year.
+      debugPrint('[SuperAdmin] Calling get_super_admin_dashboard RPC for year=$_selectedYear...');
+      final rpcResult = await SupabaseService.client.rpc(
+        'get_super_admin_dashboard',
+        params: {'p_yrlabel': _selectedYear},
+      );
       debugPrint(
           '[SuperAdmin] RPC raw result type=${rpcResult.runtimeType} value=$rpcResult');
       // Supabase returns json RPC results sometimes as List, sometimes as a
@@ -446,19 +548,26 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                // Larger transparent tile so the E-mark detail is readable
+                // — the previous 36×36 with tinted backdrop dimmed the
+                // navy mark against the navy backdrop.
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Image.asset(
+                    'assets/images/educore360_logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const AppIcon(
+                      'teacher',
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
                   ),
-                  child: AppIcon('teacher', color: AppColors.primary, size: 18),
                 ),
                 if (!collapsed) ...[
                   const SizedBox(width: 10),
                   const Text(
-                    'EduDesk',
+                    'EduCore 360',
                     style: TextStyle(
                       fontSize: 17,
                       color: AppColors.textPrimary,
@@ -535,7 +644,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         child: InkWell(
           onTap: () {
             final prevIndex = _selectedNavIndex;
-            setState(() => _selectedNavIndex = index);
+            setState(() {
+              _selectedNavIndex = index;
+              // Clear any active drilldown so the chosen menu's page
+              // actually renders instead of the previous drilldown view.
+              _aggregateDrilldownMode = null;
+              _courseWiseSummary = null;
+              _courseWiseMode = null;
+            });
             if (index == 0 && prevIndex != 0) {
               _refreshDashboard();
             }
@@ -719,6 +835,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ],
               ),
             ),
+          ],
+          // Year filter — only on the Dashboard tab, and only when there's
+          // a real choice to make. With a single distinct yrlabel across
+          // every institution, the dropdown is decorative noise.
+          if (_selectedNavIndex == 0 && _availableYears.length > 1) ...[
+            SizedBox(width: 12.w),
+            _buildYearFilter(),
           ],
           SizedBox(width: 12.w),
           if (isMobile)
@@ -1374,7 +1497,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         0, (sum, s) => sum + s.pendingApproval);
     final totalPending = _institutionSummaries.fold<double>(
         0, (sum, s) => sum + s.totalPending);
-
     return LayoutBuilder(builder: (context, c) {
       // Single-row layout for the 4 finance cards. On mobile (< 600) drop to
       // 2-up grid so they stay legible; otherwise stretch evenly across the row.
@@ -2105,22 +2227,33 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
+                                    Builder(builder: (_) {
+                                      final logo = ins['inslogo']?.toString() ?? '';
+                                      final fallback = Text(
                                         (ins['insname'] as String? ?? 'I')[0].toUpperCase(),
                                         style: const TextStyle(
                                             color: AppColors.primary,
                                             fontWeight: FontWeight.w800,
                                             fontSize: 18),
-                                      ),
-                                    ),
+                                      );
+                                      return Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        clipBehavior: Clip.antiAlias,
+                                        alignment: Alignment.center,
+                                        child: logo.isEmpty
+                                            ? fallback
+                                            : Image.network(
+                                                logo,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => fallback,
+                                              ),
+                                      );
+                                    }),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
@@ -2551,6 +2684,11 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
             params: {'p_ins_id': widget.summary.insId});
         if (rpc != null) {
           final all = List<Map<String, dynamic>>.from(rpc as List).map((r) {
+            // RPC now returns `demand` directly (sum of feeamount). Fall back
+            // to `collection + pending` only for backward compatibility with
+            // older RPC versions that don't expose `demand`.
+            final demand = (r['demand'] as num?)?.toDouble();
+            if (demand != null) return Map<String, dynamic>.from(r);
             final collection = (r['collection'] as num?)?.toDouble() ?? 0;
             final pending = (r['pending'] as num?)?.toDouble() ?? 0;
             return {...r, 'demand': collection + pending};
@@ -3430,6 +3568,71 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                               },
                                             ),
                                     ),
+                                    if (_rows.isNotEmpty)
+                                      Builder(builder: (_) {
+                                        final studentField = widget.mode == 'pending'
+                                            ? 'unpaid_students'
+                                            : widget.mode == 'collection'
+                                                ? 'paid_students'
+                                                : widget.mode == 'approval'
+                                                    ? 'approval_students'
+                                                    : 'students';
+                                        final totalStudents = _rows.fold<int>(
+                                            0, (sum, r) => sum + ((r[studentField] as num?)?.toInt() ?? 0));
+                                        // Footer mirrors the top-header value
+                                        // for collection/demand (which use
+                                        // institution-level totals). Pending
+                                        // and approval keep the row-sum since
+                                        // those modes calculate the same way
+                                        // in both places.
+                                        final double totalAmount;
+                                        if (widget.mode == 'collection') {
+                                          totalAmount = widget.summary.totalCollected;
+                                        } else if (widget.mode == 'demand') {
+                                          totalAmount = widget.summary.totalDemand;
+                                        } else {
+                                          totalAmount = _rows.fold<double>(
+                                              0, (sum, r) => sum + ((r[widget.mode] as num?)?.toDouble() ?? 0));
+                                        }
+                                        return Container(
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.tableHeadBg,
+                                            border: Border(top: BorderSide(color: AppColors.border)),
+                                          ),
+                                          padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
+                                          child: Row(
+                                            children: [
+                                              const Expanded(
+                                                  flex: 3,
+                                                  child: Text('TOTAL',
+                                                      style: TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: AppColors.textPrimary,
+                                                          letterSpacing: 0.4))),
+                                              const Expanded(flex: 2, child: SizedBox()),
+                                              Expanded(
+                                                  flex: 2,
+                                                  child: Text('$totalStudents',
+                                                      textAlign: TextAlign.right,
+                                                      style: const TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: AppColors.textPrimary))),
+                                              Expanded(
+                                                  flex: 4,
+                                                  child: Text(_fmt(totalAmount),
+                                                      textAlign: TextAlign.right,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: AppColors.textPrimary))),
+                                            ],
+                                          ),
+                                        );
+                                      }),
                                   ],
                                 ),
                               ),

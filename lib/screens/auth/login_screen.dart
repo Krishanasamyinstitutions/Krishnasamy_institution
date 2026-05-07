@@ -144,6 +144,11 @@ class _LoginScreenState extends State<LoginScreen> {
           _isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
         );
       }
+      return;
+    }
+
+    if (mounted && authProvider.subscriptionExpired) {
+      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
     }
   }
 
@@ -659,7 +664,54 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 28),
+                  SizedBox(height: 16),
+
+                  // Activate Subscription — direct route to the activation
+                  // screen for institutions who already have a code from
+                  // the office. Hidden for super admin (they don't need it).
+                  if (!_isSuperAdmin)
+                    FadeInDown(
+                      delay: const Duration(milliseconds: 700),
+                      child: Center(
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            // Resolve insId from the dropdown so the activation
+                            // screen knows which institution to attach the code to.
+                            // If they haven't picked one, prompt first.
+                            if (_selectedInsId == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select your institution first.')),
+                              );
+                              return;
+                            }
+                            // Stash the picked institution into AuthProvider so
+                            // the activation screen has insId/insName for the
+                            // request-code email and the activate RPC call.
+                            final auth = context.read<AuthProvider>();
+                            final picked = _institutions.firstWhere(
+                              (i) => i['ins_id'] == _selectedInsId,
+                              orElse: () => <String, dynamic>{},
+                            );
+                            await auth.primeForActivation(
+                              insId: _selectedInsId!,
+                              insName: picked['insname']?.toString(),
+                              inscode: picked['inscode']?.toString(),
+                            );
+                            if (!context.mounted) return;
+                            Navigator.pushNamed(context, AppRoutes.subscriptionExpired);
+                          },
+                          icon: const AppIcon('key', size: 16, color: AppColors.accent),
+                          label: Text(
+                            'Have an activation code? Activate',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   SizedBox(height: 24),
 

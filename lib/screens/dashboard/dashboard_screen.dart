@@ -55,14 +55,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const List<_NavItem> _allNavItems = [
     _NavItem('element-3', 'Dashboard', section: 'MAIN MENU'),
     _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true, subItems: [
+      _NavSubItem('user-tick', 'Admission Type'),
+      _NavSubItem('ticket', 'Quota'),
       _NavSubItem('teacher', 'Course'),
       _NavSubItem('book-1', 'Class'),
       _NavSubItem('category-2', 'Fee Group'),
       _NavSubItem('receipt-1', 'Fee Type'),
       _NavSubItem('receipt-discount', 'Concession'),
       _NavSubItem('note-2', 'Class Fee Demand'),
-      _NavSubItem('user-tick', 'Admission Type'),
-      _NavSubItem('ticket', 'Quota'),
     ]),
     _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
     _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),

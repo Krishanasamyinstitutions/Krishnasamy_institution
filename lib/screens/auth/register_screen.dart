@@ -108,6 +108,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _currentStep = step);
   }
 
+  /// Wipe every text field and step state so the form is back to its
+  /// freshly-mounted appearance. Called after a successful institution
+  /// creation so the super admin can register the next one without
+  /// stale values bleeding over.
+  void _resetForm() {
+    _institutionNameController.clear();
+    _institutionShortNameController.clear();
+    _institutionCodeController.clear();
+    _authorizedUsernameController.clear();
+    _designationController.clear();
+    _mobileNumberController.clear();
+    _affiliationController.clear();
+    _affiliationNumberController.clear();
+    _address1Controller.clear();
+    _address2Controller.clear();
+    _address3Controller.clear();
+    _pinCodeController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _countryController.clear();
+    _emailController.clear();
+    _yearLabelController.clear();
+    _adminNameController.clear();
+    _adminEmailController.clear();
+    _adminPhoneController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    setState(() {
+      _institutionType = null;
+      _institutionRecognized = 'Yes';
+      _institutionStartDate = null;
+      _affiliationStartYear = null;
+      _yearStartDate = null;
+      _yearEndDate = null;
+      _adminDob = null;
+      _adminDesignation = 'Principal';
+      _logoFile = null;
+      _logoFileName = null;
+      _obscurePassword = true;
+      _obscureConfirm = true;
+      // Each step has its own form key, so just reset their internal state.
+      for (final k in _formKeys) {
+        k.currentState?.reset();
+      }
+    });
+    // Snap back to step 1.
+    _pageController.jumpToPage(0);
+    setState(() => _currentStep = 0);
+  }
+
   String? _logoFileName;
 
   Future<void> _pickLogo() async {
@@ -161,10 +211,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final yrStaDate = _yearStartDate ?? DateTime(DateTime.now().year, 6, 1);
       final yrEndDate = _yearEndDate ?? DateTime(DateTime.now().year + 1, 5, 31);
 
-      // Single atomic RPC call — creates institution rows AND schema in one transaction.
-      // If validation fails or schema creation errors out, the database rolls back
-      // every insert so no partial data is left behind.
+      // Single atomic RPC call — creates institution rows AND schema in one
+      // transaction. If validation fails or schema creation errors out, the
+      // database rolls back every insert so no partial data is left behind.
+      // p_license_key is null because super-admin registration doesn't
+      // require an activation code; the RPC skips the activation gate when
+      // the parameter is null/empty.
       final result = await SupabaseService.client.rpc('register_institution', params: {
+        'p_license_key': null,
         'p_insname': _institutionNameController.text.trim(),
         'p_inscode': _institutionCodeController.text.trim(),
         'p_inshortname': _institutionShortNameController.text.trim(),
@@ -264,12 +318,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
 
-      // Show success and stay on super admin dashboard
+      // Show success and reset the form so the next institution starts
+      // from a blank slate instead of the previous one's data.
       if (mounted) {
         setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Institution created successfully!'), backgroundColor: Colors.green),
         );
+        _resetForm();
         widget.onRegistered?.call();
       }
     } catch (e) {
@@ -1058,11 +1114,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: _inputDec('Enter password').copyWith(
-                        prefixIcon: AppIcon('lock', size: 12, color: AppColors.textSecondary),
-                        suffixIcon: IconButton(
-                          icon: AppIcon(_obscurePassword ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
+                        // Compact tap target — IconButton's default 48×48 hit
+                        // area gets clipped inside the smaller field height,
+                        // so wrap the icon in a tight InkWell instead.
+                        suffixIcon: InkWell(
+                          onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                          customBorder: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: AppIcon(
+                              _obscurePassword ? 'eye-slash' : 'eye',
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
+                        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                       style: _fieldStyle(),
                       validator: (v) {
@@ -1078,11 +1146,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
                       decoration: _inputDec('Re-enter password').copyWith(
-                        prefixIcon: AppIcon('lock', size: 12, color: AppColors.textSecondary),
-                        suffixIcon: IconButton(
-                          icon: AppIcon(_obscureConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                        prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
+                        suffixIcon: InkWell(
+                          onTap: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                          customBorder: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: AppIcon(
+                              _obscureConfirm ? 'eye-slash' : 'eye',
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
+                        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                       style: _fieldStyle(),
                       validator: (v) {

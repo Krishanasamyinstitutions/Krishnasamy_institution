@@ -195,29 +195,54 @@ class SupabaseService {
 
   // ==================== SUBSCRIPTION ====================
 
-  /// Check if institution has an active subscription year with valid license key
-  /// Returns (isActive, yearLabel, endDate) based on institutionyear table
-  static Future<({bool isActive, String? yearLabel, DateTime? endDate})> checkSubscription(int insId) async {
+  /// Check if institution has an active subscription year with a valid license key.
+  /// Validates: today within institutionyear date range, iyearsubstatus=1,
+  /// iyearlicencekey present, and the key's row in public.license_keys has status='used'
+  /// (i.e. activated and not revoked). license_keys.status flips to 'revoked'
+  /// to remotely kill an institution's access mid-year.
+  ///
+  /// [yearLabel] is the academic year the user picked on the login screen.
+  /// Without this filter, an institution with multiple institutionyear rows
+  /// could log into a year whose row has no key, by piggy-backing on a
+  /// different year's valid key — that's an auth bypass. Pass the picked
+  /// label so we only check that specific row.
+  static Future<({bool isActive, String? yearLabel, DateTime? endDate, String? reason})> checkSubscription(int insId, {String? yearLabel}) async {
     try {
       final now = DateTime.now().toIso8601String().split('T').first;
-      final result = await client
+      var query = client
           .from('institutionyear')
           .select('yrlabel, iyrstadate, iyrenddate, iyearsubstatus, iyearlicencekey')
           .eq('ins_id', insId)
           .lte('iyrstadate', now)
           .gte('iyrenddate', now)
           .eq('iyearsubstatus', 1)
-          .not('iyearlicencekey', 'is', null)
-          .maybeSingle();
+          .not('iyearlicencekey', 'is', null);
+      if (yearLabel != null && yearLabel.isNotEmpty) {
+        query = query.eq('yrlabel', yearLabel);
+      }
+      final result = await query.maybeSingle();
 
       if (result == null) {
-        return (isActive: false, yearLabel: null, endDate: null);
+        return (isActive: false, yearLabel: null, endDate: null, reason: 'No active subscription year covering today.');
       }
 
-      // Verify the license key is not empty
-      final licenseKey = result['iyearlicencekey'] as String?;
-      if (licenseKey == null || licenseKey.trim().isEmpty) {
-        return (isActive: false, yearLabel: null, endDate: null);
+      final licenseKey = (result['iyearlicencekey'] as String?)?.trim();
+      if (licenseKey == null || licenseKey.isEmpty) {
+        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key missing on institution year.');
+      }
+
+      final keyRow = await client
+          .from('license_keys')
+          .select('status')
+          .eq('license_key', licenseKey)
+          .maybeSingle();
+
+      if (keyRow == null) {
+        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key not recognised.');
+      }
+      final status = (keyRow['status'] as String?)?.toLowerCase();
+      if (status != 'used') {
+        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key is $status.');
       }
 
       return (
@@ -226,10 +251,11 @@ class SupabaseService {
         endDate: result['iyrenddate'] != null
             ? DateTime.parse(result['iyrenddate'].toString())
             : null,
+        reason: null,
       );
     } catch (e) {
       debugPrint('Subscription check error: $e');
-      return (isActive: false, yearLabel: null, endDate: null);
+      return (isActive: false, yearLabel: null, endDate: null, reason: 'Check failed: $e');
     }
   }
 
