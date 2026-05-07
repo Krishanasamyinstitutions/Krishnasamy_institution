@@ -107,3 +107,22 @@ add_custom_target(flutter_assemble DEPENDS
   ${CPP_WRAPPER_SOURCES_PLUGIN}
   ${CPP_WRAPPER_SOURCES_APP}
 )
+
+# Workaround: on this machine the Flutter tool_backend.bat unpacks only
+# the cpp_client_wrapper headers into ephemeral/, never the .cc sources,
+# so the C++ compile of flutter_wrapper_plugin / flutter_wrapper_app
+# fails with C1083 every clean build. Copy the missing files out of the
+# Flutter SDK cache after assemble runs so msbuild always finds them.
+# copy_if_different is a no-op when the files are already up to date.
+set(CPP_WRAPPER_SDK_DIR "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64/cpp_client_wrapper")
+add_custom_command(TARGET flutter_assemble POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${WRAPPER_ROOT}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CPP_WRAPPER_SDK_DIR}/core_implementations.cc"
+    "${CPP_WRAPPER_SDK_DIR}/standard_codec.cc"
+    "${CPP_WRAPPER_SDK_DIR}/plugin_registrar.cc"
+    "${CPP_WRAPPER_SDK_DIR}/flutter_engine.cc"
+    "${CPP_WRAPPER_SDK_DIR}/flutter_view_controller.cc"
+    "${WRAPPER_ROOT}/"
+  VERBATIM
+)

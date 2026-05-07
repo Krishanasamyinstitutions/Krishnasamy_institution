@@ -277,8 +277,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       // Create the per-institution student photo bucket. Runs via a
-      // SECURITY DEFINER RPC so anon can trigger it; logs but doesn't
-      // block registration if Supabase can't create the bucket.
+      // SECURITY DEFINER RPC so anon can trigger it. Failure used to
+      // only debugPrint, which made the missing bucket invisible until
+      // someone tried to upload a photo months later. Now we surface it
+      // to the super admin via a snackbar so they can re-run the RPC
+      // manually if Supabase rejected the call.
       if (regResult['inscode'] != null) {
         try {
           await SupabaseService.client.rpc('ensure_student_photo_bucket', params: {
@@ -286,7 +289,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           });
           debugPrint('Photo bucket ready for inscode=${regResult['inscode']}');
         } catch (e) {
-          debugPrint('ensure_student_photo_bucket skipped: $e');
+          debugPrint('ensure_student_photo_bucket failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Institution created, but student photo bucket setup failed: $e\n'
+                  'Run: SELECT public.ensure_student_photo_bucket(\'${regResult['inscode']}\') in Supabase SQL Editor.',
+                ),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 10),
+              ),
+            );
+          }
         }
       }
 
