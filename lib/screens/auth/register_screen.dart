@@ -108,6 +108,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _currentStep = step);
   }
 
+  /// Validate the form for [step] and return whether it passed. Used by the
+  /// Next button and the milestone-progress chevron taps so we don't let
+  /// the user advance over a step with required fields still empty.
+  bool _validateStep(int step) {
+    if (step < 0 || step >= _formKeys.length) return true;
+    return _formKeys[step].currentState?.validate() ?? true;
+  }
+
   /// Wipe every text field and step state so the form is back to its
   /// freshly-mounted appearance. Called after a successful institution
   /// creation so the super admin can register the next one without
