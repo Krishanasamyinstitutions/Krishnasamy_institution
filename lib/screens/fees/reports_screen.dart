@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 
 const _termOrder = [
@@ -162,22 +163,46 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               r['createdby'].toString(),
         }.toList()..sort();
         return StatefulBuilder(builder: (ctx, setStateDialog) {
-          Widget presetChip(String label, VoidCallback onTap) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
+          String activePreset() {
+            if (from == null && to == null) return 'All';
+            if (from == null || to == null) return '';
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            bool sameDay(DateTime a, DateTime b) =>
+                a.year == b.year && a.month == b.month && a.day == b.day;
+            if (sameDay(from!, today) && sameDay(to!, today)) return 'Today';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 7)))) return '7 Days';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 30)))) return '30 Days';
+            if (sameDay(to!, today) && sameDay(from!, DateTime(now.year, now.month, 1))) return 'This Month';
+            return '';
+          }
+          final preset = activePreset();
+          Widget presetChip(String label, VoidCallback onTap) {
+            final selected = preset == label;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
                     ),
-                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              );
+              ),
+            );
+          }
 
           Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
             return InkWell(
@@ -729,30 +754,51 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     );
   }
 
-  InputDecoration _filterDec(String hint, {IconData? icon}) => InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textLight, fontWeight: FontWeight.w600),
-        isDense: true,
-        prefixIcon: icon != null
-            ? Icon(icon, size: 16, color: AppColors.accent)
-            : null,
-        prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        // 10px vertical + 16px content + ~2px border ≈ 40px total — matches
-        // the Refresh / Excel / PDF action buttons next to these dropdowns.
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide: const BorderSide(color: AppColors.border),
+  // Styled like the "All Methods" dropdown on Fee Collection: white pill,
+  // border, just text + chevron (no leading icon), responsive at <=1366.
+  Widget _filterDropdown<T>({
+    required T value,
+    required String hint,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+    required double width,
+    Key? key,
+  }) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final radius = compact ? 6.0 : 10.0;
+    final textSize = compact ? 11.0 : 13.0;
+    return SizedBox(
+      width: width,
+      height: AppBtn.height(context),
+      child: DropdownButtonHideUnderline(
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: DropdownButton<T>(
+            key: key,
+            value: value,
+            isExpanded: true,
+            hint: Text(hint, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+            isDense: true,
+            // Popup styling — rounded, white, soft elevation, no Material 3 tint.
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            menuMaxHeight: 320,
+            items: items,
+            onChanged: onChanged,
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-        ),
-      );
+      ),
+    );
+  }
 
   Widget _buildFilters() {
     return Padding(
@@ -769,80 +815,64 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 child: Row(
                   children: [
                     // Course filter
-          SizedBox(
+          _filterDropdown<String?>(
+            value: _selectedCourse,
+            hint: 'All Courses',
             width: 160.w,
-            child: DropdownButtonFormField<String?>(
-              value: _selectedCourse,
-              isExpanded: true,
-              decoration: _filterDec('Course', icon: Icons.school_rounded),
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              items: [
-                DropdownMenuItem<String?>(value: null, child: Text('All Courses', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                ..._courses.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
-              ],
-              onChanged: (v) => setState(() { _selectedCourse = v; _selectedClass = null; }),
-            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All Courses')),
+              ..._courses.map((c) => DropdownMenuItem(value: c, child: Text(c))),
+            ],
+            onChanged: (v) => setState(() { _selectedCourse = v; _selectedClass = null; }),
           ),
           SizedBox(width: 12.w),
           // Class filter
-          SizedBox(
+          _filterDropdown<String?>(
+            key: ValueKey(_selectedCourse),
+            value: _selectedClass,
+            hint: 'All Classes',
             width: 160.w,
-            child: DropdownButtonFormField<String?>(
-              key: ValueKey(_selectedCourse),
-              value: _selectedClass,
-              isExpanded: true,
-              decoration: _filterDec('Class', icon: Icons.class_rounded),
-              style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-              items: [
-                DropdownMenuItem<String?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                ...(_selectedCourse != null
-                    ? _classes.where((c) => _allDemands.any((d) => d['courname']?.toString() == _selectedCourse && d['stuclass']?.toString() == c))
-                    : _classes
-                ).map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
-              ],
-              onChanged: (v) => setState(() => _selectedClass = v),
-            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
+              ...(_selectedCourse != null
+                  ? _classes.where((c) => _allDemands.any((d) => d['courname']?.toString() == _selectedCourse && d['stuclass']?.toString() == c))
+                  : _classes
+              ).map((c) => DropdownMenuItem(value: c, child: Text(c))),
+            ],
+            onChanged: (v) => setState(() => _selectedClass = v),
           ),
           if (_tabController.index == 0) ...[
             SizedBox(width: 12.w),
-            SizedBox(
+            _filterDropdown<String?>(
+              value: _selectedFeeType,
+              hint: 'All Fee Types',
               width: 200.w,
-              child: DropdownButtonFormField<String?>(
-                value: _selectedFeeType,
-                isExpanded: true,
-                decoration: _filterDec('Fee Type', icon: Icons.payments_rounded),
-                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                items: [
-                  DropdownMenuItem<String?>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                  ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
-                ],
-                onChanged: (v) => setState(() => _selectedFeeType = v),
-              ),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
+                ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f))),
+              ],
+              onChanged: (v) => setState(() => _selectedFeeType = v),
             ),
             SizedBox(width: 12.w),
-            SizedBox(
-              width: 170.w,
-              child: Builder(builder: (_) {
-                final prefixes = _dailyPrefixes();
-                // Stale _selectedPrefix can survive a date change that drops
-                // its prefix from the list — guard against the assertion in
-                // DropdownButton requiring exactly one matching item.
-                final safeValue = (_selectedPrefix != null && prefixes.contains(_selectedPrefix))
-                    ? _selectedPrefix
-                    : null;
-                return DropdownButtonFormField<String?>(
+            Builder(builder: (_) {
+              final prefixes = _dailyPrefixes();
+              // Stale _selectedPrefix can survive a date change that drops
+              // its prefix from the list — guard against the assertion in
+              // DropdownButton requiring exactly one matching item.
+              final safeValue = (_selectedPrefix != null && prefixes.contains(_selectedPrefix))
+                  ? _selectedPrefix
+                  : null;
+              return _filterDropdown<String?>(
                 value: safeValue,
-                isExpanded: true,
-                decoration: _filterDec('Prefix', icon: Icons.tag_rounded),
-                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                hint: 'All Prefixes',
+                width: 170.w,
                 items: [
-                  DropdownMenuItem<String?>(value: null, child: Text('All Prefixes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                  ...prefixes.map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))),
+                  const DropdownMenuItem<String?>(value: null, child: Text('All Prefixes')),
+                  ...prefixes.map((p) => DropdownMenuItem(value: p, child: Text(p))),
                 ],
                 onChanged: (v) => setState(() => _selectedPrefix = v),
               );
-              }),
-            ),
+            }),
           ],
                   ],
                 ),
@@ -926,7 +956,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       // tab-body-open
           children: [
             Container(
-              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
               child: Row(children: [
                 AppIcon('chart-2', size: 18, color: AppColors.accent),
                 SizedBox(width: 8.w),
@@ -1260,7 +1290,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       // tab-body-open
           children: [
             Container(
-              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
               child: Row(children: [
                 AppIcon('clock', size: 18, color: AppColors.accent),
                 SizedBox(width: 8.w),
@@ -1561,8 +1591,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   Widget _buildStudentLedger() {
     final students = _studentsForLedger();
-    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textPrimary);
+    final headerStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3);
+    final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
 
     // Build rows grouped by term (YEARLY / V SEM / VI SEM / Misc)
     final grouped = <String, List<Map<String, dynamic>>>{};
@@ -1594,7 +1624,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       // tab-body-open
       children: [
         Container(
-          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
           child: Row(
             children: [
               AppIcon('book-1', size: 18, color: AppColors.accent),
@@ -1776,10 +1806,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     child: Row(
                       children: [
-                        Expanded(flex: 2, child: Text('ROLL NO', style: headerStyle)),
-                        Expanded(flex: 5, child: Text('STUDENT NAME', style: headerStyle)),
-                        Expanded(flex: 3, child: Text('COURSE', style: headerStyle)),
-                        Expanded(flex: 2, child: Text('CLASS', style: headerStyle)),
+                        Expanded(child: Text('ROLL NO', style: headerStyle)),
+                        Expanded(child: Text('STUDENT NAME', style: headerStyle)),
+                        Expanded(child: Text('COURSE', style: headerStyle)),
+                        Expanded(child: Text('CLASS', style: headerStyle)),
                       ],
                     ),
                   ),
@@ -1796,10 +1826,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                             child: Row(
                               children: [
-                                Expanded(flex: 2, child: Text(s['stuadmno'] ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                Expanded(flex: 5, child: Text(s['stuname'] ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
-                                Expanded(flex: 3, child: Text(s['courname'] ?? '-', style: cellStyle)),
-                                Expanded(flex: 2, child: Text(s['stuclass'] ?? '-', style: cellStyle)),
+                                Expanded(child: Text(s['stuadmno'] ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                Expanded(child: Text(s['stuname'] ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                Expanded(child: Text(s['courname'] ?? '-', style: cellStyle)),
+                                Expanded(child: Text(s['stuclass'] ?? '-', style: cellStyle)),
                               ],
                             ),
                           ),
@@ -2068,7 +2098,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       // tab-body-open
       children: [
         Container(
-          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 10.h),
+          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
           child: Row(
             children: [
               AppIcon('calendar-1', size: 18, color: AppColors.accent),
@@ -3260,147 +3290,6 @@ class _StickyTable extends StatefulWidget {
   State<_StickyTable> createState() => _StickyTableState();
 }
 
-/// Classic Windows-style horizontal scrollbar with left/right arrow buttons
-/// and a draggable thumb. Thumb size/position are computed from the
-/// explicit content/viewport widths passed in, not from the ScrollController's
-/// position, so the thumb is correct on the first frame after a content
-/// change instead of lagging until the user scrolls.
-class _ClassicHScrollbar extends StatefulWidget {
-  const _ClassicHScrollbar({
-    required this.controller,
-    required this.contentWidth,
-    required this.viewportWidth,
-  });
-
-  final ScrollController controller;
-  final double contentWidth;
-  final double viewportWidth;
-
-  @override
-  State<_ClassicHScrollbar> createState() => _ClassicHScrollbarState();
-}
-
-class _ClassicHScrollbarState extends State<_ClassicHScrollbar> {
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onScroll);
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ctrl = widget.controller;
-    final maxExtent = (widget.contentWidth - widget.viewportWidth).clamp(0.0, double.infinity);
-    // Offset reads from the controller when attached, else 0.
-    final offset = (ctrl.hasClients && ctrl.positions.isNotEmpty)
-        ? ctrl.offset.clamp(0.0, maxExtent > 0 ? maxExtent : 0.0)
-        : 0.0;
-
-    return Container(
-      height: 20,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF0F0F0),
-        border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-      ),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () {
-              if (!ctrl.hasClients) return;
-              ctrl.animateTo(
-                (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-              );
-            },
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE0E0E0),
-                border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-              ),
-              child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, c) {
-                // thumbRatio = viewport / content, proportional to how much
-                // of the total content is visible at once. Clamped so the
-                // thumb is always at least grabbable.
-                final thumbRatio = (widget.viewportWidth / widget.contentWidth).clamp(0.1, 1.0);
-                final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
-                final trackSpace = c.maxWidth - thumbWidth;
-                final scrollRatio = maxExtent > 0 ? (offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                final thumbOffset = trackSpace * scrollRatio;
-                return GestureDetector(
-                  onHorizontalDragUpdate: (details) {
-                    if (trackSpace > 0 && ctrl.hasClients && maxExtent > 0) {
-                      final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                      ctrl.jumpTo(newRatio * maxExtent);
-                    }
-                  },
-                  child: Container(
-                    color: const Color(0xFFF0F0F0),
-                    height: 20,
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          left: thumbOffset,
-                          top: 2,
-                          child: Container(
-                            width: thumbWidth,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFC0C0C0),
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(color: const Color(0xFFB0B0B0)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          InkWell(
-            onTap: () {
-              if (!ctrl.hasClients) return;
-              ctrl.animateTo(
-                (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-              );
-            },
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE0E0E0),
-                border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-              ),
-              child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StickyTableState extends State<_StickyTable> {
   final ScrollController _hController = ScrollController();
 
@@ -3522,7 +3411,7 @@ class _StickyTableState extends State<_StickyTable> {
                 ),
               ),
               if (needsScroll)
-                _ClassicHScrollbar(
+                ClassicHScrollbar(
                   controller: _hController,
                   contentWidth: width,
                   viewportWidth: constraints.maxWidth,

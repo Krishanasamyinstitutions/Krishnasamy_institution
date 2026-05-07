@@ -173,6 +173,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLeftPanel(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final logoSize = compact ? 60.0 : 80.0;
+    final outerPad = compact ? 36.0 : 64.0;
+    final gapAfterLogo = compact ? 22.0 : 32.0;
+    final gapAfterTitle = compact ? 12.0 : 16.0;
+    final gapAfterDesc = compact ? 30.0 : 48.0;
+    final titleSize = compact ? 22.0 : 28.0;
+    final descSize = compact ? 13.0 : 16.0;
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.splashGradient),
       child: Stack(
@@ -197,43 +205,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
           Center(
             child: Padding(
-              padding: EdgeInsets.all(64),
+              padding: EdgeInsets.all(outerPad),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInLeft(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(compact ? 16 : 22),
                       child: Container(
-                        width: 80,
-                        height: 80,
+                        width: logoSize,
+                        height: logoSize,
                         color: Colors.white,
-                        padding: EdgeInsets.all(8),
+                        padding: EdgeInsets.all(compact ? 6 : 8),
                         child: Image.asset(
                           'assets/images/educore360_logo.png',
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => AppIcon('teacher',
-                            size: 40,
+                            size: compact ? 30 : 40,
                             color: AppColors.accent,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(height: 32),
+                  SizedBox(height: gapAfterLogo),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
                       'Welcome to\nEduCore360',
                       textAlign: TextAlign.center,
-                      style:
-                          Theme.of(context).textTheme.displayMedium?.copyWith(
-                                color: Colors.white,
-                                height: 1.2,
-                              ),
+                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                            color: Colors.white,
+                            height: 1.2,
+                            fontSize: titleSize,
+                          ),
                     ),
                   ),
-                  SizedBox(height: 16),
+                  SizedBox(height: gapAfterTitle),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 400),
                     child: Text(
@@ -242,10 +250,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: Colors.white.withValues(alpha: 0.6),
                             height: 1.6,
+                            fontSize: descSize,
                           ),
                     ),
                   ),
-                  SizedBox(height: 48),
+                  SizedBox(height: gapAfterDesc),
                   FadeInLeft(
                     delay: const Duration(milliseconds: 600),
                     child: _buildFeatureList(context),
@@ -260,6 +269,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFeatureList(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final iconBox = compact ? 28.0 : 36.0;
+    final iconSize = compact ? 14.0 : 18.0;
+    final gapBetween = compact ? 10.0 : 14.0;
+    final rowGap = compact ? 12.0 : 16.0;
+    final textSize = compact ? 12.0 : 14.0;
     final features = [
       {'icon': 'shield-tick', 'text': 'Enterprise-grade security'},
       {'icon': 'monitor', 'text': 'Access from any device'},
@@ -269,28 +284,29 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       children: features.map((f) {
         return Padding(
-          padding: EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.only(bottom: rowGap),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: iconBox,
+                height: iconBox,
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(compact ? 8 : 10),
                 ),
                 child: AppIcon(
                   f['icon'] as String,
                   color: AppColors.accent,
-                  size: 18,
+                  size: iconSize,
                 ),
               ),
-              SizedBox(width: 14),
+              SizedBox(width: gapBetween),
               Text(
                 f['text'] as String,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: textSize,
                     ),
               ),
             ],
@@ -301,13 +317,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildFormPanel(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
     return Container(
       color: AppColors.surface,
       child: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(40),
+          padding: EdgeInsets.all(compact ? 24 : 40),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: BoxConstraints(maxWidth: compact ? 360 : 420),
             child: Form(
               key: _formKey,
               child: Column(
@@ -331,27 +348,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 32),
+                  SizedBox(height: compact ? 18 : 32),
 
                   FadeInDown(
                     delay: const Duration(milliseconds: 100),
                     child: Text(
                       _isSuperAdmin ? 'Super Admin' : 'Sign In',
-                      style: Theme.of(context).textTheme.displayMedium,
+                      style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                            fontSize: compact ? 22 : 28,
+                          ),
                     ),
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: compact ? 6 : 8),
                   FadeInDown(
                     delay: const Duration(milliseconds: 200),
                     child: Text(
                       _isSuperAdmin
                           ? 'Enter your super admin credentials'
                           : 'Enter your credentials to access the dashboard',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontSize: compact ? 12 : 16,
+                          ),
                     ),
                   ),
 
-                  SizedBox(height: 36),
+                  SizedBox(height: compact ? 22 : 36),
 
                   // Error message
                   Consumer<AuthProvider>(
@@ -408,41 +429,111 @@ class _LoginScreenState extends State<LoginScreen> {
                           SizedBox(height: 8),
                           _loadingInstitutions
                               ? const LinearProgressIndicator()
-                              : DropdownButtonFormField<int>(
-                                  value: _selectedInsId,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    hintText: 'Select your institution',
-                                    prefixIcon: AppIcon.linear('teacher',
-                                        size: 20, color: AppColors.textLight),
-                                    prefixIconConstraints: BoxConstraints(
-                                        minWidth: 52, minHeight: 0),
-                                  ),
-                                  items: _institutions.map((ins) {
-                                    return DropdownMenuItem<int>(
-                                      value: ins['ins_id'] as int,
-                                      child: Text(ins['insname'] ?? '', overflow: TextOverflow.ellipsis),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedInsId = value;
-                                      _selectedYear = null;
-                                      _availableYears = [];
-                                    });
-                                    if (value != null) _loadYears(value);
-                                  },
-                                  validator: (value) {
-                                    if (value == null) {
-                                      return 'Please select an institution';
-                                    }
-                                    return null;
-                                  },
-                                ),
+                              : Builder(builder: (_) {
+                                  final selected = _selectedInsId == null
+                                      ? null
+                                      : _institutions.cast<Map<String, dynamic>?>().firstWhere(
+                                            (i) => i?['ins_id'] == _selectedInsId,
+                                            orElse: () => null,
+                                          );
+                                  final selectedLogo = (selected?['inslogo'] as String?)?.trim() ?? '';
+                                  return DropdownButtonFormField<int>(
+                                    value: _selectedInsId,
+                                    isExpanded: true,
+                                    dropdownColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    elevation: 6,
+                                    decoration: InputDecoration(
+                                      hintText: 'Select your institution',
+                                      prefixIcon: selectedLogo.isNotEmpty
+                                          ? Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(6),
+                                                child: Image.network(
+                                                  selectedLogo,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (_, __, ___) => AppIcon.linear('teacher', size: 20, color: AppColors.textLight),
+                                                ),
+                                              ),
+                                            )
+                                          : AppIcon.linear('teacher', size: 20, color: AppColors.textLight),
+                                      prefixIconConstraints: const BoxConstraints(minWidth: 52, minHeight: 0),
+                                    ),
+                                    selectedItemBuilder: (context) => _institutions.map((ins) {
+                                      return Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          ins['insname'] ?? '',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.textPrimary),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    items: _institutions.map((ins) {
+                                      final logo = (ins['inslogo'] as String?)?.trim() ?? '';
+                                      return DropdownMenuItem<int>(
+                                        value: ins['ins_id'] as int,
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 28,
+                                              height: 28,
+                                              clipBehavior: Clip.antiAlias,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.surface,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: AppColors.border),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: logo.isNotEmpty
+                                                  ? Image.network(
+                                                      logo,
+                                                      fit: BoxFit.contain,
+                                                      errorBuilder: (_, __, ___) => Text(
+                                                        ((ins['insname'] as String?) ?? 'I')[0].toUpperCase(),
+                                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primary),
+                                                      ),
+                                                    )
+                                                  : Text(
+                                                      ((ins['insname'] as String?) ?? 'I')[0].toUpperCase(),
+                                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primary),
+                                                    ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                ins['insname'] ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedInsId = value;
+                                        _selectedYear = null;
+                                        _availableYears = [];
+                                      });
+                                      if (value != null) _loadYears(value);
+                                    },
+                                    validator: (value) {
+                                      if (value == null) {
+                                        return 'Please select an institution';
+                                      }
+                                      return null;
+                                    },
+                                  );
+                                }),
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: compact ? 14 : 20),
                     // Year dropdown (shows after institution selected)
                     if (_availableYears.isNotEmpty)
                       FadeInDown(
@@ -457,6 +548,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : DropdownButtonFormField<String>(
                                     value: _selectedYear,
                                     isExpanded: true,
+                                    dropdownColor: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    elevation: 6,
                                     decoration: InputDecoration(
                                       hintText: 'Select academic year',
                                       prefixIcon: AppIcon.linear('calendar', size: 20, color: AppColors.textLight),
@@ -619,7 +713,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 28),
+                  SizedBox(height: compact ? 18 : 28),
 
                   // Sign in button
                   FadeInDown(
@@ -627,20 +721,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         return SizedBox(
-                          height: 54,
+                          height: compact ? 44 : 54,
                           child: ElevatedButton(
                             onPressed: auth.isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.accent,
-                              padding: EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                              padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 28, vertical: compact ? 12 : 20),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: auth.isLoading
                                 ? SizedBox(
-                                    width: 22,
-                                    height: 22,
+                                    width: compact ? 18 : 22,
+                                    height: compact ? 18 : 22,
                                     child: const CircularProgressIndicator(
                                       strokeWidth: 2.5,
                                       color: Colors.white,
@@ -649,7 +743,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : Text(
                                     'Sign In',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: compact ? 14 : 16,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -659,9 +753,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  SizedBox(height: 28),
+                  SizedBox(height: compact ? 18 : 28),
 
-                  SizedBox(height: 24),
+                  SizedBox(height: compact ? 14 : 24),
 
                   // Demo hint
                   FadeInDown(

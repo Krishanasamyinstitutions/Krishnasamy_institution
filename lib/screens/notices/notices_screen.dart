@@ -146,16 +146,8 @@ class _NoticesScreenState extends State<NoticesScreen> {
   }
 
   Widget _buildNoticeList() {
-    return Column(
-      children: [
-        // Header
-        Container(
+    Widget headerBar() => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(color: AppColors.border),
-          ),
           child: Row(
             children: [
               AppIcon('volume-high', color: AppColors.accent, size: 18),
@@ -200,23 +192,44 @@ class _NoticesScreenState extends State<NoticesScreen> {
               ),
             ],
           ),
-        ),
-        SizedBox(height: 16.h),
+        );
 
-        // Content
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _notices.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: _notices.length,
-                      separatorBuilder: (_, __) => SizedBox(height: 10.h),
-                      itemBuilder: (context, index) => _buildNoticeCard(_notices[index]),
-                    ),
-        ),
-      ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          headerBar(),
+          // Inner card holding zebra-striped notice rows. Same outer/inner
+          // card layout as the report-page tables and the Notifications page.
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _notices.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: _notices.length,
+                            separatorBuilder: (_, __) => Divider(height: 1, thickness: 1, color: AppColors.border.withValues(alpha: 0.6)),
+                            itemBuilder: (context, index) => _buildNoticeCard(_notices[index], index),
+                          ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -248,85 +261,92 @@ class _NoticesScreenState extends State<NoticesScreen> {
     );
   }
 
-  Widget _buildNoticeCard(Map<String, dynamic> notice) {
+  Widget _buildNoticeCard(Map<String, dynamic> notice, [int index = 0]) {
     final title = notice['noticetitle']?.toString() ?? notice['title']?.toString() ?? 'Untitled';
     final desc = notice['noticedesc']?.toString() ?? notice['description']?.toString() ?? '';
     final date = notice['createdat']?.toString() ?? notice['noticedate']?.toString();
     final priority = notice['noticepriority']?.toString() ?? notice['priority']?.toString();
     final category = notice['noticecategory']?.toString() ?? notice['category']?.toString();
 
+    final pColor = _priorityColor(priority);
     return InkWell(
       onTap: () => setState(() => _selectedNotice = notice),
-      borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: AppColors.border),
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        color: index.isEven ? Colors.white : AppColors.surface,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon
+            // Soft circular icon
             Container(
-              width: 22,
-              height: 22,
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _priorityColor(priority).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(5.r),
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
               ),
-              child: AppIcon(_categoryIcon(category), size: 10, color: _priorityColor(priority)),
+              child: AppIcon.linear(_categoryIcon(category), size: 18, color: AppColors.textSecondary),
             ),
             SizedBox(width: 12.w),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (priority != null)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: _priorityColor(priority).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(priority, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColor(priority))),
+                        child: Row(
+                          children: [
+                            if (priority != null) ...[
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(color: pColor, shape: BoxShape.circle),
+                              ),
+                              SizedBox(width: 6.w),
+                            ],
+                            Flexible(
+                              child: Text(
+                                title,
+                                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.2),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
                       SizedBox(width: 8.w),
-                      const AppIcon.linear('Chevron Right', size: 18, color: AppColors.textSecondary),
+                      Text(
+                        _timeAgo(date),
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary.withValues(alpha: 0.75),
+                        ),
+                      ),
                     ],
                   ),
                   if (desc.isNotEmpty) ...[
                     SizedBox(height: 4.h),
-                    Text(desc, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, height: 1.3), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      desc,
+                      style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, height: 1.4),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                  SizedBox(height: 4.h),
-                  Row(
-                    children: [
-                      AppIcon('calendar-1', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      SizedBox(width: 4.w),
-                      Text(_formatDate(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      SizedBox(width: 10.w),
-                      AppIcon('clock', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                      SizedBox(width: 4.w),
-                      Text(_timeAgo(date), style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      if (category != null) ...[
-                        SizedBox(width: 10.w),
-                        AppIcon('tag', size: 11, color: AppColors.textSecondary.withValues(alpha: 0.6)),
-                        SizedBox(width: 4.w),
-                        Text(category, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary.withValues(alpha: 0.7))),
-                      ],
-                    ],
-                  ),
                 ],
               ),
+            ),
+            SizedBox(width: 10.w),
+            Padding(
+              padding: EdgeInsets.only(top: 2.h),
+              child: const AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -598,6 +618,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           value: _selectedCourse,
           isExpanded: true,
           hint: Text('All Courses', style: TextStyle(fontSize: 13.sp)),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 6,
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
           icon: const AppIcon.linear('Chevron Down', size: 18),
           items: [
@@ -1082,6 +1105,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                       value: _pendingFeeTermFilter,
                                       isExpanded: true,
                                       hint: Text('All Terms', style: TextStyle(fontSize: 13.sp)),
+                                      dropdownColor: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      elevation: 6,
                                       style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                                       icon: const AppIcon.linear('Chevron Down', size: 18),
                                       items: [
@@ -1361,6 +1387,9 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
               onChanged: onChanged,
