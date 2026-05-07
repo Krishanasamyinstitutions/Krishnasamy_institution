@@ -694,9 +694,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       ),
       child: Column(
         children: [
-          // Card header with title, buttons, breadcrumb, and search
-          Container(
-            padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 4.h),
+          // Card header with title, buttons, breadcrumb, and search.
+          // Hidden entirely while import is active — the import panel has
+          // its own Back button to return.
+          if (!_showImport) Container(
+            padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
             child: Row(
               children: [
                 if (_drilldownClass == null && _drilldownStudent == null) ...[
@@ -907,6 +909,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     _buildLabel('Class'),
                     DropdownButtonFormField<String>(
                       value: _selectedClass,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDecoration('Select class'),
                       items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                       onChanged: (v) => setState(() => _selectedClass = v),
@@ -918,6 +923,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     _buildLabel('Fee Type *'),
                     DropdownButtonFormField<String>(
                       value: _selectedFeeType,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDecoration('Select fee type'),
                       items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                       onChanged: (v) => setState(() => _selectedFeeType = v),
@@ -936,6 +944,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                               _buildLabel('Fee Year'),
                               DropdownButtonFormField<String>(
                                 value: _selectedFeeYear,
+                                dropdownColor: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                elevation: 6,
                                 decoration: _inputDecoration('Select year'),
                                 items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']?.toString() ?? '-'))).toList(),
                                 onChanged: (v) => setState(() => _selectedFeeYear = v),
@@ -966,6 +977,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     _buildLabel('Concession'),
                     DropdownButtonFormField<String>(
                       value: _selectedConcession,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDecoration('Select concession'),
                       items: _concessions.map((c) => DropdownMenuItem(value: c['con_id'].toString(), child: Text(c['condesc']?.toString() ?? '-'))).toList(),
                       onChanged: (v) => setState(() => _selectedConcession = v),
@@ -1241,8 +1255,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               color: AppColors.tableHeadBg,
               child: Row(
                 children: [
-                  SizedBox(width: 100.w, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                  SizedBox(width: 80.w, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                  Expanded(child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                  Expanded(child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                   Expanded(child: Text('STUDENTS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.center)),
                   Expanded(child: Text('TOTAL DEMAND', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
                   Expanded(child: Text('COLLECTED', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3), textAlign: TextAlign.right)),
@@ -1274,14 +1288,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       color: i.isEven ? Colors.white : AppColors.surface,
                       child: Row(
                         children: [
-                          SizedBox(
-                            width: 100.w,
-                            child: Text(s['courname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                          ),
-                          SizedBox(
-                            width: 80.w,
-                            child: Text(className, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                          ),
+                          Expanded(child: Text(s['courname']?.toString() ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                          Expanded(child: Text(className, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                           Expanded(child: Text('$studentCount', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), textAlign: TextAlign.center)),
                           Expanded(child: Text('₹${_formatAmount(totalDemand)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), textAlign: TextAlign.right)),
                           Expanded(child: Text('₹${_formatAmount(totalPaid)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success), textAlign: TextAlign.right)),
@@ -1304,8 +1312,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               ),
               child: Row(
                 children: [
-                  SizedBox(width: 100.w, child: Text('TOTAL', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                  SizedBox(width: 80.w),
+                  Expanded(child: Text('TOTAL', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                  const Expanded(child: SizedBox.shrink()),
                   Expanded(child: Text('${summaries.fold<int>(0, (sum, s) => sum + ((s['student_count'] as num?)?.toInt() ?? 0))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.center)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_demand'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary), textAlign: TextAlign.right)),
                   Expanded(child: Text('₹${_formatAmount(summaries.fold<double>(0, (sum, s) => sum + ((s['total_paid'] as num?)?.toDouble() ?? 0)))}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.success), textAlign: TextAlign.right)),
@@ -1421,7 +1429,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _searchController.clear();
                       }),
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                         child: Row(
                           children: [
                             Expanded(
@@ -1558,7 +1566,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
               headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              // Project default for body cells: w600 + textSecondary, matching
+              // the other tables. Per-cell overrides only for FINE (orange
+              // when > 0) and the STATUS pill.
+              dataTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
               columnSpacing: 24,
               horizontalMargin: 20,
               dataRowMinHeight: 43.h,
@@ -1591,24 +1602,27 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final dueDate = d['duedate']?.toString() ?? '-';
                   final formattedDueDate = _formatDueDate(dueDate);
-                  return DataRow(cells: [
-                    DataCell(Text('${i + 1}')),
-                    DataCell(Text(term)),
-                    DataCell(Text(feeType, style: const TextStyle(fontWeight: FontWeight.w500))),
-                    DataCell(Text('₹${_formatAmount(amt)}')),
-                    DataCell(Text('₹${_formatAmount(paid)}', style: TextStyle(color: paid > 0 ? AppColors.success : AppColors.textPrimary))),
-                    DataCell(Text(fineDisplay > 0 ? '₹${_formatAmount(fineDisplay)}' : '-', style: TextStyle(color: fineDisplay > 0 ? Colors.orange : AppColors.textSecondary))),
-                    DataCell(Text('₹${_formatAmount(bal)}', style: TextStyle(fontWeight: FontWeight.w500, color: bal > 0 ? AppColors.warning : AppColors.success))),
-                    DataCell(Text(formattedDueDate, style: TextStyle(fontSize: 13.sp))),
-                    DataCell(Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                      decoration: BoxDecoration(
-                        color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: isPaid ? AppColors.success : AppColors.warning)),
-                    )),
-                  ]);
+                  return DataRow(
+                    color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
+                    cells: [
+                      DataCell(Text('${i + 1}')),
+                      DataCell(Text(term)),
+                      DataCell(Text(feeType)),
+                      DataCell(Text('₹${_formatAmount(amt)}')),
+                      DataCell(Text('₹${_formatAmount(paid)}')),
+                      DataCell(Text(fineDisplay > 0 ? '₹${_formatAmount(fineDisplay)}' : '-', style: fineDisplay > 0 ? const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange) : null)),
+                      DataCell(Text('₹${_formatAmount(bal)}')),
+                      DataCell(Text(formattedDueDate)),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: isPaid ? AppColors.success : AppColors.warning)),
+                      )),
+                    ],
+                  );
                 }),
                 // Total row
                 DataRow(
@@ -1654,6 +1668,37 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           // Title bar
           Row(
             children: [
+              InkWell(
+                onTap: () => setState(() {
+                  _showImport = false;
+                  _resetImport();
+                }),
+                borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width <= 1366 ? 6 : 10),
+                child: Builder(builder: (context) {
+                  final compact = MediaQuery.of(context).size.width <= 1366;
+                  final hPad = compact ? 10.0 : 14.0;
+                  final radius = compact ? 6.0 : 10.0;
+                  final textSize = compact ? 11.0 : 13.0;
+                  final innerGap = compact ? 4.0 : 6.0;
+                  return Container(
+                    height: AppBtn.height(context),
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(radius),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                        SizedBox(width: innerGap),
+                        Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              SizedBox(width: 12.w),
               AppIcon('document-upload', size: 20, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('Import Fee Demands', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
@@ -1739,7 +1784,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Year *', flex: 1),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Semester *', flex: 1),
+                        _gridHeaderCell('Semester *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Concession', flex: 2),
                         _gridHeaderDivider(),
@@ -1785,7 +1830,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                       _gridDataCell(_mappedCell(row, 'courname'), flex: 1),
                                       _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'yr_id'), flex: 1),
-                                      _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 1),
+                                      _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
                                       _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
@@ -1862,7 +1907,13 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
+      child: Text(
+        text.toUpperCase(),
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w),
+      ),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
