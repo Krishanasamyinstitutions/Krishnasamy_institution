@@ -365,6 +365,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           _isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
         );
       }
+      return;
+    }
+
+    if (mounted && authProvider.subscriptionExpired) {
+      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
     }
   }
 
