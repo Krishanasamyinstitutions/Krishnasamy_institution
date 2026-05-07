@@ -119,6 +119,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               SizedBox(height: 6.h),
               DropdownButtonFormField<int?>(
                 value: reportsTo,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                elevation: 6,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
@@ -327,6 +330,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
               isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               decoration: _inputDecoration(context, 'Select designation'),
               style: _inputTextStyle(context),
               items: [
@@ -373,6 +379,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
               isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               decoration: _inputDecoration(context, 'Select reporting person'),
               style: _inputTextStyle(context),
               items: [
@@ -396,6 +405,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             DropdownButtonFormField<String>(
               value: _selectedRole,
               isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               decoration: _inputDecoration(context, 'Select role'),
               style: _inputTextStyle(context),
               items: _rolesList
@@ -586,7 +598,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       child: Column(
         children: [
           Padding(
-            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 12.h),
+            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
             child: Row(
               children: [
                 AppIcon('people', size: 18, color: AppColors.textSecondary),
@@ -658,13 +670,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   color: i.isEven ? Colors.white : AppColors.surface,
                   child: Row(
                     children: [
-                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
+                      SizedBox(width: 50.w, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                       SizedBox(width: 16.w),
                       Expanded(
                         flex: 3,
-                        child: Text(u.usename, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                        child: Text(u.usename, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                       ),
-                      Expanded(flex: 2, child: Text(u.desname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
+                      Expanded(flex: 2, child: Text(u.desname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                       Expanded(
                         flex: 2,
                         child: Row(

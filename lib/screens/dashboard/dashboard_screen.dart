@@ -75,7 +75,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem('receipt-2', 'Transactions', section: 'FEES'),
     _NavItem('notification', 'Notices', section: 'GENERAL'),
     _NavItem('notification-bing', 'Notifications', section: 'GENERAL'),
-    _NavItem('chart-1', 'Reports', section: 'GENERAL'),
+    _NavItem('chart-1', 'Reports', section: 'GENERAL', unselectedIcon: 'chart'),
   ];
 
   late List<_NavItem> _navItems;
@@ -655,14 +655,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       if (hasSubItems)
                         Container(
-                          width: 22.w,
-                          height: 22.w,
+                          width: 20.w,
+                          height: 20.w,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? Colors.white.withValues(alpha: 0.18)
-                                : AppColors.accent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6.r),
+                                : unselectedFg.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(5.r),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.30)
+                                  : unselectedFg.withValues(alpha: 0.30),
+                              width: 1,
+                            ),
                           ),
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 180),
@@ -672,8 +678,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               isExpanded ? 'Remove_Minus' : 'Add_Plus',
                               key: ValueKey(isExpanded),
                               style: AppIconStyle.bold,
-                              size: 12.sp,
-                              color: isSelected ? selectedFg : AppColors.accent,
+                              size: 15.sp,
+                              color: isSelected ? selectedFg : unselectedFg,
                             ),
                           ),
                         ),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -33,6 +34,23 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<Map<String, dynamic>> _institutions = [];
   bool _loadingInstitutions = true;
   bool _loadingFinanceData = true;
+  bool _syncingLogos = false;
+
+  Future<void> _syncInstitutionLogos() async {
+    setState(() => _syncingLogos = true);
+    final filled = await SupabaseService.backfillInstitutionLogos();
+    if (!mounted) return;
+    setState(() => _syncingLogos = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(filled == 0
+            ? 'All institution logos already in sync.'
+            : 'Synced $filled institution logo${filled == 1 ? '' : 's'}.'),
+        backgroundColor: filled == 0 ? AppColors.textSecondary : AppColors.success,
+      ),
+    );
+    if (filled > 0) _refreshDashboard();
+  }
   List<_InstitutionFinanceSummary> _institutionSummaries = [];
   List<_SuperAdminTransactionRow> _recentTransactions = [];
 
@@ -1198,21 +1216,36 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         const SizedBox(height: 12),
         SizedBox(
           height: 110,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              _miniStatCard('tick-circle', 'Collection', _formatAmount(totalCollection), AppColors.success,
-                  onTap: () => _showAggregateDrilldown(context, 'collection')),
-              const SizedBox(width: 12),
-              _miniStatCard('clock', 'Pending Approval', _formatAmount(totalPendingApproval), AppColors.warning,
-                  onTap: () => _showAggregateDrilldown(context, 'approval')),
-              const SizedBox(width: 12),
-              _miniStatCard('timer', 'Total Pending', _formatAmount(totalPending), AppColors.error,
-                  onTap: () => _showAggregateDrilldown(context, 'pending')),
-              const SizedBox(width: 12),
-              _miniStatCard('buildings-2', 'Institutes', '$activeCount of ${_institutionSummaries.length}', AppColors.accent,
-                  onTap: () => _showAggregateDrilldown(context, 'active')),
-            ],
+          // ScrollConfiguration enables mouse-drag and trackpad scrolling on
+          // Windows desktop — the default Material behavior only listens for
+          // touch, so the carousel was effectively static under a mouse.
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: const {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+                PointerDeviceKind.stylus,
+              },
+              scrollbars: false,
+            ),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _miniStatCard('tick-circle', 'Collection', _formatAmount(totalCollection), AppColors.success,
+                    onTap: () => _showAggregateDrilldown(context, 'collection')),
+                const SizedBox(width: 12),
+                _miniStatCard('clock', 'Pending Approval', _formatAmount(totalPendingApproval), AppColors.warning,
+                    onTap: () => _showAggregateDrilldown(context, 'approval')),
+                const SizedBox(width: 12),
+                _miniStatCard('timer', 'Total Pending', _formatAmount(totalPending), AppColors.error,
+                    onTap: () => _showAggregateDrilldown(context, 'pending')),
+                const SizedBox(width: 12),
+                _miniStatCard('buildings-2', 'Institutes', '$activeCount of ${_institutionSummaries.length}', AppColors.accent,
+                    onTap: () => _showAggregateDrilldown(context, 'active')),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 28),
@@ -2170,10 +2203,16 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Wrap so the button group flows below the title on narrow
+              // viewports instead of overflowing horizontally.
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       AppIcon('buildings-2', size: 18, color: AppColors.accent),
                       const SizedBox(width: 8),
@@ -2184,21 +2223,44 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                     ],
                   ),
-                  SizedBox(
-                    height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: () => setState(() => _selectedNavIndex = 1),
-                      icon: AppIcon('add', size: 16, color: Colors.white),
-                      label: const Text('Register New'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(
+                        height: 40,
+                        child: OutlinedButton.icon(
+                          onPressed: _syncingLogos ? null : _syncInstitutionLogos,
+                          icon: _syncingLogos
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : AppIcon('refresh', size: 16, color: AppColors.accent),
+                          label: const Text('Sync Logos'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.accent,
+                            side: const BorderSide(color: AppColors.accent),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                       ),
-                    ),
+                      SizedBox(
+                        height: 40,
+                        child: ElevatedButton.icon(
+                          onPressed: () => setState(() => _selectedNavIndex = 1),
+                          icon: AppIcon('add', size: 16, color: Colors.white),
+                          label: const Text('Register New'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

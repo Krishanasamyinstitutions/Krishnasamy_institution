@@ -174,6 +174,9 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                     SizedBox(height: 16.h),
                     DropdownButtonFormField<int?>(
                       value: _selectedReportTo,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDecoration('Reports To'),
                       items: [
                         DropdownMenuItem<int?>(value: null, child: Text('None', style: TextStyle(fontSize: 13.sp))),

@@ -420,7 +420,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Spacer(),
                 if (_currentStep < 2)
                   ElevatedButton.icon(
-                    onPressed: () => _goToStep(_currentStep + 1),
+                    onPressed: () {
+                      if (_validateStep(_currentStep)) _goToStep(_currentStep + 1);
+                    },
                     icon: const Text('Next', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                     label: AppIcon.linear('Chevron Right', size: 18),
                     style: ElevatedButton.styleFrom(
@@ -497,7 +499,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final color = stateColor(stepIndex);
 
           return GestureDetector(
-            onTap: () => _goToStep(stepIndex),
+            onTap: () {
+              // Backward (or same) jumps go through immediately.
+              if (stepIndex <= _currentStep) {
+                _goToStep(stepIndex);
+                return;
+              }
+              // Forward jumps must validate every step in between.
+              for (int s = _currentStep; s < stepIndex; s++) {
+                if (!_validateStep(s)) return;
+              }
+              _goToStep(stepIndex);
+            },
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -604,8 +617,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 48,
                     child: DropdownButtonFormField<String>(
                       initialValue: _institutionType,
-                      decoration: _inputDec('Select institution type'),
                       isExpanded: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
+                      decoration: _inputDec('Select institution type'),
                       style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
                       items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
                       onChanged: (v) => setState(() => _institutionType = v),
@@ -728,6 +744,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 48,
                     child: DropdownButtonFormField<String>(
                       initialValue: _institutionRecognized,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDec('Select'),
                       style: _fieldStyle(),
                       items: const [DropdownMenuItem(value: 'Yes', child: Text('Yes')), DropdownMenuItem(value: 'No', child: Text('No'))],
@@ -758,7 +777,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32.w, vertical: 20.h),
-      child: Column(
+      child: Form(
+        key: _formKeys[1],
+        child: Column(
         children: [
           // Affiliation card
           Container(
@@ -768,9 +789,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
-            child: Form(
-              key: _formKeys[1],
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -824,7 +843,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ]),
                 ],
               ),
-            ),
           ),
           SizedBox(height: 20.h),
 
@@ -868,7 +886,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _formRow(context, [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 1 *'),
-                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle()),
+                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 2'),
@@ -989,6 +1007,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           SizedBox(height: 20.h),
         ],
       ),
+      ),
     );
   }
 
@@ -1053,6 +1072,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       height: 48,
                       child: DropdownButtonFormField<String>(
                         initialValue: _adminDesignation,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
                         decoration: _inputDec('Select designation').copyWith(
                           prefixIcon: AppIcon('personalcard', size: 14, color: AppColors.textSecondary),
                         ),
