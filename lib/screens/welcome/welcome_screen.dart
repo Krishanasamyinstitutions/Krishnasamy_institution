@@ -1248,6 +1248,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     return DropdownButtonFormField<T>(
       value: value,
       isExpanded: true,
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 6,
       style: const TextStyle(
         fontSize: 14,
         color: _PinkPalette.textBody,

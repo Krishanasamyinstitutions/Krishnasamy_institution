@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
@@ -788,7 +789,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                   child: Row(
                     children: [
                       AppIcon('receipt-2',
@@ -916,22 +917,47 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         DateTime? to = _filterToDate;
         final Set<String> methods = {..._filterMethods};
         return StatefulBuilder(builder: (ctx, setStateDialog) {
-          Widget presetChip(String label, VoidCallback onTap) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
+          // Determine which preset matches the current from/to range so
+          // its chip can be highlighted as selected.
+          String activePreset() {
+            if (from == null && to == null) return 'All';
+            if (from == null || to == null) return '';
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            bool sameDay(DateTime a, DateTime b) =>
+                a.year == b.year && a.month == b.month && a.day == b.day;
+            if (sameDay(from!, today) && sameDay(to!, today)) return 'Today';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 7)))) return '7 Days';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 30)))) return '30 Days';
+            return '';
+          }
+          final preset = activePreset();
+          Widget presetChip(String label, VoidCallback onTap) {
+            final selected = preset == label;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
                     ),
-                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              );
+              ),
+            );
+          }
 
           Widget methodChip(String m) {
             final selected = methods.contains(m);
@@ -1210,7 +1236,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   // ── Sticky-header table (reused by all three tabs) ──
-  static const _txColWidths = <double>[60, 120, 180, 110, 80, 100, 90, 100, 160, 110, 90, 140];
+  static const _txColWidths = <double>[60, 90, 180, 110, 120, 100, 90, 100, 160, 110, 90, 140];
   static const _txHeaders = <String>[
     'S NO.', 'PAY NO', 'STUDENT', 'COURSE', 'CLASS', 'AMOUNT',
     'CURRENCY', 'METHOD', 'REFERENCE', 'DATE', 'STATUS', 'DOWNLOAD RECEIPT',
@@ -1329,117 +1355,16 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   ),
                 ),
               ),
-              if (needsHScroll) _classicHScrollbar(hController),
+              if (needsHScroll)
+                ClassicHScrollbar(
+                  controller: hController,
+                  contentWidth: contentWidth,
+                  viewportWidth: viewportW,
+                ),
             ],
           );
         }),
       ),
-    );
-  }
-
-  Widget _classicHScrollbar(ScrollController ctrl) {
-    return AnimatedBuilder(
-      animation: ctrl,
-      builder: (context, _) {
-        return Container(
-          height: 20,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF0F0F0),
-            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-          ),
-          child: Row(
-            children: [
-              InkWell(
-                onTap: () {
-                  if (!ctrl.hasClients) return;
-                  ctrl.animateTo(
-                    (ctrl.offset - 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                },
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0E0E0),
-                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                  ),
-                  child: Icon(Icons.chevron_left, size: 16.sp, color: const Color(0xFF333333)),
-                ),
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    final hasClients = ctrl.hasClients && ctrl.positions.isNotEmpty && ctrl.position.hasContentDimensions;
-                    if (!hasClients) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) setState(() {});
-                      });
-                    }
-                    final maxExtent = hasClients ? ctrl.position.maxScrollExtent : 1.0;
-                    final viewportWidth = hasClients ? ctrl.position.viewportDimension : c.maxWidth;
-                    final totalContentWidth = maxExtent + viewportWidth;
-                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
-                    final thumbWidth = (c.maxWidth * thumbRatio).clamp(30.0, c.maxWidth);
-                    final trackSpace = c.maxWidth - thumbWidth;
-                    final scrollRatio = maxExtent > 0 ? (ctrl.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                    final thumbOffset = trackSpace * scrollRatio;
-                    return GestureDetector(
-                      onHorizontalDragUpdate: (details) {
-                        if (trackSpace > 0 && hasClients) {
-                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                          ctrl.jumpTo(newRatio * maxExtent);
-                        }
-                      },
-                      child: Container(
-                        color: const Color(0xFFF0F0F0),
-                        height: 20,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: thumbOffset,
-                              top: 2,
-                              child: Container(
-                                width: thumbWidth,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFC0C0C0),
-                                  borderRadius: BorderRadius.circular(2),
-                                  border: Border.all(color: const Color(0xFFB0B0B0)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  if (!ctrl.hasClients) return;
-                  ctrl.animateTo(
-                    (ctrl.offset + 100).clamp(0.0, ctrl.position.maxScrollExtent),
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
-                  );
-                },
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE0E0E0),
-                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                  ),
-                  child: Icon(Icons.chevron_right, size: 16.sp, color: const Color(0xFF333333)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 

@@ -258,28 +258,100 @@ class SupabaseService {
 
   // ==================== INSTITUTION ====================
 
+  /// Scan the InstitutionLogos bucket and write each matched file's public
+  /// URL into the corresponding institution row (matched by inscode prefix).
+  /// Only fills rows whose inslogo is currently NULL/empty — never overwrites
+  /// a manually set URL. Returns the number of rows updated.
+  static Future<int> backfillInstitutionLogos() async {
+    int filled = 0;
+    try {
+      final files = await client.storage.from('InstitutionLogos').list(path: 'logos');
+      if (files.isEmpty) return 0;
+
+      final rows = await client
+          .from('institution')
+          .select('ins_id, inscode, inslogo');
+
+      for (final row in rows) {
+        final current = (row['inslogo'] as String?)?.trim() ?? '';
+        if (current.isNotEmpty) continue;
+        final inscode = (row['inscode'] as String?)?.trim();
+        if (inscode == null || inscode.isEmpty) continue;
+        // Loose match: filename startsWith inscode (case-insensitive),
+        // so files like "KMPTC Logo.jpg" still link to inscode "KMPTC".
+        final lcCode = inscode.toLowerCase();
+        final match = files.where((f) => f.name.toLowerCase().startsWith(lcCode)).toList();
+        if (match.isEmpty) continue;
+        final path = 'logos/${match.first.name}';
+        final url = client.storage.from('InstitutionLogos').getPublicUrl(path);
+        await client.from('institution').update({'inslogo': url}).eq('ins_id', row['ins_id']);
+        filled++;
+      }
+    } catch (e) {
+      debugPrint('backfillInstitutionLogos error: $e');
+    }
+    return filled;
+  }
+
   /// Get all institution names for the login dropdown.
   /// Includes inslogo so the login form can render the selected
-  /// institution's logo without a second round-trip.
+  /// institution's logo without a second round-trip. Also performs a
+  /// one-shot bucket-to-DB sync for any rows whose inslogo is empty —
+  /// after the first run, every institution's logo URL is persisted in
+  /// the DB and subsequent loads skip the bucket entirely.
   static Future<List<Map<String, dynamic>>> getInstitutionNames() async {
     try {
-      final result = await client
+      final raw = await client
           .from('institution')
           .select('ins_id, insname, inslogo, inscode')
           .order('insname');
-      return List<Map<String, dynamic>>.from(result);
+      final list = List<Map<String, dynamic>>.from(raw);
+
+      // Collect rows missing a logo URL — only run the bucket sync if any.
+      final needSync = list.where((r) {
+        final url = (r['inslogo'] as String?)?.trim() ?? '';
+        final code = (r['inscode'] as String?)?.trim() ?? '';
+        return url.isEmpty && code.isNotEmpty;
+      }).toList();
+      if (needSync.isEmpty) return list;
+
+      try {
+        final files = await client.storage.from('InstitutionLogos').list(path: 'logos');
+        if (files.isEmpty) return list;
+        for (final row in needSync) {
+          final code = (row['inscode'] as String).toLowerCase();
+          final match = files.where((f) => f.name.toLowerCase().startsWith(code)).toList();
+          if (match.isEmpty) continue;
+          final path = 'logos/${match.first.name}';
+          final url = client.storage.from('InstitutionLogos').getPublicUrl(path);
+          // Mutate the row we'll return so the dropdown shows it now.
+          row['inslogo'] = url;
+          // Persist so subsequent loads (and other screens) get it from DB.
+          try {
+            await client.from('institution').update({'inslogo': url}).eq('ins_id', row['ins_id']);
+          } catch (e) {
+            debugPrint('inslogo persist failed for ins_id=${row['ins_id']}: $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('Bucket list during getInstitutionNames failed: $e');
+      }
+      return list;
     } catch (e) {
       debugPrint('Get institution names error: $e');
       return [];
     }
   }
 
-  /// Get institution name, logo, and address from the institution table
+  /// Get institution name, logo, and address from the institution table.
+  /// If `inslogo` is empty but a matching `<inscode>.<ext>` exists in the
+  /// InstitutionLogos bucket, the URL is auto-filled into the row so the
+  /// header / receipts / dashboard pick it up the next time round.
   static Future<({String? name, String? logo, String? address, String? mobile, String? email})> getInstitutionInfo(int insId) async {
     try {
       final result = await client
           .from('institution')
-          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, inspincode, insmobno, insmail')
+          .select('insname, inslogo, insaddress1, insaddress2, insaddress3, inspincode, insmobno, insmail, inscode')
           .eq('ins_id', insId)
           .maybeSingle();
 
@@ -301,7 +373,36 @@ class SupabaseService {
       final address = lines.isNotEmpty ? lines.join('\n') : null;
 
       // inslogo column stores the full public URL directly
-      final logoUrl = result['inslogo'] as String?;
+      String? logoUrl = (result['inslogo'] as String?)?.trim();
+      if (logoUrl == null || logoUrl.isEmpty) {
+        // Auto-backfill from bucket. Real files are named freely (e.g.
+        // "KMPTC Logo.jpg"), so match on filename startsWith inscode rather
+        // than strict equality. Skip the URL guess entirely — broken
+        // guesses would 404 forever; better to fall through to the
+        // initial-letter avatar until the file actually exists.
+        final inscode = (result['inscode'] as String?)?.trim();
+        if (inscode != null && inscode.isNotEmpty) {
+          try {
+            final files = await client.storage.from('InstitutionLogos').list(path: 'logos');
+            final lcCode = inscode.toLowerCase();
+            final match = files.where((f) {
+              return f.name.toLowerCase().startsWith(lcCode);
+            }).toList();
+            if (match.isNotEmpty) {
+              final path = 'logos/${match.first.name}';
+              logoUrl = client.storage.from('InstitutionLogos').getPublicUrl(path);
+              // Persist so subsequent loads don't list the bucket.
+              try {
+                await client.from('institution').update({'inslogo': logoUrl}).eq('ins_id', insId);
+              } catch (e) {
+                debugPrint('inslogo backfill update failed: $e');
+              }
+            }
+          } catch (e) {
+            debugPrint('Bucket list for inscode=$inscode failed: $e');
+          }
+        }
+      }
 
       return (
         name: result['insname'] as String?,

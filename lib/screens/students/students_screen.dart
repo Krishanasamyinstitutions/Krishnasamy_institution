@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions, PostgrestException;
 import 'package:provider/provider.dart';
@@ -1198,7 +1199,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 4.h),
+          padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
           child: Row(
             children: [
               AppIcon('people', size: 18, color: AppColors.accent),
@@ -1223,7 +1224,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ),
         Expanded(
           child: Padding(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.w),
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -1234,18 +1235,17 @@ class _StudentsScreenState extends State<StudentsScreen> {
               child: Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
                         Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('ROLL NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('CLASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
@@ -1262,17 +1262,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           onTap: () => _populateStudentForm(s),
                           child: Container(
                             color: index.isEven ? Colors.white : AppColors.surface,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                             child: Row(
                               children: [
                                 Expanded(flex: 1, child: Text('$serialNo', style: cellStyle)),
-                                Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: cellStyle)),
-                                Expanded(flex: 4, child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                                Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: cellStyle)),
-                                Expanded(flex: 2, child: Text(s.stuclass, textAlign: TextAlign.center, style: cellStyle)),
-                                Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: cellStyle)),
-                                Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: cellStyle)),
-                                Expanded(flex: 3, child: Text(s.stumobile, textAlign: TextAlign.center, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stuadmno, style: cellStyle)),
+                                Expanded(flex: 3, child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                Expanded(flex: 2, child: Text(s.courname ?? '-', style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stuclass, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.batch ?? '-', style: cellStyle)),
+                                Expanded(flex: 1, child: Text(s.stugender, style: cellStyle)),
                                 Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary))),
                               ],
                             ),
@@ -1426,14 +1425,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       color: AppColors.tableHeadBg,
                       child: Row(
                         children: [
-                          Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 2, child: Text('ADM NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 3, child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('ADM NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                          Expanded(child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         ],
                       ),
                     ),
@@ -1441,9 +1440,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     Expanded(
                       child: pagedStudents.isEmpty
                           ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
-                          : ListView.builder(
+                          : ListView.separated(
                               padding: EdgeInsets.zero,
                               itemCount: pagedStudents.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
                               itemBuilder: (context, index) {
                                 final s = pagedStudents[index];
                                 final serialNo = startIdx + index + 1;
@@ -1457,14 +1457,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                     color: index.isEven ? Colors.white : AppColors.surface,
                                     child: Row(
                                       children: [
-                                        Expanded(flex: 1, child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                        Expanded(flex: 4, child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)),
-                                        Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        Expanded(flex: 3, child: Text(s.stumobile, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-                                        Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent))),
+                                        Expanded(child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                                        Expanded(child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(child: Text(s.stugender, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(child: Text(s.stumobile, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                        Expanded(child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent))),
                                       ],
                                     ),
                                   ),
@@ -1852,8 +1852,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _row3(
           _fieldFull(label: 'Academic Year *', child: DropdownButtonFormField<String>(
             initialValue: _selectedYrId,
-            decoration: _dec('Select year'),
             dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            decoration: _dec('Select year'),
             style: _inputStyle,
             items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']))).toList(),
             onChanged: (v) => setState(() {
@@ -1914,8 +1916,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
           ),
           _fieldFull(label: 'Gender *', child: DropdownButtonFormField<String>(
             initialValue: _selectedGender,
-            decoration: _dec('Select gender'),
             dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            decoration: _dec('Select gender'),
             style: _inputStyle,
             items: _genders.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
             onChanged: (v) => setState(() => _selectedGender = v),
@@ -1964,8 +1968,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
           )),
           _fieldFull(label: 'Class *', child: DropdownButtonFormField<String>(
             initialValue: _classes.contains(_selectedClass) ? _selectedClass : null,
-            decoration: _dec('Select class'),
             dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            decoration: _dec('Select class'),
             style: _inputStyle,
             items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
             onChanged: (v) => setState(() => _selectedClass = v),
@@ -1984,8 +1990,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
             initialValue: _selectedBloodGroup,
             isExpanded: true,
-            decoration: _dec('Select'),
             dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            decoration: _dec('Select'),
             style: _inputStyle,
             items: _bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
@@ -1993,6 +2001,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Concession', child: DropdownButtonFormField<String>(
             initialValue: _selectedConId,
             isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
             decoration: _dec('Select concession'),
             style: _inputStyle,
             items: _concessions.map((c) => DropdownMenuItem(
@@ -2010,6 +2021,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Admission Type', child: DropdownButtonFormField<String>(
             initialValue: _selectedAdmName,
             isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
             decoration: _dec('Select admission type'),
             style: _inputStyle,
             items: _admissionTypes.map((a) => DropdownMenuItem(
@@ -2021,6 +2035,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
           _fieldFull(label: 'Quota', child: DropdownButtonFormField<String>(
             initialValue: _selectedQuoName,
             isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
             decoration: _dec('Select quota'),
             style: _inputStyle,
             items: _quotas.map((q) => DropdownMenuItem(
@@ -2776,6 +2793,34 @@ class _StudentsScreenState extends State<StudentsScreen> {
           // Title bar
           Row(
             children: [
+              InkWell(
+                onTap: _resetImport,
+                borderRadius: BorderRadius.circular(MediaQuery.of(context).size.width <= 1366 ? 6 : 10),
+                child: Builder(builder: (context) {
+                  final compact = MediaQuery.of(context).size.width <= 1366;
+                  final hPad = compact ? 10.0 : 14.0;
+                  final radius = compact ? 6.0 : 10.0;
+                  final textSize = compact ? 11.0 : 13.0;
+                  final innerGap = compact ? 4.0 : 6.0;
+                  return Container(
+                    height: AppBtn.height(context),
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(radius),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon.linear('Chevron Left', size: AppBtn.iconSize(context), color: Colors.white),
+                        SizedBox(width: innerGap),
+                        Text('Back', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              SizedBox(width: 12.w),
               AppIcon('document-upload', size: 20, color: AppColors.accent),
               SizedBox(width: 8.w),
               Text('Import Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
@@ -2837,87 +2882,109 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 borderRadius: BorderRadius.circular(8.r),
               ),
               clipBehavior: Clip.hardEdge,
-              child: Scrollbar(
-                controller: _importScrollController,
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  controller: _importScrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: 54 + _importGridKeys.fold<double>(0, (sum, k) => sum + _gridColWidth(k) + 1),
-                    child: Column(
-                      children: [
-                        // Header row
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.tableHeadBg,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(7.r),
-                              topRight: Radius.circular(7.r),
-                            ),
-                          ),
-                          child: Row(
+              child: LayoutBuilder(builder: (ctx, constraints) {
+                final viewportW = constraints.maxWidth;
+                final sNoW = 50.w;
+                final dividers = (_importGridKeys.length + 1) * 1.0;
+                final dataColsRaw = _importGridKeys.fold<double>(0, (sum, k) => sum + _gridColWidth(k));
+                final totalRaw = sNoW + dataColsRaw + dividers;
+                // If natural width fits the viewport, scale data columns up to fill it
+                // (keeps S.No fixed). Otherwise keep widths and let the user scroll.
+                final scale = totalRaw < viewportW ? (viewportW - sNoW - dividers) / dataColsRaw : 1.0;
+                double colW(String key) => _gridColWidth(key) * scale;
+                final tableW = totalRaw < viewportW ? viewportW : totalRaw;
+                final needsScroll = tableW > viewportW;
+                return Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: _importScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: needsScroll ? tableW : viewportW,
+                          child: Column(
                             children: [
-                              _gridHeaderCell('S.No', width: 50.w, center: true),
-                              _gridHeaderDivider(),
-                              for (final key in _importGridKeys) ...[
-                                _gridHeaderCell(_importGridLabels[key] ?? key, width: _gridColWidth(key)),
-                                _gridHeaderDivider(),
-                              ],
+                              // Header row
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.tableHeadBg,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(7.r),
+                                    topRight: Radius.circular(7.r),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _gridHeaderCell('S.No', width: sNoW, center: true),
+                                    _gridHeaderDivider(),
+                                    for (final key in _importGridKeys) ...[
+                                      _gridHeaderCell(_importGridLabels[key] ?? key, width: colW(key)),
+                                      _gridHeaderDivider(),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              // Data rows
+                              Expanded(
+                                child: _importRows.isEmpty
+                                    ? Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            AppIcon('element-4', size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+                                            SizedBox(height: 8.h),
+                                            Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                            SizedBox(height: 4.h),
+                                            Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                                          ],
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        itemCount: _importRows.length,
+                                        itemBuilder: (context, index) {
+                                          final row = _importRows[index];
+                                          final isEven = index % 2 == 0;
+                                          final hasError = _rowErrors.containsKey(index);
+                                          return Tooltip(
+                                            message: hasError ? _rowErrors[index]! : '',
+                                            child: Container(
+                                              color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
+                                              padding: EdgeInsets.symmetric(vertical: 6.h),
+                                              child: Row(
+                                                children: [
+                                                  _gridDataCell('${index + 1}', width: sNoW, center: true),
+                                                  for (final key in _importGridKeys)
+                                                    _gridDataCell(_importMappedCell(row, key), width: colW(key)),
+                                                  if (hasError)
+                                                    Padding(
+                                                      padding: EdgeInsets.only(right: 8.w),
+                                                      child: Tooltip(
+                                                        message: _rowErrors[index]!,
+                                                        child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
                             ],
                           ),
                         ),
-                        // Data rows
-                        Expanded(
-                          child: _importRows.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      AppIcon('element-4', size: 48.sp, color: AppColors.textSecondary.withValues(alpha: 0.3)),
-                                      SizedBox(height: 8.h),
-                                      Text('No data loaded', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-                                      SizedBox(height: 4.h),
-                                      Text('Click Browse to load a CSV or Excel file', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  itemCount: _importRows.length,
-                                  itemBuilder: (context, index) {
-                                    final row = _importRows[index];
-                                    final isEven = index % 2 == 0;
-                                    final hasError = _rowErrors.containsKey(index);
-                                    return Tooltip(
-                                      message: hasError ? _rowErrors[index]! : '',
-                                      child: Container(
-                                        color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
-                                        padding: EdgeInsets.symmetric(vertical: 6.h),
-                                        child: Row(
-                                          children: [
-                                            _gridDataCell('${index + 1}', width: 50.w, center: true),
-                                            for (final key in _importGridKeys)
-                                              _gridDataCell(_importMappedCell(row, key), width: _gridColWidth(key)),
-                                            if (hasError)
-                                              Padding(
-                                                padding: EdgeInsets.only(right: 8.w),
-                                                child: Tooltip(
-                                                  message: _rowErrors[index]!,
-                                                  child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                    if (needsScroll)
+                      ClassicHScrollbar(
+                        controller: _importScrollController,
+                        contentWidth: tableW,
+                        viewportWidth: viewportW,
+                      ),
+                  ],
+                );
+              }),
             ),
           ),
 
@@ -3053,29 +3120,37 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   double _gridColWidth(String key) {
+    // Widths sized to fit header text on a single line at 13.sp / w700
+    // (e.g., "GUARDIAN MOBILE" needs ~150px; "CONCESSION *" needs ~140px).
     switch (key) {
-      case 'stuadmno': return 100;
-      case 'stuname': return 160;
-      case 'stugender': return 80;
-      case 'studob': return 100;
-      case 'stuadmdate': return 100;
-      case 'stuclass': return 70;
-      case 'stumobile': return 110;
-      case 'stuemail': return 160;
-      case 'concession': return 130;
-      case 'stuaddress': return 160;
-      case 'stucity': return 100;
-      case 'stustate': return 100;
-      case 'stucountry': return 100;
-      case 'stupin': return 80;
-      case 'stubloodgrp': return 90;
-      case 'fathername': case 'mothername': case 'guardianname': return 140;
-      case 'fathermobile': case 'mothermobile': case 'guardianmobile': return 120;
-      case 'fatheroccupation': case 'motheroccupation': case 'guardianoccupation': return 120;
-      case 'payincharge': return 130;
-      case 'payinchargemob': return 120;
-      case 'admittyear': return 120;
-      default: return 110;
+      case 'stuadmno': return 110;          // ROLL NO *
+      case 'stuname': return 170;           // NAME *
+      case 'stugender': return 110;         // GENDER *
+      case 'studob': return 100;            // DOB *
+      case 'stuadmdate': return 120;        // ADM DATE
+      case 'stuclass': return 100;          // CLASS *
+      case 'courname': return 110;          // COURSE
+      case 'stumobile': return 120;         // MOBILE
+      case 'stuemail': return 170;          // EMAIL
+      case 'concession': return 150;        // CONCESSION *
+      case 'stuaddress': return 170;        // ADDRESS
+      case 'stucity': return 100;           // CITY
+      case 'stustate': return 100;          // STATE
+      case 'stucountry': return 110;        // COUNTRY
+      case 'stupin': return 110;            // PIN CODE
+      case 'stubloodgrp': return 130;       // BLOOD GROUP
+      case 'fathername': case 'mothername': return 150;
+      case 'guardianname': return 160;      // GUARDIAN NAME
+      case 'fathermobile': case 'mothermobile': return 150;
+      case 'guardianmobile': return 170;    // GUARDIAN MOBILE
+      case 'fatheroccupation': case 'motheroccupation': case 'guardianoccupation': return 150;
+      case 'payincharge': return 160;       // PAY IN CHARGE *
+      case 'payinchargemob': return 140;    // PAY MOBILE *
+      case 'admname': return 160;           // ADMISSION TYPE
+      case 'quoname': return 110;           // QUOTA
+      case 'batch': return 110;             // BATCH
+      case 'admittyear': return 140;        // ADMITTED YEAR
+      default: return 120;
     }
   }
 
@@ -3083,7 +3158,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final child = Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
       alignment: center ? Alignment.center : Alignment.centerLeft,
-      child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
+      child: Text(
+        text.toUpperCase(),
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.visible,
+        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w),
+      ),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }

@@ -390,6 +390,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               value: _selectedClass,
               hint: Text('All Classes',
                   style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               style: TextStyle(
                   fontSize: 13.sp, color: AppColors.textPrimary),
               icon: AppIcon.linear('Chevron Down',
