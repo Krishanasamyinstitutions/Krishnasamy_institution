@@ -1,6 +1,7 @@
 import 'dart:io';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
@@ -709,6 +710,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     final isDrilldown = _showTotalCollection ||
         _showTodayCollection ||
         _showPendingFees ||
+        _showPendingApproval ||
         _selectedPayId != null ||
         _selectedDate != null;
     // Notify parent so the tabs row can hide while drilled in.
@@ -1000,6 +1002,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
                       isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       // Cash vs Bank matches the Method-wise Summary grouping.
                       items: const [
                         DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
@@ -1051,7 +1056,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                 child: Row(
                   children: [
                     AppIcon('wallet-money', size: 18, color: AppColors.accent),
@@ -1109,7 +1114,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               final sid = p['stu_id']?.toString();
                               if (sid != null) mStuIds.add(sid);
                             }
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)), cells: [
+                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
                               DataCell(Text('${idx + 1}', style: const TextStyle(color: AppColors.textSecondary))),
                               DataCell(Text(method, style: const TextStyle(fontWeight: FontWeight.w600))),
                               DataCell(Text('${items.length}')),
@@ -1145,7 +1150,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                 child: Row(
                   children: [
                     AppIcon.linear('receipt-2', size: 18, color: AppColors.accent),
@@ -1207,14 +1212,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             final stuClass = p['stuclass']?.toString().isNotEmpty == true ? p['stuclass'].toString()
                                 : (stuId != null && _stuIdToClass.containsKey(stuId)) ? _stuIdToClass[stuId]! : '-';
                             final amount = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)), cells: [
-                              DataCell(Text('${idx + 1}', style: const TextStyle(color: AppColors.textSecondary))),
-                              DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w500))),
-                              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200), child: Text(stuName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w500)))),
-                              DataCell(Text(stuCourse)),
-                              DataCell(Text(stuClass)),
-                              DataCell(Text(_formatDate(p['paydate']))),
-                              DataCell(Text(p['paymethod']?.toString() ?? '-')),
+                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
+                              DataCell(Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200), child: Text(stuName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
+                              DataCell(Text(stuCourse, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              DataCell(Text(stuClass, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              DataCell(Text(_formatDate(p['paydate']), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              DataCell(Text(p['paymethod']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                               DataCell(Text(_formatCurrency(amount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
                             ]);
                           }),
@@ -1506,9 +1511,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DropdownButton<String?>(
                       value: feeTypes.contains(_pendingFeeTypeFilter) ? _pendingFeeTypeFilter : null,
                       hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
-                      isDense: true,
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
                         ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
@@ -1539,9 +1547,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DropdownButton<String?>(
                       value: classes.contains(_pendingClassFilter) ? _pendingClassFilter : null,
                       hint: Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
-                      isDense: true,
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
                         ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
@@ -1630,7 +1641,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     }
                   }
                   return DataRow(
-                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
+                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface),
                     onSelectChanged: (_) => setState(() => _selectedPendingFeeGroup = groupName),
                     cells: [
                       DataCell(Text('${idx + 1}')),
@@ -1774,7 +1785,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
                   final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Unpaid';
                   final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : Colors.red;
-                  return DataRow(color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)), cells: [
+                  return DataRow(color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface), cells: [
                     DataCell(Text('${i + 1}')),
                     DataCell(Text(term)),
                     DataCell(Text(feeGroupName, style: const TextStyle(fontWeight: FontWeight.w500))),
@@ -1943,7 +1954,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final i = e.key;
                   final r = e.value;
                   return DataRow(
-                    color: WidgetStateProperty.all(i.isEven ? Colors.white : const Color(0xFFF7FAFC)),
+                    color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
                     onSelectChanged: (_) => setState(() => _selectedPendingCourseClass = r['key'] as String),
                     cells: [
                       DataCell(Text('${i + 1}')),
@@ -2142,9 +2153,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DropdownButton<String?>(
                       value: feeTypes.contains(_pendingFeeTypeFilter) ? _pendingFeeTypeFilter : null,
                       hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
-                      isDense: true,
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
                         ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
@@ -2175,9 +2189,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DropdownButton<String?>(
                       value: classes.contains(_pendingClassFilter) ? _pendingClassFilter : null,
                       hint: Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
-                      isDense: true,
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
                         ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
@@ -2254,7 +2271,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   final statusLabel = sBalance <= 0 ? 'Paid' : sPaid > 0 ? 'Partial' : 'Unpaid';
                   final statusColor = sBalance <= 0 ? AppColors.success : sPaid > 0 ? AppColors.warning : Colors.red;
                   return DataRow(
-                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : const Color(0xFFF7FAFC)),
+                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface),
                     onSelectChanged: (_) => setState(() {
                       _selectedStudentKey = stuKey;
                       _selectedStudentDemands = demands;
@@ -2376,22 +2393,44 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         DateTime to = _toDate;
         final Set<String> methods = {..._filterMethods};
         return StatefulBuilder(builder: (ctx, setStateDialog) {
-          Widget presetChip(String label, VoidCallback onTap) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
+          String activePreset() {
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            bool sameDay(DateTime a, DateTime b) =>
+                a.year == b.year && a.month == b.month && a.day == b.day;
+            if (sameDay(from, today) && sameDay(to, today)) return 'Today';
+            if (sameDay(to, today) && sameDay(from, now.subtract(const Duration(days: 7)))) return '7 Days';
+            if (sameDay(to, today) && sameDay(from, now.subtract(const Duration(days: 30)))) return '30 Days';
+            if (sameDay(to, today) && sameDay(from, DateTime(now.year, now.month, 1))) return 'This Month';
+            return '';
+          }
+          final preset = activePreset();
+          Widget presetChip(String label, VoidCallback onTap) {
+            final selected = preset == label;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
                     ),
-                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              );
+              ),
+            );
+          }
 
           Widget methodChip(String m) {
             final selected = methods.contains(m);
@@ -2568,7 +2607,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
             child: Row(
               children: [
                 AppIcon.linear('document-text', size: 18, color: AppColors.accent),
@@ -2682,9 +2721,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                   setState(() { _selectedDate = group.date; _dateDrilldownPage = 0; });
                                 },
                                 cells: [
-                                  DataCell(Text('${startIdx + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                                  DataCell(Text('${startIdx + i + 1}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   DataCell(Text(_formatDisplayDate(group.date), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  DataCell(Text('${group.payments.length}', textAlign: TextAlign.right, style: const TextStyle(color: AppColors.textSecondary))),
+                                  DataCell(Text('${group.payments.length}', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   DataCell(Text(_formatCurrency(group.totalAmount - group.totalFine), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   DataCell(Text(group.totalFine > 0 ? _formatCurrency(group.totalFine) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: group.totalFine > 0 ? Colors.orange : AppColors.textSecondary))),
                                   DataCell(Text(_formatCurrency(group.totalAmount), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
@@ -2879,6 +2918,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           value: _dateDrilldownMethodFilter,
                           hint: Text('All Methods', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                           style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          elevation: 6,
                           // Only Cash vs Bank — matches the Method-wise
                           // Summary buckets above. Listing raw methods
                           // (qr_upi, razorpay, cheque…) was confusing for
@@ -2968,14 +3010,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
                               onSelectChanged: (_) => _onPaymentTap(p),
                               cells: [
-                                DataCell(Text('${ddStart + i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
+                                DataCell(Text('${ddStart + i + 1}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                 DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                DataCell(Text(timeStr, style: const TextStyle(color: AppColors.textSecondary))),
-                                DataCell(Text(student?['stuadmno']?.toString() ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
+                                DataCell(Text(timeStr, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                DataCell(Text(student?['stuadmno']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                 DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(student?['stuname']?.toString() ?? '-', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
-                                DataCell(Text(student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : (_stuIdToCourse[p['stu_id'] as int?] ?? '-'), style: const TextStyle(color: AppColors.textSecondary))),
-                                DataCell(Text(student?['stuclass']?.toString() ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
-                                DataCell(Text(p['paymethod'] ?? '-', style: const TextStyle(color: AppColors.textSecondary))),
+                                DataCell(Text(student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : (_stuIdToCourse[p['stu_id'] as int?] ?? '-'), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                DataCell(Text(student?['stuclass']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                DataCell(Text(p['paymethod'] ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                 DataCell(Text(_formatCurrency(collection), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                 DataCell(Text(fine > 0 ? _formatCurrency(fine) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: fine > 0 ? Colors.orange : AppColors.textSecondary))),
                                 DataCell(Text(_formatCurrency(totalAmt), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
@@ -3633,7 +3675,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         children: [
           // Breadcrumb
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
             child: Row(
               children: [
                 InkWell(
@@ -3684,9 +3726,32 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           // Table
           if (pending.isEmpty)
             Padding(
-              padding: EdgeInsets.all(32.w),
-              child: Text('No payments awaiting approval',
-                  style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary)),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 60.h),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      AppIcon.linear('tick-circle', size: 48.sp, color: AppColors.success.withValues(alpha: 0.6)),
+                      SizedBox(height: 12.h),
+                      Text('No payments awaiting approval',
+                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      SizedBox(height: 4.h),
+                      Text('All collected payments have been reconciled.',
+                          style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ),
             )
           else
             LayoutBuilder(builder: (context, constraints) {
@@ -4822,7 +4887,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               children: [
                   // Card header: title left, search+filter right
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    padding: EdgeInsets.fromLTRB(16, 14, 16, 8.h),
                     child: Row(
                       children: [
                         AppIcon('book-1', size: 18, color: AppColors.accent),
@@ -4856,6 +4921,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 value: _classFilterFeeType,
                                 isDense: true,
                                 hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                dropdownColor: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                elevation: 6,
                                 style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                 icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
                                 items: [
@@ -4909,13 +4977,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   const double cColSpacing = 20;
                   const double cSnoW = 50;
                   const double cCourseW = 90;
-                  const double cClassW = 70;
+                  const double cClassW = 120;
                   const double cStudentsW = 70;
                   const double cFeeTypesW = 260;
                   const double cTotalDemandW = 110;
                   const double cPaidW = 100;
                   const double cFineW = 80;
-                  const double cCollectedW = 90;
+                  const double cCollectedW = 120;
                   const double cPendingW = 110;
                   const double cActionW = 130;
                   final List<double> cColWidths = [cSnoW, cCourseW, cClassW, cStudentsW, cFeeTypesW, cTotalDemandW, cPaidW, cFineW, cCollectedW, cPendingW, cActionW];
@@ -4930,7 +4998,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       width: cAdj[colIndex],
                       child: child ?? Align(
                         alignment: colIndex >= 5 && colIndex <= 10 ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Text(text, style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color)),
+                        child: Text(
+                          text,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: fontSize ?? 13.sp, fontWeight: fontWeight, color: color),
+                        ),
                       ),
                     );
                   }
@@ -5017,9 +5091,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         onTap: () => onClassTap(),
                         child: Container(
                           color: i.isEven ? Colors.white : AppColors.surface,
-                          padding: EdgeInsets.symmetric(horizontal: cHMargin),
+                          padding: EdgeInsets.symmetric(horizontal: cHMargin, vertical: 10),
                           constraints: BoxConstraints(minHeight: 50),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               SizedBox(width: cAdj[0], child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                               const SizedBox(width: cColSpacing),
@@ -5047,7 +5122,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                               const SizedBox(width: cColSpacing),
                               SizedBox(width: cAdj[6], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(g.totalPaid), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                               const SizedBox(width: cColSpacing),
-                              SizedBox(width: cAdj[7], child: Align(alignment: Alignment.centerRight, child: Text(g.totalFine > 0 ? _formatCurrency(g.totalFine) : '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: g.totalFine > 0 ? Colors.orange : AppColors.textSecondary)))),
+                              SizedBox(width: cAdj[7], child: Align(alignment: Alignment.centerRight, child: Text(g.totalFine > 0 ? _formatCurrency(g.totalFine) : '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: g.totalFine > 0 ? Colors.orange : AppColors.textSecondary)))),
                               const SizedBox(width: cColSpacing),
                               SizedBox(width: cAdj[8], child: Container(
                                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
@@ -5124,107 +5199,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       ),
                       // Classic horizontal scrollbar with arrow buttons
                       if (_canScrollClass)
-                        Container(
-                          height: 20,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF0F0F0),
-                            border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                          ),
-                          child: Row(
-                            children: [
-                              // Left arrow button
-                              InkWell(
-                                onTap: () {
-                                  _classTableScrollController.animateTo(
-                                    (_classTableScrollController.offset - 100).clamp(0.0, _classTableScrollController.position.maxScrollExtent),
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeOut,
-                                  );
-                                },
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE0E0E0),
-                                    border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                  ),
-                                  child: AppIcon.linear('Chevron Left', size: 16, color: const Color(0xFF333333)),
-                                ),
-                              ),
-                              // Scrollbar track + thumb
-                              Expanded(
-                                child: LayoutBuilder(
-                                  builder: (context, scrollbarConstraints) {
-                                    final maxExtent = _classTableScrollController.hasClients &&
-                                            _classTableScrollController.positions.isNotEmpty &&
-                                            _classTableScrollController.position.hasContentDimensions
-                                        ? _classTableScrollController.position.maxScrollExtent
-                                        : 1.0;
-                                    final viewportWidth = _classTableScrollController.hasClients &&
-                                            _classTableScrollController.positions.isNotEmpty &&
-                                            _classTableScrollController.position.hasContentDimensions
-                                        ? _classTableScrollController.position.viewportDimension
-                                        : scrollbarConstraints.maxWidth;
-                                    final totalContentWidth = maxExtent + viewportWidth;
-                                    final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
-                                    final thumbWidth = (scrollbarConstraints.maxWidth * thumbRatio).clamp(30.0, scrollbarConstraints.maxWidth);
-                                    final trackSpace = scrollbarConstraints.maxWidth - thumbWidth;
-                                    final scrollRatio = maxExtent > 0 ? (_classTableScrollController.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                                    final thumbOffset = trackSpace * scrollRatio;
-
-                                    return GestureDetector(
-                                      onHorizontalDragUpdate: (details) {
-                                        if (trackSpace > 0) {
-                                          final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                                          _classTableScrollController.jumpTo(newRatio * maxExtent);
-                                        }
-                                      },
-                                      child: Container(
-                                        color: const Color(0xFFF0F0F0),
-                                        height: 20,
-                                        child: Stack(
-                                          children: [
-                                            Positioned(
-                                              left: thumbOffset,
-                                              top: 2,
-                                              child: Container(
-                                                width: thumbWidth,
-                                                height: 16,
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFC0C0C0),
-                                                  borderRadius: BorderRadius.circular(2),
-                                                  border: Border.all(color: const Color(0xFFB0B0B0)),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              // Right arrow button
-                              InkWell(
-                                onTap: () {
-                                  _classTableScrollController.animateTo(
-                                    (_classTableScrollController.offset + 100).clamp(0.0, _classTableScrollController.position.maxScrollExtent),
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeOut,
-                                  );
-                                },
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE0E0E0),
-                                    border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                  ),
-                                  child: AppIcon.linear('Chevron Right', size: 16, color: const Color(0xFF333333)),
-                                ),
-                              ),
-                            ],
-                          ),
+                        ClassicHScrollbar(
+                          controller: _classTableScrollController,
+                          contentWidth: cTableWidth,
+                          viewportWidth: viewportW,
                         ),
                     ],
                   );
@@ -5265,7 +5243,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
             child: Row(
               children: [
                 InkWell(
@@ -5347,76 +5325,147 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             totalFine += isPaid ? fa : 0;
             totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
           }
-          return SingleChildScrollView(child: Scrollbar(controller: _drilldownFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _drilldownFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 1,
-              showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-              columns: const [
-                DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('SEMESTER')),
-                DataColumn(label: Text('FEE TYPE')),
-                DataColumn(label: Text('AMOUNT'), numeric: true),
-                DataColumn(label: Text('PAID'), numeric: true),
-                DataColumn(label: Text('FINE'), numeric: true),
-                DataColumn(label: Text('BALANCE'), numeric: true),
-                DataColumn(label: Text('STATUS')),
-              ],
-              rows: [
-                ...demands.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final d = entry.value;
-                  final term = d['demfeeterm']?.toString() ?? '-';
-                  final feeType = d['demfeetype']?.toString() ?? '-';
-                  final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                  final isPaidRow = pa > 0 || d['paidstatus'] == 'P';
-                  final paid = pa - (isPaidRow ? fa : 0);
-                  final fineDisplay = isPaidRow ? fa : 0.0;
-                  final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
-                  final statusColor = balance <= 0 ? AppColors.success : paid > 0 ? AppColors.warning : AppColors.warning;
-                  return DataRow(
-                    color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
-                    cells: [
-                    DataCell(Text('${i + 1}', style: const TextStyle(color: AppColors.textSecondary))),
-                    DataCell(Text(term, style: const TextStyle(color: AppColors.textSecondary))),
-                    DataCell(Text(feeType, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    DataCell(Text(_formatCurrencyLocal(amount), style: const TextStyle(color: AppColors.textSecondary))),
-                    DataCell(Text(_formatCurrencyLocal(paid), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    DataCell(Text(fineDisplay > 0 ? _formatCurrencyLocal(fineDisplay) : '-', style: TextStyle(fontWeight: FontWeight.w600, color: fineDisplay > 0 ? Colors.orange : AppColors.textSecondary))),
-                    DataCell(Text(_formatCurrencyLocal(balance), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                    DataCell(Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8.r),
+          // Custom layout so we can give every non–S No. column the same
+          // width (S No. is the only narrow one).
+          const double dHMargin = 16;
+          const double dColSpacing = 12;
+          const double dSnoW = 45;
+          // 7 equal-width columns fill the remaining viewport.
+          final double dOtherW = ((constraints.maxWidth - dHMargin * 2 - dColSpacing * 7 - dSnoW) / 7).clamp(110.0, 1000.0);
+          final List<double> dWidths = [dSnoW, dOtherW, dOtherW, dOtherW, dOtherW, dOtherW, dOtherW, dOtherW];
+          final dTableWidth = dWidths.reduce((a, b) => a + b) + dColSpacing * 7 + dHMargin * 2;
+
+          Widget dCellText(String text, int col, {FontWeight? fontWeight, double? fontSize, Color? color, TextAlign? align}) {
+            return SizedBox(
+              width: dWidths[col],
+              child: Align(
+                // S No., SEMESTER, FEE TYPE → left; AMOUNT/PAID/FINE/BALANCE → right; STATUS → left
+                alignment: (col >= 3 && col <= 6) ? Alignment.centerRight : Alignment.centerLeft,
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: fontSize ?? 13.sp,
+                    fontWeight: fontWeight ?? FontWeight.w600,
+                    color: color ?? AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          Widget dRow(List<Widget> cells, {Color? bgColor, double height = 44}) {
+            return Container(
+              height: height,
+              color: bgColor,
+              padding: const EdgeInsets.symmetric(horizontal: dHMargin),
+              child: Row(
+                children: [
+                  for (int i = 0; i < cells.length; i++) ...[
+                    if (i > 0) const SizedBox(width: dColSpacing),
+                    cells[i],
+                  ],
+                ],
+              ),
+            );
+          }
+
+          final headerRow = dRow([
+            dCellText('S No.', 0, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('SEMESTER', 1, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('FEE TYPE', 2, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('AMOUNT', 3, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('PAID', 4, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('FINE', 5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('BALANCE', 6, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            dCellText('STATUS', 7, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ], bgColor: AppColors.tableHeadBg, height: 44);
+
+          final bodyRows = <Widget>[];
+          for (int i = 0; i < demands.length; i++) {
+            final d = demands[i];
+            final term = d['demfeeterm']?.toString() ?? '-';
+            final feeType = d['demfeetype']?.toString() ?? '-';
+            final amount = (d['feeamount'] as num?)?.toDouble() ?? 0;
+            final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+            final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+            final isPaidRow = pa > 0 || d['paidstatus'] == 'P';
+            final paid = pa - (isPaidRow ? fa : 0);
+            final fineDisplay = isPaidRow ? fa : 0.0;
+            final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
+            final statusLabel = balance <= 0 ? 'Paid' : paid > 0 ? 'Partial' : 'Pending';
+            final statusColor = balance <= 0 ? AppColors.success : AppColors.warning;
+            bodyRows.add(Container(
+              height: 44,
+              color: i.isEven ? Colors.white : AppColors.surface,
+              padding: const EdgeInsets.symmetric(horizontal: dHMargin),
+              child: Row(
+                children: [
+                  dCellText('${i + 1}', 0),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(term, 1),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(feeType, 2),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(_formatCurrencyLocal(amount), 3),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(_formatCurrencyLocal(paid), 4),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(fineDisplay > 0 ? _formatCurrencyLocal(fineDisplay) : '-', 5, color: fineDisplay > 0 ? Colors.orange : AppColors.textSecondary),
+                  const SizedBox(width: dColSpacing),
+                  dCellText(_formatCurrencyLocal(balance), 6),
+                  const SizedBox(width: dColSpacing),
+                  SizedBox(
+                    width: dWidths[7],
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(statusLabel, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: statusColor)),
                       ),
-                      child: Text(statusLabel, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: statusColor)),
-                    )),
-                  ]);
-                }),
-                // Grand total row
-                DataRow(
-                  color: WidgetStateProperty.all(AppColors.tableHeadBg),
-                  cells: [
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrencyLocal(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrencyLocal(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrencyLocal(totalFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrencyLocal(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    const DataCell(Text('')),
+                    ),
+                  ),
+                ],
+              ),
+            ));
+          }
+
+          final footerRow = dRow([
+            dCellText('', 0),
+            dCellText('', 1),
+            dCellText('Total', 2, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+            dCellText(_formatCurrencyLocal(totalDemand), 3, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+            dCellText(_formatCurrencyLocal(totalPaid), 4, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+            dCellText(_formatCurrencyLocal(totalFine), 5, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+            dCellText(_formatCurrencyLocal(totalBalance), 6, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+            dCellText('', 7),
+          ], bgColor: AppColors.tableHeadBg, height: 44);
+
+          return Scrollbar(
+            controller: _drilldownFeeScrollCtrl,
+            thumbVisibility: true,
+            trackVisibility: true,
+            child: SingleChildScrollView(
+              controller: _drilldownFeeScrollCtrl,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: dTableWidth,
+                child: Column(
+                  children: [
+                    headerRow,
+                    ...bodyRows,
+                    footerRow,
                   ],
                 ),
-              ],
+              ),
             ),
-          ))));
+          );
         })))),
         ],
       ),
@@ -5478,7 +5527,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                 child: Row(
                   children: [
                     InkWell(
@@ -5563,6 +5612,9 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           child: DropdownButton<String?>(
                             value: _studentStatusFilter,
                             hint: Text('All Status', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            elevation: 6,
                             style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                             items: [
                               DropdownMenuItem<String>(value: null, child: Text('All Status', style: TextStyle(fontSize: 13.sp))),
@@ -5610,14 +5662,18 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 const double sHMargin = 16;
                 const double sColSpacing = 12;
                 const double sSnoW = 45;
-                const double sAdmNoW = 80;
-                const double sNameW = 160;
-                const double sFeeAmtW = 100;
-                const double sPaidW = 90;
-                const double sFineW = 70;
-                const double sBalanceW = 100;
-                const double sStatusW = 70;
-                const double sActionW = 80;
+                // Equal width for the other 8 columns; the table layout will
+                // distribute remaining viewport space proportionally to keep
+                // them visually identical.
+                const double sOtherW = 110;
+                const double sAdmNoW = sOtherW;
+                const double sNameW = sOtherW;
+                const double sFeeAmtW = sOtherW;
+                const double sPaidW = sOtherW;
+                const double sFineW = sOtherW;
+                const double sBalanceW = sOtherW;
+                const double sStatusW = sOtherW;
+                const double sActionW = sOtherW;
                 final List<double> sColWidths = [sSnoW, sAdmNoW, sNameW, sFeeAmtW, sPaidW, sFineW, sBalanceW, sStatusW, sActionW];
                 final sTotalFixedWidth = sColWidths.reduce((a, b) => a + b) + (sColWidths.length - 1) * sColSpacing + 2 * sHMargin;
                 final sTableWidth = sTotalFixedWidth > constraints.maxWidth ? sTotalFixedWidth : constraints.maxWidth;
@@ -5730,13 +5786,16 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[6], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sBalance), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                             const SizedBox(width: sColSpacing),
-                            SizedBox(width: sAdj[7], child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8.r),
+                            SizedBox(width: sAdj[7], child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: allPaid ? AppColors.success.withValues(alpha: 0.1) : anyPaid ? AppColors.warning.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
                               ),
-                              child: Text(allPaid ? 'Paid' : anyPaid ? 'Partial' : 'Unpaid', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: allPaid ? AppColors.success : anyPaid ? AppColors.warning : AppColors.error)),
                             )),
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[8], child: Align(
@@ -5801,107 +5860,10 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     ),
                     // Classic horizontal scrollbar with arrow buttons
                     if (_canScrollStudent)
-                      Container(
-                        height: 20,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF0F0F0),
-                          border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                        ),
-                        child: Row(
-                          children: [
-                            // Left arrow button
-                            InkWell(
-                              onTap: () {
-                                _studentTableScrollController.animateTo(
-                                  (_studentTableScrollController.offset - 100).clamp(0.0, _studentTableScrollController.position.maxScrollExtent),
-                                  duration: const Duration(milliseconds: 200),
-                                  curve: Curves.easeOut,
-                                );
-                              },
-                              child: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE0E0E0),
-                                  border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                ),
-                                child: AppIcon.linear('Chevron Left', size: 16, color: const Color(0xFF333333)),
-                              ),
-                            ),
-                            // Scrollbar track + thumb
-                            Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, scrollbarConstraints) {
-                                  final maxExtent = _studentTableScrollController.hasClients &&
-                                          _studentTableScrollController.positions.isNotEmpty &&
-                                          _studentTableScrollController.position.hasContentDimensions
-                                      ? _studentTableScrollController.position.maxScrollExtent
-                                      : 1.0;
-                                  final viewportWidth = _studentTableScrollController.hasClients &&
-                                          _studentTableScrollController.positions.isNotEmpty &&
-                                          _studentTableScrollController.position.hasContentDimensions
-                                      ? _studentTableScrollController.position.viewportDimension
-                                      : scrollbarConstraints.maxWidth;
-                                  final totalContentWidth = maxExtent + viewportWidth;
-                                  final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
-                                  final thumbWidth = (scrollbarConstraints.maxWidth * thumbRatio).clamp(30.0, scrollbarConstraints.maxWidth);
-                                  final trackSpace = scrollbarConstraints.maxWidth - thumbWidth;
-                                  final scrollRatio = maxExtent > 0 ? (_studentTableScrollController.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                                  final thumbOffset = trackSpace * scrollRatio;
-
-                                  return GestureDetector(
-                                    onHorizontalDragUpdate: (details) {
-                                      if (trackSpace > 0) {
-                                        final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                                        _studentTableScrollController.jumpTo(newRatio * maxExtent);
-                                      }
-                                    },
-                                    child: Container(
-                                      color: const Color(0xFFF0F0F0),
-                                      height: 20,
-                                      child: Stack(
-                                        children: [
-                                          Positioned(
-                                            left: thumbOffset,
-                                            top: 2,
-                                            child: Container(
-                                              width: thumbWidth,
-                                              height: 16,
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFC0C0C0),
-                                                borderRadius: BorderRadius.circular(2),
-                                                border: Border.all(color: const Color(0xFFB0B0B0)),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            // Right arrow button
-                            InkWell(
-                              onTap: () {
-                                _studentTableScrollController.animateTo(
-                                  (_studentTableScrollController.offset + 100).clamp(0.0, _studentTableScrollController.position.maxScrollExtent),
-                                  duration: const Duration(milliseconds: 200),
-                                  curve: Curves.easeOut,
-                                );
-                              },
-                              child: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE0E0E0),
-                                  border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                ),
-                                child: AppIcon.linear('Chevron Right', size: 16, color: const Color(0xFF333333)),
-                              ),
-                            ),
-                          ],
-                        ),
+                      ClassicHScrollbar(
+                        controller: _studentTableScrollController,
+                        contentWidth: sTableWidth,
+                        viewportWidth: constraints.maxWidth,
                       ),
                   ],
                 );
@@ -6235,22 +6197,44 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         DateTime from = _fromDate;
         DateTime to = _toDate;
         return StatefulBuilder(builder: (ctx, setStateDialog) {
-          Widget presetChip(String label, VoidCallback onTap) => Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
+          String activePreset() {
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            bool sameDay(DateTime a, DateTime b) =>
+                a.year == b.year && a.month == b.month && a.day == b.day;
+            if (sameDay(from, today) && sameDay(to, today)) return 'Today';
+            if (sameDay(to, today) && sameDay(from, now.subtract(const Duration(days: 7)))) return '7 Days';
+            if (sameDay(to, today) && sameDay(from, now.subtract(const Duration(days: 30)))) return '30 Days';
+            if (sameDay(to, today) && sameDay(from, DateTime(now.year, now.month, 1))) return 'This Month';
+            return '';
+          }
+          final preset = activePreset();
+          Widget presetChip(String label, VoidCallback onTap) {
+            final selected = preset == label;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
                     ),
-                    child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              );
+              ),
+            );
+          }
 
           Widget datePickerBox({required String hint, required DateTime value, required ValueChanged<DateTime> onChanged}) {
             return InkWell(
@@ -6603,7 +6587,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                 children: [
                   // Title bar with search & filter
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                     child: Row(
                       children: [
                         AppIcon('grid-1', size: 18, color: AppColors.accent),
@@ -6643,6 +6627,9 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 child: DropdownButton<String?>(
                                   value: _filterFeeType,
                                   hint: Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  dropdownColor: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  elevation: 6,
                                   style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                                   items: [
                                     const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
@@ -6731,19 +6718,22 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                         Expanded(child: LayoutBuilder(
                           builder: (context, constraints) {
                             const headerBg = AppColors.tableHeadBg;
-                            const subTotalBg = Color(0xFFE2E8F0);
+                            // Match the warm zebra/header palette used by the
+                            // other tables instead of the cool blue defaults.
+                            final dateHeaderBg = AppColors.accent.withValues(alpha: 0.10);
+                            const subTotalBg = AppColors.tableHeadBg;
 
                             // Column widths: SNO, RECPT.NO, ROLL NO, NAME, COURSE, CLASS, ...feeTypes, TOTAL
                             const double colSpacing = 12;
                             const double hMargin = 12;
-                            const double snoW = 50;
-                            const double recptW = 100;
-                            const double admnW = 80;
-                            const double nameW = 150;
-                            const double courseW = 100;
-                            const double classW = 70;
-                            const double feeColW = 170;
-                            const double totalColW = 100;
+                            const double snoW = 70;
+                            const double recptW = 140;
+                            const double admnW = 160;   // ROLL NO — fits 12-digit numbers
+                            const double nameW = 220;
+                            const double courseW = 140;
+                            const double classW = 160;  // CLASS — fits "B.E CSE -II" / "B.TECH (IT) -III" on one line
+                            const double feeColW = 180; // each fee type column
+                            const double totalColW = 140;
                             final int feeCount = activeDisplayFeeTypes.length;
 
                             // Build column widths list (FINE col before TOTAL)
@@ -6816,15 +6806,19 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
                             // --- BODY ROWS ---
                             final bodyChildren = <Widget>[];
+                            int dataRowIdx = 0;
                             for (final row in flatRows) {
                               final type = row['_type'] as String;
                               if (type == 'grandTotal') continue;
 
                               if (type == 'dateHeader') {
+                                // Reset zebra index per date group so the first
+                                // row under a header is always white.
+                                dataRowIdx = 0;
                                 // Date header spans the full table row, not constrained to col 0 width
                                 bodyChildren.add(Container(
                                   height: 36,
-                                  color: const Color(0xFFF1F5F9),
+                                  color: dateHeaderBg,
                                   padding: EdgeInsets.symmetric(horizontal: hMargin.toDouble()),
                                   alignment: Alignment.centerLeft,
                                   child: Text(
@@ -6880,10 +6874,10 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                       7 + feeCount, fontWeight: FontWeight.w600,
                                     ),
                                   ],
+                                  bgColor: dataRowIdx.isEven ? Colors.white : AppColors.surface,
                                   height: 36,
                                 ));
-                                // Thin divider between data rows
-                                bodyChildren.add(const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)));
+                                dataRowIdx++;
                               }
                             }
 

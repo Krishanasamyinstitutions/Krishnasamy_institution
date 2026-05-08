@@ -448,7 +448,7 @@ Widget _buildImportCard({
             ),
           ),
         ],
-        SizedBox(height: 12.h),
+        SizedBox(height: 8.h),
 
         // Data grid
         Expanded(

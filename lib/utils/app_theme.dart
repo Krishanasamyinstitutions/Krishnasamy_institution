@@ -257,6 +257,39 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppCard.radius),
         ),
       ),
+      // Soft accent-tinted hover used by DropdownButton menu items, list
+      // tiles and any default Material InkWell. Replaces the muted gray
+      // hover that ships with Material 3 by default.
+      hoverColor: AppColors.accent.withValues(alpha: 0.10),
+      // DropdownMenu (Material 3) — rounded, white, soft elevation.
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(Colors.white),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.white),
+          elevation: const WidgetStatePropertyAll(6),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppColors.border),
+            ),
+          ),
+        ),
+      ),
+      // PopupMenuButton — same rounded, white, accent hover treatment.
+      popupMenuTheme: PopupMenuThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        textStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 

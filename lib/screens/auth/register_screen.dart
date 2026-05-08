@@ -108,6 +108,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _currentStep = step);
   }
 
+  /// Validate the form for [step] and return whether it passed. Used by the
+  /// Next button and the milestone-progress chevron taps so we don't let
+  /// the user advance over a step with required fields still empty.
+  bool _validateStep(int step) {
+    if (step < 0 || step >= _formKeys.length) return true;
+    return _formKeys[step].currentState?.validate() ?? true;
+  }
+
+  /// Wipe every text field and step state so the form is back to its
+  /// freshly-mounted appearance. Called after a successful institution
+  /// creation so the super admin can register the next one without
+  /// stale values bleeding over.
+  void _resetForm() {
+    _institutionNameController.clear();
+    _institutionShortNameController.clear();
+    _institutionCodeController.clear();
+    _authorizedUsernameController.clear();
+    _designationController.clear();
+    _mobileNumberController.clear();
+    _affiliationController.clear();
+    _affiliationNumberController.clear();
+    _address1Controller.clear();
+    _address2Controller.clear();
+    _address3Controller.clear();
+    _pinCodeController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _countryController.clear();
+    _emailController.clear();
+    _yearLabelController.clear();
+    _adminNameController.clear();
+    _adminEmailController.clear();
+    _adminPhoneController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    setState(() {
+      _institutionType = null;
+      _institutionRecognized = 'Yes';
+      _institutionStartDate = null;
+      _affiliationStartYear = null;
+      _yearStartDate = null;
+      _yearEndDate = null;
+      _adminDob = null;
+      _adminDesignation = 'Principal';
+      _logoFile = null;
+      _logoFileName = null;
+      _obscurePassword = true;
+      _obscureConfirm = true;
+      // Each step has its own form key, so just reset their internal state.
+      for (final k in _formKeys) {
+        k.currentState?.reset();
+      }
+    });
+    // Snap back to step 1.
+    _pageController.jumpToPage(0);
+    setState(() => _currentStep = 0);
+  }
+
   String? _logoFileName;
 
   Future<void> _pickLogo() async {
@@ -161,10 +219,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final yrStaDate = _yearStartDate ?? DateTime(DateTime.now().year, 6, 1);
       final yrEndDate = _yearEndDate ?? DateTime(DateTime.now().year + 1, 5, 31);
 
-      // Single atomic RPC call — creates institution rows AND schema in one transaction.
-      // If validation fails or schema creation errors out, the database rolls back
-      // every insert so no partial data is left behind.
+      // Single atomic RPC call — creates institution rows AND schema in one
+      // transaction. If validation fails or schema creation errors out, the
+      // database rolls back every insert so no partial data is left behind.
+      // p_license_key is null because super-admin registration doesn't
+      // require an activation code; the RPC skips the activation gate when
+      // the parameter is null/empty.
       final result = await SupabaseService.client.rpc('register_institution', params: {
+        'p_license_key': null,
         'p_insname': _institutionNameController.text.trim(),
         'p_inscode': _institutionCodeController.text.trim(),
         'p_inshortname': _institutionShortNameController.text.trim(),
@@ -223,8 +285,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
 
       // Create the per-institution student photo bucket. Runs via a
-      // SECURITY DEFINER RPC so anon can trigger it; logs but doesn't
-      // block registration if Supabase can't create the bucket.
+      // SECURITY DEFINER RPC so anon can trigger it. Failure used to
+      // only debugPrint, which made the missing bucket invisible until
+      // someone tried to upload a photo months later. Now we surface it
+      // to the super admin via a snackbar so they can re-run the RPC
+      // manually if Supabase rejected the call.
       if (regResult['inscode'] != null) {
         try {
           await SupabaseService.client.rpc('ensure_student_photo_bucket', params: {
@@ -232,7 +297,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           });
           debugPrint('Photo bucket ready for inscode=${regResult['inscode']}');
         } catch (e) {
-          debugPrint('ensure_student_photo_bucket skipped: $e');
+          debugPrint('ensure_student_photo_bucket failed: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Institution created, but student photo bucket setup failed: $e\n'
+                  'Run: SELECT public.ensure_student_photo_bucket(\'${regResult['inscode']}\') in Supabase SQL Editor.',
+                ),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 10),
+              ),
+            );
+          }
         }
       }
 
@@ -264,12 +341,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
 
-      // Show success and stay on super admin dashboard
+      // Show success and reset the form so the next institution starts
+      // from a blank slate instead of the previous one's data.
       if (mounted) {
         setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Institution created successfully!'), backgroundColor: Colors.green),
         );
+        _resetForm();
         widget.onRegistered?.call();
       }
     } catch (e) {
@@ -349,7 +428,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Spacer(),
                 if (_currentStep < 2)
                   ElevatedButton.icon(
-                    onPressed: () => _goToStep(_currentStep + 1),
+                    onPressed: () {
+                      if (_validateStep(_currentStep)) _goToStep(_currentStep + 1);
+                    },
                     icon: const Text('Next', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                     label: AppIcon.linear('Chevron Right', size: 18),
                     style: ElevatedButton.styleFrom(
@@ -426,7 +507,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final color = stateColor(stepIndex);
 
           return GestureDetector(
-            onTap: () => _goToStep(stepIndex),
+            onTap: () {
+              // Backward (or same) jumps go through immediately.
+              if (stepIndex <= _currentStep) {
+                _goToStep(stepIndex);
+                return;
+              }
+              // Forward jumps must validate every step in between.
+              for (int s = _currentStep; s < stepIndex; s++) {
+                if (!_validateStep(s)) return;
+              }
+              _goToStep(stepIndex);
+            },
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -533,8 +625,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 48,
                     child: DropdownButtonFormField<String>(
                       initialValue: _institutionType,
-                      decoration: _inputDec('Select institution type'),
                       isExpanded: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
+                      decoration: _inputDec('Select institution type'),
                       style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
                       items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
                       onChanged: (v) => setState(() => _institutionType = v),
@@ -657,6 +752,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 48,
                     child: DropdownButtonFormField<String>(
                       initialValue: _institutionRecognized,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       decoration: _inputDec('Select'),
                       style: _fieldStyle(),
                       items: const [DropdownMenuItem(value: 'Yes', child: Text('Yes')), DropdownMenuItem(value: 'No', child: Text('No'))],
@@ -687,7 +785,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32.w, vertical: 20.h),
-      child: Column(
+      child: Form(
+        key: _formKeys[1],
+        child: Column(
         children: [
           // Affiliation card
           Container(
@@ -697,9 +797,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
-            child: Form(
-              key: _formKeys[1],
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -753,7 +851,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ]),
                 ],
               ),
-            ),
           ),
           SizedBox(height: 20.h),
 
@@ -797,7 +894,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _formRow(context, [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 1 *'),
-                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle()),
+                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 2'),
@@ -918,6 +1015,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           SizedBox(height: 20.h),
         ],
       ),
+      ),
     );
   }
 
@@ -982,6 +1080,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       height: 48,
                       child: DropdownButtonFormField<String>(
                         initialValue: _adminDesignation,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
                         decoration: _inputDec('Select designation').copyWith(
                           prefixIcon: AppIcon('personalcard', size: 14, color: AppColors.textSecondary),
                         ),
@@ -1058,11 +1159,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: _inputDec('Enter password').copyWith(
-                        prefixIcon: AppIcon('lock', size: 12, color: AppColors.textSecondary),
-                        suffixIcon: IconButton(
-                          icon: AppIcon(_obscurePassword ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
+                        // Compact tap target — IconButton's default 48×48 hit
+                        // area gets clipped inside the smaller field height,
+                        // so wrap the icon in a tight InkWell instead.
+                        suffixIcon: InkWell(
+                          onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                          customBorder: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: AppIcon(
+                              _obscurePassword ? 'eye-slash' : 'eye',
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
+                        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                       style: _fieldStyle(),
                       validator: (v) {
@@ -1078,11 +1191,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
                       decoration: _inputDec('Re-enter password').copyWith(
-                        prefixIcon: AppIcon('lock', size: 12, color: AppColors.textSecondary),
-                        suffixIcon: IconButton(
-                          icon: AppIcon(_obscureConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
-                          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                        prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
+                        suffixIcon: InkWell(
+                          onTap: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                          customBorder: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: AppIcon(
+                              _obscureConfirm ? 'eye-slash' : 'eye',
+                              size: 18,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ),
+                        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                       style: _fieldStyle(),
                       validator: (v) {

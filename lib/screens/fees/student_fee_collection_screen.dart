@@ -836,9 +836,12 @@ class _StudentFeeCollectionScreenState
                   height: 40,
                   child: DropdownButtonFormField<String>(
                     value: _selectedCourse,
+                    isExpanded: true,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 6,
                     decoration: _inputDec('Course'),
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    isExpanded: true,
                     items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))).toList(),
                     onChanged: (val) {
                       setState(() {
@@ -868,9 +871,12 @@ class _StudentFeeCollectionScreenState
                   child: DropdownButtonFormField<String>(
                     key: ValueKey(_selectedCourse),
                     value: _selectedClass,
+                    isExpanded: true,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 6,
                     decoration: _inputDec('Class'),
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    isExpanded: true,
                     items: _classList.map((c) {
                       return DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)));
                     }).toList(),
@@ -986,6 +992,9 @@ class _StudentFeeCollectionScreenState
           DropdownButtonFormField<String?>(
             value: _selectedTerm,
             isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
             decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
@@ -1015,7 +1024,7 @@ class _StudentFeeCollectionScreenState
           // Panel header
           Container(
             padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -1055,6 +1064,9 @@ class _StudentFeeCollectionScreenState
                     child: DropdownButtonFormField<String?>(
                       value: _selectedTerm,
                       isExpanded: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
                       style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

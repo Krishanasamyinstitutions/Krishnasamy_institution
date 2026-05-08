@@ -252,17 +252,35 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildActionBar(),
-        SizedBox(height: 16.h),
+        // Card container — matches Bank Reconciliation layout
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMsg != null
-                  ? _buildError()
-                  : _buildTable(),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                // Title bar with selected count + Approve + Refresh
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: _buildActionBar(),
+                ),
+                Divider(height: 1, color: AppColors.border),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMsg != null
+                          ? _buildError()
+                          : _buildTable(),
+                ),
+                if (!_loading && _errorMsg == null && _filteredDemands.isNotEmpty)
+                  _buildPagination(),
+              ],
+            ),
+          ),
         ),
-        if (!_loading && _errorMsg == null && _filteredDemands.isNotEmpty)
-          _buildPagination(),
       ],
     );
   }
@@ -312,8 +330,8 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.accent,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.4),
-            disabledForegroundColor: Colors.white70,
+            disabledBackgroundColor: const Color(0xFFE0E0E0),
+            disabledForegroundColor: const Color(0xFF9E9E9E),
             padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
@@ -390,6 +408,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               value: _selectedClass,
               hint: Text('All Classes',
                   style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
               style: TextStyle(
                   fontSize: 13.sp, color: AppColors.textPrimary),
               icon: AppIcon.linear('Chevron Down',

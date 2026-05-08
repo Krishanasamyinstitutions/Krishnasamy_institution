@@ -288,11 +288,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     border: Border(bottom: BorderSide(color: AppColors.border))),
                 child: Row(
                   children: [
-                    AppIcon('people', size: 16, color: AppColors.accent),
+                    AppIcon('people', size: 20, color: AppColors.accent),
                     SizedBox(width: 8.w),
                     Text('Students',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                     const Spacer(),
                     if (!_loadingClasses)
                       Container(
@@ -431,12 +430,12 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
+          padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
           child: Row(
             children: [
-              AppIcon('people', size: 18, color: AppColors.accent),
+              AppIcon('people', size: 20, color: AppColors.accent),
               SizedBox(width: 8.w),
-              Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              Text('All Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
               SizedBox(width: 8.w),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -455,7 +454,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         ),
         Expanded(
           child: Padding(
-            padding: EdgeInsets.all(16.w),
+            padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.w),
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -466,17 +465,17 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
               child: Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
                         Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('ROLL NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('CLASS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
@@ -495,16 +494,16 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             onTap: () => _selectStudent(s),
                             child: Container(
                               color: i.isOdd ? AppColors.surface : Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                               child: Row(
                                 children: [
                                   Expanded(flex: 1, child: Text('${i + 1}', style: cellStyle)),
-                                  Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                  Expanded(flex: 4, child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                                  Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: cellStyle)),
-                                  Expanded(flex: 2, child: Text(s.stuclass, textAlign: TextAlign.center, style: cellStyle)),
-                                  Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: cellStyle)),
-                                  Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: cellStyle)),
+                                  Expanded(flex: 2, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                  Expanded(flex: 3, child: Text(s.stuname, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                                  Expanded(flex: 2, child: Text(s.courname ?? '-', style: cellStyle)),
+                                  Expanded(flex: 2, child: Text(s.stuclass, style: cellStyle)),
+                                  Expanded(flex: 2, child: Text(s.batch ?? '-', style: cellStyle)),
+                                  Expanded(flex: 1, child: Text(s.stugender, style: cellStyle)),
                                   Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary))),
                                 ],
                               ),
@@ -575,15 +574,15 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         // Table header
         Container(
           color: AppColors.tableHeadBg,
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
               Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('ROLL NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 4, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
               Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
             ],
           ),
@@ -606,15 +605,15 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             onTap: () => _selectStudent(s),
                             child: Container(
                               color: i.isOdd ? AppColors.surface : Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                               child: Row(
                                 children: [
                                   Expanded(flex: 1, child: Text('${i + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                  Expanded(flex: 4, child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
-                                  Expanded(flex: 2, child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                  Expanded(flex: 2, child: Text(s.stugender, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                  Expanded(flex: 3, child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                                  Expanded(flex: 2, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 2, child: Text(s.batch ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                                  Expanded(flex: 1, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                                   Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary))),
                                 ],
                               ),
@@ -637,7 +636,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       children: [
         // Back + student info
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 0),
           child: Row(
             children: [
               InkWell(
@@ -747,7 +746,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     final closingBalance = _totalPending;
 
     return Padding(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.w),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(

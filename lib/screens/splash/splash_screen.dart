@@ -48,6 +48,8 @@ class _SplashScreenState extends State<SplashScreen>
         context,
         auth.isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
       );
+    } else if (auth.subscriptionExpired) {
+      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
     } else {
       Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
     }
