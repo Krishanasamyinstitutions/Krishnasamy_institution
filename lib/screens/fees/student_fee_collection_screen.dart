@@ -2171,6 +2171,58 @@ class _StudentFeeCollectionScreenState
         });
       }
 
+      // Resolve a beneficiary bank for this Razorpay payment by walking
+      // the items → feedemand.fee_id → feetype.fg_id → feegroup.ban_id
+      // chain and picking the most common ban_id. Razorpay batches all
+      // fee groups into one transaction, so we stamp the predominant
+      // group's bank — good enough for the testing/demo flow. Mixed
+      // multi-bank payments leave ban_id NULL and a real split-payment
+      // gateway (Razorpay Route / virtual accounts) handles them later.
+      int? razorpayBanId;
+      try {
+        final demIds = items.map((it) => it['dem_id']).whereType<int>().toList();
+        if (demIds.isNotEmpty) {
+          final fdRows = await SupabaseService.fromSchema('feedemand')
+              .select('fee_id')
+              .inFilter('dem_id', demIds);
+          final feeIds = (fdRows as List)
+              .map((r) => r['fee_id'])
+              .whereType<int>()
+              .toSet()
+              .toList();
+          if (feeIds.isNotEmpty) {
+            final ftRows = await SupabaseService.fromSchema('feetype')
+                .select('fg_id')
+                .inFilter('fee_id', feeIds);
+            final fgIds = (ftRows as List)
+                .map((r) => r['fg_id'])
+                .whereType<int>()
+                .toSet()
+                .toList();
+            if (fgIds.isNotEmpty) {
+              final fgRows = await SupabaseService.fromSchema('feegroup')
+                  .select('ban_id')
+                  .inFilter('fg_id', fgIds);
+              final banIds = (fgRows as List)
+                  .map((r) => r['ban_id'])
+                  .whereType<int>()
+                  .toList();
+              if (banIds.isNotEmpty) {
+                // Pick the ban_id that appears most often.
+                final counts = <int, int>{};
+                for (final id in banIds) {
+                  counts[id] = (counts[id] ?? 0) + 1;
+                }
+                final entry = counts.entries.reduce((a, b) => a.value >= b.value ? a : b);
+                razorpayBanId = entry.key;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('ban_id resolve failed: $e');
+      }
+
       // 1. Create a temporary payment for Razorpay order (status I)
       final inserted = await SupabaseService.fromSchema('payment').insert({
         'ins_id': insId,
@@ -2185,6 +2237,7 @@ class _StudentFeeCollectionScreenState
         'createdby': createdBy,
         'recon_status': 'P',
         'payitems': jsonEncode(items),
+        if (razorpayBanId != null) 'ban_id': razorpayBanId,
       }).select('pay_id').single();
       final payId = inserted['pay_id'] as int;
 

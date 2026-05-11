@@ -9,6 +9,7 @@ const _kPassword = 'saved_password';
 const _kInsId = 'saved_ins_id';
 const _kIsSuperAdmin = 'saved_is_super_admin';
 const _kSchema = 'saved_schema';
+const _kYearLabel = 'saved_year_label';
 
 // Password is kept in the OS secure store (Keychain / Keystore / DPAPI /
 // libsecret). Other non-sensitive fields stay in SharedPreferences.
@@ -194,12 +195,13 @@ class AuthProvider extends ChangeNotifier {
     final password = await _secureStorage.read(key: _kPassword);
     final insId = prefs.getInt(_kInsId);
     final isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
+    final yearLabel = prefs.getString(_kYearLabel);
     if (email == null || password == null) return false;
-    return login(email, password, insId: insId, isSuperAdmin: isSuperAdmin);
+    return login(email, password, insId: insId, isSuperAdmin: isSuperAdmin, yearLabel: yearLabel);
   }
 
   /// Save credentials for auto-login on next launch
-  Future<void> saveCredentials(String email, String password, {int? insId, bool isSuperAdmin = false}) async {
+  Future<void> saveCredentials(String email, String password, {int? insId, bool isSuperAdmin = false, String? yearLabel}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kEmail, email);
     await _secureStorage.write(key: _kPassword, value: password);
@@ -210,6 +212,9 @@ class AuthProvider extends ChangeNotifier {
     if (_schema != null) {
       await prefs.setString(_kSchema, _schema!);
     }
+    if (yearLabel != null && yearLabel.isNotEmpty) {
+      await prefs.setString(_kYearLabel, yearLabel);
+    }
   }
 
   /// Clear saved credentials (call on logout)
@@ -219,6 +224,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(_kPassword); // remove any legacy plaintext copy too
     await prefs.remove(_kInsId);
     await prefs.remove(_kSchema);
+    await prefs.remove(_kYearLabel);
     await _secureStorage.delete(key: _kPassword);
   }
 

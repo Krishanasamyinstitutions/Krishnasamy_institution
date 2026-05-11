@@ -31,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _authorizedUsernameController = TextEditingController();
   final _designationController = TextEditingController();
   final _mobileNumberController = TextEditingController();
+  final _activationCodeController = TextEditingController();
 
   final List<String> _institutionTypes = [
     'Schools (Primary, Secondary, Higher Secondary)',
@@ -74,6 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isCreating = false;
+  bool _requestingCode = false;
 
   @override
   void dispose() {
@@ -84,6 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _authorizedUsernameController.dispose();
     _designationController.dispose();
     _mobileNumberController.dispose();
+    _activationCodeController.dispose();
     _affiliationController.dispose();
     _affiliationNumberController.dispose();
     _address1Controller.dispose();
@@ -127,6 +130,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _authorizedUsernameController.clear();
     _designationController.clear();
     _mobileNumberController.clear();
+    _activationCodeController.clear();
     _affiliationController.clear();
     _affiliationNumberController.clear();
     _address1Controller.clear();
@@ -191,6 +195,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  /// Send a new-institution activation request to the office via the
+  /// `request-activation-code` Edge Function. The office sees the institution
+  /// name + email and replies with a code the super-admin pastes back into
+  /// the Activation Code field.
+  Future<void> _requestActivationCode() async {
+    final insName = _institutionNameController.text.trim();
+    final email = _emailController.text.trim();
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (insName.isEmpty || email.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Enter Institution Name and Email first, then request a code.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _requestingCode = true);
+    try {
+      await SupabaseService.client.functions.invoke(
+        'request-activation-code',
+        body: {
+          'purpose': 'register',
+          'insName': insName,
+          'inscode': _institutionCodeController.text.trim(),
+          'contact': _authorizedUsernameController.text.trim(),
+          'mobile': _mobileNumberController.text.trim(),
+          'email': email,
+        },
+      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Request sent. The office will email you an activation code shortly.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not send request: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _requestingCode = false);
+    }
+  }
+
   Future<void> _handleRegister() async {
     if (!_formKeys[2].currentState!.validate()) return;
 
@@ -222,11 +277,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Single atomic RPC call — creates institution rows AND schema in one
       // transaction. If validation fails or schema creation errors out, the
       // database rolls back every insert so no partial data is left behind.
-      // p_license_key is null because super-admin registration doesn't
-      // require an activation code; the RPC skips the activation gate when
-      // the parameter is null/empty.
+      // The activation code is required: register_institution validates the
+      // hash against license_keys (status='used', not 'revoked') and rejects
+      // the call if it doesn't match.
       final result = await SupabaseService.client.rpc('register_institution', params: {
-        'p_license_key': null,
+        'p_license_key': _activationCodeController.text.trim(),
         'p_insname': _institutionNameController.text.trim(),
         'p_inscode': _institutionCodeController.text.trim(),
         'p_inshortname': _institutionShortNameController.text.trim(),
@@ -772,6 +827,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
                   ),
                 ]),
+              ]),
+              SizedBox(height: 16.h),
+
+              _formRow(context, [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _fieldLabel('Activation Code *'),
+                  TextFormField(
+                    controller: _activationCodeController,
+                    decoration: _inputDec('Enter activation code'),
+                    style: _fieldStyle(),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Activation code is required' : null,
+                  ),
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(height: 22.h),
+                  SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _requestingCode ? null : _requestActivationCode,
+                      icon: _requestingCode
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.email_outlined, size: 18),
+                      label: Text(_requestingCode ? 'Sending…' : 'Request Activation Code'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: BorderSide(color: AppColors.accent),
+                        padding: EdgeInsets.symmetric(horizontal: 14.w),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      ),
+                    ),
+                  ),
+                ]),
+                const SizedBox.shrink(),
               ]),
             ],
           ),

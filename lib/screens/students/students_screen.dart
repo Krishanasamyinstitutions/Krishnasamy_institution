@@ -727,6 +727,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _photoUploadTotal = imageFiles.length;
     });
 
+    try {
+      await SupabaseService.client.rpc('ensure_student_photo_bucket', params: {
+        'p_inscode': inscode,
+      });
+    } catch (e) {
+      debugPrint('ensure_student_photo_bucket failed: $e');
+    }
+
     const mimeMap = {
       'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
       'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif',
@@ -2007,17 +2015,26 @@ class _StudentsScreenState extends State<StudentsScreen> {
             style: _inputStyle,
             keyboardType: TextInputType.emailAddress,
           )),
-          _fieldFull(label: 'Class *', child: DropdownButtonFormField<String>(
-            initialValue: _classes.contains(_selectedClass) ? _selectedClass : null,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            elevation: 6,
-            decoration: _dec('Select class'),
-            style: _inputStyle,
-            items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-            onChanged: (v) => setState(() => _selectedClass = v),
-            validator: (v) => v == null ? 'Required' : null,
-          )),
+          _fieldFull(label: 'Class *', child: Builder(builder: (_) {
+            final classOptions = [
+              ..._classes,
+              if (_selectedClass != null &&
+                  _selectedClass!.isNotEmpty &&
+                  !_classes.contains(_selectedClass))
+                _selectedClass!,
+            ];
+            return DropdownButtonFormField<String>(
+              initialValue: classOptions.contains(_selectedClass) ? _selectedClass : null,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
+              decoration: _dec('Select class'),
+              style: _inputStyle,
+              items: classOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (v) => setState(() => _selectedClass = v),
+              validator: (v) => v == null ? 'Required' : null,
+            );
+          })),
         ),
         SizedBox(height: 14.h),
 
