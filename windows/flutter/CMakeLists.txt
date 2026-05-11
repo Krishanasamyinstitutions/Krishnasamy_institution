@@ -109,19 +109,52 @@ add_custom_target(flutter_assemble DEPENDS
 )
 
 # Workaround: on this machine the Flutter tool_backend.bat unpacks only
-# part of the cpp_client_wrapper into ephemeral/ — sometimes just the
-# include subdir, sometimes only the public headers — so the C++ compile
-# of flutter_wrapper_plugin / flutter_wrapper_app fails with C1083 every
-# clean build (missing core_implementations.cc, binary_messenger_impl.h,
-# include/flutter/plugin_registrar.h, etc). Copy the entire SDK cache
-# directory recursively after assemble so every source and internal
-# header is in place. copy_directory is idempotent and a no-op when
-# the contents already match.
+# part of the Windows engine artifacts into ephemeral/. Sometimes just
+# cpp_client_wrapper/include/ lands; the .cc sources, internal *.h files
+# (binary_messenger_impl.h, byte_buffer_streams.h …) and the top-level
+# flutter_*.h headers / flutter_windows.dll are all missing, so the
+# C++ compile of flutter_wrapper_plugin / flutter_wrapper_app fails
+# with C1083 every clean build. As a permanent fix, after assemble runs,
+# copy:
+#   1. the entire cpp_client_wrapper SDK directory into ephemeral/cpp_client_wrapper/
+#   2. the top-level Windows engine SDK directory (flutter_windows.dll,
+#      icudtl.dat, flutter_export.h, flutter_messenger.h, etc) into ephemeral/
+# copy_directory is idempotent and a no-op when contents already match.
 set(CPP_WRAPPER_SDK_DIR "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64/cpp_client_wrapper")
+set(WIN_ENGINE_SDK_DIR  "${FLUTTER_ROOT}/bin/cache/artifacts/engine/windows-x64")
 add_custom_command(TARGET flutter_assemble POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory "${WRAPPER_ROOT}"
   COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CPP_WRAPPER_SDK_DIR}"
     "${WRAPPER_ROOT}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${WIN_ENGINE_SDK_DIR}/flutter_export.h"
+    "${WIN_ENGINE_SDK_DIR}/flutter_windows.h"
+    "${WIN_ENGINE_SDK_DIR}/flutter_messenger.h"
+    "${WIN_ENGINE_SDK_DIR}/flutter_plugin_registrar.h"
+    "${WIN_ENGINE_SDK_DIR}/flutter_texture_registrar.h"
+    "${WIN_ENGINE_SDK_DIR}/flutter_windows.dll"
+    "${WIN_ENGINE_SDK_DIR}/flutter_windows.dll.lib"
+    "${WIN_ENGINE_SDK_DIR}/icudtl.dat"
+    "${EPHEMERAL_DIR}/"
+  VERBATIM
+)
+
+# Same root cause as the cpp_client_wrapper hole: tool_backend.bat skips
+# the asset bundle step too, so the runner's data/flutter_assets/ ends up
+# missing AssetManifest.bin / FontManifest.json / AssetManifest.json,
+# which blows up at app launch with "Unable to load asset" spam. Run
+# `flutter build bundle` (writes to ${PROJECT_DIR}/build/flutter_assets)
+# and mirror its output into the runner's data dir so launch succeeds.
+add_custom_command(TARGET flutter_assemble POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E env ${FLUTTER_TOOL_ENVIRONMENT}
+    "${FLUTTER_ROOT}/bin/flutter.bat" build bundle --suppress-analytics --target=lib/main.dart
+  WORKING_DIRECTORY "${PROJECT_DIR}"
+  VERBATIM
+)
+add_custom_command(TARGET flutter_assemble POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${PROJECT_DIR}/build/flutter_assets"
+    "${PROJECT_DIR}/build/windows/x64/runner/$<CONFIG>/data/flutter_assets"
   VERBATIM
 )

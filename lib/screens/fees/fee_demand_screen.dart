@@ -70,6 +70,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   String _searchQuery = '';
 
   static const _importFieldKeys = [
+    'demno',
     'stuadmno',
     'stuclass',
     'courname',
@@ -83,6 +84,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   ];
 
   static const Map<String, String> _importFieldLabels = {
+    'demno': 'Demand No',
     'stuadmno': 'Roll No',
     'stuclass': 'Class',
     'courname': 'Course',
@@ -363,6 +365,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   static String? _autoMapHeader(String header) {
     final h = header.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     const aliases = {
+      'demno': 'demno', 'demandno': 'demno', 'demandnumber': 'demno', 'docno': 'demno',
       'admissionno': 'stuadmno', 'admno': 'stuadmno', 'stuadmno': 'stuadmno', 'admissionnumber': 'stuadmno', 'rollno': 'stuadmno', 'roll': 'stuadmno', 'rollnumber': 'stuadmno',
       'class': 'stuclass', 'stuclass': 'stuclass',
       'course': 'courname', 'courname': 'courname', 'coursename': 'courname',
@@ -587,6 +590,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         final data = {
           'ins_id': insId,
           'inscode': auth.inscode ?? '',
+          'demno': _cellByKey(row, 'demno'),
           'stuadmno': admNoRaw,
           'stu_id': stuId,
           'stuclass': _cellByKey(row, 'stuclass'),
@@ -1774,15 +1778,17 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       children: [
                         _gridHeaderCell('S.No', width: 60, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Roll No *', flex: 2),
+                        _gridHeaderCell('Demand No', flex: 2),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Class *', flex: 1),
+                        _gridHeaderCell('Roll No *', flex: 3),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Course', flex: 1),
+                        _gridHeaderCell('Class *', flex: 2),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Fee Type *', flex: 2),
+                        _gridHeaderCell('Course', flex: 2),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Year *', flex: 1),
+                        _gridHeaderCell('Fee Type *', flex: 3),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Year *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Semester *', flex: 2),
                         _gridHeaderDivider(),
@@ -1792,7 +1798,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Con. Amt', flex: 2, center: true),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Due Date *', flex: 2, center: true),
+                        _gridHeaderCell('Due Date *', flex: 3, center: true),
                       ],
                     ),
                   ),
@@ -1825,16 +1831,17 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                   child: Row(
                                     children: [
                                       _gridDataCell('${index + 1}', width: 60, center: true),
-                                      _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'stuclass'), flex: 1),
-                                      _gridDataCell(_mappedCell(row, 'courname'), flex: 1),
-                                      _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'yr_id'), flex: 1),
+                                      _gridDataCell(_mappedCell(row, 'demno'), flex: 2),
+                                      _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 3),
+                                      _gridDataCell(_mappedCell(row, 'stuclass'), flex: 2),
+                                      _gridDataCell(_mappedCell(row, 'courname'), flex: 2),
+                                      _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 3),
+                                      _gridDataCell(_mappedCell(row, 'yr_id'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
                                       _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
                                       _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
-                                      _gridDataCell(_mappedCell(row, 'duedate'), flex: 2, center: true),
+                                      _gridDataCell(_mappedCell(row, 'duedate'), flex: 3, center: true),
                                     ],
                                   ),
                                 ),
@@ -1941,6 +1948,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     excel.delete('Sheet1');
 
     final headers = [
+      'Demand No',
       'Roll No',
       'Class',
       'Course',
@@ -1959,7 +1967,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       bold: true,
     );
 
-    const columnWidths = [18.0, 12.0, 18.0, 14.0, 12.0, 16.0, 16.0, 16.0, 20.0, 16.0, 14.0];
+    const columnWidths = [16.0, 18.0, 12.0, 18.0, 14.0, 12.0, 16.0, 16.0, 16.0, 20.0, 16.0];
 
     for (int i = 0; i < headers.length; i++) {
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
@@ -2001,12 +2009,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final sheet = excel['Fee Demands'];
     excel.delete('Sheet1');
 
-    final headers = ['Roll No', 'Class', 'Course', 'Fee Type', 'Fee Year', 'Semester', 'Concession', 'Fee Amount', 'Concession Amount', 'Due Date'];
+    final headers = ['Demand No', 'Roll No', 'Class', 'Course', 'Fee Type', 'Fee Year', 'Semester', 'Concession', 'Fee Amount', 'Concession Amount', 'Due Date'];
     final sampleRows = [
-      ['CS001', 'I Year', 'BSC-CS', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
-      ['CS001', 'I Year', 'BSC-CS', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],
-      ['BBA001', 'II Year', 'BBA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '2000', '2026-05-31'],
-      ['MCA001', 'I Year', 'MCA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '6500', '0', '2026-05-31'],
+      ['', 'CS001', 'I Year', 'BSC-CS', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
+      ['', 'CS001', 'I Year', 'BSC-CS', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],
+      ['', 'BBA001', 'II Year', 'BBA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '2000', '2026-05-31'],
+      ['', 'MCA001', 'I Year', 'MCA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '6500', '0', '2026-05-31'],
     ];
 
     final headerStyle = xl.CellStyle(

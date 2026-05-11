@@ -126,6 +126,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
       final insInfo = results[2] as ({String? name, String? logo, String? address, String? mobile, String? email});
 
+      // Guard: the user may have navigated away while the parallel
+      // queries were in flight. Without this check Flutter logs a
+      // "setState() called after dispose" warning every time the
+      // Transactions tab is left mid-load.
+      if (!mounted) return;
       setState(() {
         _paidTransactions =
             paidData.map((e) => PaymentModel.fromJson(e)).toList();
