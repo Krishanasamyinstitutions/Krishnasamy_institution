@@ -137,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
         insId: _isSuperAdmin ? null : _selectedInsId,
         isSuperAdmin: _isSuperAdmin,
+        yearLabel: _selectedYear,
       );
       if (mounted) {
         Navigator.pushReplacementNamed(

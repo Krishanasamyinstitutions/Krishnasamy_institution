@@ -73,6 +73,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   String _insPhone = '';
   String _insEmail = '';
 
+  // PowerCollege tab state — independent date range so it doesn't override
+  // the Daily Collection range when the user navigates between tabs.
+  DateTime? _pcFrom;
+  DateTime? _pcTo;
+  bool _pcExporting = false;
+  bool _pcLoading = false;
+  List<Map<String, dynamic>> _pcRows = [];
+
   // Daily collection tab state
   DateTime? _dailyFrom;
   DateTime? _dailyTo;
@@ -102,12 +110,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     return m.contains('CASH') || m.contains('CHEQUE') || m.contains('DD');
   }
 
+  String _prefixOf(String paynumber) {
+    final m = RegExp(r'^[A-Za-z]+').firstMatch(paynumber);
+    return m?.group(0) ?? '';
+  }
+
   List<String> _dailyPrefixes() {
     final set = <String>{};
     for (final r in _dailyRows) {
       final n = r['paynumber']?.toString() ?? '';
-      final idx = n.indexOf('/');
-      final p = idx > 0 ? n.substring(0, idx) : n;
+      final p = _prefixOf(n);
       if (p.isNotEmpty) set.add(p);
     }
     final list = set.toList()..sort();
@@ -142,6 +154,172 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       return '$datePart · ${_selectedMode!.toUpperCase()}';
     }
     return datePart;
+  }
+
+  /// Quick-range / custom-range filter dialog for the PowerCollege tab.
+  /// Mirrors the Daily Collection dialog so the two reports feel
+  /// consistent, but trims the payment-mode and user pickers since the
+  /// PowerCollege export is mode-agnostic.
+  Future<void> _openPcDateDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        DateTime? from = _pcFrom;
+        DateTime? to = _pcTo;
+        return StatefulBuilder(builder: (ctx, setStateDialog) {
+          String activePreset() {
+            if (from == null || to == null) return '';
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            bool sameDay(DateTime a, DateTime b) =>
+                a.year == b.year && a.month == b.month && a.day == b.day;
+            if (sameDay(from!, today) && sameDay(to!, today)) return 'Today';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 7)))) return '7 Days';
+            if (sameDay(to!, today) && sameDay(from!, now.subtract(const Duration(days: 30)))) return '30 Days';
+            if (sameDay(to!, today) && sameDay(from!, DateTime(now.year, now.month, 1))) return 'This Month';
+            return '';
+          }
+          final preset = activePreset();
+          Widget presetChip(String label, VoidCallback onTap) {
+            final selected = preset == label;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent.withValues(alpha: 0.14) : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: selected ? AppColors.accent : AppColors.border),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? AppColors.accent : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
+            return InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: value ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                );
+                if (picked != null) onChanged(picked);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(value != null ? _dailyFmt(value) : hint,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3)),
+              );
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            titlePadding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
+            title: Row(
+              children: [
+                Text('Filters', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                  splashRadius: 18,
+                  tooltip: 'Close',
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 460,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  sectionLabel('QUICK RANGE'),
+                  Wrap(children: [
+                    presetChip('Today', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = DateTime(now.year, now.month, now.day); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('7 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 7)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('30 Days', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = now.subtract(const Duration(days: 30)); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                    presetChip('This Month', () {
+                      final now = DateTime.now();
+                      setStateDialog(() { from = DateTime(now.year, now.month, 1); to = DateTime(now.year, now.month, now.day); });
+                    }),
+                  ]),
+                  const SizedBox(height: 16),
+                  sectionLabel('CUSTOM RANGE'),
+                  Row(children: [
+                    Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
+                  ]),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (from != null && to != null) {
+                    setState(() {
+                      _pcFrom = from;
+                      _pcTo = to;
+                    });
+                    _loadPowerCollege();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        });
+      },
+    );
   }
 
   Future<void> _openDailyDateMethodDialog() async {
@@ -450,10 +628,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     final now = DateTime.now();
     _dailyFrom = DateTime(now.year, now.month, 1);
     _dailyTo = DateTime(now.year, now.month, now.day);
+    _pcFrom = DateTime(now.year, now.month, 1);
+    _pcTo = DateTime(now.year, now.month, now.day);
+    // Pre-load the PowerCollege list so the tab isn't blank on first view.
+    _loadPowerCollege();
     _loadData();
     _loadDailyCollection();
   }
@@ -696,8 +878,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           listenable: _tabController,
           builder: (context, _) {
             final selected = _tabController.index;
-            final tabLabels = ['Daily Collection', 'Student Ledger', 'Pending Payment', 'Consolidated Status'];
-            final tabIcons = ['calendar-1', 'book-1', 'clock', 'chart-2'];
+            final tabLabels = ['Daily Collection', 'Student Ledger', 'Pending Payment', 'Consolidated Status', 'PowerCollege'];
+            final tabIcons = ['calendar-1', 'book-1', 'clock', 'chart-2', 'document-download'];
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: SingleChildScrollView(
@@ -746,6 +928,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           _buildStudentLedger(),
                           _buildPendingPayment(),
                           _buildConsolidatedStatus(),
+                          _buildPowerCollege(),
                         ],
                       ),
           ),
@@ -2073,9 +2256,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         if (_selectedMode == 'bank' && isCash) return false;
       }
       if (_selectedPrefix != null) {
-        final n = r['paynumber']?.toString() ?? '';
-        final idx = n.indexOf('/');
-        final p = idx > 0 ? n.substring(0, idx) : n;
+        final p = _prefixOf(r['paynumber']?.toString() ?? '');
         if (p != _selectedPrefix) return false;
       }
       if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
@@ -2916,9 +3097,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           if (_selectedMode == 'bank' && isCash) return false;
         }
         if (_selectedPrefix != null) {
-          final n = r['paynumber']?.toString() ?? '';
-          final idx = n.indexOf('/');
-          final p = idx > 0 ? n.substring(0, idx) : n;
+          final p = _prefixOf(r['paynumber']?.toString() ?? '');
           if (p != _selectedPrefix) return false;
         }
         if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
@@ -3093,6 +3272,267 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
   }
 
+  /// PowerCollege export — one row per (payment, fee demand) for every
+  /// reconciled payment in the selected date range. Joins payment +
+  /// paymentdetails + feedemand + students + bank server-side via the
+  /// get_powercollege_export RPC. Only paystatus='C' AND recon_status='R'
+  /// rows are included (matches the "settled / cleared" expectation).
+  /// Fetch reconciled per-line-item rows for the current PC date range
+  /// into _pcRows. Called on tab init and when the user changes a date.
+  /// Same RPC the export uses; we just keep the result in memory so the
+  /// tab can show a preview and the export button doesn't have to re-fetch.
+  Future<void> _loadPowerCollege() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    final schema = SupabaseService.currentSchema;
+    if (insId == null || schema == null || _pcFrom == null || _pcTo == null) return;
+
+    setState(() {
+      _pcLoading = true;
+      _pcRows = [];
+    });
+    try {
+      String d(DateTime x) => '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
+      final result = await SupabaseService.client.rpc('get_powercollege_export', params: {
+        'p_schema': schema,
+        'p_ins_id': insId,
+        'p_from': d(_pcFrom!),
+        'p_to': d(_pcTo!),
+      });
+      final rows = result is List ? List<Map<String, dynamic>>.from(result) : <Map<String, dynamic>>[];
+      if (mounted) {
+        setState(() {
+          _pcRows = rows;
+          _pcLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('PowerCollege load error: $e');
+      if (mounted) setState(() => _pcLoading = false);
+    }
+  }
+
+  Future<void> _exportPowerCollege() async {
+    if (_pcFrom == null || _pcTo == null) return;
+    if (_pcRows.isEmpty && !_pcLoading) {
+      // Last-second refresh in case the list was cleared.
+      await _loadPowerCollege();
+    }
+    if (_pcRows.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No reconciled payments in this date range.'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
+
+    setState(() => _pcExporting = true);
+    try {
+      final rows = _pcRows;
+      final excel = xl.Excel.createExcel();
+      final sheet = excel['PowerCollege'];
+      excel.delete('Sheet1');
+
+      final headerStyle = xl.CellStyle(
+        bold: true, fontSize: 10,
+        backgroundColorHex: xl.ExcelColor.fromHexString('#2D3748'),
+        fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+      );
+      final numStyle = xl.CellStyle(fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      const headers = [
+        'Roll No', 'Name', 'Course', 'Class',
+        'Transaction Date', 'Payment Mode', 'Doc No', 'Term', 'Fee Type',
+        'Amount', 'Fine', 'Bank Name', 'Settlement Date',
+      ];
+
+      for (int c = 0; c < headers.length; c++) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0));
+        cell.value = xl.TextCellValue(headers[c]);
+        cell.cellStyle = headerStyle;
+      }
+
+      String fmtDate(dynamic raw) {
+        if (raw == null) return '';
+        final s = raw.toString();
+        final dt = DateTime.tryParse(s);
+        return dt == null ? s : _formatDate(dt);
+      }
+
+      double grandTotal = 0;
+      double grandFine = 0;
+      for (int i = 0; i < rows.length; i++) {
+        final r = rows[i];
+        final amt = (r['amount'] as num?)?.toDouble() ?? 0;
+        final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+        grandTotal += amt;
+        grandFine += fine;
+        final row = i + 1;
+
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(r['stuadmno']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(r['stuname']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.TextCellValue(r['courname']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(r['stuclass']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(fmtDate(r['paydate']));
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue(r['paymethod']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue(r['docno']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(r['demfeeterm']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = xl.TextCellValue(r['demfeetype']?.toString() ?? '');
+        final amtCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row));
+        amtCell.value = xl.DoubleCellValue(amt);
+        amtCell.cellStyle = numStyle;
+        final fineCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row));
+        fineCell.value = xl.DoubleCellValue(fine);
+        fineCell.cellStyle = numStyle;
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = xl.TextCellValue(r['banname']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = xl.TextCellValue(fmtDate(r['settlement_date']));
+      }
+
+      // Grand total row
+      final totalRow = rows.length + 1;
+      final totalLabelCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: totalRow));
+      totalLabelCell.value = xl.TextCellValue('Grand Total');
+      totalLabelCell.cellStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final totalCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: totalRow));
+      totalCell.value = xl.DoubleCellValue(grandTotal);
+      totalCell.cellStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+      final fineTotalCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: totalRow));
+      fineTotalCell.value = xl.DoubleCellValue(grandFine);
+      fineTotalCell.cellStyle = xl.CellStyle(bold: true, fontSize: 10, horizontalAlign: xl.HorizontalAlign.Right);
+
+      // Reasonable widths
+      sheet.setColumnWidth(0, 14);
+      sheet.setColumnWidth(1, 28);
+      sheet.setColumnWidth(2, 10);
+      sheet.setColumnWidth(3, 20);
+      sheet.setColumnWidth(4, 16);
+      sheet.setColumnWidth(5, 14);
+      sheet.setColumnWidth(6, 14);
+      sheet.setColumnWidth(7, 12);
+      sheet.setColumnWidth(8, 16);
+      sheet.setColumnWidth(9, 12);
+      sheet.setColumnWidth(10, 10);
+      sheet.setColumnWidth(11, 22);
+      sheet.setColumnWidth(12, 16);
+
+      await _saveExcel(excel, 'PowerCollege_${_formatDateCompact(_pcFrom!)}_${_formatDateCompact(_pcTo!)}');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PowerCollege export error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pcExporting = false);
+    }
+  }
+
+  /// PowerCollege tab — date range pickers, Excel export button, and a
+  /// preview table of every reconciled per-line-item row that the export
+  /// would emit. Same shape as Daily Collection so users can see what
+  /// they'll get before downloading.
+  Widget _buildPowerCollege() {
+    String fmt(dynamic raw) {
+      if (raw == null) return '';
+      final dt = DateTime.tryParse(raw.toString());
+      return dt == null ? raw.toString() : _formatDate(dt);
+    }
+
+    double grandTotal = 0;
+    double grandFine = 0;
+    for (final r in _pcRows) {
+      grandTotal += (r['amount'] as num?)?.toDouble() ?? 0;
+      grandFine += (r['fine'] as num?)?.toDouble() ?? 0;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
+          child: Row(
+            children: [
+              const AppIcon('document-download', size: 18, color: AppColors.accent),
+              SizedBox(width: 8.w),
+              Text('PowerCollege Export',
+                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              SizedBox(width: 8.w),
+              if (_pcLoading)
+                SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+              const Spacer(),
+              SizedBox(
+                height: AppBtn.height(context),
+                child: OutlinedButton.icon(
+                  onPressed: _openPcDateDialog,
+                  icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: AppColors.textPrimary),
+                  label: Text(
+                    _pcFrom != null && _pcTo != null
+                        ? '${_formatDate(_pcFrom!)} – ${_formatDate(_pcTo!)}'
+                        : 'Pick range',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
+                    side: const BorderSide(color: AppColors.border),
+                  ),
+                ),
+              ),
+              SizedBox(width: AppBtn.gap(context)),
+              _miniExportBtn(
+                onPressed: (_pcRows.isEmpty || _pcExporting) ? () {} : _exportPowerCollege,
+                icon: Icons.download_rounded,
+                label: _pcExporting ? 'Exporting…' : 'Excel',
+                color: const Color(0xFF6366F1),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _pcRows.isEmpty
+              ? _emptyState(_pcLoading
+                  ? 'Loading reconciled payments…'
+                  : 'No reconciled payments in this range')
+              : Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: _PowerCollegeTable(rows: _pcRows, fmt: fmt),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: const BoxDecoration(
+                          color: AppColors.tableHeadBg,
+                          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text('${_pcRows.length} line item${_pcRows.length == 1 ? '' : 's'}',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            const Spacer(),
+                            Text('Fine: ₹${grandFine.toStringAsFixed(2)}',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            SizedBox(width: 16.w),
+                            Text('Grand Total: ₹${grandTotal.toStringAsFixed(2)}',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+
   Future<void> _exportDailyCollectionPdf() async {
     try {
       final visibleRows = _dailyRows.where((r) {
@@ -3108,9 +3548,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           if (_selectedMode == 'bank' && isCash) return false;
         }
         if (_selectedPrefix != null) {
-          final n = r['paynumber']?.toString() ?? '';
-          final idx = n.indexOf('/');
-          final p = idx > 0 ? n.substring(0, idx) : n;
+          final p = _prefixOf(r['paynumber']?.toString() ?? '');
           if (p != _selectedPrefix) return false;
         }
         if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
@@ -3430,5 +3868,163 @@ class _StickyTableState extends State<_StickyTable> {
         );
       },
     );
+  }
+}
+
+/// Custom table for the PowerCollege report. Sticky header, scrollable body,
+/// and the project's standard Windows-style horizontal scrollbar pinned to
+/// the bottom (matches the table style used on Fee Collection / Students /
+/// Failed Transactions).
+class _PowerCollegeTable extends StatefulWidget {
+  const _PowerCollegeTable({required this.rows, required this.fmt});
+  final List<Map<String, dynamic>> rows;
+  final String Function(dynamic) fmt;
+
+  @override
+  State<_PowerCollegeTable> createState() => _PowerCollegeTableState();
+}
+
+class _PowerCollegeTableState extends State<_PowerCollegeTable> {
+  final _hCtrl = ScrollController();
+  final _vCtrl = ScrollController();
+
+  static const _colWidths = <double>[
+    120, 220, 110, 130, 140, 110, 130, 90, 200, 100, 90, 240, 140,
+  ];
+  static const _headers = <String>[
+    'Roll No', 'Name', 'Course', 'Class',
+    'Transaction Date', 'Payment Mode', 'Doc No', 'Term', 'Fee Type',
+    'Amount', 'Fine', 'Bank Name', 'Settlement Date',
+  ];
+  static const _numericColumns = <int>{9, 10};
+
+  @override
+  void dispose() {
+    _hCtrl.dispose();
+    _vCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _headerCell(int i) {
+    return Container(
+      width: _colWidths[i],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
+      child: Text(
+        _headers[i],
+        style: TextStyle(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _bodyCell(int i, String text) {
+    return Container(
+      width: _colWidths[i],
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13.sp,
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    double tableWidth = 0;
+    for (final w in _colWidths) {
+      tableWidth += w;
+    }
+
+    return LayoutBuilder(builder: (_, constraints) {
+      final viewportWidth = constraints.maxWidth;
+      final needsScroll = tableWidth > viewportWidth;
+      return Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _hCtrl,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: tableWidth,
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        color: AppColors.tableHeadBg,
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          for (int i = 0; i < _headers.length; i++) _headerCell(i),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _vCtrl,
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          controller: _vCtrl,
+                          itemCount: widget.rows.length,
+                          itemBuilder: (_, idx) {
+                            final r = widget.rows[idx];
+                            final amt = (r['amount'] as num?)?.toDouble() ?? 0;
+                            final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: idx.isEven ? Colors.white : AppColors.surface,
+                                border: const Border(
+                                  bottom: BorderSide(color: AppColors.border, width: 0.5),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  _bodyCell(0, r['stuadmno']?.toString() ?? ''),
+                                  _bodyCell(1, r['stuname']?.toString() ?? ''),
+                                  _bodyCell(2, r['courname']?.toString() ?? ''),
+                                  _bodyCell(3, r['stuclass']?.toString() ?? ''),
+                                  _bodyCell(4, widget.fmt(r['paydate'])),
+                                  _bodyCell(5, r['paymethod']?.toString() ?? ''),
+                                  _bodyCell(6, r['docno']?.toString() ?? ''),
+                                  _bodyCell(7, r['demfeeterm']?.toString() ?? ''),
+                                  _bodyCell(8, r['demfeetype']?.toString() ?? ''),
+                                  _bodyCell(9, amt.toStringAsFixed(2)),
+                                  _bodyCell(10, fine.toStringAsFixed(2)),
+                                  _bodyCell(11, r['banname']?.toString() ?? ''),
+                                  _bodyCell(12, widget.fmt(r['settlement_date'])),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (needsScroll)
+            ClassicHScrollbar(
+              controller: _hCtrl,
+              contentWidth: tableWidth,
+              viewportWidth: viewportWidth,
+            ),
+        ],
+      );
+    });
   }
 }
