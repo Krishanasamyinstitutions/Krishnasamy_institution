@@ -10,6 +10,9 @@
 .svn/
 migrate_working_dir/
 
+# Supabase Edge Function secrets (real values, never commit)
+/scripts/secrets.env
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -71,3 +74,6 @@ linux/flutter/ephemeral/
 
 # OS
 Thumbs.db
+
+# Supabase CLI temp
+supabase/.temp/

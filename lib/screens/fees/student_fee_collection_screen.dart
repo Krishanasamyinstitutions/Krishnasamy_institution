@@ -1,16 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_windows/webview_windows.dart'
     if (dart.library.html) 'webview_windows_stub.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
+import '../../utils/receipt_pdf.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/receipt_widget.dart';
 
 import '../../widgets/app_icon.dart';
 const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -1055,6 +1060,32 @@ class _StudentFeeCollectionScreenState
                   ),
                 ],
                 const Spacer(),
+                if (_selected.isNotEmpty) ...[
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('NET AMOUNT: ',
+                            style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                letterSpacing: 0.3)),
+                        Text(
+                          'Rs.${_totalNetSelected.toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                ],
                 if (_student != null && _terms.isNotEmpty) ...[
                   Text('Semester:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                   SizedBox(width: 8.w),
@@ -1284,13 +1315,15 @@ class _StudentFeeCollectionScreenState
                                 selection: TextSelection.collapsed(offset: clamped.length),
                               );
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Collection amount cannot exceed balance due (₹${bal.toStringAsFixed(0)})'),
-                                    backgroundColor: Colors.red,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      content: Text('Collection amount cannot exceed balance due (₹${bal.toStringAsFixed(0)})'),
+                                      backgroundColor: Colors.red,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
                               }
                             }
                           }
@@ -1303,7 +1336,7 @@ class _StudentFeeCollectionScreenState
                       flex: 2,
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: _numField(_fineCtrl[key], () => setState(() {})),
+                        child: _numField(_fineCtrl[key], () => setState(() {}), maxLength: 4),
                       ),
                     ),
                     // Net Amt
@@ -1347,32 +1380,6 @@ class _StudentFeeCollectionScreenState
                     fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
               ),
               const Spacer(),
-              Container(
-                padding: EdgeInsets.symmetric(
-                    horizontal: 14.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
-                ),
-                child: Row(
-                  children: [
-                    Text('Net Amount: ',
-                        style: TextStyle(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary)),
-                    Text(
-                      'Rs.${_totalNetSelected.toStringAsFixed(2)}',
-                      style: TextStyle(
-                          fontSize: 13.sp,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 12.w),
               ElevatedButton.icon(
                 onPressed:
                     _selected.isEmpty ? null : _onCollectAndReceipt,
@@ -1640,7 +1647,11 @@ class _StudentFeeCollectionScreenState
                                 },
                                 decoration: InputDecoration(
                                   hintText: 'DD/MM/YYYY',
-                                  suffixIcon: AppIcon.linear('calendar', size: 16),
+                                  suffixIcon: Padding(
+                                    padding: EdgeInsets.only(right: 8.w),
+                                    child: AppIcon.linear('calendar', size: 14),
+                                  ),
+                                  suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                                   contentPadding: EdgeInsets.symmetric(
                                     horizontal: 12.w,
                                     vertical: 12.h,
@@ -1884,8 +1895,264 @@ class _StudentFeeCollectionScreenState
     );
   }
 
-  void _downloadReceipt(int payId, String payNumber) {
-    widget.onNavigateToTransactions?.call();
+  Future<void> _downloadReceipt(int payId, String payNumber) async {
+    if (!mounted) return;
+    // Show a non-dismissable spinner while we fetch + render the receipt data.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    ReceiptData? receiptData;
+    try {
+      receiptData = await _fetchReceiptData(payId, payNumber);
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
+        );
+      }
+      return;
+    }
+    if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close spinner
+    if (receiptData == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load receipt details.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    _showReceiptPreviewDialog(receiptData);
+  }
+
+  /// Receipt preview dialog matching the Daily Collection look — header with
+  /// Download / Print / close, then the rendered ReceiptWidget below.
+  void _showReceiptPreviewDialog(ReceiptData receiptData) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+        child: SizedBox(
+          width: 620,
+          height: 920,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        try {
+                          final pdf = await buildReceiptPdf(receiptData);
+                          final bytes = await pdf.save();
+                          final defaultName = 'Receipt_${receiptData.receiptNo.replaceAll('/', '_')}.pdf';
+                          final result = await FilePicker.platform.saveFile(
+                            dialogTitle: 'Save Receipt PDF',
+                            fileName: defaultName,
+                            type: FileType.custom,
+                            allowedExtensions: ['pdf'],
+                          );
+                          if (result != null) {
+                            final file = File(result);
+                            await file.writeAsBytes(bytes);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Receipt saved successfully'), backgroundColor: Colors.green),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
+                            );
+                          }
+                        }
+                      },
+                      icon: AppIcon('document-download', size: 18),
+                      label: const Text('Download'),
+                    ),
+                    SizedBox(width: 8.w),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        try {
+                          final pdf = await buildReceiptPdf(receiptData);
+                          await Printing.layoutPdf(
+                            onLayout: (PdfPageFormat format) async => pdf.save(),
+                            name: 'Receipt_${receiptData.receiptNo.replaceAll('/', '_')}',
+                          );
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
+                            );
+                          }
+                        }
+                      },
+                      icon: AppIcon('printer', size: 18),
+                      label: const Text('Print'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                        elevation: 0,
+                        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: AppIcon.linear('close-circle', size: 20),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(12.w),
+                  child: Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: ReceiptWidget(data: receiptData),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Assembles a ReceiptData object by joining payment + paymentdetails +
+  /// feedemand + student + parent + institution rows. Returns null if the
+  /// payment row can't be found.
+  Future<ReceiptData?> _fetchReceiptData(int payId, String payNumber) async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return null;
+
+    final payment = await SupabaseService.fromSchema('payment')
+        .select('pay_id, paynumber, paydate, paymethod, paystatus, payreference, transtotalamount, stu_id, recon_status, createdat')
+        .eq('pay_id', payId)
+        .maybeSingle();
+    if (payment == null) return null;
+
+    final stuId = payment['stu_id'] as int?;
+    Map<String, dynamic>? student;
+    String? payInchargeMob;
+    if (stuId != null) {
+      student = await SupabaseService.fromSchema('students')
+          .select('stu_id, stuname, stuadmno, stuclass, courname, stuaddress, stumobile')
+          .eq('stu_id', stuId)
+          .maybeSingle();
+      try {
+        final parent = await SupabaseService.getStudentParent(stuId, stuadmno: student?['stuadmno']?.toString());
+        payInchargeMob = parent?['payinchargemob']?.toString();
+      } catch (_) {}
+    }
+
+    // paymentdetails → fee breakdown for this payment
+    final details = await SupabaseService.fromSchema('paymentdetails')
+        .select('dem_id, transtotalamount')
+        .eq('pay_id', payId)
+        .eq('activestatus', 1);
+    final detailList = List<Map<String, dynamic>>.from(details);
+    final demIds = detailList.map((d) => d['dem_id'] as int?).whereType<int>().toSet().toList();
+
+    // Pull the matching feedemand rows so we know term/feetype/duedate/fine
+    // for each line in the receipt.
+    final Map<int, Map<String, dynamic>> demById = {};
+    if (demIds.isNotEmpty) {
+      final demands = await SupabaseService.fromSchema('feedemand')
+          .select('dem_id, demfeetype, demfeeterm, duedate, fineamount, feeamount')
+          .inFilter('dem_id', demIds);
+      for (final d in demands) {
+        demById[d['dem_id'] as int] = Map<String, dynamic>.from(d);
+      }
+    }
+
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    String dateStr = '-';
+    final dateRaw = payment['paydate'] ?? payment['createdat'];
+    if (dateRaw != null) {
+      try {
+        final dt = DateTime.parse(dateRaw.toString());
+        dateStr = '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+      } catch (_) {
+        dateStr = dateRaw.toString();
+      }
+    }
+
+    // Group fee details by term, splitting fine into its own line item.
+    const monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
+    final termMap = <String, List<ReceiptFeeItem>>{};
+    for (final d in detailList) {
+      final demId = d['dem_id'] as int?;
+      final dem = demId != null ? demById[demId] : null;
+      final feeType = dem?['demfeetype']?.toString() ?? 'Fee';
+      String term = dem?['demfeeterm']?.toString() ?? '-';
+      final fine = (dem?['fineamount'] as num?)?.toDouble() ?? 0;
+      final collected = (d['transtotalamount'] as num?)?.toDouble() ?? 0;
+      final feeOnly = (collected - fine).clamp(0, double.infinity).toDouble();
+      if (monthFeeTypes.contains(feeType.toUpperCase())) {
+        final duedate = dem?['duedate'];
+        if (duedate != null) {
+          try {
+            final dt = DateTime.parse(duedate.toString());
+            term = months[dt.month - 1].toUpperCase();
+          } catch (_) {}
+        }
+      }
+      termMap.putIfAbsent(term, () => []);
+      termMap[term]!.add(ReceiptFeeItem(type: feeType, amount: feeOnly));
+      if (fine > 0) {
+        termMap[term]!.add(ReceiptFeeItem(type: '  Fine', amount: fine));
+      }
+    }
+    final totalAmount = (payment['transtotalamount'] as num?)?.toDouble() ?? 0;
+    final termDetails = termMap.isEmpty
+        ? [ReceiptTermDetail(term: '-', fees: [ReceiptFeeItem(type: 'Payment', amount: totalAmount)])]
+        : termMap.entries.map((e) => ReceiptTermDetail(term: e.key, fees: e.value)).toList();
+
+    final ins = await SupabaseService.getInstitutionInfo(insId);
+
+    return ReceiptData(
+      receiptNo: payment['paynumber']?.toString() ?? payNumber,
+      date: dateStr,
+      studentName: student?['stuname']?.toString() ?? '-',
+      mobileNo: (payInchargeMob?.isNotEmpty == true) ? payInchargeMob! : (student?['stumobile']?.toString() ?? '-'),
+      address: student?['stuaddress']?.toString() ?? '-',
+      admissionNo: student?['stuadmno']?.toString() ?? '-',
+      className: student?['stuclass']?.toString() ?? '-',
+      courseName: student?['courname']?.toString().isNotEmpty == true ? student!['courname'].toString() : '-',
+      schoolName: (ins.name?.isNotEmpty == true) ? ins.name! : (auth.insName ?? 'Institution'),
+      schoolAddress: (ins.address?.isNotEmpty == true) ? ins.address! : '-',
+      schoolLogoUrl: ins.logo,
+      schoolMobile: ins.mobile,
+      schoolEmail: ins.email,
+      feeDetails: termDetails,
+      paymentMethod: payment['paymethod']?.toString() ?? '-',
+      paymentDate: dateStr,
+      status: payment['paystatus']?.toString() == 'C' ? 'paid' : 'pending',
+      reconStatus: payment['recon_status']?.toString() ?? 'P',
+      paymentReference: payment['payreference']?.toString(),
+      total: totalAmount,
+    );
   }
 
   // ── Direct payment (Cash / Bank / Cheque) using atomic RPCs ──
@@ -2003,6 +2270,14 @@ class _StudentFeeCollectionScreenState
       // Result is JSON array of receipt numbers
       final receipts = result is List ? result : (result is String ? [result] : []);
       final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+      // Grab the first pay_id so the Download Receipt button has something to fetch.
+      int? firstPayId;
+      for (final r in receipts) {
+        if (r is Map && r['pay_id'] != null) {
+          firstPayId = r['pay_id'] is int ? r['pay_id'] as int : int.tryParse(r['pay_id'].toString());
+          break;
+        }
+      }
 
       // Update cheque details if applicable
       if (_paymentMode == 'Cheque' && receipts.isNotEmpty) {
@@ -2040,7 +2315,7 @@ class _StudentFeeCollectionScreenState
         }
       }
 
-      _showSuccessDialog(receiptStr, totalNet);
+      _showSuccessDialog(receiptStr, totalNet, payId: firstPayId);
     } catch (e) {
       String errorMsg = e.toString();
       if (errorMsg.contains('already fully paid')) {
@@ -2607,6 +2882,13 @@ class _StudentFeeCollectionScreenState
 
         final receipts = rpResult is List ? rpResult : [rpResult];
         final receiptStr = receipts.map((r) => r is Map ? r['paynumber'] ?? r.toString() : r.toString()).join(', ');
+        int? firstPayIdRp;
+        for (final r in receipts) {
+          if (r is Map && r['pay_id'] != null) {
+            firstPayIdRp = r['pay_id'] is int ? r['pay_id'] as int : int.tryParse(r['pay_id'].toString());
+            break;
+          }
+        }
 
         // On cancel/fail, explicitly reset fineamount to 0 on the attempted
         // demands so no stale fine value is left in the DB.
@@ -2628,7 +2910,7 @@ class _StudentFeeCollectionScreenState
 
         if (mounted) {
           if (status == 'C') {
-            _showSuccessDialog(receiptStr, totalNet);
+            _showSuccessDialog(receiptStr, totalNet, payId: firstPayIdRp);
           } else if (result == 'F') {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Payment failed. Receipt: $receiptStr'), backgroundColor: Colors.red),
@@ -2734,7 +3016,7 @@ class _StudentFeeCollectionScreenState
     );
   }
 
-  Widget _numField(TextEditingController? ctrl, VoidCallback onChange) {
+  Widget _numField(TextEditingController? ctrl, VoidCallback onChange, {int? maxLength}) {
     if (ctrl == null) return const SizedBox();
     return SizedBox(
       height: 28.h,
@@ -2745,6 +3027,7 @@ class _StudentFeeCollectionScreenState
             const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+          if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
         ],
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 13.sp),
