@@ -255,6 +255,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       paymentDate: dateStr,
       status: t.isSuccess ? 'paid' : (t.paystatus == 'F' ? 'failed' : 'pending'),
       reconStatus: t.reconStatus ?? 'P',
+      paymentReference: t.payreference,
       total: t.transtotalamount,
     );
   }
@@ -390,8 +391,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     final pdf = pw.Document();
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(60),
+        pageFormat: PdfPageFormat.a5,
+        margin: const pw.EdgeInsets.all(40),
         theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
         build: (pw.Context ctx) {
           String formatAmount(double amount) {
@@ -620,6 +621,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                   pw.SizedBox(height: 6),
                   labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
+                  if (ReceiptWidget.isOnlineMethod(data.paymentMethod) &&
+                      ReceiptWidget.formatReference(data.paymentReference).isNotEmpty) ...[
+                    pw.SizedBox(height: 6),
+                    labelValue('Reference:', ReceiptWidget.formatReference(data.paymentReference)),
+                  ],
                 ],
               ),
               pw.Spacer(),
