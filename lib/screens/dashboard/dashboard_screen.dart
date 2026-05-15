@@ -13,6 +13,7 @@ import '../fees/student_fee_collection_screen.dart';
 import '../fees/student_ledger_screen.dart';
 import '../transactions/failed_transactions_screen.dart';
 import '../admin/admin_creation_screen.dart';
+import '../admin/bank_details_screen.dart';
 import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
@@ -65,6 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _NavSubItem('note-2', 'Class Fee Demand'),
     ]),
     _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
+    _NavItem('bank', 'Bank Accounts', section: 'ADMIN', adminOnly: true),
     _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),
     _NavItem('people', 'Students', section: 'STUDENTS', adminOnly: true),
     _NavItem('book-1', 'Student Ledger', section: 'STUDENTS'),
@@ -1049,7 +1051,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Reports';
+    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Bank Accounts' || label == 'Reports';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -1096,6 +1098,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Sequence Creation') {
       return const SettingsScreen();
+    }
+    if (selectedMenu == 'Bank Accounts') {
+      return const BankDetailsScreen();
     }
     if (selectedMenu == 'Bank Reconciliation') {
       return const BankReconciliationScreen();

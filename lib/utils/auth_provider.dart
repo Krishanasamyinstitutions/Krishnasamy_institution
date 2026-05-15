@@ -9,6 +9,7 @@ const _kPassword = 'saved_password';
 const _kInsId = 'saved_ins_id';
 const _kIsSuperAdmin = 'saved_is_super_admin';
 const _kSchema = 'saved_schema';
+const _kYearLabel = 'saved_year_label';
 
 // Password is kept in the OS secure store (Keychain / Keystore / DPAPI /
 // libsecret). Other non-sensitive fields stay in SharedPreferences.
@@ -20,7 +21,6 @@ class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool _isLoading = false;
   bool _subscriptionActive = false;
-  bool _subscriptionExpired = false;
   bool _isSuperAdmin = false;
   String? _schema;
   String? _userEmail;
@@ -38,7 +38,6 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   bool get subscriptionActive => _subscriptionActive;
-  bool get subscriptionExpired => _subscriptionExpired;
   bool get isSuperAdmin => _isSuperAdmin;
   String? get schema => _schema;
   String? get userEmail => _userEmail;
@@ -56,7 +55,6 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> login(String email, String password, {int? insId, bool isSuperAdmin = false, String? yearLabel}) async {
     _isLoading = true;
     _errorMessage = null;
-    _subscriptionExpired = false;
     notifyListeners();
 
     try {
@@ -85,23 +83,13 @@ class AuthProvider extends ChangeNotifier {
           } catch (_) {/* non-fatal — keep going */}
         }
 
-        // Gate institution logins on a valid subscription year + activated
-        // (non-revoked) license key. Pass yearLabel so we only validate the
-        // year the user actually picked — without it, a key on year A would
-        // grant access to year B (auth bypass). Super admin must always be
-        // able to log in to fix expired institutions, so they bypass.
-        if (!isSuperAdmin && user.insId != null) {
-          final sub = await SupabaseService.checkSubscription(user.insId!, yearLabel: yearLabel);
-          if (!sub.isActive) {
-            _subscriptionExpired = true;
-            _subscriptionActive = false;
-            _errorMessage = sub.reason ?? 'Subscription is not active.';
-            _isLoading = false;
-            notifyListeners();
-            return false;
-          }
-          _subscriptionActive = true;
-        }
+        // Subscription gating removed: activation codes are only consumed
+        // at institution creation. After that, users may log into any year
+        // they have a row for — including past years whose iyrenddate has
+        // elapsed — so they can keep viewing historical data without a
+        // renewal flow. The product-license gate in splash handles app-
+        // wide expiry separately.
+        _subscriptionActive = !isSuperAdmin && user.insId != null;
 
         _isAuthenticated = true;
         _isSuperAdmin = isSuperAdmin;
@@ -194,12 +182,13 @@ class AuthProvider extends ChangeNotifier {
     final password = await _secureStorage.read(key: _kPassword);
     final insId = prefs.getInt(_kInsId);
     final isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
+    final yearLabel = prefs.getString(_kYearLabel);
     if (email == null || password == null) return false;
-    return login(email, password, insId: insId, isSuperAdmin: isSuperAdmin);
+    return login(email, password, insId: insId, isSuperAdmin: isSuperAdmin, yearLabel: yearLabel);
   }
 
   /// Save credentials for auto-login on next launch
-  Future<void> saveCredentials(String email, String password, {int? insId, bool isSuperAdmin = false}) async {
+  Future<void> saveCredentials(String email, String password, {int? insId, bool isSuperAdmin = false, String? yearLabel}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kEmail, email);
     await _secureStorage.write(key: _kPassword, value: password);
@@ -210,6 +199,9 @@ class AuthProvider extends ChangeNotifier {
     if (_schema != null) {
       await prefs.setString(_kSchema, _schema!);
     }
+    if (yearLabel != null && yearLabel.isNotEmpty) {
+      await prefs.setString(_kYearLabel, yearLabel);
+    }
   }
 
   /// Clear saved credentials (call on logout)
@@ -219,6 +211,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(_kPassword); // remove any legacy plaintext copy too
     await prefs.remove(_kInsId);
     await prefs.remove(_kSchema);
+    await prefs.remove(_kYearLabel);
     await _secureStorage.delete(key: _kPassword);
   }
 
@@ -226,7 +219,6 @@ class AuthProvider extends ChangeNotifier {
     await clearCredentials();
     _isAuthenticated = false;
     _subscriptionActive = false;
-    _subscriptionExpired = false;
     _isSuperAdmin = false;
     _schema = null;
     SupabaseService.setSchema(null);
@@ -282,22 +274,4 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Stash institution identity ahead of opening the Subscription Expired
-  /// screen via the login-screen "Activate" link, so the activation screen
-  /// has insId/insName/inscode to (a) target the right institution in the
-  /// activate_subscription_code RPC and (b) prefill the Request Activation
-  /// Code email. Called instead of login() because we don't have/need
-  /// password credentials to activate.
-  Future<void> primeForActivation({
-    required int insId,
-    String? insName,
-    String? inscode,
-  }) async {
-    _insId = insId;
-    _insName = insName;
-    _inscode = inscode;
-    _subscriptionExpired = false;
-    _errorMessage = null;
-    notifyListeners();
-  }
 }

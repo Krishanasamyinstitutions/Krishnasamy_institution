@@ -358,6 +358,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         _passwordController.text,
         insId: _isSuperAdmin ? null : _selectedInsId,
         isSuperAdmin: _isSuperAdmin,
+        yearLabel: _selectedYear,
       );
       if (mounted) {
         Navigator.pushReplacementNamed(
@@ -366,10 +367,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         );
       }
       return;
-    }
-
-    if (mounted && authProvider.subscriptionExpired) {
-      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
     }
   }
 

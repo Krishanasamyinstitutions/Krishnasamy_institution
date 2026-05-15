@@ -208,50 +208,18 @@ class SupabaseService {
   /// label so we only check that specific row.
   static Future<({bool isActive, String? yearLabel, DateTime? endDate, String? reason})> checkSubscription(int insId, {String? yearLabel}) async {
     try {
-      final now = DateTime.now().toIso8601String().split('T').first;
-      var query = client
-          .from('institutionyear')
-          .select('yrlabel, iyrstadate, iyrenddate, iyearsubstatus, iyearlicencekey')
-          .eq('ins_id', insId)
-          .lte('iyrstadate', now)
-          .gte('iyrenddate', now)
-          .eq('iyearsubstatus', 1)
-          .not('iyearlicencekey', 'is', null);
-      if (yearLabel != null && yearLabel.isNotEmpty) {
-        query = query.eq('yrlabel', yearLabel);
-      }
-      final result = await query.maybeSingle();
-
-      if (result == null) {
-        return (isActive: false, yearLabel: null, endDate: null, reason: 'No active subscription year covering today.');
-      }
-
-      final licenseKey = (result['iyearlicencekey'] as String?)?.trim();
-      if (licenseKey == null || licenseKey.isEmpty) {
-        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key missing on institution year.');
-      }
-
-      final keyRow = await client
-          .from('license_keys')
-          .select('status')
-          .eq('license_key', licenseKey)
-          .maybeSingle();
-
-      if (keyRow == null) {
-        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key not recognised.');
-      }
-      final status = (keyRow['status'] as String?)?.toLowerCase();
-      if (status != 'used') {
-        return (isActive: false, yearLabel: null, endDate: null, reason: 'License key is $status.');
-      }
-
+      final res = await client.rpc('check_subscription', params: {
+        'p_ins_id': insId,
+        'p_yrlabel': yearLabel,
+      });
+      final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+      final isActive = m['is_active'] == true;
+      final endRaw = m['end_date']?.toString();
       return (
-        isActive: true,
-        yearLabel: result['yrlabel'] as String?,
-        endDate: result['iyrenddate'] != null
-            ? DateTime.parse(result['iyrenddate'].toString())
-            : null,
-        reason: null,
+        isActive: isActive,
+        yearLabel: m['year_label'] as String?,
+        endDate: endRaw != null && endRaw.isNotEmpty ? DateTime.tryParse(endRaw) : null,
+        reason: isActive ? null : (m['reason'] as String?),
       );
     } catch (e) {
       debugPrint('Subscription check error: $e');
@@ -923,6 +891,60 @@ class SupabaseService {
     }
   }
 
+  // ==================== BANK ACCOUNTS ====================
+
+  /// Per-institution beneficiary bank accounts (school's own, transport's,
+  /// hostel's etc.). Stored in the institution schema, not public, so each
+  /// tenant only sees its own list.
+  static Future<List<Map<String, dynamic>>> getBanks() async {
+    try {
+      final response = await fromSchema('bank')
+          .select('*')
+          .eq('activestatus', 1)
+          .order('ban_id', ascending: true);
+      return List<Map<String, dynamic>>.from(response as List);
+    } catch (e) {
+      debugPrint('Error fetching banks: $e');
+      return [];
+    }
+  }
+
+  static Future<int?> addBank(Map<String, dynamic> data) async {
+    try {
+      final response = await fromSchema('bank')
+          .insert(data)
+          .select('ban_id')
+          .maybeSingle();
+      return response?['ban_id'] as int?;
+    } catch (e) {
+      debugPrint('Error adding bank: $e');
+      rethrow;
+    }
+  }
+
+  static Future<bool> updateBank(int banId, Map<String, dynamic> data) async {
+    try {
+      await fromSchema('bank').update(data).eq('ban_id', banId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating bank: $e');
+      return false;
+    }
+  }
+
+  /// Soft-delete: flips activestatus to 0 so historical fee groups /
+  /// payments still resolve their bank reference. A hard DELETE would
+  /// orphan the FK references.
+  static Future<bool> deleteBank(int banId) async {
+    try {
+      await fromSchema('bank').update({'activestatus': 0}).eq('ban_id', banId);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting bank: $e');
+      return false;
+    }
+  }
+
   // ==================== FEE GROUPS ====================
 
   /// Get all active fee groups for an institution
@@ -937,6 +959,19 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error fetching fee groups: $e');
       return [];
+    }
+  }
+
+  /// Assign / clear the beneficiary bank account on a fee group. Used by
+  /// the Bank Details screen so admins can route each fee group's
+  /// payments to a specific bank without re-importing fee groups.
+  static Future<bool> setFeeGroupBank(int fgId, int? banId) async {
+    try {
+      await fromSchema('feegroup').update({'ban_id': banId}).eq('fg_id', fgId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating feegroup ban_id: $e');
+      return false;
     }
   }
 
