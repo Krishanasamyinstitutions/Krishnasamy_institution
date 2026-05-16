@@ -14,6 +14,7 @@ import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
+import '../../utils/friendly_error.dart';
 
 const _termOrder = [
   'I SEMESTER', 'I TERM', 'II SEMESTER', 'II TERM', 'III SEMESTER', 'III TERM',
@@ -1447,7 +1448,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (int c = 0; c < headers.length; c++) sheet.setColumnWidth(c, c <= 1 ? 18 : 13);
       await _saveExcel(excel, 'Consolidated_Status_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1519,7 +1520,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Consolidated_Status_${_formatDateCompact(DateTime.now())}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1804,7 +1805,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_Payment_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1864,7 +1865,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Pending_Payment_${_formatDateCompact(DateTime.now())}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2296,7 +2297,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2375,7 +2376,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3117,7 +3118,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_Fee_Report_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3258,7 +3259,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_${groupBy}_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3463,7 +3464,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3615,7 +3616,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PowerCollege export error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('PowerCollege export error. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -3859,7 +3860,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         filename: 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}.pdf',
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 

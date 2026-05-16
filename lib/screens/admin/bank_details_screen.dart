@@ -209,32 +209,58 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       backgroundColor: AppColors.surface,
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 16 : 24.w),
-        child: isMobile
-            ? Column(
-                children: [
-                  _buildList(),
-                  const SizedBox(height: 16),
-                  Expanded(child: _buildForm()),
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(flex: 3, child: _buildList()),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    flex: 4,
-                    child: Column(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Page header — matches the User Creation screen.
+            Row(
+              children: [
+                AppIcon('bank', color: AppColors.accent, size: 18),
+                SizedBox(width: 10.w),
+                Text(
+                  'Bank Accounts',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+            Expanded(
+              child: isMobile
+                  ? Column(
+                      children: [
+                        Expanded(flex: 3, child: _buildForm()),
+                        const SizedBox(height: 16),
+                        Expanded(flex: 2, child: _buildAssignmentsPanel()),
+                        const SizedBox(height: 16),
+                        Expanded(flex: 2, child: _buildList()),
+                      ],
+                    )
+                  : Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildForm(),
-                        SizedBox(height: 16.h),
-                        Expanded(child: _buildAssignmentsPanel()),
+                        // Left — Add Bank Account form
+                        Expanded(flex: 4, child: _buildForm()),
+                        SizedBox(width: 16.w),
+                        // Right — Fee Group Assignments (top) + Bank Accounts (below)
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(flex: 2, child: _buildAssignmentsPanel()),
+                              SizedBox(height: 16.h),
+                              Expanded(flex: 3, child: _buildList()),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -244,7 +270,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -360,12 +386,12 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
               ),
               SizedBox(height: 20.h),
               _row([
-                _field('Bank Name *', _nameController, hint: 'HDFC Bank', required: true),
+                _field('Bank Name *', _nameController, hint: 'IOB', required: true),
                 _field('Branch *', _branchController, hint: 'Cuddalore Main', required: true),
               ]),
               SizedBox(height: 16.h),
               _row([
-                _field('IFSC Code *', _ifscController, hint: 'HDFC0001234', required: true),
+                _field('IFSC Code *', _ifscController, hint: 'IOBA0001234', required: true),
                 _field('Account Holder *', _accHolderController, hint: 'KCET College', required: true),
               ]),
               SizedBox(height: 16.h),
@@ -425,7 +451,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(

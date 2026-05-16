@@ -16,6 +16,7 @@ import '../../services/supabase_service.dart';
 import '../auth/register_screen.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../utils/friendly_error.dart';
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
 
@@ -4003,7 +4004,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to save. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -4260,7 +4261,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Update failed. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {

@@ -2344,7 +2344,7 @@ class _StudentFeeCollectionScreenState
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment failed: $errorMsg'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Payment failed. ${friendlyError(errorMsg)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -2608,7 +2608,7 @@ class _StudentFeeCollectionScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Online payment failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Online payment failed. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -2685,7 +2685,7 @@ class _StudentFeeCollectionScreenState
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to open payment window: $e'), backgroundColor: Colors.red),
+            SnackBar(content: Text('Failed to open payment window. ${friendlyError(e)}'), backgroundColor: Colors.red),
           );
         }
       }
