@@ -26,6 +26,7 @@ import '../fees/reports_screen.dart';
 
 
 import '../../widgets/app_icon.dart';
+import '../../utils/friendly_error.dart';
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -68,7 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
     _NavItem('bank', 'Bank Accounts', section: 'ADMIN', adminOnly: true),
     _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),
-    _NavItem('people', 'Students', section: 'STUDENTS', adminOnly: true),
+    _NavItem('people', 'Student', section: 'STUDENTS', adminOnly: true),
     _NavItem('book-1', 'Student Ledger', section: 'STUDENTS'),
     _NavItem('receipt-edit', 'Fee Demand', section: 'FEES'),
     _NavItem('tick-square', 'Fee Demand Approval', section: 'FEES', adminOnly: true),
@@ -269,7 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
@@ -1051,12 +1052,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Students' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Bank Accounts' || label == 'Reports';
+    return label == 'Dashboard' || label == 'Student' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Bank Accounts' || label == 'Reports';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
     final selectedMenu = _navItems[_selectedNavIndex].label;
-    if (selectedMenu == 'Students') {
+    if (selectedMenu == 'Student') {
       final student = _navigateToStudent;
       _navigateToStudent = null;
       return StudentsScreen(key: student != null ? ValueKey(student.stuId) : null, initialStudent: student);

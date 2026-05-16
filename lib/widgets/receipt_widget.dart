@@ -365,8 +365,6 @@ class ReceiptWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('To:', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -468,7 +466,7 @@ class ReceiptWidget extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text('Sub Total', textAlign: TextAlign.right,
+                            child: Text('Total', textAlign: TextAlign.right,
                               style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
                           ),
                           SizedBox(

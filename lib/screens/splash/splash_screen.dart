@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
+import '../../services/device_service.dart';
 import '../../services/supabase_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -40,33 +41,6 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(seconds: 4));
     if (!mounted) return;
 
-    // Product-license gate. The whole app is gated by an annual product
-    // license stored in public.tbsannuallicense. If no active row exists,
-    // route to the product-activation screen; if the most recent row is
-    // expired, route to the expired-license screen. Only when an active
-    // license is found do we proceed to auto-login / onboarding.
-    final license = await SupabaseService.client
-        .rpc('get_product_license_status')
-        .then((v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{})
-        .catchError((_) => <String, dynamic>{});
-    if (!mounted) return;
-    final state = license['state']?.toString();
-    if (state != 'active') {
-      Navigator.pushReplacementNamed(
-        context,
-        state == 'expired' ? AppRoutes.productExpired : AppRoutes.productActivation,
-      );
-      return;
-    }
-    // Soft "ends soon" warning. Threshold is 30 days; blocks navigation
-    // only until the user dismisses the dialog. Shown every startup so
-    // the office has a chance of being contacted before the hard expiry.
-    final daysLeft = (license['days_left'] as num?)?.toInt() ?? 0;
-    if (daysLeft <= 30 && daysLeft > 0) {
-      await _showEndingSoonDialog(daysLeft, license['end_date']?.toString());
-      if (!mounted) return;
-    }
-
     final auth = context.read<AuthProvider>();
     final loggedIn = await auth.tryAutoLogin();
     if (!mounted) return;
@@ -76,38 +50,32 @@ class _SplashScreenState extends State<SplashScreen>
         context,
         auth.isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
       );
-    } else {
-      Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+      return;
     }
-  }
 
-  Future<void> _showEndingSoonDialog(int daysLeft, String? endDate) async {
-    final dayWord = daysLeft == 1 ? 'day' : 'days';
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.schedule_rounded, color: AppColors.accent, size: 40),
-        title: const Text('Subscription Ending Soon'),
-        content: Text(
-          'Your annual license expires in $daysLeft $dayWord'
-          '${endDate != null && endDate.isNotEmpty ? ' (on $endDate)' : ''}.\n\n'
-          'Please contact the office to renew before this date.',
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    // First-run gate: on a brand-new database there is no super-admin
+    // account. Until one is created, route to the Super Admin
+    // Registration screen. Once it exists, this is skipped forever.
+    final saExists = await SupabaseService.client
+        .rpc('super_admin_exists')
+        .then((v) => v == true)
+        .catchError((_) => true); // on error, don't block — fall through
+    if (!mounted) return;
+    if (!saExists) {
+      Navigator.pushReplacementNamed(context, AppRoutes.superAdminRegistration);
+      return;
+    }
+
+    // Device gate: any Windows PC must be activated once before login.
+    // This is a one-time check against the local activation flag — once
+    // a PC is activated it is never re-verified against the server.
+    final activated = await DeviceService.isActivated();
+    if (!mounted) return;
+    if (!activated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.deviceActivation);
+    } else {
+      Navigator.pushReplacementNamed(context, AppRoutes.welcome);
+    }
   }
 
   @override

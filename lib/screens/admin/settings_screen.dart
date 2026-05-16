@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/pill_tab.dart';
+import '../../utils/friendly_error.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -830,7 +831,7 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
@@ -1161,7 +1162,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red));
     }
   }
 
@@ -1171,7 +1172,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
       _loadRules();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rule deleted'), backgroundColor: AppColors.success));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red));
     }
   }
 

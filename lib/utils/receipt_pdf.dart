@@ -128,8 +128,6 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
               pw.Container(height: 1, color: dividerColor),
               pw.SizedBox(height: 12),
               if (isFirstPage) ...[
-                pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 13, color: textDark)),
-                pw.SizedBox(height: 8),
                 pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -244,7 +242,7 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                                 child: pw.Row(
                                   children: [
                                     pw.Expanded(
-                                      child: pw.Text('Sub Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                      child: pw.Text('Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
                                     ),
                                     pw.SizedBox(
                                       width: 119,

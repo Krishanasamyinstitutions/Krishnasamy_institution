@@ -63,7 +63,7 @@ pwsh -ExecutionPolicy Bypass -File scripts\bootstrap_new_supabase.ps1 `
 | Function | Purpose | Secrets required |
 |---|---|---|
 | `request-activation-code` | New institution registration emails office a license key. | `RESEND_API_KEY` |
-| `request-product-license` | New install requests a product license. Office gets the cleartext code by email. | `RESEND_API_KEY` |
+| `request-device-code` | Fresh PC requests a device activation code; office gets an AES-encrypted JSON payload by email. | `RESEND_API_KEY`, `DEVICE_CODE_ENC_KEY` |
 | `send-password-reset-otp` | Sends the 6-digit OTP for institution-user password reset via BulkSMSGateway. | `BULKSMS_USER`, `BULKSMS_PASSWORD`, `BULKSMS_SENDER`, `BULKSMS_TEMPLATE_ID` |
 | `create-razorpay-order` | Creates a Razorpay order for a pending fee payment and stamps payorderid on payment row. | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` |
 | `get-razorpay-payment` | Fetches Razorpay payment status (used after gateway redirect to confirm capture). | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` |

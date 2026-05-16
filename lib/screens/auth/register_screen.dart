@@ -7,6 +7,7 @@ import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../utils/friendly_error.dart';
 class RegisterScreen extends StatefulWidget {
   final VoidCallback? onRegistered;
   const RegisterScreen({super.key, this.onRegistered});
@@ -238,7 +239,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (mounted) {
         messenger.showSnackBar(
-          SnackBar(content: Text('Could not send request: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not send request. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -387,7 +388,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Institution created, but logo upload failed: $e'),
+                content: Text('Institution created, but logo upload failed. ${friendlyError(e)}'),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 6),
               ),
@@ -410,7 +411,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('Registration error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: Colors.red),
         );
         setState(() => _isCreating = false);
       }
