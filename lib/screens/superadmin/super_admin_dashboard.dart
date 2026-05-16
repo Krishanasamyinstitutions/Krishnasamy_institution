@@ -204,6 +204,18 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     return '$dd/$mo ${h12.toString().padLeft(2, '0')}:$mm $ampm';
   }
 
+  /// Full date + time for the header pill. Falls back to the current
+  /// moment until the first refresh stamps [_lastUpdated].
+  String _formatHeaderDateTime(DateTime? t) {
+    final d = t ?? DateTime.now();
+    final h12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final ampm = d.hour < 12 ? 'AM' : 'PM';
+    final mm = d.minute.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    final mo = d.month.toString().padLeft(2, '0');
+    return '$dd/$mo/${d.year}  ${h12.toString().padLeft(2, '0')}:$mm $ampm';
+  }
+
   Future<void> _loadTodayCollections(
       List<_InstitutionFinanceSummary> summaries) async {
     // Try the v2 RPC first — single round-trip aggregation for everything.
@@ -554,7 +566,16 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               width: _sidebarCollapsed ? 78 : 240,
-              child: _buildSidebar(context, _sidebarCollapsed),
+              // Lay the sidebar out at its target width and clip — otherwise
+              // the content overflows while the width tween is mid-flight.
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: _sidebarCollapsed ? 78 : 240,
+                  maxWidth: _sidebarCollapsed ? 78 : 240,
+                  child: _buildSidebar(context, _sidebarCollapsed),
+                ),
+              ),
             ),
           Expanded(
             child: Column(
@@ -658,7 +679,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         children: [
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: collapsed ? 16 : 20,
+              horizontal: collapsed ? 10 : 20,
               vertical: 20,
             ),
             child: Row(
@@ -911,6 +932,76 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             )
           else ...[
             SizedBox(width: 14.w),
+            // Menu name + date/time + refresh, left-aligned beside the collapse icon
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _navItems[_selectedNavIndex].label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                      height: 1.1),
+                ),
+                SizedBox(height: 6.h),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current date & time — refreshed on demand
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon('clock', size: 14, color: AppColors.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatHeaderDateTime(_lastUpdated),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.accent),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    // Refresh — updates the date & time to the current moment
+                    InkWell(
+                      onTap:
+                          _loadingInstitutions ? null : _refreshDashboard,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.accent,
+                        ),
+                        child: _loadingInstitutions
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : AppIcon('refresh',
+                                size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
             if (_trustName.isNotEmpty)
               Expanded(
                 child: Center(
@@ -921,8 +1012,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         ClipOval(
                           child: Image.network(
                             _trustLogo!,
-                            width: 28,
-                            height: 28,
+                            width: 44,
+                            height: 44,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
                                 const SizedBox.shrink(),
@@ -948,19 +1039,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ),
               )
             else
-              Expanded(
-                child: Text(
-                  _navItems[_selectedNavIndex].label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.2,
-                      height: 1.1),
-                ),
-              ),
+              const Spacer(),
           ],
           // Year filter — only on the Dashboard tab, and only when there's
           // a real choice to make. With a single distinct yrlabel across
@@ -1157,70 +1236,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600))))
           else ...[
-            Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: Row(
-                children: [
-                  Text(
-                    _navItems[_selectedNavIndex].label,
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.2,
-                        height: 1.1),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon('clock', size: 14, color: AppColors.accent),
-                        SizedBox(width: 6.w),
-                        Text(
-                          _lastUpdated == null
-                              ? 'Updated —'
-                              : 'Updated ${_formatUpdated(_lastUpdated!)}',
-                          style: TextStyle(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  InkWell(
-                    onTap: _loadingInstitutions ? null : _refreshDashboard,
-                    borderRadius: BorderRadius.circular(999),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        color: AppColors.accent,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _loadingInstitutions
-                              ? const SizedBox(
-                                  width: 12, height: 12,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : AppIcon('refresh', size: 14, color: Colors.white),
-                          SizedBox(width: 6.w),
-                          const Text(
-                            'Refresh',
-                            style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             _buildSummaryRow(),
             SizedBox(height: 16.h),
             Expanded(
@@ -1867,37 +1882,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             // Adaptive layout: stack vertically on mobile, 2-col on tablet,
             // single row on desktop.
             const gap = 12.0;
-            final logoBox = Container(
-              width: 80.w,
-              height: 80.w,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10.r),
-                border: Border.all(color: AppColors.border),
-                color: Colors.white,
-              ),
-              child: s.insLogo != null && s.insLogo!.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(9.r),
-                      child: Image.network(
-                        s.insLogo!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Text(s.insName[0],
-                              style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary)),
-                        ),
-                      ),
-                    )
-                  : Center(
-                      child: Text(s.insName[0],
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary)),
-                    ),
-            );
             final demand = _buildFinanceTile('Total Demand', s.totalDemand, AppColors.accent,
                 icon: 'wallet-1', onTap: () => _showCourseWiseDemand(context, s));
             final collection = _buildFinanceTile('Total Collection', s.totalCollected, AppColors.success,
@@ -1911,8 +1895,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               // Mobile: stack vertically
               return Column(
                 children: [
-                  logoBox,
-                  SizedBox(height: gap),
                   demand,
                   SizedBox(height: gap),
                   collection,
@@ -1923,23 +1905,21 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ],
               );
             } else if (w < 1000) {
-              // Tablet: 2-column grid for finance tiles, logo full width
+              // Tablet: 2-column grid for finance tiles
               final tileWidth = (w - gap) / 2;
               return Column(
                 children: [
                   Row(children: [
-                    logoBox,
+                    SizedBox(width: tileWidth, child: demand),
                     SizedBox(width: gap),
-                    Expanded(child: demand),
+                    SizedBox(width: tileWidth, child: collection),
                   ]),
                   SizedBox(height: gap),
                   Row(children: [
-                    SizedBox(width: tileWidth, child: collection),
-                    SizedBox(width: gap),
                     SizedBox(width: tileWidth, child: approval),
+                    SizedBox(width: gap),
+                    SizedBox(width: tileWidth, child: pending),
                   ]),
-                  SizedBox(height: gap),
-                  pending,
                 ],
               );
             }
@@ -1948,8 +1928,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  logoBox,
-                  SizedBox(width: gap),
                   Expanded(child: demand),
                   SizedBox(width: gap),
                   Expanded(child: collection),
@@ -3440,6 +3418,97 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
     return (r['students'] as num?)?.toInt() ?? 0;
   }
 
+  /// Renders the course breakdown as a grouped register — each course is a
+  /// section with an accent header, its per-class rows, and a S.Total row,
+  /// matching the Date-wise Paid Collection Register style.
+  Widget _buildCourseBreakdownTable(double rowPadH) {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final r in _rows) {
+      final course = '${r['course'] ?? 'Other'}';
+      grouped.putIfAbsent(course, () => []).add(r);
+    }
+
+    // Single cell — flex + alignment shared by every row type.
+    Widget cell(String text, int flex,
+            {TextAlign? align, FontWeight? weight, Color? color}) =>
+        Expanded(
+          flex: flex,
+          child: Text(text,
+              textAlign: align,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: weight ?? FontWeight.w600,
+                  color: color ?? AppColors.textSecondary)),
+        );
+
+    final rows = <Widget>[];
+    grouped.forEach((course, classRows) {
+      // Section header — course name, accent text on a pale accent fill.
+      rows.add(Container(
+        width: double.infinity,
+        color: AppColors.accent.withValues(alpha: 0.10),
+        padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 10),
+        child: Text(course,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent)),
+      ));
+
+      // Per-class rows — zebra restarts within each course section.
+      for (var i = 0; i < classRows.length; i++) {
+        final r = classRows[i];
+        final amount = (r[widget.mode] as num?)?.toDouble() ?? 0;
+        rows.add(Container(
+          color: i.isEven ? Colors.white : AppColors.surface,
+          padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
+          child: Row(
+            children: [
+              cell('', 3),
+              cell('${r['class'] ?? ''}', 2),
+              cell('${_studentsOf(r)}', 2, align: TextAlign.right),
+              cell(_fmt(amount), 4,
+                  align: TextAlign.right,
+                  weight: FontWeight.w700,
+                  color: AppColors.textPrimary),
+            ],
+          ),
+        ));
+      }
+
+      // S.Total — per-course subtotal.
+      final secStudents =
+          classRows.fold<int>(0, (s, r) => s + _studentsOf(r));
+      final secAmount = classRows.fold<double>(
+          0, (s, r) => s + ((r[widget.mode] as num?)?.toDouble() ?? 0));
+      rows.add(Container(
+        color: AppColors.tableHeadBg,
+        padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 12),
+        child: Row(
+          children: [
+            cell('S.Total', 3,
+                weight: FontWeight.w700, color: AppColors.textPrimary),
+            cell('', 2),
+            cell('$secStudents', 2,
+                align: TextAlign.right,
+                weight: FontWeight.w700,
+                color: AppColors.textPrimary),
+            cell(_fmt(secAmount), 4,
+                align: TextAlign.right,
+                weight: FontWeight.w700,
+                color: AppColors.textPrimary),
+          ],
+        ),
+      ));
+    });
+
+    return ListView(children: rows);
+  }
+
   @override
   Widget build(BuildContext context) {
     final String valueLabel;
@@ -3760,61 +3829,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                                       fontSize: 13,
                                                       color: AppColors.textSecondary,
                                                       fontWeight: FontWeight.w600)))
-                                          : ListView.builder(
-                                              itemCount: _rows.length,
-                                              itemBuilder: (context, i) {
-                                                final r = _rows[i];
-                                                final courseLabel = '${r['course'] ?? 'Other'}';
-                                                final classLabel = '${r['class'] ?? ''}';
-                                                final amount = (r[widget.mode] as num?)?.toDouble() ?? 0;
-                                                final students = _studentsOf(r);
-                                                final zebra = i.isOdd ? AppColors.surface : Colors.white;
-                                                return Container(
-                                                  color: zebra,
-                                                  padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
-                                                  child: Row(
-                                                    children: [
-                                                      Expanded(
-                                                          flex: 3,
-                                                          child: Text(courseLabel,
-                                                              maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
-                                                              style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: AppColors.textSecondary))),
-                                                      Expanded(
-                                                          flex: 2,
-                                                          child: Text(classLabel,
-                                                              maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
-                                                              style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: AppColors.textSecondary))),
-                                                      Expanded(
-                                                          flex: 2,
-                                                          child: Text('$students',
-                                                              textAlign: TextAlign.right,
-                                                              style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: AppColors.textSecondary))),
-                                                      Expanded(
-                                                          flex: 4,
-                                                          child: Text(_fmt(amount),
-                                                              textAlign: TextAlign.right,
-                                                              maxLines: 1,
-                                                              overflow: TextOverflow.ellipsis,
-                                                              style: const TextStyle(
-                                                                  fontSize: 13,
-                                                                  fontWeight: FontWeight.w700,
-                                                                  color: AppColors.textPrimary))),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            ),
+                                          : _buildCourseBreakdownTable(rowPadH),
                                     ),
                                     if (_rows.isNotEmpty)
                                       Builder(builder: (_) {
@@ -3844,7 +3859,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
                                             children: [
                                               const Expanded(
                                                   flex: 3,
-                                                  child: Text('TOTAL',
+                                                  child: Text('GRAND TOTAL',
                                                       style: TextStyle(
                                                           fontSize: 13,
                                                           fontWeight: FontWeight.w800,
@@ -4107,76 +4122,97 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
               ],
             ),
             const SizedBox(height: 20),
-            _label('Trust Name'),
-            TextFormField(
-              controller: _trustNameCtrl,
-              decoration: _inputDec('e.g. Krishnaswamy Educational Trust'),
-              style: _fieldStyle(),
-            ),
-            const SizedBox(height: 14),
-            _label('Trust Logo (optional)'),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: _trustLogoFile != null
-                      ? Image.file(_trustLogoFile!, fit: BoxFit.cover)
-                      : ((_trustLogoUrl ?? '').isNotEmpty
-                          ? Image.network(
-                              _trustLogoUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: AppIcon('image', color: AppColors.textSecondary, size: 22),
-                              ),
-                            )
-                          : Center(
-                              child: AppIcon('image', color: AppColors.textSecondary, size: 22),
-                            )),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _trustLogoFileName ?? (((_trustLogoUrl ?? '').isNotEmpty) ? 'Current logo' : 'No logo selected'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      _label('Trust Name'),
+                      TextFormField(
+                        controller: _trustNameCtrl,
+                        readOnly: true,
+                        canRequestFocus: false,
+                        decoration: _inputDec('e.g. Krishnaswamy Educational Trust'),
+                        style: _fieldStyle(),
                       ),
-                      const SizedBox(height: 6),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _label('Trust Logo (optional)'),
                       Row(
                         children: [
-                          OutlinedButton.icon(
-                            onPressed: _pickTrustLogo,
-                            icon: AppIcon('document-upload', size: 14, color: AppColors.accent),
-                            label: Text(_trustLogoFile == null && (_trustLogoUrl ?? '').isEmpty ? 'Choose file' : 'Change'),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border),
-                              foregroundColor: AppColors.textPrimary,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _trustLogoFile != null
+                                ? Image.file(_trustLogoFile!, fit: BoxFit.cover)
+                                : ((_trustLogoUrl ?? '').isNotEmpty
+                                    ? Image.network(
+                                        _trustLogoUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Center(
+                                          child: AppIcon('image', color: AppColors.textSecondary, size: 22),
+                                        ),
+                                      )
+                                    : Center(
+                                        child: AppIcon('image', color: AppColors.textSecondary, size: 22),
+                                      )),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _trustLogoFileName ?? (((_trustLogoUrl ?? '').isNotEmpty) ? 'Current logo' : 'No logo selected'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: _pickTrustLogo,
+                                      icon: AppIcon('document-upload', size: 14, color: AppColors.accent),
+                                      label: Text(_trustLogoFile == null && (_trustLogoUrl ?? '').isEmpty ? 'Choose file' : 'Change'),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.border),
+                                        foregroundColor: AppColors.textPrimary,
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                    if (_trustLogoFile != null || (_trustLogoUrl ?? '').isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      TextButton(
+                                        onPressed: () => setState(() {
+                                          _trustLogoFile = null;
+                                          _trustLogoFileName = null;
+                                          _trustLogoUrl = null;
+                                        }),
+                                        child: const Text('Remove', style: TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          if (_trustLogoFile != null || (_trustLogoUrl ?? '').isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            TextButton(
-                              onPressed: () => setState(() {
-                                _trustLogoFile = null;
-                                _trustLogoFileName = null;
-                                _trustLogoUrl = null;
-                              }),
-                              child: const Text('Remove', style: TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.w600)),
-                            ),
-                          ],
                         ],
                       ),
                     ],
@@ -4184,20 +4220,24 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            Align(
-              alignment: Alignment.centerRight,
-              child: ElevatedButton.icon(
-                onPressed: _savingTrust ? null : _saveTrust,
-                icon: _savingTrust
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : AppIcon('save-2', color: Colors.white, size: 16),
-                label: Text(_savingTrust ? 'Saving…' : 'Save Trust'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            const SizedBox(height: 28),
+            Center(
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _savingTrust ? null : _saveTrust,
+                  icon: _savingTrust
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : AppIcon('save-2', size: 18, color: Colors.white),
+                  label: Text(_savingTrust ? 'Saving…' : 'Save Trust',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ),
             ),
@@ -4300,6 +4340,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
         focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
         filled: true,
         fillColor: Colors.white,
+        // No hover tint — read-only fields shouldn't look interactive.
+        hoverColor: Colors.transparent,
         isDense: false,
         constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
         suffixIcon: suffix,
@@ -4359,6 +4401,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 _label('Username'),
                 TextFormField(
                   controller: _usernameCtrl,
+                  readOnly: true,
+                  canRequestFocus: false,
                   decoration: _inputDec('Enter username'),
                   style: _fieldStyle(),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
@@ -4367,6 +4411,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 _label('Email'),
                 TextFormField(
                   controller: _emailCtrl,
+                  readOnly: true,
+                  canRequestFocus: false,
                   decoration: _inputDec('Enter email'),
                   style: _fieldStyle(),
                   keyboardType: TextInputType.emailAddress,
@@ -4379,6 +4425,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     _label('Username'),
                     TextFormField(
                       controller: _usernameCtrl,
+                      readOnly: true,
+                      canRequestFocus: false,
                       decoration: _inputDec('Enter username'),
                       style: _fieldStyle(),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
@@ -4389,6 +4437,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     _label('Email'),
                     TextFormField(
                       controller: _emailCtrl,
+                      readOnly: true,
+                      canRequestFocus: false,
                       decoration: _inputDec('Enter email'),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.emailAddress,
@@ -4402,6 +4452,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 _label('Mobile No'),
                 TextFormField(
                   controller: _phoneCtrl,
+                  readOnly: true,
+                  canRequestFocus: false,
                   decoration: _inputDec('Enter 10-digit mobile number'),
                   style: _fieldStyle(),
                   keyboardType: TextInputType.phone,
@@ -4423,7 +4475,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 TextFormField(
                   controller: _dobCtrl,
                   readOnly: true,
-                  onTap: _pickDob,
+                  canRequestFocus: false,
                   decoration: _inputDec('Select date of birth',
                       suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
                   style: _fieldStyle(),
@@ -4434,6 +4486,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     _label('Mobile No'),
                     TextFormField(
                       controller: _phoneCtrl,
+                      readOnly: true,
+                      canRequestFocus: false,
                       decoration: _inputDec('Enter 10-digit mobile number'),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.phone,
@@ -4457,7 +4511,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     TextFormField(
                       controller: _dobCtrl,
                       readOnly: true,
-                      onTap: _pickDob,
+                      canRequestFocus: false,
                       decoration: _inputDec('Select date of birth',
                           suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
                       style: _fieldStyle(),
@@ -4492,7 +4546,10 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 ],
               ),
               const SizedBox(height: 16),
-              _label('Current Password *'),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _label('Current Password *'),
+              ),
               TextFormField(
                 controller: _currentPwdCtrl,
                 obscureText: !_showCurrent,
