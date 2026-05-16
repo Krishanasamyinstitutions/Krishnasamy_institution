@@ -15,6 +15,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
+import '../../utils/friendly_error.dart';
 
 class StudentsScreen extends StatefulWidget {
   final StudentModel? initialStudent;
@@ -598,7 +599,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving student: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Error saving student. ${friendlyError(e)}'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -649,7 +650,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo upload failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Photo upload failed. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -689,7 +690,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read folder: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read folder. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1294,7 +1295,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('MOBILE NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                         Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
@@ -1320,7 +1321,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 Expanded(flex: 2, child: Text(s.courname ?? '-', style: cellStyle)),
                                 Expanded(flex: 2, child: Text(s.stuclass, style: cellStyle)),
                                 Expanded(flex: 2, child: Text(s.batch ?? '-', style: cellStyle)),
-                                Expanded(flex: 1, child: Text(s.stugender, style: cellStyle)),
+                                Expanded(flex: 2, child: Text(s.stumobile.isEmpty ? '-' : s.stumobile, style: cellStyle)),
                                 Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary))),
                               ],
                             ),
@@ -2454,7 +2455,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -2519,7 +2520,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: AppColors.error),
         );
       }
     }

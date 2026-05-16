@@ -3937,7 +3937,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       debugPrint('Export collection summary error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     }
@@ -5341,7 +5341,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 // them visually identical.
                 const double sOtherW = 110;
                 const double sAdmNoW = sOtherW;
-                const double sNameW = sOtherW;
+                // Student name needs more room so long names stay on one line.
+                const double sNameW = 200;
                 const double sFeeAmtW = sOtherW;
                 const double sPaidW = sOtherW;
                 const double sFineW = sOtherW;
@@ -5450,7 +5451,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[1], child: Text(admNo, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                             const SizedBox(width: sColSpacing),
-                            SizedBox(width: sAdj[2], child: Text(stuName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                            SizedBox(width: sAdj[2], child: Text(stuName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[3], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sDemand), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                             const SizedBox(width: sColSpacing),

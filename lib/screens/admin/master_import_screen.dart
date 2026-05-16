@@ -9,6 +9,7 @@ import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
 import 'package:provider/provider.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 
 void _showImportResultDialog(BuildContext context, {required int imported, required int skipped, List<String> errors = const [], VoidCallback? onDone}) {
   showDialog(
@@ -626,7 +627,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     try {
       final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId).order('cour_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['cour_id']?.toString() ?? '', r['courname'] ?? '', r['ordid']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['courname'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -643,7 +644,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -729,7 +730,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Course ID', 'Course Name', 'Order'],
+      existingHeaders: const ['Course Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -773,14 +774,20 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('cla_id', ascending: true);
+      final results = await Future.wait([
+        SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('cla_id', ascending: true),
+        SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId),
+      ]);
+      final rows = results[0] as List;
+      final courseRows = results[1] as List;
+      // Course name by cour_id; class name by cla_id (for succeeding class lookup).
+      final courseMap = { for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString() };
+      final classMap = { for (final r in rows) r['cla_id'].toString(): (r['claname'] ?? '').toString() };
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [
-          r['cla_id']?.toString() ?? '',
+        _existingRows = rows.map((r) => [
           r['claname'] ?? '',
-          r['cour_id']?.toString() ?? '',
-          r['succeedingclass']?.toString() ?? '',
-          r['ordid']?.toString() ?? '',
+          courseMap['${r['cour_id'] ?? ''}'] ?? '',
+          classMap['${r['succeedingclass'] ?? ''}'] ?? '',
         ]).toList();
         _isLoadingExisting = false;
       });
@@ -798,7 +805,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -896,7 +903,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class ID', 'Class Name', 'Course ID', 'Succeeding Class', 'Order'],
+      existingHeaders: const ['Class Name', 'Course', 'Succeeding Class'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -940,7 +947,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     try {
       final groups = await SupabaseService.getFeeGroups(insId);
       if (mounted) setState(() {
-        _existingRows = groups.map((g) => [g['fg_id']?.toString() ?? '', g['fgdesc'] ?? '', g['yrlabel'] ?? '']).toList();
+        _existingRows = groups.map((g) => [g['fgdesc'] ?? '', g['yrlabel'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -957,7 +964,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1037,7 +1044,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Fee Group ID', 'Group Name', 'Year'],
+      existingHeaders: const ['Group Name', 'Year'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1091,7 +1098,6 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
         const fineLabels = {'1': 'Yes', '0': 'No'};
         _existingRows = (types as List).map((t) {
           return [
-            t['fee_id']?.toString() ?? '',
             t['feedesc'] ?? '',
             t['feeshort'] ?? '',
             fgNameMap[t['fg_id']] ?? '',
@@ -1115,7 +1121,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1204,7 +1210,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Fee ID', 'Fee Name', 'Short Name', 'Fee Group', 'Year', 'Fine Applicable'],
+      existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Fine Applicable'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1251,7 +1257,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     try {
       final concessions = await SupabaseService.getConcessions(insId);
       if (mounted) setState(() {
-        _existingRows = concessions.map((c) => [c['con_id']?.toString() ?? '', c['condesc'] ?? '']).toList();
+        _existingRows = concessions.map((c) => [c['condesc'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -1268,7 +1274,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1346,7 +1352,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Concession ID', 'Concession Name'],
+      existingHeaders: const ['Concession Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1399,11 +1405,10 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       final admRows = results[1];
       final admMap = { for (final a in (admRows as List)) a['adm_id'].toString(): (a['admname'] ?? '').toString() };
       if (mounted) setState(() {
-        const classOrder = {'PKG': 0, 'LKG': 1, 'UKG': 2, 'I': 3, 'II': 4, 'III': 5, 'IV': 6, 'V': 7, 'VI': 8, 'VII': 9, 'VIII': 10, 'IX': 11, 'X': 12, 'XI': 13, 'XII': 14};
         final sorted = List<Map<String, dynamic>>.from(rows as List);
         sorted.sort((a, b) {
-          final ca = classOrder[a['cfclass']?.toString() ?? ''] ?? 99;
-          final cb = classOrder[b['cfclass']?.toString() ?? ''] ?? 99;
+          final ca = (a['cfclass']?.toString() ?? '').toLowerCase();
+          final cb = (b['cfclass']?.toString() ?? '').toLowerCase();
           if (ca != cb) return ca.compareTo(cb);
           return (a['cfterm']?.toString() ?? '').compareTo(b['cfterm']?.toString() ?? '');
         });
@@ -1431,7 +1436,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1620,7 +1625,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
     try {
       final rows = await SupabaseService.fromSchema('admissiontype').select('adm_id, admname').eq('activestatus', 1).order('adm_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['adm_id']?.toString() ?? '', r['admname']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['admname']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (_) {
@@ -1637,7 +1642,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1710,7 +1715,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Adm ID', 'Admission Name'],
+      existingHeaders: const ['Admission Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );
@@ -1749,7 +1754,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
     try {
       final rows = await SupabaseService.fromSchema('quota').select('quo_id, quoname').eq('ins_id', insId).eq('activestatus', 1).order('quo_id', ascending: true);
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['quo_id']?.toString() ?? '', r['quoname']?.toString() ?? '']).toList();
+        _existingRows = (rows as List).map((r) => [r['quoname']?.toString() ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (_) {
@@ -1766,7 +1771,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not read file: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Could not read file. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -1840,7 +1845,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Quo ID', 'Quota Name'],
+      existingHeaders: const ['Quota Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
     );

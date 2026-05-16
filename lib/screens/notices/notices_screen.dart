@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../utils/friendly_error.dart';
 class NoticesScreen extends StatefulWidget {
   const NoticesScreen({super.key});
 
@@ -940,7 +941,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
