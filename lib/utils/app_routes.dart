@@ -5,7 +5,8 @@ import '../screens/welcome/welcome_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
-import '../screens/auth/subscription_expired_screen.dart';
+import '../screens/auth/device_activation_screen.dart';
+import '../screens/auth/super_admin_registration_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/superadmin/super_admin_dashboard.dart';
 
@@ -16,7 +17,8 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String forgotPassword = '/forgot-password';
-  static const String subscriptionExpired = '/subscription-expired';
+  static const String deviceActivation = '/device-activation';
+  static const String superAdminRegistration = '/super-admin-registration';
   static const String dashboard = '/dashboard';
   static const String superAdminDashboard = '/super-admin-dashboard';
 
@@ -27,7 +29,8 @@ class AppRoutes {
         login: (context) => const LoginScreen(),
         register: (context) => const RegisterScreen(),
         forgotPassword: (context) => const ForgotPasswordScreen(),
-        subscriptionExpired: (context) => const SubscriptionExpiredScreen(),
+        deviceActivation: (context) => const DeviceActivationScreen(),
+        superAdminRegistration: (context) => const SuperAdminRegistrationScreen(),
         dashboard: (context) => const DashboardScreen(),
         superAdminDashboard: (context) => const SuperAdminDashboard(),
       };

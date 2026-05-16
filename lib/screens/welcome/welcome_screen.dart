@@ -368,10 +368,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       }
       return;
     }
-
-    if (mounted && authProvider.subscriptionExpired) {
-      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
-    }
   }
 
   @override

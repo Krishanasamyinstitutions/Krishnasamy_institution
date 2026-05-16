@@ -22,6 +22,7 @@ class ReceiptData {
   final String paymentDate;
   final String status; // 'paid' or 'pending'
   final String reconStatus; // 'P' = pending recon, 'R' = reconciled
+  final String? paymentReference; // gateway txn id / UTR — shown only for online/UPI
   final double total;
 
   const ReceiptData({
@@ -43,6 +44,7 @@ class ReceiptData {
     required this.paymentDate,
     required this.status,
     this.reconStatus = 'R',
+    this.paymentReference,
     required this.total,
   });
 }
@@ -61,8 +63,10 @@ class ReceiptFeeItem {
   const ReceiptFeeItem({required this.type, required this.amount});
 }
 
-/// Flutter receipt widget matching the Figma design exactly
-/// Renders multiple A4 pages (595 x 842) when fee items overflow
+/// Flutter receipt widget matching the Figma design exactly.
+/// On-screen preview renders at A4 (595 x 842 pt). The actual PDF that
+/// gets printed/downloaded is sized A5 by the PDF builders — the preview
+/// is just for viewing, so we keep it spacious.
 class ReceiptWidget extends StatelessWidget {
   final ReceiptData data;
 
@@ -316,6 +320,11 @@ class ReceiptWidget extends StatelessWidget {
                 _labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                 const SizedBox(height: 3),
                 _labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
+                if (isOnlineMethod(data.paymentMethod) &&
+                    formatReference(data.paymentReference).isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  _labelValue('Reference:', formatReference(data.paymentReference)),
+                ],
               ],
             ),
           ],
@@ -324,12 +333,38 @@ class ReceiptWidget extends StatelessWidget {
     );
   }
 
+  static bool isOnlineMethod(String method) {
+    final m = method.toLowerCase();
+    return m.contains('razorpay') ||
+        m.contains('online') ||
+        m.contains('upi') ||
+        m.contains('netbanking') ||
+        m.contains('card');
+  }
+
+  /// Strips operator metadata stored in `payreference` so the receipt only
+  /// shows the txn id. Example: "UPI Txn: DE55254MO by Satheesh" → "DE55254MO".
+  static String formatReference(String? raw) {
+    if (raw == null) return '';
+    var s = raw.trim();
+    if (s.isEmpty) return '';
+    // Drop a leading "<label>: " prefix (e.g. "UPI Txn:", "Cheque No:").
+    final colon = s.indexOf(':');
+    if (colon != -1 && colon < 30) {
+      s = s.substring(colon + 1).trim();
+    }
+    // Drop a trailing " by <name>" recorded-by suffix.
+    final byMatch = RegExp(r'\s+by\s+.+$', caseSensitive: false).firstMatch(s);
+    if (byMatch != null) {
+      s = s.substring(0, byMatch.start).trim();
+    }
+    return s;
+  }
+
   Widget _buildStudentInfo() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('To:', style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w600, color: _textDark)),
-        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -431,7 +466,7 @@ class ReceiptWidget extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Text('Sub Total', textAlign: TextAlign.right,
+                            child: Text('Total', textAlign: TextAlign.right,
                               style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
                           ),
                           SizedBox(

@@ -5,6 +5,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
+import '../../services/device_service.dart';
+import '../../services/supabase_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -48,10 +50,31 @@ class _SplashScreenState extends State<SplashScreen>
         context,
         auth.isSuperAdmin ? AppRoutes.superAdminDashboard : AppRoutes.dashboard,
       );
-    } else if (auth.subscriptionExpired) {
-      Navigator.pushReplacementNamed(context, AppRoutes.subscriptionExpired);
+      return;
+    }
+
+    // First-run gate: on a brand-new database there is no super-admin
+    // account. Until one is created, route to the Super Admin
+    // Registration screen. Once it exists, this is skipped forever.
+    final saExists = await SupabaseService.client
+        .rpc('super_admin_exists')
+        .then((v) => v == true)
+        .catchError((_) => true); // on error, don't block — fall through
+    if (!mounted) return;
+    if (!saExists) {
+      Navigator.pushReplacementNamed(context, AppRoutes.superAdminRegistration);
+      return;
+    }
+
+    // Device gate: any Windows PC must be activated once before login.
+    // This is a one-time check against the local activation flag — once
+    // a PC is activated it is never re-verified against the server.
+    final activated = await DeviceService.isActivated();
+    if (!mounted) return;
+    if (!activated) {
+      Navigator.pushReplacementNamed(context, AppRoutes.deviceActivation);
     } else {
-      Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+      Navigator.pushReplacementNamed(context, AppRoutes.welcome);
     }
   }
 

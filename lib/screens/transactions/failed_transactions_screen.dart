@@ -15,6 +15,7 @@ import '../../services/supabase_service.dart';
 import '../../models/payment_model.dart';
 import '../../models/student_model.dart';
 import '../../widgets/receipt_widget.dart';
+import '../../utils/friendly_error.dart';
 
 class FailedTransactionsScreen extends StatefulWidget {
   const FailedTransactionsScreen({super.key});
@@ -76,8 +77,21 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     return filtered;
   }
 
+  // 'all' | 'paid' | 'failed' — toggled by tapping the summary cards.
+  String _statusFilter = 'all';
+
   List<PaymentModel> get _allTransactions {
-    final all = [..._paidTransactions, ..._failedTransactions];
+    final List<PaymentModel> all;
+    switch (_statusFilter) {
+      case 'paid':
+        all = [..._paidTransactions];
+        break;
+      case 'failed':
+        all = [..._failedTransactions];
+        break;
+      default:
+        all = [..._paidTransactions, ..._failedTransactions];
+    }
     all.sort((a, b) {
       final dateA = a.paydate ?? a.createdat;
       final dateB = b.paydate ?? b.createdat;
@@ -255,6 +269,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       paymentDate: dateStr,
       status: t.isSuccess ? 'paid' : (t.paystatus == 'F' ? 'failed' : 'pending'),
       reconStatus: t.reconStatus ?? 'P',
+      paymentReference: t.payreference,
       total: t.transtotalamount,
     );
   }
@@ -390,8 +405,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     final pdf = pw.Document();
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(60),
+        pageFormat: PdfPageFormat.a5,
+        margin: const pw.EdgeInsets.all(40),
         theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
         build: (pw.Context ctx) {
           String formatAmount(double amount) {
@@ -620,6 +635,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
                   pw.SizedBox(height: 6),
                   labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
+                  if (ReceiptWidget.isOnlineMethod(data.paymentMethod) &&
+                      ReceiptWidget.formatReference(data.paymentReference).isNotEmpty) ...[
+                    pw.SizedBox(height: 6),
+                    labelValue('Reference:', ReceiptWidget.formatReference(data.paymentReference)),
+                  ],
                 ],
               ),
               pw.Spacer(),
@@ -673,7 +693,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       debugPrint('Error downloading receipt: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
@@ -690,7 +710,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
       debugPrint('Error printing receipt: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
@@ -700,85 +720,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // 1. Tab buttons (on top)
-        ListenableBuilder(
-          listenable: _tabController,
-          builder: (context, _) {
-            final selected = _tabController.index;
-            final tabColors = [AppColors.accent, Colors.green.shade600, Colors.red.shade600];
-            final tabBgColors = [AppColors.accent.withValues(alpha: 0.1), Colors.green.shade50, Colors.red.shade50];
-            final tabIcons = ['menu-1', 'tick-circle', 'close-circle'];
-            final tabLabels = ['All', 'Paid', 'Failed'];
-            final filteredPaid = _applyDateFilter(_paidTransactions);
-            final filteredFailed = _applyDateFilter(_failedTransactions);
-            final tabCounts = [
-              filteredPaid.length + filteredFailed.length,
-              filteredPaid.length,
-              filteredFailed.length,
-            ];
-
-            final compact = MediaQuery.of(context).size.width <= 1366;
-            final pillHPad = compact ? 14.0 : 18.0;
-            final pillVPad = compact ? 8.0 : 10.0;
-            final pillRadius = compact ? 18.0 : 22.0;
-            final pillIconSize = compact ? 14.0 : 16.0;
-            final pillTextSize = compact ? 12.0 : 13.0;
-            final pillGap = compact ? 6.0 : 8.0;
-            final badgeHPad = compact ? 8.0 : 10.0;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  for (int i = 0; i < 3; i++) ...[
-                    GestureDetector(
-                      onTap: () => _tabController.animateTo(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: EdgeInsets.symmetric(horizontal: pillHPad, vertical: pillVPad),
-                        decoration: BoxDecoration(
-                          color: selected == i ? tabColors[i] : Colors.transparent,
-                          borderRadius: BorderRadius.circular(pillRadius),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AppIcon(tabIcons[i], size: pillIconSize, color: selected == i ? Colors.white : tabColors[i]),
-                            SizedBox(width: pillGap),
-                            Text(
-                              tabLabels[i],
-                              style: TextStyle(
-                                fontSize: pillTextSize,
-                                fontWeight: FontWeight.w600,
-                                color: selected == i ? Colors.white : AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(width: pillGap),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: badgeHPad, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: selected == i ? Colors.white.withValues(alpha: 0.25) : tabBgColors[i],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${tabCounts[i]}',
-                                style: TextStyle(fontSize: pillTextSize, fontWeight: FontWeight.w700, color: selected == i ? Colors.white : tabColors[i]),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (i < 2) SizedBox(width: pillGap),
-                  ],
-                ],
-              ),
-            );
-          },
-        ),
-        SizedBox(height: 10.h),
-
-        // 2. Summary cards
+        // Summary cards
         _buildSummaryCards(),
         SizedBox(height: 10.h),
 
@@ -865,14 +807,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildAllTransactionTable(),
-                            _buildTransactionTable(_filterBySearch(_paidTransactions), isPaid: true),
-                            _buildTransactionTable(_filterBySearch(_failedTransactions), isPaid: false),
-                          ],
-                        ),
+                      : _buildAllTransactionTable(),
                 ),
               ],
             ),
@@ -1156,6 +1091,9 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredPaid.length} transactions',
             Colors.green,
             'tick-circle',
+            selected: _statusFilter == 'paid',
+            onTap: () => setState(() =>
+                _statusFilter = _statusFilter == 'paid' ? 'all' : 'paid'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1166,6 +1104,9 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredFailed.length} transactions',
             Colors.red,
             'info-circle',
+            selected: _statusFilter == 'failed',
+            onTap: () => setState(() =>
+                _statusFilter = _statusFilter == 'failed' ? 'all' : 'failed'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1176,6 +1117,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             'All records',
             AppColors.primary,
             'receipt-2',
+            selected: _statusFilter == 'all',
+            onTap: () => setState(() => _statusFilter = 'all'),
           ),
         ),
       ],
@@ -1183,52 +1126,56 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   Widget _buildSummaryCard(
-      String title, String value, String subtitle, Color color, String icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      String title, String value, String subtitle, Color color, String icon,
+      {bool selected = false, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10.r),
+      child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: selected ? color.withValues(alpha: 0.06) : Colors.white,
         borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: selected ? color : AppColors.border, width: selected ? 1.5 : 1),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+              borderRadius: BorderRadius.circular(8.r),
             ),
-            child: AppIcon(icon, color: color, size: 20),
+            child: AppIcon(icon, color: color, size: 16),
           ),
-          SizedBox(width: 14.w),
+          SizedBox(width: 12.w),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 13.sp,
+                    fontSize: 11.sp,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 4.h),
+                SizedBox(height: 2.h),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 18.sp,
+                    fontSize: 15.sp,
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 2.h),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 13.sp,
+                    fontSize: 10.sp,
                     color: AppColors.textSecondary.withValues(alpha: 0.7),
                   ),
                 ),
@@ -1237,10 +1184,11 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           ),
         ],
       ),
+      ),
     );
   }
 
-  // ── Sticky-header table (reused by all three tabs) ──
+  // ── Sticky-header table ──
   static const _txColWidths = <double>[60, 90, 180, 110, 120, 100, 90, 100, 160, 110, 90, 140];
   static const _txHeaders = <String>[
     'S NO.', 'PAY NO', 'STUDENT', 'COURSE', 'CLASS', 'AMOUNT',

@@ -14,6 +14,7 @@ import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
+import '../../utils/friendly_error.dart';
 
 const _termOrder = [
   'I SEMESTER', 'I TERM', 'II SEMESTER', 'II TERM', 'III SEMESTER', 'III TERM',
@@ -65,7 +66,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   List<String> _feeTypes = [];
   String? _selectedCourse;
   String? _selectedClass;
-  String? _selectedFeeType;
+  Set<String> _selectedFeeTypes = <String>{};
+  final GlobalKey _feeTypeKey = GlobalKey();
 
   // Institution info
   String _insName = '';
@@ -802,7 +804,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     return _allDemands.where((d) {
       if (_selectedCourse != null && d['courname']?.toString() != _selectedCourse) return false;
       if (_selectedClass != null && d['stuclass']?.toString() != _selectedClass) return false;
-      if (_selectedFeeType != null && d['demfeetype']?.toString() != _selectedFeeType) return false;
+      if (_selectedFeeTypes.isNotEmpty && !_selectedFeeTypes.contains(d['demfeetype']?.toString())) return false;
       return true;
     }).toList();
   }
@@ -939,6 +941,176 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
   // Styled like the "All Methods" dropdown on Fee Collection: white pill,
   // border, just text + chevron (no leading icon), responsive at <=1366.
+  /// Multi-select checkbox dropdown for fee types. Same visual shell as
+  /// _filterDropdown so it lines up with the other Daily Collection filters.
+  /// Empty selection = "All Fee Types".
+  Widget _feeTypeMultiSelect({required double width}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final radius = compact ? 6.0 : 10.0;
+    final textSize = compact ? 11.0 : 13.0;
+    final selectedCount = _selectedFeeTypes.length;
+    final label = selectedCount == 0
+        ? 'All Fee Types'
+        : selectedCount == 1
+            ? _selectedFeeTypes.first
+            : '$selectedCount fee types';
+    return SizedBox(
+      key: _feeTypeKey,
+      width: width,
+      height: AppBtn.height(context),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(radius),
+        onTap: _openFeeTypePicker,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: hPad),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFeeTypePicker() async {
+    final renderBox = _feeTypeKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final triggerPos = renderBox.localToGlobal(Offset.zero);
+    final triggerSize = renderBox.size;
+    final screen = MediaQuery.of(context).size;
+
+    const popupWidth = 280.0;
+    const popupMaxHeight = 360.0;
+    // Anchor: left-aligned to trigger, just below it. Clamp to screen.
+    final left = triggerPos.dx
+        .clamp(8.0, (screen.width - popupWidth - 8).clamp(8.0, screen.width));
+    final top = (triggerPos.dy + triggerSize.height + 4)
+        .clamp(8.0, (screen.height - 100).clamp(8.0, screen.height));
+
+    final tempSelected = Set<String>.from(_selectedFeeTypes);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      barrierColor: Colors.transparent,
+      builder: (ctx) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ),
+          Positioned(
+            left: left,
+            top: top,
+            width: popupWidth,
+            child: StatefulBuilder(builder: (ctx, setLocalState) {
+              return Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: popupMaxHeight),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text('Select Fee Types',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                            ),
+                            InkWell(
+                              onTap: () => setLocalState(() => tempSelected
+                                ..clear()
+                                ..addAll(_feeTypes)),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Text('Select All',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => setLocalState(tempSelected.clear),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Text('Clear',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Flexible(
+                        child: ListView(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          children: _feeTypes
+                              .map((ft) => CheckboxListTile(
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    controlAffinity: ListTileControlAffinity.leading,
+                                    value: tempSelected.contains(ft),
+                                    title: Text(ft, style: const TextStyle(fontSize: 12)),
+                                    onChanged: (v) => setLocalState(() {
+                                      if (v == true) {
+                                        tempSelected.add(ft);
+                                      } else {
+                                        tempSelected.remove(ft);
+                                      }
+                                    }),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, tempSelected),
+                              child: const Text('Apply'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      setState(() => _selectedFeeTypes = result);
+    }
+  }
+
   Widget _filterDropdown<T>({
     required T value,
     required String hint,
@@ -1026,16 +1198,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ),
           if (_tabController.index == 0) ...[
             SizedBox(width: 12.w),
-            _filterDropdown<String?>(
-              value: _selectedFeeType,
-              hint: 'All Fee Types',
-              width: 200.w,
-              items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
-                ..._feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f))),
-              ],
-              onChanged: (v) => setState(() => _selectedFeeType = v),
-            ),
+            _feeTypeMultiSelect(width: 200.w),
             SizedBox(width: 12.w),
             Builder(builder: (_) {
               final prefixes = _dailyPrefixes();
@@ -1069,7 +1232,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 onPressed: () => setState(() {
                   _selectedCourse = null;
                   _selectedClass = null;
-                  _selectedFeeType = null;
+                  _selectedFeeTypes = <String>{};
                   _selectedPrefix = null;
                 }),
                 icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
@@ -1285,7 +1448,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (int c = 0; c < headers.length; c++) sheet.setColumnWidth(c, c <= 1 ? 18 : 13);
       await _saveExcel(excel, 'Consolidated_Status_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1357,7 +1520,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Consolidated_Status_${_formatDateCompact(DateTime.now())}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1642,7 +1805,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_Payment_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -1702,7 +1865,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Pending_Payment_${_formatDateCompact(DateTime.now())}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2134,7 +2297,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2213,7 +2376,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ));
       await Printing.sharePdf(bytes: await pdf.save(), filename: 'Student_Ledger_${_ledgerStudent?['stuadmno'] ?? ''}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2246,9 +2409,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     final visibleRows = _dailyRows.where((r) {
       if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
       if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
-      if (_selectedFeeType != null) {
+      if (_selectedFeeTypes.isNotEmpty) {
         final fees = r['fees'] as Map<String, double>;
-        if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+        if (!_selectedFeeTypes.any((ft) => (fees[ft] ?? 0) > 0)) return false;
       }
       if (_selectedMode != null) {
         final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
@@ -2263,13 +2426,31 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       return true;
     }).toList();
 
-    final visibleFeeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+    final visibleFeeTypes = _selectedFeeTypes.isNotEmpty
+        ? _dailyFeeTypes.where(_selectedFeeTypes.contains).toList()
+        : _dailyFeeTypes;
+
+    // When fee types are selected, narrow the row total down to the sum of
+    // just those fees + the row's fine. With no filter, use the full receipt
+    // total. CASH/CHEQUE/BANK columns and the footer follow this same total.
+    double rowDisplayTotal(Map<String, dynamic> r) {
+      final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+      if (_selectedFeeTypes.isEmpty) {
+        return (r['total'] as num?)?.toDouble() ?? 0;
+      }
+      final fees = r['fees'] as Map<String, double>;
+      double sum = 0;
+      for (final ft in _selectedFeeTypes) {
+        sum += fees[ft] ?? 0;
+      }
+      return sum + fine;
+    }
 
     double totalAmt = 0;
     double totalFine = 0;
     final ftTotals = <String, double>{};
     for (final r in visibleRows) {
-      totalAmt += (r['total'] as num?)?.toDouble() ?? 0;
+      totalAmt += rowDisplayTotal(r);
       totalFine += (r['fine'] as num?)?.toDouble() ?? 0;
       final fees = r['fees'] as Map<String, double>;
       for (final ft in visibleFeeTypes) {
@@ -2335,7 +2516,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   double totalCheque = 0;
                   double totalBank = 0;
                   for (final r in visibleRows) {
-                    final total = (r['total'] as num?)?.toDouble() ?? 0;
+                    final total = rowDisplayTotal(r);
                     final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
                     if (bucket == 'cash') {
                       totalCash += total;
@@ -2382,7 +2563,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         () {
                           final fees = r['fees'] as Map<String, double>;
                           final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-                          final total = (r['total'] as num?)?.toDouble() ?? 0;
+                          final total = rowDisplayTotal(r);
                           final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
                           return <String>[
                             r['paynumber']?.toString() ?? '',
@@ -2445,7 +2626,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
     return _buildReportTable(
       title: 'PENDING FEE REPORT AS ON ${_formatDate(DateTime.now())}',
-      subtitle: 'FEE TYPE : ${_selectedFeeType ?? 'ALL FEE TYPE'}',
+      subtitle: 'FEE TYPE : ${_selectedFeeTypes.isEmpty ? 'ALL FEE TYPE' : _selectedFeeTypes.join(', ')}',
       terms: terms,
       pivotData: pivotData,
       termTotals: termTotals,
@@ -2848,7 +3029,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('PENDING FEE REPORT AS ON ${_formatDate(DateTime.now())}');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = subHeader;
       row++;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE TYPE : ${_selectedFeeType ?? 'ALL FEE TYPE'}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE TYPE : ${_selectedFeeTypes.isEmpty ? 'ALL FEE TYPE' : _selectedFeeTypes.join(', ')}');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = subHeader;
       row++;
       row++; // blank row
@@ -2937,7 +3118,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_Fee_Report_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -2988,7 +3169,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('PENDING FEE REPORT AS ON ${_formatDate(DateTime.now())}');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = subHeader;
       row++;
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE TYPE : ${_selectedFeeType ?? 'ALL FEE TYPE'}');
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue('FEE TYPE : ${_selectedFeeTypes.isEmpty ? 'ALL FEE TYPE' : _selectedFeeTypes.join(', ')}');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).cellStyle = subHeader;
       row++;
       row++; // blank row
@@ -3078,7 +3259,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Pending_${groupBy}_${_formatDateCompact(DateTime.now())}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3087,9 +3268,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final visibleRows = _dailyRows.where((r) {
         if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
         if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
-        if (_selectedFeeType != null) {
+        if (_selectedFeeTypes.isNotEmpty) {
           final fees = r['fees'] as Map<String, double>;
-          if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+          if (!_selectedFeeTypes.any((ft) => (fees[ft] ?? 0) > 0)) return false;
         }
         if (_selectedMode != null) {
           final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
@@ -3103,7 +3284,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
         return true;
       }).toList();
-      final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+      final feeTypes = _selectedFeeTypes.isNotEmpty
+          ? _dailyFeeTypes.where(_selectedFeeTypes.contains).toList()
+          : _dailyFeeTypes;
 
       final excel = xl.Excel.createExcel();
       final sheet = excel['Daily Collection'];
@@ -3174,10 +3357,23 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final bankCol = showBank ? cursor++ : -1;
       final netCol = cursor;
 
+      double exportRowTotal(Map<String, dynamic> r) {
+        final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+        if (_selectedFeeTypes.isEmpty) {
+          return (r['total'] as num?)?.toDouble() ?? 0;
+        }
+        final fees = r['fees'] as Map<String, double>;
+        double sum = 0;
+        for (final ft in _selectedFeeTypes) {
+          sum += fees[ft] ?? 0;
+        }
+        return sum + fine;
+      }
+
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
         final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final total = exportRowTotal(r);
         final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
         totalAmt += total;
         totalFine += fine;
@@ -3268,7 +3464,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
       await _saveExcel(excel, 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 
@@ -3420,7 +3616,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PowerCollege export error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('PowerCollege export error. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -3437,13 +3633,6 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       if (raw == null) return '';
       final dt = DateTime.tryParse(raw.toString());
       return dt == null ? raw.toString() : _formatDate(dt);
-    }
-
-    double grandTotal = 0;
-    double grandFine = 0;
-    for (final r in _pcRows) {
-      grandTotal += (r['amount'] as num?)?.toDouble() ?? 0;
-      grandFine += (r['fine'] as num?)?.toDouble() ?? 0;
     }
 
     return Column(
@@ -3500,32 +3689,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: _PowerCollegeTable(rows: _pcRows, fmt: fmt),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: const BoxDecoration(
-                          color: AppColors.tableHeadBg,
-                          border: Border(top: BorderSide(color: AppColors.border, width: 1)),
-                        ),
-                        child: Row(
-                          children: [
-                            Text('${_pcRows.length} line item${_pcRows.length == 1 ? '' : 's'}',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                            const Spacer(),
-                            Text('Fine: ₹${grandFine.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                            SizedBox(width: 16.w),
-                            Text('Grand Total: ₹${grandTotal.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: _PowerCollegeTable(rows: _pcRows, fmt: fmt),
                 ),
         ),
       ],
@@ -3538,9 +3702,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       final visibleRows = _dailyRows.where((r) {
         if (_selectedCourse != null && r['courname']?.toString() != _selectedCourse) return false;
         if (_selectedClass != null && r['stuclass']?.toString() != _selectedClass) return false;
-        if (_selectedFeeType != null) {
+        if (_selectedFeeTypes.isNotEmpty) {
           final fees = r['fees'] as Map<String, double>;
-          if ((fees[_selectedFeeType] ?? 0) == 0) return false;
+          if (!_selectedFeeTypes.any((ft) => (fees[ft] ?? 0) > 0)) return false;
         }
         if (_selectedMode != null) {
           final isCash = _isCashMode(r['paymethod']?.toString() ?? '');
@@ -3554,11 +3718,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         if (_selectedUser != null && r['createdby']?.toString() != _selectedUser) return false;
         return true;
       }).toList();
-      final feeTypes = _selectedFeeType != null ? [_selectedFeeType!] : _dailyFeeTypes;
+      final feeTypes = _selectedFeeTypes.isNotEmpty
+          ? _dailyFeeTypes.where(_selectedFeeTypes.contains).toList()
+          : _dailyFeeTypes;
 
       final showCash = _selectedMode == null || _selectedMode == 'cash';
       final showCheque = _selectedMode == null || _selectedMode == 'cash';
       final showBank = _selectedMode == null || _selectedMode == 'bank';
+
+      double pdfRowTotal(Map<String, dynamic> r) {
+        final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+        if (_selectedFeeTypes.isEmpty) {
+          return (r['total'] as num?)?.toDouble() ?? 0;
+        }
+        final fees = r['fees'] as Map<String, double>;
+        double sum = 0;
+        for (final ft in _selectedFeeTypes) {
+          sum += fees[ft] ?? 0;
+        }
+        return sum + fine;
+      }
 
       final ftTotals = <String, double>{};
       double totalAmt = 0;
@@ -3568,7 +3747,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       double totalBank = 0;
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
-        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final total = pdfRowTotal(r);
         totalAmt += total;
         totalFine += (r['fine'] as num?)?.toDouble() ?? 0;
         final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
@@ -3590,7 +3769,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       for (final r in visibleRows) {
         final fees = r['fees'] as Map<String, double>;
         final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-        final total = (r['total'] as num?)?.toDouble() ?? 0;
+        final total = pdfRowTotal(r);
         final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
         rows.add([
           r['paynumber']?.toString() ?? '',
@@ -3681,7 +3860,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         filename: 'Daily_Collection_${_formatDateCompact(_dailyFrom!)}_${_formatDateCompact(_dailyTo!)}.pdf',
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error: $e'), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF error. ${friendlyError(e)}'), backgroundColor: Colors.red));
     }
   }
 

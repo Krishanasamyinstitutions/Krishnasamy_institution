@@ -24,6 +24,8 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   List<String> _classes = [];
   Map<String, int> _classCounts = {};
   Map<String, Map<String, int>> _courseClassCounts = {};
+  Map<String, int> _classOrdMap = {};
+  Map<String, int> _courseOrdMap = {};
   List<StudentModel> _allStudents = [];
   bool _loadingClasses = true;
 
@@ -76,7 +78,27 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     if (insId == null) return;
     setState(() => _loadingClasses = true);
     try {
-      final students = await SupabaseService.getStudents(insId);
+      final results = await Future.wait<dynamic>([
+        SupabaseService.getStudents(insId),
+        // class + course masters with ordid for sidebar ordering — same
+        // source the Students screen sidebar uses.
+        SupabaseService.fromSchema('class').select('claname, ordid').eq('ins_id', insId).eq('activestatus', 1),
+        SupabaseService.fromSchema('course').select('courname, ordid').eq('ins_id', insId).eq('activestatus', 1),
+      ]);
+      final students = results[0] as List<StudentModel>;
+      final classMaster = results[1] as List<dynamic>;
+      final courseMaster = results[2] as List<dynamic>;
+      final classOrdMap = <String, int>{
+        for (final r in classMaster)
+          if (r['claname'] != null && r['ordid'] != null)
+            r['claname'].toString().trim(): (r['ordid'] as num).toInt(),
+      };
+      final courseOrdMap = <String, int>{
+        for (final r in courseMaster)
+          if (r['courname'] != null && r['ordid'] != null)
+            r['courname'].toString().trim(): (r['ordid'] as num).toInt(),
+      };
+
       final counts = <String, int>{};
       final courseCounts = <String, Map<String, int>>{};
       for (final s in students) {
@@ -87,13 +109,21 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
       }
       final rawClasses = counts.keys.toList();
       final ordered = _classOrder.where(rawClasses.contains).toList();
-      final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList()..sort();
+      final extra = rawClasses.where((c) => !_classOrder.contains(c)).toList()
+        ..sort((a, b) {
+          final ai = classOrdMap[a.trim()] ?? classOrdMap[a] ?? 1 << 30;
+          final bi = classOrdMap[b.trim()] ?? classOrdMap[b] ?? 1 << 30;
+          if (ai != bi) return ai.compareTo(bi);
+          return a.compareTo(b);
+        });
       if (!mounted) return;
       setState(() {
         _allStudents = students;
         _classes = [...ordered, ...extra];
         _classCounts = counts;
         _courseClassCounts = courseCounts;
+        _classOrdMap = classOrdMap;
+        _courseOrdMap = courseOrdMap;
         _loadingClasses = false;
       });
     } catch (_) {
@@ -283,16 +313,15 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           child: Column(
             children: [
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
-                decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.border))),
+                padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 10.h),
                 child: Row(
                   children: [
                     AppIcon('people', size: 20, color: AppColors.accent),
                     SizedBox(width: 8.w),
-                    Text('Students',
-                        style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    const Spacer(),
+                    Expanded(
+                      child: Text('Students',
+                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    ),
                     if (!_loadingClasses)
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -308,6 +337,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   ],
                 ),
               ),
+              Divider(height: 1.h, color: AppColors.border),
               Expanded(
                 child: _loadingClasses
                     ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
@@ -315,9 +345,25 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         padding: EdgeInsets.symmetric(vertical: 4.h),
                         itemCount: _courseClassCounts.keys.length,
                         itemBuilder: (context, courseIndex) {
-                          final courseNames = _courseClassCounts.keys.toList()..sort();
+                          final courseNames = _courseClassCounts.keys.toList()
+                            ..sort((a, b) {
+                              final ai = _courseOrdMap[a.trim()] ?? _courseOrdMap[a] ?? 1 << 30;
+                              final bi = _courseOrdMap[b.trim()] ?? _courseOrdMap[b] ?? 1 << 30;
+                              if (ai != bi) return ai.compareTo(bi);
+                              return a.compareTo(b);
+                            });
                           final courseName = courseNames[courseIndex];
-                          final classCounts = _courseClassCounts[courseName]!;
+                          final rawClassCounts = _courseClassCounts[courseName]!;
+                          final classCounts = <String, int>{
+                            for (final k in rawClassCounts.keys.toList()
+                              ..sort((a, b) {
+                                final ai = _classOrdMap[a.trim()] ?? _classOrdMap[a] ?? 1 << 30;
+                                final bi = _classOrdMap[b.trim()] ?? _classOrdMap[b] ?? 1 << 30;
+                                if (ai != bi) return ai.compareTo(bi);
+                                return a.compareTo(b);
+                              }))
+                              k: rawClassCounts[k]!,
+                          };
                           final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
 
                           return ExpansionTile(
@@ -365,20 +411,20 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('Class $cls',
-                                              style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600, color: isSelected ? color : AppColors.textPrimary)),
+                                          Text(cls,
+                                              style: TextStyle(fontSize: 13.sp, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? color : AppColors.textPrimary)),
                                           Text('$count students',
-                                              style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                                              style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
                                         ],
                                       ),
                                     ),
                                     Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
+                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                                       decoration: BoxDecoration(
                                         color: color.withValues(alpha: isSelected ? 0.2 : 0.1),
                                         borderRadius: BorderRadius.circular(10.r),
                                       ),
-                                      child: Text('$count', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: color)),
+                                      child: Text('$count', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: color)),
                                     ),
                                     SizedBox(width: 6.w),
                                     AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
@@ -548,7 +594,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             children: [
               AppIcon('book-1', size: 14, color: color),
               SizedBox(width: 6.w),
-              Text('Class $cls',
+              Text(cls,
                   style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: color)),
               SizedBox(width: 8.w),
               Container(

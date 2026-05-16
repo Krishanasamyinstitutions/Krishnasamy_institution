@@ -209,32 +209,58 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       backgroundColor: AppColors.surface,
       body: Padding(
         padding: EdgeInsets.all(isMobile ? 16 : 24.w),
-        child: isMobile
-            ? Column(
-                children: [
-                  _buildList(),
-                  const SizedBox(height: 16),
-                  Expanded(child: _buildForm()),
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(flex: 3, child: _buildList()),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    flex: 4,
-                    child: Column(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Page header — matches the User Creation screen.
+            Row(
+              children: [
+                AppIcon('bank', color: AppColors.accent, size: 18),
+                SizedBox(width: 10.w),
+                Text(
+                  'Bank Accounts',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+            Expanded(
+              child: isMobile
+                  ? Column(
+                      children: [
+                        Expanded(flex: 3, child: _buildForm()),
+                        const SizedBox(height: 16),
+                        Expanded(flex: 2, child: _buildAssignmentsPanel()),
+                        const SizedBox(height: 16),
+                        Expanded(flex: 2, child: _buildList()),
+                      ],
+                    )
+                  : Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildForm(),
-                        SizedBox(height: 16.h),
-                        Expanded(child: _buildAssignmentsPanel()),
+                        // Left — Add Bank Account form
+                        Expanded(flex: 4, child: _buildForm()),
+                        SizedBox(width: 16.w),
+                        // Right — Fee Group Assignments (top) + Bank Accounts (below)
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(flex: 2, child: _buildAssignmentsPanel()),
+                              SizedBox(height: 16.h),
+                              Expanded(flex: 3, child: _buildList()),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -244,7 +270,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -331,10 +357,10 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
 
   Widget _buildForm() {
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Form(
@@ -345,10 +371,10 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             children: [
               Row(
                 children: [
-                  AppIcon(_editingBanId != null ? 'edit-2' : 'add', size: 18, color: AppColors.accent),
+                  AppIcon(_editingBanId != null ? 'edit-2' : 'add', size: 18, color: AppColors.textSecondary),
                   SizedBox(width: 8.w),
                   Text(_editingBanId != null ? 'Edit Bank Account' : 'Add Bank Account',
-                      style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
                   const Spacer(),
                   if (_editingBanId != null)
                     TextButton.icon(
@@ -358,32 +384,32 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     ),
                 ],
               ),
-              SizedBox(height: 12.h),
+              SizedBox(height: 20.h),
               _row([
-                _field('Bank Name *', _nameController, hint: 'HDFC Bank', required: true),
+                _field('Bank Name *', _nameController, hint: 'IOB', required: true),
                 _field('Branch *', _branchController, hint: 'Cuddalore Main', required: true),
               ]),
-              SizedBox(height: 10.h),
+              SizedBox(height: 16.h),
               _row([
-                _field('IFSC Code *', _ifscController, hint: 'HDFC0001234', required: true),
+                _field('IFSC Code *', _ifscController, hint: 'IOBA0001234', required: true),
                 _field('Account Holder *', _accHolderController, hint: 'KCET College', required: true),
               ]),
-              SizedBox(height: 10.h),
+              SizedBox(height: 16.h),
               _row([
                 _field('Account Number *', _accNoController, hint: '1234567890', required: true),
                 _field('Mobile', _mobileController, hint: '+91…'),
               ]),
-              SizedBox(height: 10.h),
+              SizedBox(height: 16.h),
               _row([
                 _field('Email', _emailController, hint: 'finance@school.in'),
                 _field('Address Line 1 *', _addr1Controller, required: true),
               ]),
-              SizedBox(height: 10.h),
+              SizedBox(height: 16.h),
               _row([
                 _field('Address Line 2', _addr2Controller),
                 _field('Address Line 3', _addr3Controller),
               ]),
-              SizedBox(height: 18.h),
+              SizedBox(height: 20.h),
               Row(
                 children: [
                   Expanded(
@@ -425,7 +451,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10.r),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -463,7 +489,12 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                 itemBuilder: (_, i) {
                   final fg = _feeGroups[i];
                   final fgId = fg['fg_id'] as int?;
-                  final currentBanId = fg['ban_id'] as int?;
+                  final rawBanId = fg['ban_id'] as int?;
+                  // Reset to null if the saved bank was deleted — otherwise
+                  // DropdownButtonFormField asserts because no item matches.
+                  final currentBanId = rawBanId != null && _banks.any((b) => b['ban_id'] == rawBanId)
+                      ? rawBanId
+                      : null;
                   return Row(
                     children: [
                       Expanded(
@@ -530,20 +561,51 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        SizedBox(height: 4.h),
+        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
+        SizedBox(height: 6.h),
         TextFormField(
           controller: c,
-          decoration: InputDecoration(
-            hintText: hint,
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+          decoration: _inputDecoration(context, hint ?? ''),
+          style: _inputTextStyle(context),
           validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
         ),
       ],
+    );
+  }
+
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final textSize = compact ? 11.0 : 14.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: const BorderSide(color: AppColors.accent),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
+
+  TextStyle _inputTextStyle(BuildContext context) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    return TextStyle(
+      fontWeight: FontWeight.w500,
+      fontSize: compact ? 11 : 14,
+      color: const Color(0xFF555555),
     );
   }
 }

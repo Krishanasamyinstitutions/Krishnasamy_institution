@@ -16,6 +16,7 @@ import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
 import '../../models/fee_model.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/receipt_pdf.dart';
 import '../../widgets/receipt_widget.dart';
 
 /// Signals when a drilldown view is active inside the Fee Collection tab.
@@ -488,13 +489,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         _payments = payments;
         _dateGroups = dateGroups;
         _payFineMap = payFineMap;
+        // Headline includes fine so the four cards tally:
+        // Demand = Collection + PendingApproval + PendingFees.
         _todayCollection = todayCollection;
         _todayFine = todayFine;
         _feeGroupById = Map<int, String>.from(feeGroupMaps['byId'] ?? {});
         _feeGroupByName = Map<String, String>.from(feeGroupMaps['byName'] ?? {});
-        // Both totals come from the SAME source (payments table) so they tally:
-        // total_collection ≥ today_collection always holds, and the fee/fine
-        // breakdown comes from the same payFineMap for consistency.
         _totalCollection = totalCollectionFromPayments;
         _totalFine = totalFineFromPayments;
         _totalCollectionPending = totalCollectionPending;
@@ -3177,352 +3177,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       paymentDate: dateStr,
       status: 'paid',
       reconStatus: payment['recon_status']?.toString() ?? 'P',
+      paymentReference: payment['payreference']?.toString(),
       total: totalAmount,
     );
   }
 
-  Future<pw.Document> _buildReceiptPdf(ReceiptData data) async {
-    final font = await PdfGoogleFonts.montserratRegular();
-    final fontMedium = await PdfGoogleFonts.montserratMedium();
-    final fontSemiBold = await PdfGoogleFonts.montserratSemiBold();
-    final fontItalic = await PdfGoogleFonts.montserratItalic();
-    final fontPtSerif = await PdfGoogleFonts.pTSerifRegular();
-
-    const primaryBlue = PdfColor.fromInt(0xFF6C8EEF);
-    const darkBlue = PdfColor.fromInt(0xFF4A6CD4);
-    const textDark = PdfColor.fromInt(0xFF2a2a2a);
-    const textMediumC = PdfColor.fromInt(0xFF4c4c4c);
-    const headerBg = PdfColor.fromInt(0xFFE9EEFF);
-    const borderColor = PdfColor.fromInt(0xFFd9d9d9);
-    const paidGreen = PdfColor.fromInt(0xFF34c759);
-    const dividerColor = PdfColor.fromInt(0xFFACBEDD);
-
-    final sSemiBold = pw.TextStyle(font: fontSemiBold, fontSize: 10, color: textDark);
-    final sMedium = pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC);
-    final sMediumDark = pw.TextStyle(font: fontMedium, fontSize: 10, color: textDark);
-
-    pw.Widget labelValue(String label, String value) {
-      return pw.Row(
-        mainAxisSize: pw.MainAxisSize.min,
-        children: [
-          pw.Text(label, style: sSemiBold),
-          pw.SizedBox(width: 6),
-          pw.Text(value, style: sMedium),
-        ],
-      );
-    }
-
-    pw.Widget tableCell(String text, pw.TextStyle style, {pw.Alignment alignment = pw.Alignment.center}) {
-      return pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        alignment: alignment,
-        child: pw.Text(text, style: style),
-      );
-    }
-
-    pw.ImageProvider? logoImage;
-    if (data.schoolLogoUrl != null) {
-      try { logoImage = await networkImage(data.schoolLogoUrl!); } catch (_) {}
-    }
-
-    String formatAmount(double amount) {
-      if (amount == amount.truncateToDouble()) {
-        return amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-      }
-      return amount.toStringAsFixed(2).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
-    }
-
-    // Split fee details into chunks that fit per page (max 8 per page)
-    const int maxItemsPerPage = 8;
-    final totalItems = data.feeDetails.length;
-    final totalPages = (totalItems / maxItemsPerPage).ceil().clamp(1, 100);
-
-    final pdf = pw.Document();
-
-    for (int page = 0; page < totalPages; page++) {
-      final startIdx = page * maxItemsPerPage;
-      final endIdx = (startIdx + maxItemsPerPage).clamp(0, totalItems);
-      final pageItems = data.feeDetails.sublist(startIdx, endIdx);
-      final isFirstPage = page == 0;
-      final isLastPage = page == totalPages - 1;
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(60),
-          theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
-          build: (pw.Context ctx) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header (on every page)
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          if (logoImage != null)
-                            pw.SizedBox(width: 64, height: 64, child: pw.Image(logoImage, fit: pw.BoxFit.cover)),
-                          if (logoImage != null) pw.SizedBox(height: 8),
-                          pw.Text(data.schoolName, style: pw.TextStyle(font: fontSemiBold, fontSize: 14, color: darkBlue)),
-                          pw.SizedBox(height: 6),
-                          pw.Row(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text('Address:  ', style: sSemiBold),
-                              pw.Expanded(child: pw.Text(data.schoolAddress, style: sMedium, maxLines: 3)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    pw.SizedBox(width: 20),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(data.reconStatus == 'P' ? 'Acknowledgement' : 'Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
-                        pw.SizedBox(height: 12),
-                        labelValue('Receipt No:', data.receiptNo),
-                        pw.SizedBox(height: 6),
-                        labelValue('Date:', data.date),
-                        if (totalPages > 1) ...[
-                          pw.SizedBox(height: 6),
-                          pw.Text('Page ${page + 1} of $totalPages', style: pw.TextStyle(font: fontMedium, fontSize: 9, color: textMediumC)),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 12),
-                pw.Container(height: 1, color: dividerColor),
-                pw.SizedBox(height: 12),
-                // To section (only on first page)
-                if (isFirstPage) ...[
-                  pw.Text('To:', style: pw.TextStyle(font: fontSemiBold, fontSize: 13, color: textDark)),
-                  pw.SizedBox(height: 8),
-                  pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Expanded(
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            labelValue('Name:', data.studentName),
-                            pw.SizedBox(height: 6),
-                            labelValue('Mobile No:', data.mobileNo),
-                            pw.SizedBox(height: 6),
-                            pw.Row(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text('Address:', style: sSemiBold),
-                                pw.SizedBox(width: 6),
-                                pw.Expanded(child: pw.Text(
-                                  (data.address.trim().isNotEmpty && data.address.trim() != '-' && data.address.trim().toLowerCase() != 'null') ? data.address : 'NA',
-                                  style: sMedium,
-                                )),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      pw.SizedBox(width: 20),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.end,
-                        children: [
-                          labelValue('Roll No:', data.admissionNo),
-                          pw.SizedBox(height: 6),
-                          labelValue('Class:', data.className),
-                        ],
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 20),
-                ],
-                // Fee Table with stamp overlay
-                pw.Stack(
-                  children: [
-                    pw.Column(
-                      children: [
-                        pw.Table(
-                          border: pw.TableBorder.all(color: borderColor, width: 0.5),
-                          columnWidths: {
-                            0: const pw.FixedColumnWidth(46),
-                            1: const pw.FixedColumnWidth(125),
-                            2: const pw.FlexColumnWidth(),
-                            3: const pw.FixedColumnWidth(120),
-                          },
-                          children: [
-                            pw.TableRow(
-                              decoration: const pw.BoxDecoration(color: headerBg),
-                              children: [
-                                tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
-                                tableCell('Semester', sSemiBold.copyWith(color: primaryBlue)),
-                                tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
-                                tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
-                              ],
-                            ),
-                            for (var i = 0; i < pageItems.length; i++)
-                              pw.TableRow(
-                                children: [
-                                  pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    alignment: pw.Alignment.topCenter,
-                                    child: pw.Text('${startIdx + i + 1}.', style: sMediumDark),
-                                  ),
-                                  pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    alignment: pw.Alignment.topCenter,
-                                    child: pw.Text(pageItems[i].term, style: sMediumDark),
-                                  ),
-                                  pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    child: pw.Column(
-                                      children: [
-                                        for (final fee in pageItems[i].fees)
-                                          pw.Padding(
-                                            padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                            child: pw.Text(fee.type, style: sMediumDark, textAlign: pw.TextAlign.center),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  pw.Container(
-                                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    child: pw.Column(
-                                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                                      children: [
-                                        for (final fee in pageItems[i].fees)
-                                          pw.Padding(
-                                            padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                            child: pw.Text('\u20B9${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                        // Sub Total row (only on last page)
-                        if (isLastPage)
-                          pw.Row(
-                            children: [
-                              pw.SizedBox(width: 172),
-                              pw.Expanded(
-                                child: pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  decoration: const pw.BoxDecoration(color: primaryBlue),
-                                  child: pw.Row(
-                                    children: [
-                                      pw.Expanded(
-                                        child: pw.Text('Sub Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
-                                      ),
-                                      pw.SizedBox(
-                                        width: 119,
-                                        child: pw.Text('\u20B9${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                    // Stamp overlay: SUBJECT TO REALIZATION when the
-                    // payment is awaiting bank reconciliation, otherwise PAID.
-                    if (data.reconStatus == 'P')
-                      pw.Positioned(
-                        left: 90, top: 40,
-                        child: pw.Opacity(
-                          opacity: 0.55,
-                          child: pw.Transform.rotateBox(
-                            angle: -0.40,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-                              decoration: pw.BoxDecoration(
-                                color: const PdfColor.fromInt(0x66ffe7b5),
-                                borderRadius: pw.BorderRadius.circular(10.r),
-                                border: pw.Border.all(color: const PdfColor.fromInt(0xffe09100), width: 2.5),
-                              ),
-                              child: pw.Text(
-                                'SUBJECT TO\nREALIZATION',
-                                style: pw.TextStyle(font: fontSemiBold, fontSize: 16, color: const PdfColor.fromInt(0xffb86b00)),
-                                textAlign: pw.TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    else if (data.status == 'paid')
-                      pw.Positioned(
-                        left: 120, top: 40,
-                        child: pw.Opacity(
-                          opacity: 0.55,
-                          child: pw.Transform.rotateBox(
-                            angle: -0.40,
-                            child: pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-                              decoration: pw.BoxDecoration(
-                                color: const PdfColor.fromInt(0x66c2eecd),
-                                borderRadius: pw.BorderRadius.circular(10.r),
-                                border: pw.Border.all(color: paidGreen, width: 2.5),
-                              ),
-                              child: pw.Text('PAID', style: pw.TextStyle(font: fontSemiBold, fontSize: 20, color: paidGreen)),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                if (isLastPage) ...[
-                  pw.SizedBox(height: 20),
-                  // Payment info
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
-                      pw.SizedBox(height: 6),
-                      labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
-                    ],
-                  ),
-                  pw.Spacer(),
-                  // Footer
-                  pw.Center(
-                    child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
-                  ),
-                  pw.SizedBox(height: 8),
-                  if (data.schoolEmail != null || data.schoolMobile != null)
-                    pw.Center(
-                      child: pw.Text(
-                        'For any further inquiries, please contact us at '
-                        '${data.schoolEmail ?? ''}'
-                        '${data.schoolEmail != null && data.schoolMobile != null ? ' or\ncall ' : ''}'
-                        '${data.schoolMobile ?? ''}',
-                        style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC),
-                        textAlign: pw.TextAlign.center,
-                      ),
-                    ),
-                ] else ...[
-                  pw.Spacer(),
-                  pw.Center(
-                    child: pw.Text('Continued on next page...', style: pw.TextStyle(font: fontItalic, fontSize: 10, color: textMediumC)),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-      );
-    }
-    return pdf;
-  }
+  Future<pw.Document> _buildReceiptPdf(ReceiptData data) => buildReceiptPdf(data);
 
   void _showReceiptDialog(Map<String, dynamic> payment, List<Map<String, dynamic>>? feeDetails) async {
     // Enrich student address + fetch parent's payinchargemob for receipt
@@ -4277,7 +3937,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       debugPrint('Export collection summary error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: Colors.red),
         );
       }
     }
@@ -4687,6 +4347,7 @@ class _ClassWiseDemandTab extends StatefulWidget {
 class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with AutomaticKeepAliveClientMixin {
   bool _isLoading = false;
   List<_ClassGroup> _classGroups = [];
+  Map<String, String> _feeShortByDesc = {};
   String? _selectedClass;
   List<Map<String, dynamic>> _drilldownDemands = [];
   bool _drilldownLoading = false;
@@ -4792,12 +4453,25 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
 
     setState(() => _isLoading = true);
 
-    // Use aggregate summary — one row per class, no row-limit issues
-    final summaryRows = await SupabaseService.getFeeDemandSummary(insId);
+    // Aggregate summary + feetype master so chips render the short code.
+    final results = await Future.wait([
+      SupabaseService.getFeeDemandSummary(insId),
+      SupabaseService.fromSchema('feetype')
+          .select('feedesc, feeshort')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1),
+    ]);
+    final summaryRows = results[0] as List<Map<String, dynamic>>;
+    final feeTypeMaster = results[1] as List;
 
     if (mounted) {
       setState(() {
         _classGroups = _buildClassGroupsFromSummary(summaryRows);
+        _feeShortByDesc = {
+          for (final r in feeTypeMaster)
+            if (r['feedesc'] != null && r['feeshort'] != null)
+              r['feedesc'].toString(): r['feeshort'].toString(),
+        };
         _isLoading = false;
       });
     }
@@ -4979,7 +4653,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   const double cCourseW = 90;
                   const double cClassW = 120;
                   const double cStudentsW = 70;
-                  const double cFeeTypesW = 260;
+                  const double cFeeTypesW = 140;
                   const double cTotalDemandW = 110;
                   const double cPaidW = 100;
                   const double cFineW = 80;
@@ -5112,7 +4786,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                     ...g.feeTypes.map((ft) => Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(6.r)),
-                                      child: Text(ft, style: TextStyle(fontSize: 11.sp, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                                      child: Text(_feeShortByDesc[ft] ?? ft, style: TextStyle(fontSize: 11.sp, color: AppColors.accent, fontWeight: FontWeight.w700)),
                                     )),
                                   ],
                                 ),
@@ -5667,7 +5341,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                 // them visually identical.
                 const double sOtherW = 110;
                 const double sAdmNoW = sOtherW;
-                const double sNameW = sOtherW;
+                // Student name needs more room so long names stay on one line.
+                const double sNameW = 200;
                 const double sFeeAmtW = sOtherW;
                 const double sPaidW = sOtherW;
                 const double sFineW = sOtherW;
@@ -5776,7 +5451,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[1], child: Text(admNo, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                             const SizedBox(width: sColSpacing),
-                            SizedBox(width: sAdj[2], child: Text(stuName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                            SizedBox(width: sAdj[2], child: Text(stuName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
                             const SizedBox(width: sColSpacing),
                             SizedBox(width: sAdj[3], child: Align(alignment: Alignment.centerRight, child: Text(_formatCurrency(sDemand), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                             const SizedBox(width: sColSpacing),
@@ -6022,6 +5697,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
   List<String> _feeTypes = [];
   Map<int, String> _payNumberMap = {};
+  Map<String, String> _feeShortByDesc = {};
   double _summaryTotalDemand = 0;
   double _summaryTotalPaid = 0;
   double _summaryTotalPending = 0;
@@ -6098,13 +5774,19 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
     setState(() => _isLoading = true);
 
     try {
-      // Stage 1: fetch demands and totals in parallel
+      // Stage 1: fetch demands, totals, and feetype master in parallel.
+      // feetype master lets the column header show feeshort instead of feedesc.
       final results = await Future.wait([
         SupabaseService.getPaidFeeDemands(insId),
         SupabaseService.getFeeTotals(insId),
+        SupabaseService.fromSchema('feetype')
+            .select('feedesc, feeshort')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1),
       ]);
       final demands = results[0] as List<Map<String, dynamic>>;
       final feeTotals = results[1] as Map<String, double>;
+      final feeTypeMaster = results[2] as List;
 
       // Stage 2: fetch pay numbers (needs pay_ids from demands)
       final payIds = demands
@@ -6119,9 +5801,14 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
         setState(() {
           _allDemands = demands;
           _payNumberMap = payNumberMap;
+          _feeShortByDesc = {
+            for (final r in feeTypeMaster)
+              if (r['feedesc'] != null && r['feeshort'] != null)
+                r['feedesc'].toString(): r['feeshort'].toString(),
+          };
           _summaryTotalDemand = feeTotals['totalDemand'] ?? 0;
-          // Total Collected card shows actual fee + fine paid
-          _summaryTotalPaid = (feeTotals['totalPaid'] ?? 0) + (feeTotals['totalFine'] ?? 0);
+          // totalPaid already includes fine — don't add it again.
+          _summaryTotalPaid = feeTotals['totalPaid'] ?? 0;
           _summaryTotalPending = feeTotals['totalPending'] ?? 0;
           _isLoading = false;
         });
@@ -6725,22 +6412,23 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
 
                             // Column widths: SNO, RECPT.NO, ROLL NO, NAME, COURSE, CLASS, ...feeTypes, TOTAL
                             const double colSpacing = 12;
-                            const double hMargin = 12;
-                            const double snoW = 70;
-                            const double recptW = 140;
-                            const double admnW = 160;   // ROLL NO — fits 12-digit numbers
-                            const double nameW = 220;
-                            const double courseW = 140;
-                            const double classW = 160;  // CLASS — fits "B.E CSE -II" / "B.TECH (IT) -III" on one line
-                            const double feeColW = 180; // each fee type column
-                            const double totalColW = 140;
+                            const double hMargin = 8;
+                            const double snoW = 40;
+                            const double recptW = 80;
+                            const double admnW = 100;   // ROLL NO — fits 12-digit numbers
+                            const double nameW = 140;
+                            const double courseW = 80;
+                            const double classW = 110;  // CLASS — fits "B.E CSE -II" / "B.TECH (IT) -III"
+                            const double feeColW = 70;  // each fee type column (short codes)
+                            const double fineColW = 60;
+                            const double totalColW = 80;
                             final int feeCount = activeDisplayFeeTypes.length;
 
                             // Build column widths list (FINE col before TOTAL)
                             final List<double> colWidths = [
                               snoW, recptW, admnW, nameW, courseW, classW,
                               ...List.filled(feeCount, feeColW),
-                              feeColW, // FINE
+                              fineColW,
                               totalColW,
                             ];
                             final totalFixedWidth = colWidths.reduce((a, b) => a + b) + (colWidths.length - 1) * colSpacing + 2 * hMargin;
@@ -6796,7 +6484,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 buildCell('COURSE', 4, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
                                 buildCell('CLASS', 5, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
                                 for (int i = 0; i < feeCount; i++)
-                                  buildCell(activeDisplayFeeTypes[i].toUpperCase(), 6 + i, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
+                                  buildCell((_feeShortByDesc[activeDisplayFeeTypes[i]] ?? activeDisplayFeeTypes[i]).toUpperCase(), 6 + i, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
                                 buildCell('FINE', 6 + feeCount, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
                                 buildCell('TOTAL', 7 + feeCount, fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary),
                               ],

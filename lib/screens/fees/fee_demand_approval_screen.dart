@@ -7,6 +7,7 @@ import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../utils/friendly_error.dart';
 class FeeDemandApprovalScreen extends StatefulWidget {
   const FeeDemandApprovalScreen({super.key});
 
@@ -239,7 +240,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
         setState(() => _approving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error approving: $e'),
+            content: Text('Error approving. ${friendlyError(e)}'),
             backgroundColor: AppColors.error,
           ),
         );

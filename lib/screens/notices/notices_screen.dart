@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../utils/friendly_error.dart';
 class NoticesScreen extends StatefulWidget {
   const NoticesScreen({super.key});
 
@@ -530,9 +531,10 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   List<String> _availableClasses = [];
   bool _isLoadingClasses = false;
   bool _isSending = false;
-  String? _pendingFeeTermFilter;
+  Set<String> _pendingFeeTerms = <String>{};
   List<String> _availableFeeTerms = [];
   bool _isLoadingFeeTerms = false;
+  final GlobalKey _feeTermPickerKey = GlobalKey();
   // Course → class map. Drives the Course dropdown + scoped class chips
   // for both 'Specific Classes' and 'Pending Fees' target modes.
   Map<String, List<String>> _courseClassMap = {};
@@ -668,6 +670,127 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     }
   }
 
+  /// Anchored multi-select popup for the Pending Fees term filter.
+  /// Drops below the trigger button so it lines up like a dropdown.
+  Future<void> _openFeeTermPicker() async {
+    final renderBox = _feeTermPickerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final triggerPos = renderBox.localToGlobal(Offset.zero);
+    final triggerSize = renderBox.size;
+    final screen = MediaQuery.of(context).size;
+
+    const popupWidth = 260.0;
+    const popupMaxHeight = 360.0;
+    final left = triggerPos.dx.clamp(8.0, (screen.width - popupWidth - 8).clamp(8.0, screen.width));
+    final top = (triggerPos.dy + triggerSize.height + 4).clamp(8.0, (screen.height - 100).clamp(8.0, screen.height));
+
+    final tempSelected = Set<String>.from(_pendingFeeTerms);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      barrierColor: Colors.transparent,
+      builder: (ctx) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ),
+          Positioned(
+            left: left,
+            top: top,
+            width: popupWidth,
+            child: StatefulBuilder(builder: (ctx, setLocalState) {
+              return Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: popupMaxHeight),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text('Select Fee Terms', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                            ),
+                            InkWell(
+                              onTap: () => setLocalState(() => tempSelected
+                                ..clear()
+                                ..addAll(_availableFeeTerms)),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Text('Select All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => setLocalState(tempSelected.clear),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                child: Text('Clear', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Flexible(
+                        child: ListView(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          children: _availableFeeTerms
+                              .map((t) => CheckboxListTile(
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    controlAffinity: ListTileControlAffinity.leading,
+                                    value: tempSelected.contains(t),
+                                    title: Text(t, style: const TextStyle(fontSize: 12)),
+                                    onChanged: (v) => setLocalState(() {
+                                      if (v == true) {
+                                        tempSelected.add(t);
+                                      } else {
+                                        tempSelected.remove(t);
+                                      }
+                                    }),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, tempSelected),
+                              child: const Text('Apply'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+    if (result != null) {
+      setState(() => _pendingFeeTerms = result);
+    }
+  }
+
   Future<void> _submitNotice() async {
     final title = _titleController.text.trim();
     final desc = _descController.text.trim();
@@ -703,7 +826,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           : _targetType == 'Staff'
               ? 'Staff'
               : _targetType == 'Pending Fees'
-                  ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}'
+                  ? 'Pending Fees${_pendingFeeTerms.isNotEmpty ? ' - ${_pendingFeeTerms.join(', ')}' : ''}'
                   : _selectedClasses.join(', ');
 
       // Insert notice and capture its id so the child notifications can
@@ -750,7 +873,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         for (final d in demands) {
           final balance = (d['balancedue'] as num?)?.toDouble() ?? 0;
           if (balance > 0) {
-            if (_pendingFeeTermFilter != null && d['demfeeterm']?.toString() != _pendingFeeTermFilter) continue;
+            if (_pendingFeeTerms.isNotEmpty && !_pendingFeeTerms.contains(d['demfeeterm']?.toString() ?? '')) continue;
             final stuId = d['stu_id'] as int?;
             if (stuId != null) pendingStuIds.add(stuId);
           }
@@ -818,7 +941,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(friendlyError(e)), backgroundColor: AppColors.error),
         );
       }
     }
@@ -916,7 +1039,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                 _selectedClasses.clear();
                                 _selectedCourse = null;
                               }
-                              if (t != 'Pending Fees') _pendingFeeTermFilter = null;
+                              if (t != 'Pending Fees') _pendingFeeTerms.clear();
                             });
                             if (t == 'Pending Fees' && _availableFeeTerms.isEmpty) _loadFeeTerms();
                           },
@@ -963,6 +1086,17 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                           // so admins of multi-course institutions don't
                           // pick the wrong "I Year" by accident.
                           _buildCourseFilterDropdown(),
+                          // Hide the class chip list until a specific course
+                          // is picked — showing every class up front (from
+                          // every course) is overwhelming and invites picking
+                          // the wrong "Year I" across courses.
+                          if (_selectedCourse == null) ...[
+                            SizedBox(height: 12.h),
+                            Text(
+                              'Select a course above to choose classes.',
+                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                            ),
+                          ] else ...[
                           SizedBox(height: 12.h),
                           Row(
                             children: [
@@ -1026,6 +1160,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             Text('${_selectedClasses.length} class${_selectedClasses.length > 1 ? 'es' : ''} selected',
                                 style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.accent)),
                           ],
+                          ],
                         ],
                       ),
                     ),
@@ -1050,71 +1185,76 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                           Text('Filter by Course', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                           SizedBox(height: 8.h),
                           _buildCourseFilterDropdown(),
-                          SizedBox(height: 12.h),
-                          Row(
-                            children: [
-                              Text('Filter by Class', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
-                              const Spacer(),
-                              if (_selectedClasses.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () => setState(() => _selectedClasses.clear()),
-                                  child: Text('Clear', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
-                                ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _classesInScope.map((cls) {
-                              final isSelected = _selectedClasses.contains(cls);
-                              return GestureDetector(
-                                onTap: () => setState(() {
-                                  if (isSelected) {
-                                    _selectedClasses.remove(cls);
-                                  } else {
-                                    _selectedClasses.add(cls);
-                                  }
-                                }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.white,
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
+                          if (_selectedCourse != null) ...[
+                            SizedBox(height: 12.h),
+                            Row(
+                              children: [
+                                Text('Filter by Class', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                                const Spacer(),
+                                if (_selectedClasses.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () => setState(() => _selectedClasses.clear()),
+                                    child: Text('Clear', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
                                   ),
-                                  child: Text(cls, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _classesInScope.map((cls) {
+                                final isSelected = _selectedClasses.contains(cls);
+                                return GestureDetector(
+                                  onTap: () => setState(() {
+                                    if (isSelected) {
+                                      _selectedClasses.remove(cls);
+                                    } else {
+                                      _selectedClasses.add(cls);
+                                    }
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : Colors.white,
+                                      borderRadius: BorderRadius.circular(8.r),
+                                      border: Border.all(color: isSelected ? AppColors.accent : AppColors.border),
+                                    ),
+                                    child: Text(cls, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: isSelected ? AppColors.accent : AppColors.textPrimary)),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                           SizedBox(height: 12.h),
                           Text('Filter by Fee Term', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                           SizedBox(height: 8.h),
                           _isLoadingFeeTerms
                               ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
-                              : Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    border: Border.all(color: AppColors.border),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String?>(
-                                      value: _pendingFeeTermFilter,
-                                      isExpanded: true,
-                                      hint: Text('All Terms', style: TextStyle(fontSize: 13.sp)),
-                                      dropdownColor: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      elevation: 6,
-                                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                                      icon: const AppIcon.linear('Chevron Down', size: 18),
-                                      items: [
-                                        const DropdownMenuItem<String?>(value: null, child: Text('All Terms')),
-                                        ..._availableFeeTerms.map((term) => DropdownMenuItem<String?>(value: term, child: Text(term))),
+                              : InkWell(
+                                  key: _feeTermPickerKey,
+                                  borderRadius: BorderRadius.circular(8.r),
+                                  onTap: _openFeeTermPicker,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8.r),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _pendingFeeTerms.isEmpty
+                                                ? 'All Terms'
+                                                : _pendingFeeTerms.length == 1
+                                                    ? _pendingFeeTerms.first
+                                                    : '${_pendingFeeTerms.length} terms',
+                                            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                                          ),
+                                        ),
+                                        const AppIcon.linear('Chevron Down', size: 18),
                                       ],
-                                      onChanged: (v) => setState(() => _pendingFeeTermFilter = v),
                                     ),
                                   ),
                                 ),
@@ -1275,7 +1415,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                             AppIcon('people', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                             SizedBox(width: 4.w),
                             Text(
-                              _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : _targetType == 'Pending Fees' ? 'Pending Fees${_pendingFeeTermFilter != null ? ' - $_pendingFeeTermFilter' : ''}' : '${_selectedClasses.length} classes',
+                              _targetType == 'All Students' ? 'All Students' : _targetType == 'Staff' ? 'Staff' : _targetType == 'Pending Fees' ? 'Pending Fees${_pendingFeeTerms.isNotEmpty ? ' - ${_pendingFeeTerms.join(', ')}' : ''}' : '${_selectedClasses.length} classes',
                               style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary.withValues(alpha: 0.7)),
                             ),
                           ],
