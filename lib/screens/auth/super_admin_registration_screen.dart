@@ -177,10 +177,10 @@ class _SuperAdminRegistrationScreenState
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF003166), Color(0xFF002147), Color(0xFF00152E)],
+          image: DecorationImage(
+            image: AssetImage(
+                'assets/images/vimal-s-J69ERsG93hI-unsplash.jpg'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Center(
@@ -219,7 +219,7 @@ class _SuperAdminRegistrationScreenState
                   _field(_trustNameController, 'Trust Name *',
                       Icons.account_balance_outlined),
                   SizedBox(height: 12.h),
-                  _field(_nameController, 'Admin Name *', Icons.person_outline),
+                  _field(_nameController, 'Username *', Icons.person_outline),
                   SizedBox(height: 12.h),
                   _field(_emailController, 'Email *', Icons.mail_outline,
                       keyboard: TextInputType.emailAddress),
