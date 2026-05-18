@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:animate_do/animate_do.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../config/device_code_key.dart';
@@ -11,6 +12,7 @@ import '../../services/device_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/app_icon.dart';
 
 /// Pull a clean, human-readable message out of whatever an Edge Function
 /// call threw — FunctionException wraps the server's {"error": "..."}
@@ -279,61 +281,116 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
     }
   }
 
+  /// Field label rendered above each input — matches the login screen's
+  /// label-above-field treatment.
+  Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          text,
+          style: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(fontSize: 13),
+        ),
+      );
+
+  /// Shared input decoration in the login screen's style — rounded fill,
+  /// hint text, and a tinted prefix icon.
+  InputDecoration _inputDecoration(String hint, String iconName) =>
+      InputDecoration(
+        hintText: hint,
+        prefixIcon:
+            AppIcon.linear(iconName, size: 20, color: AppColors.textLight),
+        prefixIconConstraints:
+            const BoxConstraints(minWidth: 52, minHeight: 0),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF003166), Color(0xFF002147), Color(0xFF00152E)],
+          image: DecorationImage(
+            image: AssetImage(
+                'assets/images/vimal-s-J69ERsG93hI-unsplash.jpg'),
+            fit: BoxFit.cover,
           ),
         ),
         child: Center(
           child: SingleChildScrollView(
-            child: Container(
-              width: 560.w,
-              padding: EdgeInsets.all(32.w),
-              margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(Icons.verified_user_rounded,
-                      size: 48.sp, color: AppColors.primary),
-                  SizedBox(height: 12.h),
-                  Text(
-                    'Activate this PC',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                  ),
-                  SizedBox(height: 16.h),
-                  TabBar(
-                    controller: _tabController,
-                    labelColor: AppColors.primary,
-                    indicatorColor: AppColors.primary,
-                    tabs: const [
-                      Tab(text: 'Request Code'),
-                      Tab(text: 'Enter Code'),
-                    ],
-                  ),
-                  SizedBox(height: 16.h),
-                  SizedBox(
-                    height: 440.h,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [_buildRequestCodeTab(), _buildEnterCodeTab()],
+            child: FadeInUp(
+              duration: const Duration(milliseconds: 350),
+              child: Container(
+                width: 720.w,
+                padding: EdgeInsets.all(28.w),
+                margin:
+                    EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.20),
+                      blurRadius: 32,
+                      offset: const Offset(0, 12),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 46.w,
+                        height: 46.w,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14.r),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.verified_user_rounded,
+                            size: 24.sp, color: AppColors.primary),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Activate this PC',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                    ),
+                    SizedBox(height: 12.h),
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorColor: AppColors.accent,
+                      indicatorWeight: 3,
+                      labelStyle: TextStyle(
+                          fontSize: 13.sp, fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: TextStyle(
+                          fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      tabs: const [
+                        Tab(text: 'Request Code'),
+                        Tab(text: 'Enter Code'),
+                      ],
+                    ),
+                    SizedBox(height: 12.h),
+                    SizedBox(
+                      height: 400.h,
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildRequestCodeTab(),
+                          _buildEnterCodeTab()
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -348,81 +405,119 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: 8.h),
-          Text(
-            'Enter the activation code, or import the file the office sent you.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
-          ),
-          SizedBox(height: 12.h),
-          OutlinedButton.icon(
-            onPressed: _activating ? null : _importCode,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              side: BorderSide(color: AppColors.primary),
-              padding: EdgeInsets.symmetric(vertical: 12.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.r),
-              ),
+          FadeInDown(
+            child: Text(
+              'Enter the activation code, or import the file the office sent you.',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
             ),
-            icon: const Icon(Icons.upload_file_rounded),
-            label: Text('Import Code File',
-                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
           ),
           SizedBox(height: 14.h),
-          Row(
-            children: [
-              const Expanded(child: Divider()),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10.w),
-                child: Text('or enter manually',
+          FadeInDown(
+            delay: const Duration(milliseconds: 100),
+            child: SizedBox(
+              height: 48.h,
+              child: OutlinedButton.icon(
+                onPressed: _activating ? null : _importCode,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: const BorderSide(color: AppColors.accent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                ),
+                icon: AppIcon.linear('document-upload',
+                    size: 18, color: AppColors.accent),
+                label: Text('Import Code File',
                     style: TextStyle(
-                        color: AppColors.textSecondary, fontSize: 11.sp)),
+                        fontSize: 14.sp, fontWeight: FontWeight.w600)),
               ),
-              const Expanded(child: Divider()),
-            ],
+            ),
           ),
           SizedBox(height: 14.h),
-          TextField(
-            controller: _codeController,
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-            style: TextStyle(fontFamily: 'monospace', fontSize: 18.sp, letterSpacing: 2),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
-              LengthLimitingTextInputFormatter(19),
-            ],
-            decoration: InputDecoration(
-              labelText: 'Activation Code',
-              hintText: 'XXXX-XXXX-XXXX-XXXX',
-              prefixIcon: const Icon(Icons.vpn_key_rounded),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          FadeInDown(
+            delay: const Duration(milliseconds: 150),
+            child: Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w),
+                  child: Text('or enter manually',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 11.sp)),
+                ),
+                const Expanded(child: Divider()),
+              ],
             ),
-            onSubmitted: (_) => _activate(),
+          ),
+          SizedBox(height: 14.h),
+          FadeInDown(
+            delay: const Duration(milliseconds: 200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _fieldLabel('Activation Code'),
+                TextField(
+                  controller: _codeController,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 18.sp,
+                      letterSpacing: 2),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+                    LengthLimitingTextInputFormatter(19),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: 'XXXX-XXXX-XXXX-XXXX',
+                    prefixIcon: AppIcon.linear('key',
+                        size: 20, color: AppColors.textLight),
+                    prefixIconConstraints:
+                        const BoxConstraints(minWidth: 52, minHeight: 0),
+                  ),
+                  onSubmitted: (_) => _activate(),
+                ),
+              ],
+            ),
           ),
           if (_activateError != null) ...[
             SizedBox(height: 12.h),
             _errorBox(_activateError!),
           ],
-          SizedBox(height: 16.h),
-          ElevatedButton(
-            onPressed: _activating ? null : _activate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 14.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+          SizedBox(height: 18.h),
+          FadeInDown(
+            delay: const Duration(milliseconds: 300),
+            child: Center(
+              child: SizedBox(
+                height: 50.h,
+                child: ElevatedButton(
+                  onPressed: _activating ? null : _activate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.r)),
+                  ),
+                  child: _activating
+                      ? SizedBox(
+                          height: 20.h,
+                          width: 20.h,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text('Activate',
+                          style: TextStyle(
+                              fontSize: 15.sp, fontWeight: FontWeight.w600)),
+                ),
+              ),
             ),
-            child: _activating
-                ? SizedBox(
-                    height: 20.h,
-                    width: 20.h,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : Text('Activate',
-                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -464,96 +559,160 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
         ),
       );
     }
+    final institutionField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Institution / Trust'),
+        DropdownButtonFormField<int>(
+          value: _selectedInsId,
+          isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          // Match the text size of the other input fields.
+          style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            hintText: 'Select your institution or trust',
+            hintStyle:
+                const TextStyle(fontSize: 14, color: AppColors.textLight),
+            prefixIcon: AppIcon.linear('teacher',
+                size: 20, color: AppColors.textLight),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 52, minHeight: 0),
+          ),
+          items: [
+            DropdownMenuItem<int>(
+              value: _kTrustSentinel,
+              child:
+                  Text('★ $_trustName', overflow: TextOverflow.ellipsis),
+            ),
+            ..._institutions.map<DropdownMenuItem<int>>(
+              (i) => DropdownMenuItem<int>(
+                value: i['ins_id'] as int,
+                child: Text(i['insname']?.toString() ?? '—',
+                    overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ],
+          onChanged: (v) => setState(() => _selectedInsId = v),
+        ),
+      ],
+    );
+
+    final usernameField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Username *'),
+        TextField(
+          controller: _usernameController,
+          decoration:
+              _inputDecoration('Your login username / email', 'user'),
+        ),
+      ],
+    );
+
+    final mobileField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Mobile *'),
+        TextField(
+          controller: _mobileController,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          decoration: _inputDecoration('10-digit mobile number', 'call'),
+        ),
+      ],
+    );
+
+    final emailField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Email *'),
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: _inputDecoration('name@example.com', 'sms'),
+        ),
+      ],
+    );
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: 8.h),
-          Text(
-            'Fill the form and we will email a fresh code to the office. They will forward it to you.',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12.sp),
-          ),
-          SizedBox(height: 12.h),
-          DropdownButtonFormField<int>(
-            value: _selectedInsId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: 'Institution / Trust',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              isDense: true,
-            ),
-            items: [
-              DropdownMenuItem<int>(
-                value: _kTrustSentinel,
-                child: Text('★ $_trustName', overflow: TextOverflow.ellipsis),
-              ),
-              ..._institutions.map<DropdownMenuItem<int>>(
-                (i) => DropdownMenuItem<int>(
-                  value: i['ins_id'] as int,
-                  child: Text(i['insname']?.toString() ?? '—',
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ],
-            onChanged: (v) => setState(() => _selectedInsId = v),
-          ),
-          SizedBox(height: 10.h),
-          TextField(
-            controller: _usernameController,
-            decoration: InputDecoration(
-              labelText: 'Username *',
-              hintText: 'Your login username / email',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              isDense: true,
+          FadeInDown(
+            child: Text(
+              'Fill the form and we will email a fresh code to the office. They will forward it to you.',
+              style:
+                  TextStyle(color: AppColors.textSecondary, fontSize: 12.sp),
             ),
           ),
-          SizedBox(height: 10.h),
-          TextField(
-            controller: _mobileController,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
-            ],
-            decoration: InputDecoration(
-              labelText: 'Mobile *',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              isDense: true,
+          SizedBox(height: 16.h),
+          // Two fields per row.
+          FadeInDown(
+            delay: const Duration(milliseconds: 100),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: institutionField),
+                SizedBox(width: 18.w),
+                Expanded(child: usernameField),
+              ],
             ),
           ),
-          SizedBox(height: 10.h),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'Email *',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-              isDense: true,
+          SizedBox(height: 16.h),
+          FadeInDown(
+            delay: const Duration(milliseconds: 200),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: mobileField),
+                SizedBox(width: 18.w),
+                Expanded(child: emailField),
+              ],
             ),
           ),
           if (_requestError != null) ...[
             SizedBox(height: 12.h),
             _errorBox(_requestError!),
           ],
-          SizedBox(height: 14.h),
-          ElevatedButton.icon(
-            onPressed: _requesting ? null : _requestCode,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(vertical: 14.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+          SizedBox(height: 18.h),
+          FadeInDown(
+            delay: const Duration(milliseconds: 300),
+            child: Center(
+              child: SizedBox(
+                height: 50.h,
+                child: ElevatedButton.icon(
+                onPressed: _requesting ? null : _requestCode,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r)),
+                ),
+                icon: _requesting
+                    ? SizedBox(
+                        height: 18.h,
+                        width: 18.h,
+                        child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white)))
+                    : Icon(Icons.send_rounded, size: 18.sp),
+                label: Text('Request Activation Code',
+                    style: TextStyle(
+                        fontSize: 14.sp, fontWeight: FontWeight.w600)),
+              ),
+              ),
             ),
-            icon: _requesting
-                ? SizedBox(
-                    height: 18.h,
-                    width: 18.h,
-                    child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white)))
-                : const Icon(Icons.send_rounded),
-            label: Text('Request Activation Code',
-                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -562,18 +721,19 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
 
   Widget _errorBox(String msg) {
     return Container(
-      padding: EdgeInsets.all(10.w),
+      padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: Colors.red.shade200),
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 16.sp, color: Colors.red.shade700),
-          SizedBox(width: 8.w),
+          AppIcon.linear('info-circle', size: 18, color: AppColors.error),
+          SizedBox(width: 10.w),
           Expanded(
-            child: Text(msg, style: TextStyle(color: Colors.red.shade700, fontSize: 12.sp)),
+            child: Text(msg,
+                style: TextStyle(color: AppColors.error, fontSize: 12.sp)),
           ),
         ],
       ),
