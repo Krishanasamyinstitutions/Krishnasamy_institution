@@ -87,9 +87,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Future<void> _loadTrustSettings() async {
     try {
       final row = await SupabaseService.client
-          .from('app_config')
+          .from('trust')
           .select('trust_name, trust_logo')
-          .eq('cfg_id', 1)
+          .eq('trust_id', 1)
           .maybeSingle();
       if (!mounted || row == null) return;
       setState(() {
@@ -3944,9 +3944,9 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
   Future<void> _loadTrust() async {
     try {
       final row = await SupabaseService.client
-          .from('app_config')
+          .from('trust')
           .select('trust_name, trust_logo')
-          .eq('cfg_id', 1)
+          .eq('trust_id', 1)
           .maybeSingle();
       if (!mounted || row == null) return;
       setState(() {
@@ -4004,13 +4004,13 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
         _trustLogoFileName = null;
       }
       await SupabaseService.client
-          .from('app_config')
+          .from('trust')
           .update({
             'trust_name': _trustNameCtrl.text.trim(),
             'trust_logo': _trustLogoUrl,
             'updatedat': DateTime.now().toIso8601String(),
           })
-          .eq('cfg_id', 1);
+          .eq('trust_id', 1);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Trust settings saved'), backgroundColor: Colors.green),
