@@ -280,13 +280,13 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             // total of all receipts sharing this reference must match the
             // bank amount (handles a single UTR split across multiple
             // receipts the same way cheques are grouped below).
-            if ((payMethod == 'qr_upi' || payMethod == 'razorpay') &&
+            if ((payMethod == 'upi' || payMethod == 'qr_upi' || payMethod == 'razorpay') &&
                 _normalizeReference(payRef).contains(normalizedBankRef)) {
               final refPayments = _pendingPayments
                   .where((p) {
                     final pm = p['paymethod']?.toString() ?? '';
                     final pr = p['payreference']?.toString() ?? '';
-                    return (pm == 'qr_upi' || pm == 'razorpay') &&
+                    return (pm == 'upi' || pm == 'qr_upi' || pm == 'razorpay') &&
                         !usedPayIds.contains(p['pay_id']) &&
                         _normalizeReference(pr).contains(normalizedBankRef);
                   })
@@ -1117,6 +1117,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         return 'Cash';
       case 'razorpay':
         return 'Razorpay';
+      case 'upi':
       case 'qr_upi':
         return 'Bank';
       case 'cheque':

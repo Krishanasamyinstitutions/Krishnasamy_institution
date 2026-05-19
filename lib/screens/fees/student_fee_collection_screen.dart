@@ -2244,7 +2244,7 @@ class _StudentFeeCollectionScreenState
       if (_paymentMode == 'QR/UPI') {
         final upiRef = _upiRefController.text.trim();
         payReference = 'UPI Txn: $upiRef by $createdBy';
-        payMethod = 'qr_upi';
+        payMethod = 'upi';
       } else if (_paymentMode == 'Cheque') {
         final chequeNo = _chequeNoController.text.trim();
         final bankName = _bankNameController.text.trim();

@@ -523,12 +523,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 if (!collapsed) ...[
                   SizedBox(width: 10.w),
-                  Text(
-                    'EduCore360',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
+                  Flexible(
+                    child: Text(
+                      'EduCore360',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
