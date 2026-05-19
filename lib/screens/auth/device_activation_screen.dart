@@ -52,7 +52,7 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
   List<Map<String, dynamic>> _institutions = [];
   int? _selectedInsId;
   bool _loadingInstitutions = true;
-  String _trustName = 'Trust (Office)';
+  final String _trustName = 'Super Admin';
   bool _requesting = false;
   String? _requestError;
   bool _requestSent = false;
@@ -66,7 +66,6 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
     _tabController = TabController(length: 2, vsync: this);
     _loadDeviceInfo();
     _loadInstitutions();
-    _loadTrustName();
   }
 
   Future<void> _loadDeviceInfo() async {
@@ -91,19 +90,6 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
       if (!mounted) return;
       setState(() => _loadingInstitutions = false);
     }
-  }
-
-  Future<void> _loadTrustName() async {
-    try {
-      final row = await SupabaseService.client
-          .from('app_config')
-          .select('trust_name')
-          .eq('cfg_id', 1)
-          .maybeSingle();
-      final name = (row?['trust_name'] as String?)?.trim();
-      if (!mounted || name == null || name.isEmpty) return;
-      setState(() => _trustName = name);
-    } catch (_) {/* keep the fallback label */}
   }
 
   @override

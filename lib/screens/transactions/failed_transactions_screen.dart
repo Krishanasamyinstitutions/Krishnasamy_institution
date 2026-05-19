@@ -1189,10 +1189,10 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   // ── Sticky-header table ──
-  static const _txColWidths = <double>[60, 90, 180, 110, 120, 100, 90, 100, 160, 110, 90, 140];
+  static const _txColWidths = <double>[60, 110, 100, 180, 110, 120, 120, 100, 160, 90, 140];
   static const _txHeaders = <String>[
-    'S NO.', 'PAY NO', 'STUDENT', 'COURSE', 'CLASS', 'AMOUNT',
-    'CURRENCY', 'METHOD', 'REFERENCE', 'DATE', 'STATUS', 'DOWNLOAD RECEIPT',
+    'S NO.', 'DATE', 'RECEIPT NO', 'NAME', 'COURSE', 'CLASS',
+    'PAYMENT METHOD', 'AMOUNT', 'REFERENCE', 'STATUS', 'DOWNLOAD RECEIPT',
   ];
 
   // Persistent horizontal scroll controllers per tab so the scrollbar thumb tracks scroll state
@@ -1256,17 +1256,16 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               child: Row(
                 children: [
                   SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
-                  SizedBox(width: widths[1], child: Text(t.paynumber ?? '—', style: cellStyle)),
-                  SizedBox(width: widths[2], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: widths[3], child: Text(stu?.courname ?? '-', style: cellStyle)),
-                  SizedBox(width: widths[4], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
-                  SizedBox(width: widths[5], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
-                  SizedBox(width: widths[6], child: Text(t.transcurrency, style: cellStyle)),
-                  SizedBox(width: widths[7], child: Text(t.paymethod ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[1], child: Text(dateStr, style: cellStyle)),
+                  SizedBox(width: widths[2], child: Text(t.paynumber ?? '—', style: cellStyle)),
+                  SizedBox(width: widths[3], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                  SizedBox(width: widths[4], child: Text(stu?.courname ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[5], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[6], child: Text(t.paymethod ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[7], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
                   SizedBox(width: widths[8], child: Text(t.payreference ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: widths[9], child: Text(dateStr, style: cellStyle)),
                   SizedBox(
-                    width: widths[10],
+                    width: widths[9],
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
@@ -1276,7 +1275,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       ),
                     ),
                   ),
-                  SizedBox(width: widths[11], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
+                  SizedBox(width: widths[10], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                 ],
               ),
             );

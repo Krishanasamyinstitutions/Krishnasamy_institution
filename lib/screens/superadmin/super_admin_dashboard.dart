@@ -1544,8 +1544,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         ? NetworkImage(s.insLogo!)
                         : null,
                     child: (s.insLogo == null || s.insLogo!.isEmpty)
-                        ? Text(s.insName[0],
-                            style: const TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.w800))
+                        ? Text(
+                            s.insCode.isNotEmpty
+                                ? s.insCode.toUpperCase()
+                                : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w800))
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -1827,9 +1831,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                    child: Text(s.insCode.isNotEmpty ? s.insCode[0] : 'I',
+                    child: Text(
+                        s.insCode.isNotEmpty
+                            ? s.insCode.toUpperCase()
+                            : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary))),
               ),
@@ -1846,12 +1854,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary)),
-                    const SizedBox(height: 2),
-                    Text(s.insCode,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
