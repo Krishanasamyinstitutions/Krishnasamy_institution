@@ -774,6 +774,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           });
         }
         rows.add({
+          'paydate': r['paydate']?.toString() ?? '',
           'paynumber': r['paynumber']?.toString() ?? '',
           'stuadmno': r['stuadmno']?.toString() ?? '',
           'stuname': r['stuname']?.toString() ?? '',
@@ -2527,7 +2528,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     }
                   }
                   final headers = <String>[
-                    'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'COURSE', 'CLASS',
+                    'DATE', 'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'COURSE', 'CLASS',
                     ...visibleFeeTypes.map((t) => t.toUpperCase()),
                     'FINE', 'TOTAL',
                     if (showCash) 'CASH',
@@ -2536,7 +2537,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     'NET AMT',
                   ];
                   final widths = <double>[
-                    130, 130, 200, 140, 150,
+                    110, 130, 130, 200, 140, 150,
                     ...visibleFeeTypes.map((t) {
                       // Enough width for full uppercase label ("NEW ADMISSION FEES" etc.)
                       final len = t.length;
@@ -2548,13 +2549,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     if (showBank) 120,
                     130,
                   ];
-                  final numericStart = 5 + visibleFeeTypes.length - 1;
+                  // Numeric (right-aligned) columns start after the 6 text
+                  // columns: DATE, RECEIPT NO, REG NO, NAME, COURSE, CLASS.
                   final numericCols = <int>{
-                    for (int i = 5; i < headers.length; i++) i,
+                    for (int i = 6; i < headers.length; i++) i,
                   };
-                  // Decrement is unused
-                  // ignore: unused_local_variable
-                  final _ = numericStart;
                   return _stickyTable(
                     columnWidths: widths,
                     headers: headers,
@@ -2565,7 +2564,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           final fine = (r['fine'] as num?)?.toDouble() ?? 0;
                           final total = rowDisplayTotal(r);
                           final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+                          final pd = DateTime.tryParse(r['paydate']?.toString() ?? '');
                           return <String>[
+                            pd != null ? _formatDate(pd) : (r['paydate']?.toString() ?? ''),
                             r['paynumber']?.toString() ?? '',
                             r['stuadmno']?.toString() ?? '',
                             r['stuname']?.toString() ?? '',
@@ -2582,7 +2583,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         }(),
                     ],
                     footer: <String>[
-                      'TOTAL', '', '', '', '',
+                      'TOTAL', '', '', '', '', '',
                       ...visibleFeeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
                       _formatNumber(totalFine),
                       _formatNumber(totalAmt),
