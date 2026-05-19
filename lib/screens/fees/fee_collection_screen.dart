@@ -1079,30 +1079,41 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: LayoutBuilder(builder: (context, constraints) {
-                  return Scrollbar(
-                    controller: _methodSummaryScrollCtrl,
-                    thumbVisibility: true,
-                    trackVisibility: true,
-                    child: SingleChildScrollView(
-                    controller: _methodSummaryScrollCtrl,
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 1,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-                        columns: const [
-                          DataColumn(label: Text('S No.')),
-                          DataColumn(label: Text('PAYMENT METHOD')),
-                          DataColumn(label: Text('TRANSACTIONS'), numeric: true),
-                          DataColumn(label: Text('STUDENTS'), numeric: true),
-                          DataColumn(label: Text('AMOUNT'), numeric: true),
-                        ],
-                        rows: [
+                    child: Builder(builder: (context) {
+                      const flexes = <int>[1, 3, 2, 2, 2];
+                      const headers = <String>[
+                        'S No.', 'PAYMENT METHOD', 'TRANSACTIONS',
+                        'STUDENTS', 'AMOUNT',
+                      ];
+                      final hStyle = TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 0.3);
+                      Widget cell(int i, Widget child) => Expanded(
+                            flex: flexes[i],
+                            child: Align(
+                              alignment: i >= 2
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: child,
+                            ),
+                          );
+                      Widget rowWrap(Color bg, List<Widget> cells) =>
+                          Container(
+                            color: bg,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12.h),
+                            child: Row(children: cells),
+                          );
+                      return Column(
+                        children: [
+                          // Sticky header.
+                          rowWrap(AppColors.tableHeadBg, [
+                            for (int i = 0; i < headers.length; i++)
+                              cell(i, Text(headers[i], style: hStyle)),
+                          ]),
+                          Container(height: 1, color: AppColors.border),
                           ...methodKeys.asMap().entries.map((entry) {
                             final idx = entry.key;
                             final method = entry.value;
@@ -1110,32 +1121,89 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             double mTotal = 0;
                             final mStuIds = <String>{};
                             for (final p in items) {
-                              mTotal += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                              mTotal += (p['transtotalamount'] as num?)
+                                      ?.toDouble() ??
+                                  0;
                               final sid = p['stu_id']?.toString();
                               if (sid != null) mStuIds.add(sid);
                             }
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
-                              DataCell(Text('${idx + 1}', style: const TextStyle(color: AppColors.textSecondary))),
-                              DataCell(Text(method, style: const TextStyle(fontWeight: FontWeight.w600))),
-                              DataCell(Text('${items.length}')),
-                              DataCell(Text('${mStuIds.length}')),
-                              DataCell(Text(_formatCurrency(mTotal), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
-                            ]);
+                            return rowWrap(
+                                idx.isEven
+                                    ? Colors.white
+                                    : AppColors.surface,
+                                [
+                                  cell(
+                                      0,
+                                      Text('${idx + 1}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textSecondary))),
+                                  cell(
+                                      1,
+                                      Text(method,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      2,
+                                      Text('${items.length}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      3,
+                                      Text('${mStuIds.length}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      4,
+                                      Text(_formatCurrency(mTotal),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  AppColors.success))),
+                                ]);
                           }),
-                          DataRow(color: WidgetStateProperty.all(AppColors.tableHeadBg), cells: [
-                            const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text('$totalCount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text('${allStuIds.length}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                          Container(height: 1, color: AppColors.border),
+                          // Grand total.
+                          rowWrap(AppColors.tableHeadBg, [
+                            cell(0, const SizedBox()),
+                            cell(
+                                1,
+                                Text('GRAND TOTAL',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                2,
+                                Text('$totalCount',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                3,
+                                Text('${allStuIds.length}',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                4,
+                                Text(_formatCurrency(total),
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
                           ]),
                         ],
-                      ),
-                    ),
+                      );
+                    }),
                   ),
-                  );
-                })),
-              ),
+                ),
             ],
           ),
         ),
@@ -1166,80 +1234,197 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               else
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Container(
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: LayoutBuilder(builder: (context, constraints) {
-                  return Scrollbar(
-                    controller: _paymentDetailsScrollCtrl,
-                    thumbVisibility: true,
-                    trackVisibility: true,
-                    child: SingleChildScrollView(
-                    controller: _paymentDetailsScrollCtrl,
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 1,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-                        columns: const [
-                          DataColumn(label: Text('S No.')),
-                          DataColumn(label: Text('PAY NO')),
-                          DataColumn(label: Text('STUDENT')),
-                          DataColumn(label: Text('COURSE')),
-                          DataColumn(label: Text('CLASS')),
-                          DataColumn(label: Text('DATE')),
-                          DataColumn(label: Text('METHOD')),
-                          DataColumn(label: Text('AMOUNT'), numeric: true),
-                        ],
-                        rows: [
-                          ...filtered.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final p = entry.value;
-                            final stuId = p['stu_id'] as int?;
-                            final stuName = p['stuname']?.toString().isNotEmpty == true ? p['stuname'].toString()
-                                : (stuId != null && _stuIdToName.containsKey(stuId)) ? _stuIdToName[stuId]!
-                                : (p['stuadmno']?.toString() ?? '-');
-                            final stuCourse = p['courname']?.toString().isNotEmpty == true ? p['courname'].toString()
-                                : (stuId != null && _stuIdToCourse.containsKey(stuId)) ? _stuIdToCourse[stuId]! : '-';
-                            final stuClass = p['stuclass']?.toString().isNotEmpty == true ? p['stuclass'].toString()
-                                : (stuId != null && _stuIdToClass.containsKey(stuId)) ? _stuIdToClass[stuId]! : '-';
-                            final amount = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
-                              DataCell(Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200), child: Text(stuName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
-                              DataCell(Text(stuCourse, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(stuClass, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(_formatDate(p['paydate']), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(p['paymethod']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(_formatCurrency(amount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
-                            ]);
-                          }),
-                          DataRow(color: WidgetStateProperty.all(AppColors.tableHeadBg), cells: [
-                            const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                          ]),
-                        ],
+                  child: SizedBox(
+                    height: 420.h,
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
                       ),
+                      child: Builder(builder: (context) {
+                        const flexes = <int>[1, 2, 3, 2, 2, 2, 2, 2];
+                        const headers = <String>[
+                          'S No.', 'PAY NO', 'STUDENT', 'COURSE',
+                          'CLASS', 'DATE', 'METHOD', 'AMOUNT',
+                        ];
+                        final hStyle = TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 0.3);
+                        const cStyle = TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary);
+                        Widget cell(int i, Widget child) => Expanded(
+                              flex: flexes[i],
+                              child: Align(
+                                alignment: i == 7
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: child,
+                              ),
+                            );
+                        return Column(
+                          children: [
+                            // Sticky header.
+                            Container(
+                              color: AppColors.tableHeadBg,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(
+                                children: [
+                                  for (int i = 0; i < headers.length; i++)
+                                    cell(i,
+                                        Text(headers[i], style: hStyle)),
+                                ],
+                              ),
+                            ),
+                            Container(height: 1, color: AppColors.border),
+                            // Scrolling body.
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => Divider(
+                                    height: 1,
+                                    color: AppColors.border
+                                        .withValues(alpha: 0.5)),
+                                itemBuilder: (_, idx) {
+                                  final p = filtered[idx];
+                                  final stuId = p['stu_id'] as int?;
+                                  final stuName = p['stuname']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['stuname'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToName
+                                                  .containsKey(stuId))
+                                          ? _stuIdToName[stuId]!
+                                          : (p['stuadmno']?.toString() ??
+                                              '-');
+                                  final stuCourse = p['courname']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['courname'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToCourse
+                                                  .containsKey(stuId))
+                                          ? _stuIdToCourse[stuId]!
+                                          : '-';
+                                  final stuClass = p['stuclass']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['stuclass'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToClass
+                                                  .containsKey(stuId))
+                                          ? _stuIdToClass[stuId]!
+                                          : '-';
+                                  final amount = (p['transtotalamount']
+                                              as num?)
+                                          ?.toDouble() ??
+                                      0;
+                                  return Container(
+                                    color: idx.isEven
+                                        ? Colors.white
+                                        : AppColors.surface,
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 11.h),
+                                    child: Row(
+                                      children: [
+                                        cell(0,
+                                            Text('${idx + 1}',
+                                                style: cStyle)),
+                                        cell(
+                                            1,
+                                            Text(
+                                                p['paynumber']
+                                                        ?.toString() ??
+                                                    '-',
+                                                style: cStyle)),
+                                        cell(
+                                            2,
+                                            Text(stuName,
+                                                overflow: TextOverflow
+                                                    .ellipsis,
+                                                style: cStyle)),
+                                        cell(3,
+                                            Text(stuCourse,
+                                                style: cStyle)),
+                                        cell(4,
+                                            Text(stuClass,
+                                                style: cStyle)),
+                                        cell(
+                                            5,
+                                            Text(
+                                                _formatDate(
+                                                    p['paydate']),
+                                                style: cStyle)),
+                                        cell(
+                                            6,
+                                            Text(
+                                                p['paymethod']
+                                                        ?.toString() ??
+                                                    '-',
+                                                style: cStyle)),
+                                        cell(
+                                            7,
+                                            Text(
+                                                _formatCurrency(amount),
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color: AppColors
+                                                        .success))),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            // Grand total — pinned footer.
+                            Container(height: 1, color: AppColors.border),
+                            Container(
+                              color: AppColors.tableHeadBg,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(
+                                children: [
+                                  cell(0, const SizedBox()),
+                                  cell(
+                                      1,
+                                      Text('GRAND TOTAL',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14.sp,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(2, const SizedBox()),
+                                  cell(3, const SizedBox()),
+                                  cell(4, const SizedBox()),
+                                  cell(5, const SizedBox()),
+                                  cell(6, const SizedBox()),
+                                  cell(
+                                      7,
+                                      Text(_formatCurrency(total),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14.sp,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                  );
-                })),
-              ),
+                ),
             ],
           ),
         ),
@@ -1596,86 +1781,218 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ),
         SizedBox(height: 12.h),
         // Fee group-wise table
-        LayoutBuilder(builder: (context, constraints) {
-          return Scrollbar(controller: _feeGroupScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeGroupScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 1,
-              showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-              columns: const [
-                DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('FEE GROUP')),
-                DataColumn(label: Text('STUDENTS'), numeric: true),
-                DataColumn(label: Text('TOTAL DEMAND'), numeric: true),
-                DataColumn(label: Text('PAID'), numeric: true),
-                DataColumn(label: Text('FINE'), numeric: true),
-                DataColumn(label: Text('BALANCE'), numeric: true),
-                DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
-              ],
-              rows: groupKeys.isEmpty ? [
-                const DataRow(cells: [
-                  DataCell(Text('')), DataCell(Text('No pending fees found')), DataCell(Text('')),
-                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                ]),
-              ] : [
-                ...groupKeys.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final groupName = entry.value;
-                  final items = groupedByFeeGroup[groupName]!;
-                  double gDemand = 0, gPaid = 0, gFine = 0, gBalance = 0;
-                  final gStuIds = <String>{};
-                  for (final d in items) {
-                    gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                    final isPaid = pa > 0 || d['paidstatus'] == 'P';
-                    gPaid += pa - (isPaid ? fa : 0);
-                    gFine += isPaid ? fa : 0;
-                    gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                    if (((d['balancedue'] as num?)?.toDouble() ?? 0) > 0) {
-                      final sid = d['stu_id']?.toString();
-                      if (sid != null) gStuIds.add(sid);
-                    }
-                  }
-                  return DataRow(
-                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface),
-                    onSelectChanged: (_) => setState(() => _selectedPendingFeeGroup = groupName),
-                    cells: [
-                      DataCell(Text('${idx + 1}')),
-                      DataCell(Text(groupName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                      DataCell(Text('${gStuIds.length}')),
-                      DataCell(Text(_formatCurrency(gDemand))),
-                      DataCell(Text(_formatCurrency(gPaid), style: const TextStyle(color: AppColors.success))),
-                      DataCell(Text(gFine > 0 ? _formatCurrency(gFine) : '-', style: TextStyle(color: gFine > 0 ? Colors.orange : AppColors.textSecondary))),
-                      DataCell(Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
-                      DataCell(Align(
-                        alignment: Alignment.centerRight,
-                        child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary),
-                      )),
-                    ],
-                  );
-                }),
-                // Grand total row
-                DataRow(
-                  color: WidgetStateProperty.all(AppColors.tableHeadBg),
-                  cells: [
-                    const DataCell(Text('')),
-                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text('$totalStudents', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    const DataCell(Text('')),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Builder(builder: (context) {
+            const flexes = <int>[1, 3, 2, 2, 2, 2, 2, 2];
+            const headers = <String>[
+              'S No.', 'FEE GROUP', 'STUDENTS', 'TOTAL DEMAND',
+              'PAID', 'FINE', 'BALANCE', 'ACTION',
+            ];
+            final hStyle = TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                letterSpacing: 0.3);
+            Widget cell(int i, Widget child) => Expanded(
+                  flex: flexes[i],
+                  child: Align(
+                    alignment: i >= 2
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: child,
+                  ),
+                );
+            Widget headerOrTotal(Color bg, List<Widget> cells) => Container(
+                  color: bg,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12.h),
+                  child: Row(children: cells),
+                );
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 420.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Sticky header.
+                  headerOrTotal(AppColors.tableHeadBg, [
+                    for (int i = 0; i < headers.length; i++)
+                      cell(i, Text(headers[i], style: hStyle)),
+                  ]),
+                  Container(height: 1, color: AppColors.border),
+                  if (groupKeys.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Text('No pending fees found',
+                          style: TextStyle(
+                              color: AppColors.textSecondary)),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: groupKeys.length,
+                        separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: AppColors.border
+                                .withValues(alpha: 0.5)),
+                        itemBuilder: (_, idx) {
+                          final groupName = groupKeys[idx];
+                          final items = groupedByFeeGroup[groupName]!;
+                          double gDemand = 0,
+                              gPaid = 0,
+                              gFine = 0,
+                              gBalance = 0;
+                          final gStuIds = <String>{};
+                          for (final d in items) {
+                            gDemand +=
+                                (d['feeamount'] as num?)?.toDouble() ?? 0;
+                            final pa =
+                                (d['paidamount'] as num?)?.toDouble() ?? 0;
+                            final fa =
+                                (d['fineamount'] as num?)?.toDouble() ?? 0;
+                            final isPaid =
+                                pa > 0 || d['paidstatus'] == 'P';
+                            gPaid += pa - (isPaid ? fa : 0);
+                            gFine += isPaid ? fa : 0;
+                            gBalance +=
+                                (d['balancedue'] as num?)?.toDouble() ?? 0;
+                            if (((d['balancedue'] as num?)?.toDouble() ??
+                                    0) >
+                                0) {
+                              final sid = d['stu_id']?.toString();
+                              if (sid != null) gStuIds.add(sid);
+                            }
+                          }
+                          return InkWell(
+                            onTap: () => setState(() =>
+                                _selectedPendingFeeGroup = groupName),
+                            child: Container(
+                              color: idx.isEven
+                                  ? Colors.white
+                                  : AppColors.surface,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(children: [
+                                cell(
+                                    0,
+                                    Text('${idx + 1}',
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    1,
+                                    Text(groupName,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    2,
+                                    Text('${gStuIds.length}',
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    3,
+                                    Text(_formatCurrency(gDemand),
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    4,
+                                    Text(_formatCurrency(gPaid),
+                                        style: const TextStyle(
+                                            color:
+                                                AppColors.success))),
+                                cell(
+                                    5,
+                                    Text(
+                                        gFine > 0
+                                            ? _formatCurrency(gFine)
+                                            : '-',
+                                        style: TextStyle(
+                                            color: gFine > 0
+                                                ? Colors.orange
+                                                : AppColors
+                                                    .textSecondary))),
+                                cell(
+                                    6,
+                                    Text(_formatCurrency(gBalance),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange))),
+                                cell(
+                                    7,
+                                    AppIcon.linear('Chevron Right',
+                                        size: 16,
+                                        color:
+                                            AppColors.textSecondary)),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  if (groupKeys.isNotEmpty) ...[
+                    Container(height: 1, color: AppColors.border),
+                    headerOrTotal(AppColors.tableHeadBg, [
+                      cell(0, const SizedBox()),
+                      cell(
+                          1,
+                          Text('Total',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          2,
+                          Text('$totalStudents',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          3,
+                          Text(_formatCurrency(totalDemand),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          4,
+                          Text(_formatCurrency(totalPaid),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          5,
+                          Text(_formatCurrency(totalFine),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          6,
+                          Text(_formatCurrency(totalBalance),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(7, const SizedBox()),
+                    ]),
                   ],
-                ),
-              ],
-            ),
-          )));
-        }),
+                ],
+              ),
+            );
+          }),
+        ),
       ],
     );
   }

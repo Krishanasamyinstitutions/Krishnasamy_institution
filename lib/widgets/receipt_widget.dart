@@ -1,8 +1,9 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Data model matching the React ReceiptData interface
+/// Data model for a fee receipt. Kept stable so existing call sites
+/// (Daily Collection, Student Fee Collection, Failed Transactions) and the
+/// PDF builder continue to work unchanged.
 class ReceiptData {
   final String receiptNo;
   final String date;
@@ -63,276 +64,123 @@ class ReceiptFeeItem {
   const ReceiptFeeItem({required this.type, required this.amount});
 }
 
-/// Flutter receipt widget matching the Figma design exactly.
-/// On-screen preview renders at A4 (595 x 842 pt). The actual PDF that
-/// gets printed/downloaded is sized A5 by the PDF builders — the preview
-/// is just for viewing, so we keep it spacious.
+/// One flattened "particular" line — a single fee row in the receipt table.
+class ReceiptParticular {
+  final String term;
+  final String type;
+  final double amount;
+  const ReceiptParticular(
+      {required this.term, required this.type, required this.amount});
+}
+
+/// Flattens the term-grouped fee details into a flat particulars list.
+List<ReceiptParticular> flattenParticulars(ReceiptData data) {
+  final rows = <ReceiptParticular>[];
+  for (final term in data.feeDetails) {
+    for (final fee in term.fees) {
+      rows.add(ReceiptParticular(
+          term: term.term, type: fee.type, amount: fee.amount));
+    }
+  }
+  return rows;
+}
+
+/// Picks the printed header banner asset for a college from its name.
+/// Returns null when no banner matches — the receipt then falls back to
+/// the institution logo + name/address text.
+String? receiptHeaderImage(String schoolName) {
+  final s = schoolName.toLowerCase();
+  if (s.contains('engineering')) return 'assets/images/kcet.png';
+  if (s.contains('polytechnic')) return 'assets/images/kmptc.jpg';
+  if (s.contains('science') ||
+      s.contains('arts') ||
+      s.contains('management') ||
+      s.contains('women')) {
+    return 'assets/images/kcsam.jpg';
+  }
+  return null;
+}
+
+/// Distinct semesters/terms on the receipt, joined for the header field.
+String receiptSemesterLabel(ReceiptData data) {
+  final terms = <String>{};
+  for (final t in data.feeDetails) {
+    final v = t.term.trim();
+    if (v.isNotEmpty && v != '-') terms.add(v);
+  }
+  return terms.isEmpty ? '-' : terms.join(', ');
+}
+
+/// Amount with two decimals and thousands separators, e.g. 5000 -> "5,000.00".
+String formatReceiptAmount(double amount) {
+  final parts = amount.toStringAsFixed(2).split('.');
+  final intPart = parts[0].replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  return '$intPart.${parts[1]}';
+}
+
+const _onesWords = [
+  '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+  'Seventeen', 'Eighteen', 'Nineteen'
+];
+const _tensWords = [
+  '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty',
+  'Ninety'
+];
+
+String _twoDigitWords(int n) {
+  if (n < 20) return _onesWords[n];
+  final t = _tensWords[n ~/ 10];
+  return n % 10 == 0 ? t : '$t ${_onesWords[n % 10]}';
+}
+
+String _threeDigitWords(int n) {
+  final parts = <String>[];
+  if (n ~/ 100 > 0) parts.add('${_onesWords[n ~/ 100]} Hundred');
+  if (n % 100 > 0) parts.add(_twoDigitWords(n % 100));
+  return parts.join(' ');
+}
+
+String _numberToWords(int n) {
+  if (n == 0) return 'Zero';
+  final parts = <String>[];
+  final crore = n ~/ 10000000;
+  n %= 10000000;
+  final lakh = n ~/ 100000;
+  n %= 100000;
+  final thousand = n ~/ 1000;
+  n %= 1000;
+  if (crore > 0) parts.add('${_numberToWords(crore)} Crore');
+  if (lakh > 0) parts.add('${_twoDigitWords(lakh)} Lakh');
+  if (thousand > 0) parts.add('${_twoDigitWords(thousand)} Thousand');
+  if (n > 0) parts.add(_threeDigitWords(n));
+  return parts.join(' ');
+}
+
+/// "Rupees Five Thousand Only" style amount-in-words for the receipt footer.
+String amountInWords(double amount) {
+  final whole = amount.round();
+  if (whole <= 0) return 'Rupees Zero Only';
+  return 'Rupees ${_numberToWords(whole)} Only';
+}
+
+/// B5 fee-receipt widget — a Flutter port of the Figma "Receipt" design.
+/// Renders at ISO B5 (176×250 mm ≈ 499×709 pt). The matching print/download
+/// PDF is produced by `buildReceiptPdf` in receipt_pdf.dart.
 class ReceiptWidget extends StatelessWidget {
   final ReceiptData data;
 
   const ReceiptWidget({super.key, required this.data});
 
-  // Colors from Figma
-  static const _primaryBlue = Color(0xFF6C8EEF);
-  static const _darkBlue = Color(0xFF4A6CD4);
-  static const _textDark = Color(0xFF2a2a2a);
-  static const _textMedium = Color(0xFF4c4c4c);
-  static const _headerBg = Color(0xFFE9EEFF);
-  static const _borderColor = Color(0xFFd9d9d9);
-  static const _paidGreen = Color(0xFF34c759);
-  static const _paidGreenBg = Color(0xFFc2eecd);
-  static const _dividerColor = Color(0xFFACBEDD);
+  /// ISO B5 in PDF points (176×250 mm at 72 dpi).
+  static const double b5Width = 499;
+  static const double b5Height = 709;
 
-  // Max fee items per page (first page has header+student info so fewer items fit)
-  static const _maxItemsFirstPage = 8;
-  static const _maxItemsContinuation = 12;
+  static const double _amountColWidth = 120;
+  static const _border = BorderSide(color: Colors.black, width: 1);
 
-  @override
-  Widget build(BuildContext context) {
-    final totalItems = data.feeDetails.length;
-
-    // Calculate pages
-    final List<_PageChunk> pages = [];
-    int remaining = totalItems;
-    int offset = 0;
-
-    if (remaining <= _maxItemsFirstPage) {
-      pages.add(_PageChunk(startIdx: 0, items: data.feeDetails, isFirst: true, isLast: true));
-    } else {
-      // First page
-      final firstCount = _maxItemsFirstPage;
-      pages.add(_PageChunk(
-        startIdx: 0,
-        items: data.feeDetails.sublist(0, firstCount),
-        isFirst: true,
-        isLast: false,
-      ));
-      remaining -= firstCount;
-      offset = firstCount;
-
-      // Continuation pages
-      while (remaining > 0) {
-        final count = remaining <= _maxItemsContinuation ? remaining : _maxItemsContinuation;
-        final isLast = count >= remaining;
-        pages.add(_PageChunk(
-          startIdx: offset,
-          items: data.feeDetails.sublist(offset, offset + count),
-          isFirst: false,
-          isLast: isLast,
-        ));
-        offset += count;
-        remaining -= count;
-      }
-    }
-
-    if (pages.length == 1) {
-      return _buildPage(pages[0], 1, 1);
-    }
-
-    return Column(
-      children: [
-        for (int i = 0; i < pages.length; i++) ...[
-          if (i > 0) const SizedBox(height: 16),
-          _buildPage(pages[i], i + 1, pages.length),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildPage(_PageChunk chunk, int pageNum, int totalPages) {
-    return Container(
-      width: 595,
-      height: 842,
-      color: Colors.white,
-      child: Stack(
-        children: [
-          // Watermark
-          if (data.schoolLogoUrl != null && chunk.isFirst)
-            Positioned(
-              left: (595 - 228) / 2,
-              top: 278 + (286 - 228) / 2,
-              child: Opacity(
-                opacity: 0.05,
-                child: Image.network(
-                  data.schoolLogoUrl!,
-                  width: 228,
-                  height: 228,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 60),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 40),
-                // Header (on every page)
-                _buildHeader(pageNum, totalPages),
-                const SizedBox(height: 12),
-                Container(height: 1, color: _dividerColor),
-                const SizedBox(height: 12),
-                // Student info (first page only)
-                if (chunk.isFirst) ...[
-                  _buildStudentInfo(),
-                  const SizedBox(height: 20),
-                ],
-                // Fee Table for this page's items
-                _buildFeeTable(chunk),
-                if (chunk.isLast) ...[
-                  const Spacer(),
-                  // Footer
-                  Center(
-                    child: Text(
-                      'Thank you for your payment.',
-                      style: GoogleFonts.ptSerif(fontSize: 14, color: _textDark),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (data.schoolEmail != null || data.schoolMobile != null)
-                    Center(
-                      child: RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium, height: 1.6),
-                          children: [
-                            const TextSpan(text: 'For any further inquiries, please contact us at '),
-                            if (data.schoolEmail != null)
-                              TextSpan(text: data.schoolEmail!, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textMedium)),
-                            if (data.schoolEmail != null && data.schoolMobile != null)
-                              const TextSpan(text: ' or\ncall '),
-                            if (data.schoolEmail == null && data.schoolMobile != null)
-                              const TextSpan(text: ''),
-                            if (data.schoolMobile != null)
-                              TextSpan(text: data.schoolMobile!, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textMedium)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 40),
-                ] else ...[
-                  const Spacer(),
-                  Center(
-                    child: Text(
-                      'Continued on next page...',
-                      style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, fontStyle: FontStyle.italic, color: _textMedium),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ],
-            ),
-          ),
-
-          // Status stamp overlay (all pages)
-          if (data.status == 'paid' || data.status == 'failed')
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 340,
-              child: Center(
-                child: Opacity(
-                  opacity: 0.55,
-                  child: Transform.rotate(
-                    angle: -30 * pi / 180,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: data.status == 'paid' ? _paidGreenBg.withValues(alpha: 0.4) : const Color(0xFFFFD6D6).withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: data.status == 'paid' ? _paidGreen : const Color(0xFFFF3B30),
-                          width: 2.5,
-                        ),
-                      ),
-                      child: Text(
-                        data.reconStatus == 'P' ? 'SUBJECT TO\nREALIZATION' : (data.status == 'paid' ? 'PAID' : 'FAILED'),
-                        style: GoogleFonts.montserrat(fontSize: 22, fontWeight: FontWeight.w600, color: data.status == 'paid' ? _paidGreen : const Color(0xFFFF3B30)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(int pageNum, int totalPages) {
-    return Column(
-      children: [
-        // Logo beside institute name and address, all centered
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (data.schoolLogoUrl != null) ...[
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Image.network(
-                    data.schoolLogoUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(data.schoolName, style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: _darkBlue)),
-                  const SizedBox(height: 3),
-                  Text(data.schoolAddress, maxLines: 2, style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        // Fee Receipt details - left aligned, page number right aligned
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data.reconStatus == 'P' ? 'Acknowledgement' : 'Fee Receipt', style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: _primaryBlue)),
-                const SizedBox(height: 6),
-                _labelValue('Receipt No:', data.receiptNo),
-                const SizedBox(height: 3),
-                _labelValue('Date:', data.date),
-              ],
-            ),
-            const Spacer(),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (totalPages > 1) ...[
-                  Text('Page $pageNum of $totalPages', style: GoogleFonts.montserrat(fontSize: 9, fontWeight: FontWeight.w500, color: _textMedium)),
-                  const SizedBox(height: 6),
-                ] else
-                  const SizedBox(height: 22),
-                _labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
-                const SizedBox(height: 3),
-                _labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
-                if (isOnlineMethod(data.paymentMethod) &&
-                    formatReference(data.paymentReference).isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  _labelValue('Reference:', formatReference(data.paymentReference)),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
+  /// Kept for backward compatibility with existing call sites.
   static bool isOnlineMethod(String method) {
     final m = method.toLowerCase();
     return m.contains('razorpay') ||
@@ -342,204 +190,219 @@ class ReceiptWidget extends StatelessWidget {
         m.contains('card');
   }
 
-  /// Strips operator metadata stored in `payreference` so the receipt only
-  /// shows the txn id. Example: "UPI Txn: DE55254MO by Satheesh" → "DE55254MO".
+  /// Kept for backward compatibility with existing call sites.
   static String formatReference(String? raw) {
     if (raw == null) return '';
     var s = raw.trim();
     if (s.isEmpty) return '';
-    // Drop a leading "<label>: " prefix (e.g. "UPI Txn:", "Cheque No:").
     final colon = s.indexOf(':');
-    if (colon != -1 && colon < 30) {
-      s = s.substring(colon + 1).trim();
-    }
-    // Drop a trailing " by <name>" recorded-by suffix.
-    final byMatch = RegExp(r'\s+by\s+.+$', caseSensitive: false).firstMatch(s);
-    if (byMatch != null) {
-      s = s.substring(0, byMatch.start).trim();
-    }
+    if (colon != -1 && colon < 30) s = s.substring(colon + 1).trim();
+    final byMatch =
+        RegExp(r'\s+by\s+.+$', caseSensitive: false).firstMatch(s);
+    if (byMatch != null) s = s.substring(0, byMatch.start).trim();
     return s;
   }
 
-  Widget _buildStudentInfo() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  TextStyle _body({double size = 10.5, FontWeight weight = FontWeight.w400}) =>
+      GoogleFonts.inter(fontSize: size, fontWeight: weight, color: Colors.black);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: b5Width,
+      height: b5Height,
+      color: Colors.white,
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _header(),
+          const SizedBox(height: 10),
+          Text(
+            'RECEIPT',
+            textAlign: TextAlign.center,
+            style: _body(size: 13, weight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: _table()),
+        ],
+      ),
+    );
+  }
+
+  // Centered college banner (kcet/kmptc/kcsam) — falls back to logo + text.
+  Widget _header() {
+    final banner = receiptHeaderImage(data.schoolName);
+    if (banner != null) {
+      // Three-grid header: 25% logo | 50% banner | 25% empty.
+      return SizedBox(
+        height: 100,
+        child: Row(
           children: [
+            // 16% logo | 4% gap | 60% banner | 4% gap | 16% empty.
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _labelValue('Name:', data.studentName),
-                  const SizedBox(height: 6),
-                  _labelValue('Mobile No:', data.mobileNo),
-                  const SizedBox(height: 6),
-                  _wrappedLabelValue('Address:', _hasValue(data.address) ? data.address : 'NA'),
-                ],
+              flex: 4,
+              child: Center(
+                child: Image.asset('assets/images/KMPTC Logo.jpg',
+                    height: 88, fit: BoxFit.contain),
               ),
             ),
-            const SizedBox(width: 20),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            const Expanded(flex: 1, child: SizedBox()),
+            Expanded(
+              flex: 15,
+              child: Center(
+                child: Image.asset(banner, fit: BoxFit.contain),
+              ),
+            ),
+            const Expanded(flex: 1, child: SizedBox()),
+            const Expanded(flex: 4, child: SizedBox()),
+          ],
+        ),
+      );
+    }
+    final hasLogo = (data.schoolLogoUrl ?? '').isNotEmpty;
+    return SizedBox(
+      height: 100,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (hasLogo) ...[
+            SizedBox(
+              width: 70,
+              height: 70,
+              child: Image.network(
+                data.schoolLogoUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _labelValue('Roll No:', data.admissionNo),
-                const SizedBox(height: 6),
-                _labelValue('Course:', data.courseName),
-                const SizedBox(height: 6),
-                _labelValue('Class:', data.className),
+                Text(data.schoolName,
+                    style: _body(size: 15, weight: FontWeight.w800)),
+                const SizedBox(height: 3),
+                Text(data.schoolAddress,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _body(size: 9, weight: FontWeight.w500)),
               ],
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _wrappedLabelValue(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
-        const SizedBox(width: 6),
-        Expanded(child: Text(value, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium))),
-      ],
-    );
-  }
-
-  Widget _labelValue(String label, String value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(label, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _textDark)),
-        const SizedBox(width: 6),
-        Text(value, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textMedium)),
-      ],
-    );
-  }
-
-  Widget _buildFeeTable(_PageChunk chunk) {
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // Table Header
-            Container(
-              decoration: BoxDecoration(
-                color: _headerBg,
-                border: Border.all(color: _borderColor, width: 1),
-              ),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _headerCell('S.No', width: 46),
-                    Container(width: 1, color: _borderColor),
-                    _headerCell('Semester', width: 124),
-                    Container(width: 1, color: _borderColor),
-                    _headerCell('Fee Type', flex: true),
-                    Container(width: 1, color: _borderColor),
-                    _headerCell('Amount', width: 119),
-                  ],
-                ),
-              ),
-            ),
-            // Data Rows
-            for (var i = 0; i < chunk.items.length; i++)
-              _buildDataRow(chunk.startIdx + i, chunk.items[i]),
-            // Sub Total Row (only on last page)
-            if (chunk.isLast)
-              Row(
-                children: [
-                  const SizedBox(width: 172),
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: _primaryBlue,
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(4),
-                          bottomRight: Radius.circular(4),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text('Total', textAlign: TextAlign.right,
-                              style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                          ),
-                          SizedBox(
-                            width: 119,
-                            child: Text('\u20B9${_formatAmount(data.total)}', textAlign: TextAlign.right,
-                              style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _headerCell(String text, {double? width, bool flex = false}) {
-    final child = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      alignment: Alignment.center,
-      child: Text(text, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w600, color: _primaryBlue)),
-    );
-    return flex ? Expanded(child: child) : SizedBox(width: width, child: child);
-  }
-
-  Widget _buildDataRow(int index, ReceiptTermDetail term) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 36),
-      decoration: const BoxDecoration(
-        border: Border(
-          left: BorderSide(color: _borderColor, width: 1),
-          right: BorderSide(color: _borderColor, width: 1),
-          bottom: BorderSide(color: _borderColor, width: 1),
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  // The bordered receipt table.
+  Widget _table() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black, width: 1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          _infoRow(),
+          _sectionHeaderRow(),
+          Expanded(child: _particularsRow()),
+          _totalRow(),
+          _footerRow(),
+        ],
+      ),
+    );
+  }
+
+  // Two equal cells: student details | receipt details.
+  Widget _infoRow() {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _infoCell([
+              _kv('Name', data.studentName),
+              _kv('Reg. No', data.admissionNo),
+              _kv('Branch', data.courseName),
+            ]),
+          ),
+          Container(width: 1, color: Colors.black),
+          Expanded(
+            child: _infoCell([
+              _kv('Receipt No', data.receiptNo),
+              _kv('Date', data.date),
+              _kv('Semester', receiptSemesterLabel(data)),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoCell(List<Widget> lines) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < lines.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            lines[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value) {
+    return RichText(
+      text: TextSpan(
+        style: _body(size: 10),
+        children: [
+          TextSpan(
+              text: '$label : ',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          TextSpan(
+              text: value.trim().isEmpty ? '-' : value,
+              style: const TextStyle(fontWeight: FontWeight.w400)),
+        ],
+      ),
+    );
+  }
+
+  // PARTICULARS | AMOUNTS (Rs) column headings.
+  Widget _sectionHeaderRow() {
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: _border)),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _dataCell('${index + 1}.', width: 46, alignTop: true),
-            Container(width: 1, color: _borderColor),
-            _dataCell(term.term, width: 124, alignTop: true),
-            Container(width: 1, color: _borderColor),
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var fee in term.fees)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      child: Text(fee.type, textAlign: TextAlign.center,
-                        style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
-                    ),
-                ],
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text('PARTICULARS',
+                    textAlign: TextAlign.center,
+                    style: _body(size: 11, weight: FontWeight.w700)),
               ),
             ),
-            Container(width: 1, color: _borderColor),
+            Container(width: 1, color: Colors.black),
             SizedBox(
-              width: 119,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var fee in term.fees)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      child: Text('\u20B9${_formatAmount(fee.amount)}', textAlign: TextAlign.right,
-                        style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
-                    ),
-                ],
+              width: _amountColWidth,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text('AMOUNTS (Rs)',
+                    textAlign: TextAlign.right,
+                    style: _body(size: 11, weight: FontWeight.w700)),
               ),
             ),
           ],
@@ -548,45 +411,106 @@ class ReceiptWidget extends StatelessWidget {
     );
   }
 
-  Widget _dataCell(String text, {double? width, bool alignTop = false}) {
-    return SizedBox(
-      width: width,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        alignment: alignTop ? Alignment.topCenter : Alignment.center,
-        child: Text(text, style: GoogleFonts.montserrat(fontSize: 10, fontWeight: FontWeight.w500, color: _textDark)),
+  // The fee lines — fills the remaining vertical space.
+  Widget _particularsRow() {
+    final rows = flattenParticulars(data);
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: _border)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 6),
+                    Text('${i + 1}. ${rows[i].type}', style: _body()),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          Container(width: 1, color: Colors.black),
+          SizedBox(
+            width: _amountColWidth,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 6),
+                    Text(formatReceiptAmount(rows[i].amount),
+                        style: _body()),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  static bool _hasValue(String? s) {
-    if (s == null) return false;
-    final t = s.trim();
-    if (t.isEmpty) return false;
-    final lower = t.toLowerCase();
-    return t != '-' && lower != 'null' && lower != 'n/a';
+  // TOTAL | grand total.
+  Widget _totalRow() {
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: _border)),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text('TOTAL',
+                    textAlign: TextAlign.right,
+                    style: _body(size: 12, weight: FontWeight.w700)),
+              ),
+            ),
+            Container(width: 1, color: Colors.black),
+            SizedBox(
+              width: _amountColWidth,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text(formatReceiptAmount(data.total),
+                    textAlign: TextAlign.right,
+                    style: _body(size: 12, weight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  String _formatAmount(double amount) {
-    if (amount == amount.truncateToDouble()) {
-      return amount.toInt().toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    }
-    return amount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
+  // Amount in words + cashier signature line.
+  Widget _footerRow() {
+    return Container(
+      height: 110,
+      decoration: const BoxDecoration(border: Border(top: _border)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(amountInWords(data.total),
+              style: _body(size: 11, weight: FontWeight.w500)),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.only(right: 34),
+            child: Text('Cashier',
+                textAlign: TextAlign.right,
+                style: _body(size: 12, weight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
-}
-
-class _PageChunk {
-  final int startIdx;
-  final List<ReceiptTermDetail> items;
-  final bool isFirst;
-  final bool isLast;
-
-  const _PageChunk({
-    required this.startIdx,
-    required this.items,
-    required this.isFirst,
-    required this.isLast,
-  });
 }

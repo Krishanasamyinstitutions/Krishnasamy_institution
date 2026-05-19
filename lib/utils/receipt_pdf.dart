@@ -1,347 +1,311 @@
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../widgets/receipt_widget.dart';
 
-/// Shared A5 receipt PDF builder. Lives outside any screen so multiple call
-/// sites (Daily Collection, Student Fee Collection success dialog, Failed
-/// Transactions) can produce identical receipts without duplicating ~350 lines
-/// of pw.Widget code each.
+/// Builds the B5 fee-receipt PDF — a 1:1 match of [ReceiptWidget] and the
+/// Figma "Receipt" design. Shared by every call site (Daily Collection,
+/// Student Fee Collection, Failed Transactions) so receipts stay identical.
 Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
-  final font = await PdfGoogleFonts.montserratRegular();
-  final fontMedium = await PdfGoogleFonts.montserratMedium();
-  final fontSemiBold = await PdfGoogleFonts.montserratSemiBold();
-  final fontItalic = await PdfGoogleFonts.montserratItalic();
-  final fontPtSerif = await PdfGoogleFonts.pTSerifRegular();
+  final reg = await PdfGoogleFonts.interRegular();
+  final med = await PdfGoogleFonts.interMedium();
+  final semi = await PdfGoogleFonts.interSemiBold();
+  final bold = await PdfGoogleFonts.interBold();
 
-  const primaryBlue = PdfColor.fromInt(0xFF6C8EEF);
-  const darkBlue = PdfColor.fromInt(0xFF4A6CD4);
-  const textDark = PdfColor.fromInt(0xFF2a2a2a);
-  const textMediumC = PdfColor.fromInt(0xFF4c4c4c);
-  const headerBg = PdfColor.fromInt(0xFFE9EEFF);
-  const borderColor = PdfColor.fromInt(0xFFd9d9d9);
-  const paidGreen = PdfColor.fromInt(0xFF34c759);
-  const dividerColor = PdfColor.fromInt(0xFFACBEDD);
-
-  final sSemiBold = pw.TextStyle(font: fontSemiBold, fontSize: 10, color: textDark);
-  final sMedium = pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC);
-  final sMediumDark = pw.TextStyle(font: fontMedium, fontSize: 10, color: textDark);
-
-  pw.Widget labelValue(String label, String value) {
-    return pw.Row(
-      mainAxisSize: pw.MainAxisSize.min,
-      children: [
-        pw.Text(label, style: sSemiBold),
-        pw.SizedBox(width: 6),
-        pw.Text(value, style: sMedium),
-      ],
-    );
+  pw.ImageProvider? logo;
+  if ((data.schoolLogoUrl ?? '').isNotEmpty) {
+    try {
+      logo = await networkImage(data.schoolLogoUrl!);
+    } catch (_) {/* fall back to a logo-less header */}
   }
 
-  pw.Widget tableCell(String text, pw.TextStyle style, {pw.Alignment alignment = pw.Alignment.center}) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      alignment: alignment,
-      child: pw.Text(text, style: style),
-    );
+  // College header banner (kcet/kmptc/kcsam), chosen by institution name.
+  pw.ImageProvider? banner;
+  pw.ImageProvider? crest;
+  final bannerAsset = receiptHeaderImage(data.schoolName);
+  if (bannerAsset != null) {
+    try {
+      banner = await imageFromAssetBundle(bannerAsset);
+      crest = await imageFromAssetBundle('assets/images/KMPTC Logo.jpg');
+    } catch (_) {/* fall back to logo + text */}
   }
 
-  pw.ImageProvider? logoImage;
-  if (data.schoolLogoUrl != null) {
-    try { logoImage = await networkImage(data.schoolLogoUrl!); } catch (_) {}
-  }
+  const black = PdfColors.black;
+  // ISO B5 — 176 × 250 mm.
+  final b5 = PdfPageFormat(176 * PdfPageFormat.mm, 250 * PdfPageFormat.mm);
+  const divider = pw.BorderSide(color: black, width: 1);
+  const amountColWidth = 120.0;
 
-  String formatAmount(double amount) {
-    if (amount == amount.truncateToDouble()) {
-      return amount.toInt().toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
-    }
-    return amount.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+\.)'), (m) => '${m[1]},');
-  }
+  pw.TextStyle st(double size, pw.Font f) =>
+      pw.TextStyle(font: f, fontSize: size, color: black);
 
-  const int maxItemsPerPage = 8;
-  final totalItems = data.feeDetails.length;
-  final totalPages = (totalItems / maxItemsPerPage).ceil().clamp(1, 100);
+  pw.Widget kv(String label, String value) => pw.RichText(
+        text: pw.TextSpan(children: [
+          pw.TextSpan(text: '$label : ', style: st(10, semi)),
+          pw.TextSpan(
+              text: value.trim().isEmpty ? '-' : value, style: st(10, reg)),
+        ]),
+      );
+
+  pw.Widget infoCell(List<pw.Widget> lines) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            for (var i = 0; i < lines.length; i++) ...[
+              if (i > 0) pw.SizedBox(height: 8),
+              lines[i],
+            ],
+          ],
+        ),
+      );
+
+  final particulars = flattenParticulars(data);
 
   final pdf = pw.Document();
-
-  for (int page = 0; page < totalPages; page++) {
-    final startIdx = page * maxItemsPerPage;
-    final endIdx = (startIdx + maxItemsPerPage).clamp(0, totalItems);
-    final pageItems = data.feeDetails.sublist(startIdx, endIdx);
-    final isFirstPage = page == 0;
-    final isLastPage = page == totalPages - 1;
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a5,
-        margin: const pw.EdgeInsets.all(40),
-        theme: pw.ThemeData.withFont(base: font, bold: fontSemiBold, italic: fontItalic),
-        build: (pw.Context ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  pdf.addPage(
+    pw.Page(
+      pageFormat: b5,
+      margin: const pw.EdgeInsets.all(40),
+      theme: pw.ThemeData.withFont(base: reg, bold: bold),
+      build: (ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+          children: [
+            // Header — centered college banner, or logo + text fallback.
+            if (banner != null)
+              // Three-grid header: 25% logo | 50% banner | 25% empty.
+              pw.SizedBox(
+                height: 100,
+                child: pw.Row(
+                  children: [
+                    // 16% logo | 4% gap | 60% banner | 4% gap | 16% empty.
+                    pw.Expanded(
+                      flex: 4,
+                      child: pw.Center(
+                        child: crest != null
+                            ? pw.Image(crest, height: 88)
+                            : pw.SizedBox(),
+                      ),
+                    ),
+                    pw.Expanded(flex: 1, child: pw.SizedBox()),
+                    pw.Expanded(
+                      flex: 15,
+                      child: pw.Center(
+                        child: pw.Image(banner, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                    pw.Expanded(flex: 1, child: pw.SizedBox()),
+                    pw.Expanded(flex: 4, child: pw.SizedBox()),
+                  ],
+                ),
+              )
+            else
+              pw.SizedBox(
+              height: 82,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Expanded(
+                  if (logo != null) ...[
+                    pw.SizedBox(
+                        width: 70,
+                        height: 70,
+                        child: pw.Image(logo, fit: pw.BoxFit.contain)),
+                    pw.SizedBox(width: 14),
+                  ],
+                  pw.Flexible(
+                    child: pw.Column(
+                      mainAxisSize: pw.MainAxisSize.min,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(data.schoolName, style: st(15, bold)),
+                        pw.SizedBox(height: 3),
+                        pw.Text(data.schoolAddress,
+                            maxLines: 2, style: st(9, med)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Center(child: pw.Text('RECEIPT', style: st(13, bold))),
+            pw.SizedBox(height: 8),
+            // Bordered receipt table — content-sized (no Expanded), so the
+            // PDF layout engine renders every row reliably.
+            pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: black, width: 1),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  // Info row — student details | receipt details.
+                  pw.Container(
+                    height: 74,
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: infoCell([
+                            kv('Name', data.studentName),
+                            kv('Reg. No', data.admissionNo),
+                            kv('Branch', data.courseName),
+                          ]),
+                        ),
+                        pw.Container(width: 1, height: 74, color: black),
+                        pw.Expanded(
+                          child: infoCell([
+                            kv('Receipt No', data.receiptNo),
+                            kv('Date', data.date),
+                            kv('Semester', receiptSemesterLabel(data)),
+                          ]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Column headings.
+                  pw.Container(
+                    height: 30,
+                    decoration: const pw.BoxDecoration(
+                        border: pw.Border(top: divider)),
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            height: 30,
+                            alignment: pw.Alignment.center,
+                            child: pw.Text('PARTICULARS',
+                                style: st(11, bold)),
+                          ),
+                        ),
+                        pw.Container(width: 1, height: 30, color: black),
+                        pw.Container(
+                          width: amountColWidth,
+                          height: 30,
+                          alignment: pw.Alignment.centerRight,
+                          padding:
+                              const pw.EdgeInsets.symmetric(horizontal: 12),
+                          child: pw.Text('AMOUNTS (Rs)',
+                              style: st(11, bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Particulars.
+                  pw.Container(
+                    height: 240,
+                    decoration: const pw.BoxDecoration(
+                        border: pw.Border(top: divider)),
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            height: 240,
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            child: pw.Column(
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment.start,
+                              children: [
+                                for (var i = 0;
+                                    i < particulars.length;
+                                    i++) ...[
+                                  if (i > 0) pw.SizedBox(height: 6),
+                                  pw.Text(
+                                      '${i + 1}. ${particulars[i].type}',
+                                      style: st(10.5, reg)),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        pw.Container(width: 1, height: 240, color: black),
+                        pw.Container(
+                          width: amountColWidth,
+                          height: 240,
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.end,
+                            children: [
+                              for (var i = 0;
+                                  i < particulars.length;
+                                  i++) ...[
+                                if (i > 0) pw.SizedBox(height: 6),
+                                pw.Text(
+                                    formatReceiptAmount(
+                                        particulars[i].amount),
+                                    style: st(10.5, reg)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Total row.
+                  pw.Container(
+                    height: 32,
+                    decoration: const pw.BoxDecoration(
+                        border: pw.Border(top: divider)),
+                    child: pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Container(
+                            height: 32,
+                            alignment: pw.Alignment.centerRight,
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 12),
+                            child: pw.Text('TOTAL', style: st(12, bold)),
+                          ),
+                        ),
+                        pw.Container(width: 1, height: 32, color: black),
+                        pw.Container(
+                          width: amountColWidth,
+                          height: 32,
+                          alignment: pw.Alignment.centerRight,
+                          padding:
+                              const pw.EdgeInsets.symmetric(horizontal: 12),
+                          child: pw.Text(formatReceiptAmount(data.total),
+                              style: st(12, bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Footer — amount in words + cashier signature line.
+                  pw.Container(
+                    height: 110,
+                    decoration: const pw.BoxDecoration(
+                        border: pw.Border(top: divider)),
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        if (logoImage != null)
-                          pw.SizedBox(width: 64, height: 64, child: pw.Image(logoImage, fit: pw.BoxFit.cover)),
-                        if (logoImage != null) pw.SizedBox(height: 8),
-                        pw.Text(data.schoolName, style: pw.TextStyle(font: fontSemiBold, fontSize: 14, color: darkBlue)),
-                        pw.SizedBox(height: 6),
-                        pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('Address:  ', style: sSemiBold),
-                            pw.Expanded(child: pw.Text(data.schoolAddress, style: sMedium, maxLines: 3)),
-                          ],
+                        pw.Text(amountInWords(data.total),
+                            style: st(11, med)),
+                        pw.Spacer(),
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.only(right: 34),
+                          child: pw.Text('Cashier',
+                              textAlign: pw.TextAlign.right,
+                              style: st(12, bold)),
                         ),
                       ],
                     ),
-                  ),
-                  pw.SizedBox(width: 20),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(data.reconStatus == 'P' ? 'Acknowledgement' : 'Receipt', style: pw.TextStyle(font: fontSemiBold, fontSize: 32, color: primaryBlue)),
-                      pw.SizedBox(height: 12),
-                      labelValue('Receipt No:', data.receiptNo),
-                      pw.SizedBox(height: 6),
-                      labelValue('Date:', data.date),
-                      if (totalPages > 1) ...[
-                        pw.SizedBox(height: 6),
-                        pw.Text('Page ${page + 1} of $totalPages', style: pw.TextStyle(font: fontMedium, fontSize: 9, color: textMediumC)),
-                      ],
-                    ],
                   ),
                 ],
               ),
-              pw.SizedBox(height: 12),
-              pw.Container(height: 1, color: dividerColor),
-              pw.SizedBox(height: 12),
-              if (isFirstPage) ...[
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          labelValue('Name:', data.studentName),
-                          pw.SizedBox(height: 6),
-                          labelValue('Mobile No:', data.mobileNo),
-                          pw.SizedBox(height: 6),
-                          pw.Row(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text('Address:', style: sSemiBold),
-                              pw.SizedBox(width: 6),
-                              pw.Expanded(child: pw.Text(
-                                (data.address.trim().isNotEmpty && data.address.trim() != '-' && data.address.trim().toLowerCase() != 'null') ? data.address : 'NA',
-                                style: sMedium,
-                              )),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    pw.SizedBox(width: 20),
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        labelValue('Roll No:', data.admissionNo),
-                        pw.SizedBox(height: 6),
-                        labelValue('Class:', data.className),
-                      ],
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 20),
-              ],
-              pw.Stack(
-                children: [
-                  pw.Column(
-                    children: [
-                      pw.Table(
-                        border: pw.TableBorder.all(color: borderColor, width: 0.5),
-                        columnWidths: {
-                          0: const pw.FixedColumnWidth(46),
-                          1: const pw.FixedColumnWidth(125),
-                          2: const pw.FlexColumnWidth(),
-                          3: const pw.FixedColumnWidth(120),
-                        },
-                        children: [
-                          pw.TableRow(
-                            decoration: const pw.BoxDecoration(color: headerBg),
-                            children: [
-                              tableCell('S.No', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Semester', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Fee Type', sSemiBold.copyWith(color: primaryBlue)),
-                              tableCell('Amount', sSemiBold.copyWith(color: primaryBlue)),
-                            ],
-                          ),
-                          for (var i = 0; i < pageItems.length; i++)
-                            pw.TableRow(
-                              children: [
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  alignment: pw.Alignment.topCenter,
-                                  child: pw.Text('${startIdx + i + 1}.', style: sMediumDark),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  alignment: pw.Alignment.topCenter,
-                                  child: pw.Text(pageItems[i].term, style: sMediumDark),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  child: pw.Column(
-                                    children: [
-                                      for (final fee in pageItems[i].fees)
-                                        pw.Padding(
-                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                          child: pw.Text(fee.type, style: sMediumDark, textAlign: pw.TextAlign.center),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                pw.Container(
-                                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  child: pw.Column(
-                                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                                    children: [
-                                      for (final fee in pageItems[i].fees)
-                                        pw.Padding(
-                                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                          child: pw.Text('₹${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                      if (isLastPage)
-                        pw.Row(
-                          children: [
-                            pw.SizedBox(width: 172),
-                            pw.Expanded(
-                              child: pw.Container(
-                                padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                decoration: const pw.BoxDecoration(color: primaryBlue),
-                                child: pw.Row(
-                                  children: [
-                                    pw.Expanded(
-                                      child: pw.Text('Total', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
-                                    ),
-                                    pw.SizedBox(
-                                      width: 119,
-                                      child: pw.Text('₹${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  if (data.reconStatus == 'P')
-                    pw.Positioned(
-                      left: 90, top: 40,
-                      child: pw.Opacity(
-                        opacity: 0.55,
-                        child: pw.Transform.rotateBox(
-                          angle: -0.40,
-                          child: pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-                            decoration: pw.BoxDecoration(
-                              color: const PdfColor.fromInt(0x66ffe7b5),
-                              borderRadius: pw.BorderRadius.circular(10.r),
-                              border: pw.Border.all(color: const PdfColor.fromInt(0xffe09100), width: 2.5),
-                            ),
-                            child: pw.Text(
-                              'SUBJECT TO\nREALIZATION',
-                              style: pw.TextStyle(font: fontSemiBold, fontSize: 16, color: const PdfColor.fromInt(0xffb86b00)),
-                              textAlign: pw.TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (data.status == 'paid')
-                    pw.Positioned(
-                      left: 120, top: 40,
-                      child: pw.Opacity(
-                        opacity: 0.55,
-                        child: pw.Transform.rotateBox(
-                          angle: -0.40,
-                          child: pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-                            decoration: pw.BoxDecoration(
-                              color: const PdfColor.fromInt(0x66c2eecd),
-                              borderRadius: pw.BorderRadius.circular(10.r),
-                              border: pw.Border.all(color: paidGreen, width: 2.5),
-                            ),
-                            child: pw.Text('PAID', style: pw.TextStyle(font: fontSemiBold, fontSize: 20, color: paidGreen)),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              if (isLastPage) ...[
-                pw.SizedBox(height: 20),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    labelValue('Receipt Method:', data.paymentMethod.toLowerCase() == 'razorpay' ? 'Online' : data.paymentMethod),
-                    pw.SizedBox(height: 6),
-                    labelValue('Status:', data.status == 'paid' ? 'Paid' : data.status == 'failed' ? 'Failed' : data.status),
-                    if (ReceiptWidget.isOnlineMethod(data.paymentMethod) &&
-                        ReceiptWidget.formatReference(data.paymentReference).isNotEmpty) ...[
-                      pw.SizedBox(height: 6),
-                      labelValue('Reference:', ReceiptWidget.formatReference(data.paymentReference)),
-                    ],
-                  ],
-                ),
-                pw.Spacer(),
-                pw.Center(
-                  child: pw.Text('Thank you for your payment.', style: pw.TextStyle(font: fontPtSerif, fontSize: 14, color: textDark)),
-                ),
-                pw.SizedBox(height: 8),
-                if (data.schoolEmail != null || data.schoolMobile != null)
-                  pw.Center(
-                    child: pw.Text(
-                      'For any further inquiries, please contact us at '
-                      '${data.schoolEmail ?? ''}'
-                      '${data.schoolEmail != null && data.schoolMobile != null ? ' or\ncall ' : ''}'
-                      '${data.schoolMobile ?? ''}',
-                      style: pw.TextStyle(font: fontMedium, fontSize: 10, color: textMediumC),
-                      textAlign: pw.TextAlign.center,
-                    ),
-                  ),
-              ] else ...[
-                pw.Spacer(),
-                pw.Center(
-                  child: pw.Text('Continued on next page...', style: pw.TextStyle(font: fontItalic, fontSize: 10, color: textMediumC)),
-                ),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
+            ),
+          ],
+        );
+      },
+    ),
+  );
   return pdf;
 }
