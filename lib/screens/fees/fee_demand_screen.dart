@@ -1559,96 +1559,159 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           borderRadius: BorderRadius.circular(8.r),
           border: Border.all(color: AppColors.border),
         ),
-        child: LayoutBuilder(builder: (context, constraints) {
-      return SingleChildScrollView(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(
-              dividerThickness: 1,
-              showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              // Project default for body cells: w600 + textSecondary, matching
-              // the other tables. Per-cell overrides only for FINE (orange
-              // when > 0) and the STATUS pill.
-              dataTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-              columnSpacing: 24,
-              horizontalMargin: 20,
-              dataRowMinHeight: 43.h,
-              dataRowMaxHeight: 43.h,
-              headingRowHeight: 44.h,
-              columns: const [
-                DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('SEMESTER')),
-                DataColumn(label: Text('FEE TYPE')),
-                DataColumn(label: Text('AMOUNT'), numeric: true),
-                DataColumn(label: Text('PAID'), numeric: true),
-                DataColumn(label: Text('FINE'), numeric: true),
-                DataColumn(label: Text('BALANCE'), numeric: true),
-                DataColumn(label: Text('DUE DATE')),
-                DataColumn(label: Text('STATUS')),
-              ],
-              rows: [
-                ...demands.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final d = entry.value;
-                  final term = d['demfeeterm']?.toString() ?? '-';
-                  final feeType = d['demfeetype']?.toString() ?? '-';
-                  final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
-                  final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                  final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                  final status = d['paidstatus']?.toString() ?? 'U';
-                  final isPaid = pa > 0 || status == 'P' || status == 'Paid';
-                  final paid = pa - (isPaid ? fa : 0);
-                  final fineDisplay = isPaid ? fa : 0.0;
-                  final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-                  final dueDate = d['duedate']?.toString() ?? '-';
-                  final formattedDueDate = _formatDueDate(dueDate);
-                  return DataRow(
-                    color: WidgetStateProperty.all(i.isEven ? Colors.white : AppColors.surface),
-                    cells: [
-                      DataCell(Text('${i + 1}')),
-                      DataCell(Text(term)),
-                      DataCell(Text(feeType)),
-                      DataCell(Text('₹${_formatAmount(amt)}')),
-                      DataCell(Text('₹${_formatAmount(paid)}')),
-                      DataCell(Text(fineDisplay > 0 ? '₹${_formatAmount(fineDisplay)}' : '-', style: fineDisplay > 0 ? const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange) : null)),
-                      DataCell(Text('₹${_formatAmount(bal)}')),
-                      DataCell(Text(formattedDueDate)),
-                      DataCell(Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isPaid ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        child: Text(isPaid ? 'Paid' : 'Pending', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: isPaid ? AppColors.success : AppColors.warning)),
-                      )),
-                    ],
-                  );
-                }),
-                // Total row
-                DataRow(
-                  color: WidgetStateProperty.all(AppColors.tableHeadBg),
-                  cells: [
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text('₹${_formatAmount(totalAmt)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text('₹${_formatAmount(totalPaid)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.success))),
-                    DataCell(Text('₹${_formatAmount(totalFine)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.warning))),
-                    DataCell(Text('₹${_formatAmount(totalBal)}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    const DataCell(Text('')),
-                    const DataCell(Text('')),
-                  ],
+        child: Builder(builder: (context) {
+          const flexes = <int>[1, 2, 3, 2, 2, 2, 2, 2, 2];
+          const headers = <String>[
+            'S No.', 'SEMESTER', 'FEE TYPE', 'AMOUNT', 'PAID',
+            'FINE', 'BALANCE', 'DUE DATE', 'STATUS',
+          ];
+          final hStyle = TextStyle(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: 0.3);
+          final cStyle = TextStyle(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary);
+          final tStyle = TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14.sp,
+              color: AppColors.textPrimary);
+          // AMOUNT/PAID/FINE/BALANCE are right-aligned.
+          bool rightAlign(int i) => i >= 3 && i <= 6;
+          Widget cell(int i, Widget child) => Expanded(
+                flex: flexes[i],
+                child: Align(
+                  alignment: rightAlign(i)
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: child,
                 ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }),
+              );
+          return Column(
+            children: [
+              // Sticky header.
+              Container(
+                color: AppColors.tableHeadBg,
+                padding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 12.h),
+                child: Row(children: [
+                  for (int i = 0; i < headers.length; i++)
+                    cell(i, Text(headers[i], style: hStyle)),
+                ]),
+              ),
+              Container(height: 1, color: AppColors.border),
+              // Scrolling body.
+              Expanded(
+                child: ListView.separated(
+                  itemCount: demands.length,
+                  separatorBuilder: (_, __) => Divider(
+                      height: 1,
+                      color: AppColors.border.withValues(alpha: 0.5)),
+                  itemBuilder: (_, i) {
+                    final d = demands[i];
+                    final term = d['demfeeterm']?.toString() ?? '-';
+                    final feeType = d['demfeetype']?.toString() ?? '-';
+                    final amt = (d['feeamount'] as num?)?.toDouble() ?? 0;
+                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
+                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
+                    final status = d['paidstatus']?.toString() ?? 'U';
+                    final isPaid =
+                        pa > 0 || status == 'P' || status == 'Paid';
+                    final paid = pa - (isPaid ? fa : 0);
+                    final fineDisplay = isPaid ? fa : 0.0;
+                    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                    final dueDate = d['duedate']?.toString() ?? '-';
+                    final formattedDueDate = _formatDueDate(dueDate);
+                    return Container(
+                      color: i.isEven ? Colors.white : AppColors.surface,
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 11.h),
+                      child: Row(children: [
+                        cell(0, Text('${i + 1}', style: cStyle)),
+                        cell(1, Text(term, style: cStyle)),
+                        cell(2, Text(feeType, style: cStyle)),
+                        cell(3,
+                            Text('₹${_formatAmount(amt)}', style: cStyle)),
+                        cell(
+                            4,
+                            Text('₹${_formatAmount(paid)}',
+                                style: cStyle)),
+                        cell(
+                            5,
+                            Text(
+                                fineDisplay > 0
+                                    ? '₹${_formatAmount(fineDisplay)}'
+                                    : '-',
+                                style: fineDisplay > 0
+                                    ? TextStyle(
+                                        fontSize: 13.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.orange)
+                                    : cStyle)),
+                        cell(
+                            6,
+                            Text('₹${_formatAmount(bal)}',
+                                style: cStyle)),
+                        cell(7, Text(formattedDueDate, style: cStyle)),
+                        cell(
+                            8,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isPaid
+                                    ? AppColors.success
+                                        .withValues(alpha: 0.1)
+                                    : AppColors.warning
+                                        .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              child: Text(isPaid ? 'Paid' : 'Pending',
+                                  style: TextStyle(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: isPaid
+                                          ? AppColors.success
+                                          : AppColors.warning)),
+                            )),
+                      ]),
+                    );
+                  },
+                ),
+              ),
+              // Total — pinned footer.
+              Container(height: 1, color: AppColors.border),
+              Container(
+                color: AppColors.tableHeadBg,
+                padding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 12.h),
+                child: Row(children: [
+                  cell(0, const SizedBox()),
+                  cell(1, const SizedBox()),
+                  cell(2, Text('Total', style: tStyle)),
+                  cell(3, Text('₹${_formatAmount(totalAmt)}',
+                      style: tStyle)),
+                  cell(
+                      4,
+                      Text('₹${_formatAmount(totalPaid)}',
+                          style: tStyle.copyWith(
+                              color: AppColors.success))),
+                  cell(
+                      5,
+                      Text('₹${_formatAmount(totalFine)}',
+                          style: tStyle.copyWith(
+                              color: AppColors.warning))),
+                  cell(6, Text('₹${_formatAmount(totalBal)}',
+                      style: tStyle)),
+                  cell(7, const SizedBox()),
+                  cell(8, const SizedBox()),
+                ]),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }

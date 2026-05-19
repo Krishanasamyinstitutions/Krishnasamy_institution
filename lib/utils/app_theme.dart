@@ -290,6 +290,26 @@ class AppTheme {
           color: AppColors.textPrimary,
         ),
       ),
+      // Always-visible scrollbars — app-wide, on tables and any vertical
+      // (or horizontal) overflow area. Prominent thumb so it reads clearly.
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStateProperty.all(true),
+        trackVisibility: WidgetStateProperty.all(true),
+        interactive: true,
+        thickness: WidgetStateProperty.all(11),
+        radius: const Radius.circular(6),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.dragged)) {
+            return AppColors.primary.withValues(alpha: 0.85);
+          }
+          return AppColors.primary.withValues(alpha: 0.55);
+        }),
+        trackColor: WidgetStateProperty.all(
+            AppColors.border.withValues(alpha: 0.55)),
+        trackBorderColor: WidgetStateProperty.all(
+            AppColors.border.withValues(alpha: 0.6)),
+      ),
     );
   }
 

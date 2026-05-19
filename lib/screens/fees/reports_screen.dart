@@ -2871,13 +2871,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
         SizedBox(height: 8.h),
         // Data table
-        Expanded(child: _buildDataTable(terms, pivotData, termTotals)),
+        Expanded(
+            child: _buildDataTable(terms, pivotData, termTotals,
+                bounded: true)),
       ],
     );
   }
 
-  Widget _buildDataTable(List<String> terms, List<Map<String, dynamic>> pivotData, Map<String, double> termTotals, {bool grouped = false}) {
-    // Group by course + class for display
+  Widget _buildDataTable(List<String> terms, List<Map<String, dynamic>> pivotData, Map<String, double> termTotals, {bool bounded = false}) {
+    // Group by course + class for display.
     final Map<String, List<Map<String, dynamic>>> classGroups = {};
     for (final row in pivotData) {
       final course = row['courname']?.toString() ?? '';
@@ -2886,85 +2888,176 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       classGroups.putIfAbsent(key, () => []).add(row);
     }
 
-    final allRows = <DataRow>[];
-    int sno = 0;
+    // Fixed column widths — the pivot is wide (one column per term) and
+    // scrolls horizontally, so the header can't use flex.
+    final colWidths = <double>[
+      54, 92, 112, 190,
+      for (final _ in terms) 96,
+      86, 100, 140,
+    ];
+    final tableWidth = colWidths.fold<double>(0, (a, b) => a + b);
+    final headers = <String>[
+      'SNO', 'CLASS', 'ADMN. NO', 'STUDENT NAME',
+      for (final t in terms) t.toUpperCase(),
+      'FINE', 'TOTAL', 'REMARKS',
+    ];
+    final lastNumericIdx = 5 + terms.length; // term columns + FINE + TOTAL
+    bool rightAlign(int i) => i >= 4 && i <= lastNumericIdx;
 
+    final hStyle = TextStyle(
+        fontSize: 13.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.3);
+    Widget cell(int i, Widget child) => SizedBox(
+          width: colWidths[i],
+          child: Align(
+            alignment: rightAlign(i)
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: child,
+            ),
+          ),
+        );
+
+    // Flatten student rows + per-class total rows into row widgets.
+    final rowWidgets = <Widget>[];
+    int sno = 0;
+    var zebra = false;
     for (final entry in classGroups.entries) {
-      final classStudents = entry.value;
       final Map<String, double> classTotals = {};
       double classGrandTotal = 0;
       double classTotalFine = 0;
-
-      for (final row in classStudents) {
+      for (final row in entry.value) {
         sno++;
         final rowTotal = (row['_total'] as double?) ?? 0;
         final rowFine = (row['_fine'] as double?) ?? 0;
         classGrandTotal += rowTotal;
         classTotalFine += rowFine;
-        allRows.add(DataRow(
-          cells: [
-            DataCell(Text('$sno', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuclass']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuadmno']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            ...terms.map((t) {
-              final val = (row[t] as double?) ?? 0;
-              if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
-              return DataCell(Text(val > 0 ? _formatNumber(val) : '', style: TextStyle(fontSize: 13.sp)));
-            }),
-            DataCell(Text(rowFine > 0 ? _formatNumber(rowFine) : '', style: TextStyle(fontSize: 13.sp, color: Colors.orange))),
-            DataCell(Text(rowTotal > 0 ? _formatNumber(rowTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-            DataCell(Text(row['_remarks']?.toString() ?? '', style: TextStyle(fontSize: 10.sp, color: AppColors.textPrimary))),
-          ],
+        for (final t in terms) {
+          final val = (row[t] as double?) ?? 0;
+          if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
+        }
+        final cs = TextStyle(fontSize: 13.sp, color: AppColors.textPrimary);
+        rowWidgets.add(Container(
+          color: zebra ? AppColors.surface : Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          child: Row(children: [
+            cell(0, Text('$sno', style: cs)),
+            cell(1, Text(row['stuclass']?.toString() ?? '', style: cs)),
+            cell(2, Text(row['stuadmno']?.toString() ?? '', style: cs)),
+            cell(3,
+                Text(row['stuname']?.toString() ?? '',
+                    style: cs, overflow: TextOverflow.ellipsis)),
+            for (var ti = 0; ti < terms.length; ti++)
+              cell(4 + ti, Builder(builder: (_) {
+                final v = (row[terms[ti]] as double?) ?? 0;
+                return Text(v > 0 ? _formatNumber(v) : '', style: cs);
+              })),
+            cell(
+                4 + terms.length,
+                Text(rowFine > 0 ? _formatNumber(rowFine) : '',
+                    style: TextStyle(
+                        fontSize: 13.sp, color: Colors.orange))),
+            cell(
+                5 + terms.length,
+                Text(rowTotal > 0 ? _formatNumber(rowTotal) : '',
+                    style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary))),
+            cell(
+                6 + terms.length,
+                Text(row['_remarks']?.toString() ?? '',
+                    style: TextStyle(
+                        fontSize: 10.sp,
+                        color: AppColors.textPrimary))),
+          ]),
         ));
+        zebra = !zebra;
       }
-
-      // Class total row
-      allRows.add(DataRow(
-        color: WidgetStateProperty.all(const Color(0xFFE2E8F0)),
-        cells: [
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          DataCell(Text('Total', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          ...terms.map((t) => DataCell(Text(
-            (classTotals[t] ?? 0) > 0 ? _formatNumber(classTotals[t]!) : '',
-            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
-          ))),
-          DataCell(Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.orange))),
-          DataCell(Text(classGrandTotal > 0 ? _formatNumber(classGrandTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-        ],
+      // Per-class total row.
+      rowWidgets.add(Container(
+        color: const Color(0xFFE2E8F0),
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        child: Row(children: [
+          cell(0, const SizedBox()),
+          cell(
+              1,
+              Text('Total',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary))),
+          cell(2, const SizedBox()),
+          cell(3, const SizedBox()),
+          for (var ti = 0; ti < terms.length; ti++)
+            cell(
+                4 + ti,
+                Text(
+                    (classTotals[terms[ti]] ?? 0) > 0
+                        ? _formatNumber(classTotals[terms[ti]]!)
+                        : '',
+                    style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary))),
+          cell(
+              4 + terms.length,
+              Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.orange))),
+          cell(
+              5 + terms.length,
+              Text(
+                  classGrandTotal > 0
+                      ? _formatNumber(classGrandTotal)
+                      : '',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary))),
+          cell(6 + terms.length, const SizedBox()),
+        ]),
       ));
     }
 
+    final header = Container(
+      color: AppColors.tableHeadBg,
+      padding: EdgeInsets.symmetric(vertical: 10.h),
+      child: Row(children: [
+        for (var i = 0; i < headers.length; i++)
+          cell(i, Text(headers[i], style: hStyle)),
+      ]),
+    );
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-          headingTextStyle: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            letterSpacing: 0.3,
-          ),
-          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          dividerThickness: 1,
-          // Compact column/row sizing intentional — wide pivot with many term columns.
-          columnSpacing: 14, horizontalMargin: 10, dataRowMinHeight: 30, dataRowMaxHeight: 34, headingRowHeight: 36,
-          columns: [
-            const DataColumn(label: Text('SNO')),
-            const DataColumn(label: Text('CLASS')),
-            const DataColumn(label: Text('ADMN. NO')),
-            const DataColumn(label: Text('STUDENT NAME')),
-            ...terms.map((t) => DataColumn(label: Text(t.toUpperCase()), numeric: true)),
-            const DataColumn(label: Text('FINE'), numeric: true),
-            const DataColumn(label: Text('TOTAL'), numeric: true),
-            const DataColumn(label: Text('REMARKS')),
-          ],
-          rows: allRows,
-        ),
+      child: SizedBox(
+        width: tableWidth,
+        // bounded: a fixed-height host (Collection Statement) — sticky
+        // header + internally scrolling body. Otherwise the table is
+        // content-sized and the page scrolls (course/class section views).
+        child: bounded
+            ? Column(
+                children: [
+                  header,
+                  Container(height: 1, color: AppColors.border),
+                  Expanded(child: ListView(children: rowWidgets)),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  header,
+                  Container(height: 1, color: AppColors.border),
+                  ...rowWidgets,
+                ],
+              ),
       ),
     );
   }

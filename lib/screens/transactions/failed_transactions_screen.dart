@@ -15,6 +15,7 @@ import '../../services/supabase_service.dart';
 import '../../models/payment_model.dart';
 import '../../models/student_model.dart';
 import '../../widgets/receipt_widget.dart';
+import '../../utils/receipt_pdf.dart';
 import '../../utils/friendly_error.dart';
 
 class FailedTransactionsScreen extends StatefulWidget {
@@ -77,12 +78,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     return filtered;
   }
 
-  // 'all' | 'paid' | 'failed' — toggled by tapping the summary cards.
-  String _statusFilter = 'all';
+  // null = main view with summary cards; 'all' | 'paid' | 'failed' =
+  // an in-place drill-down opened by tapping a summary card.
+  String? _drilldownFilter;
 
   List<PaymentModel> get _allTransactions {
     final List<PaymentModel> all;
-    switch (_statusFilter) {
+    switch (_drilldownFilter ?? 'all') {
       case 'paid':
         all = [..._paidTransactions];
         break;
@@ -105,6 +107,26 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _fetchData();
+  }
+
+  /// Opens an in-place drill-down filtered to [filter].
+  void _openDrilldown(String filter) {
+    setState(() => _drilldownFilter = filter);
+  }
+
+  void _closeDrilldown() {
+    setState(() => _drilldownFilter = null);
+  }
+
+  String _drilldownTitle() {
+    switch (_drilldownFilter) {
+      case 'paid':
+        return 'Paid Transactions';
+      case 'failed':
+        return 'Failed Transactions';
+      default:
+        return 'All Transactions';
+    }
   }
 
   @override
@@ -353,7 +375,15 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
+  /// Builds the receipt PDF via the shared B5 builder so every screen
+  /// produces the identical Figma receipt design.
   Future<pw.Document> _buildReceiptPdf(PaymentModel t) async {
+    final data = await _buildReceiptData(t);
+    return buildReceiptPdf(data);
+  }
+
+  // ignore: unused_element
+  Future<pw.Document> _legacyReceiptPdf(PaymentModel t) async {
     final data = await _buildReceiptData(t);
 
     final font = await PdfGoogleFonts.montserratRegular();
@@ -718,12 +748,16 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDrilldown = _drilldownFilter != null;
     return Column(
       children: [
-        // Summary cards
-        _buildSummaryCards(),
-        SizedBox(height: 10.h),
-
+        if (isDrilldown)
+          _buildDrilldownHeader()
+        else ...[
+          // Summary cards
+          _buildSummaryCards(),
+          SizedBox(height: 10.h),
+        ],
         // 3. Combined header + table card
         Expanded(
           child: Container(
@@ -749,57 +783,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                             ),
                       ),
                       const Spacer(),
-                      AppSearchField(
-                        controller: _searchController,
-                        hintText: 'Search by name, pay no, reference...',
-                        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-                        width: 320,
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: IconButton(
-                                  icon: const AppIcon('close-circle', size: 14),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                  splashRadius: 12,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              )
-                            : null,
-                      ),
-                      SizedBox(width: AppBtn.gap(context)),
-                      SizedBox(
-                        height: AppBtn.height(context),
-                        child: OutlinedButton.icon(
-                          onPressed: _openDateRangeDialog,
-                          icon: AppIcon.linear('calendar', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                          label: Text(
-                            _dateRangeLabel(),
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: AppBtn.gap(context)),
-                      SizedBox(
-                        height: AppBtn.height(context),
-                        child: ElevatedButton.icon(
-                          onPressed: _fetchData,
-                          icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
-                          label: const Text('Refresh'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
+                      // In drill-down mode these move to the back-button card.
+                      if (!isDrilldown) ..._toolbarActions(),
                     ],
                   ),
                 ),
@@ -814,6 +799,136 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Search + date/method filter + refresh — shared by the table-card
+  /// header (main view) and the drill-down header card.
+  List<Widget> _toolbarActions() {
+    return [
+      AppSearchField(
+        controller: _searchController,
+        hintText: 'Search by name, pay no, reference...',
+        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+        width: 320,
+        suffixIcon: _searchQuery.isNotEmpty
+            ? Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: IconButton(
+                  icon: const AppIcon('close-circle', size: 14),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  splashRadius: 12,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              )
+            : null,
+      ),
+      SizedBox(width: AppBtn.gap(context)),
+      SizedBox(
+        height: AppBtn.height(context),
+        child: OutlinedButton.icon(
+          onPressed: _openDateRangeDialog,
+          icon: AppIcon.linear('calendar',
+              size: AppBtn.iconSize(context), color: AppColors.textPrimary),
+          label: Text(_dateRangeLabel(),
+              style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            side: const BorderSide(color: AppColors.border),
+          ),
+        ),
+      ),
+      SizedBox(width: AppBtn.gap(context)),
+      SizedBox(
+        height: AppBtn.height(context),
+        child: ElevatedButton.icon(
+          onPressed: _fetchData,
+          icon: AppIcon('refresh',
+              size: AppBtn.iconSize(context), color: Colors.white),
+          label: const Text('Refresh'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Drill-down header — Back button + breadcrumb inside a white card,
+  /// matching the Fee Collection › Total Collection drill-down design.
+  Widget _buildDrilldownHeader() {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final radius = compact ? 6.0 : 10.0;
+    final textSize = compact ? 11.0 : 13.0;
+    final innerGap = compact ? 4.0 : 6.0;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10.h),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: _closeDrilldown,
+              borderRadius: BorderRadius.circular(radius),
+              child: Container(
+                height: AppBtn.height(context),
+                padding: EdgeInsets.symmetric(horizontal: hPad),
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(radius),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIcon.linear('Chevron Left',
+                        size: AppBtn.iconSize(context), color: Colors.white),
+                    SizedBox(width: innerGap),
+                    Text('Back',
+                        style: TextStyle(
+                            fontSize: textSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Container(width: 1, height: 18, color: AppColors.border),
+            SizedBox(width: 12.w),
+            Text('Transactions',
+                style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary)),
+            SizedBox(width: 6.w),
+            AppIcon.linear('Chevron Right',
+                size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 6.w),
+            Text(_drilldownTitle(),
+                style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
+            const Spacer(),
+            ..._toolbarActions(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1091,9 +1206,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredPaid.length} transactions',
             Colors.green,
             'tick-circle',
-            selected: _statusFilter == 'paid',
-            onTap: () => setState(() =>
-                _statusFilter = _statusFilter == 'paid' ? 'all' : 'paid'),
+            onTap: () => _openDrilldown('paid'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1104,9 +1217,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredFailed.length} transactions',
             Colors.red,
             'info-circle',
-            selected: _statusFilter == 'failed',
-            onTap: () => setState(() =>
-                _statusFilter = _statusFilter == 'failed' ? 'all' : 'failed'),
+            onTap: () => _openDrilldown('failed'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1117,8 +1228,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             'All records',
             AppColors.primary,
             'receipt-2',
-            selected: _statusFilter == 'all',
-            onTap: () => setState(() => _statusFilter = 'all'),
+            onTap: () => _openDrilldown('all'),
           ),
         ),
       ],
@@ -1127,63 +1237,71 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
   Widget _buildSummaryCard(
       String title, String value, String subtitle, Color color, String icon,
-      {bool selected = false, VoidCallback? onTap}) {
+      {VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10.r),
+      borderRadius: BorderRadius.circular(14.r),
       child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? color.withValues(alpha: 0.06) : Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: selected ? color : AppColors.border, width: selected ? 1.5 : 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8.r),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: AppIcon(icon, color: color, size: 22),
             ),
-            child: AppIcon(icon, color: color, size: 16),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                    color: color,
+                  SizedBox(height: 4.h),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 21.sp,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                      height: 1.1,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    color: AppColors.textSecondary.withValues(alpha: 0.7),
+                  SizedBox(height: 4.h),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary.withValues(alpha: 0.85),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+            SizedBox(width: 8.w),
+            AppIcon.linear('Chevron Right',
+                size: 18, color: AppColors.textSecondary),
+          ],
+        ),
       ),
     );
   }

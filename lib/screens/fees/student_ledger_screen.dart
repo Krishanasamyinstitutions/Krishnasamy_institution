@@ -36,6 +36,40 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
   // Search in student list
   final _searchController = TextEditingController();
+  final _ledgerScrollCtrl = ScrollController();
+
+  /// Step-scrolls the ledger list by ~one screenful (page up / page down).
+  void _stepScrollLedger({required bool down}) {
+    if (!_ledgerScrollCtrl.hasClients) return;
+    final pos = _ledgerScrollCtrl.position;
+    final delta = pos.viewportDimension * 0.85;
+    final target = (down ? pos.pixels + delta : pos.pixels - delta)
+        .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+    _ledgerScrollCtrl.animateTo(target,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+  }
+
+  /// Small circular ▲ / ▼ scroll button parked at a corner of the table.
+  Widget _scrollArrow({required bool down}) {
+    return Material(
+      color: AppColors.primary,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _stepScrollLedger(down: down),
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Icon(
+            down ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+            size: 20,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 
   // Selected student & ledger data
   StudentModel? _selectedStudent;
@@ -69,6 +103,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _ledgerScrollCtrl.dispose();
     super.dispose();
   }
 
@@ -508,8 +543,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                 borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Column(
+              child: Stack(
                 children: [
+                  Column(
+                    children: [
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
@@ -529,6 +566,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   Container(height: 1, color: AppColors.border),
                   Expanded(
                     child: ListView.separated(
+                      controller: _ledgerScrollCtrl,
                       itemCount: students.length,
                       separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
                       itemBuilder: (context, i) {
@@ -559,6 +597,16 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                       },
                     ),
                   ),
+                    ],
+                  ),
+                  Positioned(
+                      top: 8,
+                      right: 8,
+                      child: _scrollArrow(down: false)),
+                  Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: _scrollArrow(down: true)),
                 ],
               ),
             ),
