@@ -103,4 +103,30 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) =>
       const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+
+  // Always-visible scrollbar WITH a visible track on desktop. Setting
+  // thumb/track visibility on the Scrollbar widget directly is more
+  // reliable than relying on ScrollbarThemeData resolution alone.
+  @override
+  Widget buildScrollbar(
+      BuildContext context, Widget child, ScrollableDetails details) {
+    if (axisDirectionToAxis(details.direction) == Axis.vertical) {
+      switch (getPlatform(context)) {
+        case TargetPlatform.linux:
+        case TargetPlatform.macOS:
+        case TargetPlatform.windows:
+          return Scrollbar(
+            controller: details.controller,
+            thumbVisibility: true,
+            trackVisibility: true,
+            child: child,
+          );
+        case TargetPlatform.android:
+        case TargetPlatform.fuchsia:
+        case TargetPlatform.iOS:
+          break;
+      }
+    }
+    return super.buildScrollbar(context, child, details);
+  }
 }

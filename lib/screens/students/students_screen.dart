@@ -8,6 +8,7 @@ import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions, PostgrestException;
 import 'package:provider/provider.dart';
@@ -90,13 +91,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   String? _selectedCourseFilter; // tracks which course the selected class belongs to
+  // Single-open accordion state for the course list — opening one course
+  // auto-collapses any previously open course.
+  String? _expandedCourse;
+  final Map<String, ExpansibleController> _courseExpansionCtrls = {};
   final _searchController = TextEditingController();
   final _globalSearchController = TextEditingController();
   List<StudentModel> _globalSearchResults = [];
   bool _isGlobalSearching = false;
-  int _studentPage = 0;
-  static const int _studentsPerPage = 20;
-
   // Import state
   bool _showImport = false;
   String? _importFileName;
@@ -883,52 +885,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Import / Export ─────────────────────────────────────────────────────────
-
-  Future<void> _exportClassStudents(String className, List<StudentModel> students) async {
-    if (students.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No students to export')));
-      return;
-    }
-
-    final headers = ['Roll No', 'Student Name', 'Gender', 'DOB', 'Class', 'Course', 'Mobile', 'Email', 'Address', 'City', 'State', 'Blood Group'];
-    final rows = <List<String>>[headers];
-    for (final s in students) {
-      rows.add([
-        s.stuadmno,
-        s.stuname,
-        s.gender,
-        '${s.studob.day.toString().padLeft(2, '0')}/${s.studob.month.toString().padLeft(2, '0')}/${s.studob.year}',
-        s.stuclass,
-        s.stumobile,
-        s.stuemail ?? '',
-        s.stuaddress ?? '',
-        s.stucity ?? '',
-        s.stustate ?? '',
-        s.stubloodgrp ?? '',
-      ]);
-    }
-
-    final csv = const ListToCsvConverter().convert(rows);
-
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: 'Export Class $className Students',
-      fileName: 'Class_${className}_Students.csv',
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-    );
-
-    if (result != null) {
-      final file = File(result);
-      await file.writeAsString(csv);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Exported ${students.length} students to CSV'), backgroundColor: AppColors.success),
-        );
-      }
-    }
-  }
-
   // ─── Left Panel Builders ─────────────────────────────────────────────────────
 
   // Group classes by course with correct counts
@@ -970,9 +926,33 @@ class _StudentsScreenState extends State<StudentsScreen> {
         final courseName = courseNames[courseIndex];
         final classCounts = courseClassCounts[courseName]!;
         final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
+        final controller = _courseExpansionCtrls.putIfAbsent(
+          courseName,
+          () => ExpansibleController(),
+        );
 
         return ExpansionTile(
-          initiallyExpanded: false,
+          key: PageStorageKey<String>('course-$courseName'),
+          controller: controller,
+          initiallyExpanded: _expandedCourse == courseName,
+          onExpansionChanged: (isExpanded) {
+            if (isExpanded) {
+              final prev = _expandedCourse;
+              if (prev != null && prev != courseName) {
+                final prevCtrl = _courseExpansionCtrls[prev];
+                try {
+                  prevCtrl?.collapse();
+                } catch (_) {
+                  // Controller not attached (tile off-screen). Tile will
+                  // pick up the collapsed state via initiallyExpanded
+                  // when next rebuilt.
+                }
+              }
+              setState(() => _expandedCourse = courseName);
+            } else if (_expandedCourse == courseName) {
+              setState(() => _expandedCourse = null);
+            }
+          },
           tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
           title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
           trailing: Row(
@@ -1010,7 +990,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     _selectedClassFilter = className;
                     _selectedCourseFilter = courseName;
                     _selectedStudent = null;
-                    _studentPage = 0;
                     _searchController.clear();
                   });
                   if ((_groupedStudents[className]?.isEmpty ?? true) && _cachedClassStudents[className] == null) {
@@ -1239,10 +1218,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ? _students
         : _students.where((s) => s.stuname.toLowerCase().contains(q) || s.stuadmno.toLowerCase().contains(q) || (s.courname ?? '').toLowerCase().contains(q)).toList();
     final totalStudents = allStudents.length;
-    final totalPages = (totalStudents / _studentsPerPage).ceil();
-    final startIdx = _studentPage * _studentsPerPage;
-    final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
-    final pagedStudents = allStudents.sublist(startIdx, endIdx);
 
     final cellStyle = TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
 
@@ -1265,7 +1240,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
               AppSearchField(
                 controller: _searchController,
                 hintText: 'Search...',
-                onChanged: (_) => setState(() => _studentPage = 0),
+                onChanged: (_) => setState(() {}),
                 width: 240.w,
               ),
               ..._buildImportActionButtons(),
@@ -1282,8 +1257,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 borderRadius: BorderRadius.circular(8.r),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Column(
-                children: [
+              child: AppVerticalScrollbar(
+                header: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
@@ -1301,13 +1278,15 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     ),
                   ),
                   Container(height: 1, color: AppColors.border),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: pagedStudents.length,
+                  ],
+                ),
+                builder: (context, controller) => ListView.separated(
+                      controller: controller,
+                      itemCount: allStudents.length,
                       separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
                       itemBuilder: (context, index) {
-                        final s = pagedStudents[index];
-                        final serialNo = startIdx + index + 1;
+                        final s = allStudents[index];
+                        final serialNo = index + 1;
                         return InkWell(
                           onTap: () => _populateStudentForm(s),
                           child: Container(
@@ -1329,24 +1308,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         );
                       },
                     ),
-                  ),
-                ],
               ),
             ),
-          ),
-        ),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-          child: Row(
-            children: [
-              Text('Showing ${startIdx + 1}-$endIdx of $totalStudents students', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-              const Spacer(),
-              IconButton(icon: AppIcon.linear('Double Arrow Left', size: 18), onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null),
-              IconButton(icon: AppIcon.linear('Chevron Left', size: 18), onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null),
-              Container(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h), decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)), child: Text('${_studentPage + 1}/${totalPages == 0 ? 1 : totalPages}', style: TextStyle(fontSize: 12.sp, color: Colors.white, fontWeight: FontWeight.w600))),
-              IconButton(icon: AppIcon.linear('Chevron Right', size: 18), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null),
-              IconButton(icon: AppIcon.linear('Double Arrow Right', size: 18), onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null),
-            ],
           ),
         ),
       ],
@@ -1374,14 +1337,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
             s.stuname.toLowerCase().contains(q) ||
             s.stuadmno.toLowerCase().contains(q)).toList();
 
-    // Pagination
-    final totalStudents = filteredStudents.length;
-    final totalPages = (totalStudents / _studentsPerPage).ceil();
-    if (_studentPage >= totalPages && totalPages > 0) _studentPage = totalPages - 1;
-    final startIdx = _studentPage * _studentsPerPage;
-    final endIdx = (startIdx + _studentsPerPage).clamp(0, totalStudents);
-    final pagedStudents = filteredStudents.sublist(startIdx, endIdx);
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1391,185 +1346,102 @@ class _StudentsScreenState extends State<StudentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with back button + breadcrumb
+          // Ledger-style class header: icon + class name (colored) + count
+          // pill + search field. No back/breadcrumb/export — class switching
+          // happens via the sidebar.
           Container(
-            padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
+            padding: EdgeInsets.fromLTRB(12.w, 10.h, 16.w, 10.h),
+            decoration: BoxDecoration(
+              color: classColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12.r),
+                topRight: Radius.circular(12.r),
+              ),
+              border: const Border(bottom: BorderSide(color: AppColors.border)),
+            ),
             child: Row(
               children: [
-                InkWell(
-                  onTap: () => setState(() {
-                    _selectedClassFilter = null;
-                    _selectedStudent = null;
-                    _studentPage = 0;
-                    _searchController.clear();
-                  }),
-                  borderRadius: BorderRadius.circular(8.r),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
-                        SizedBox(width: 6.w),
-                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                      ],
-                    ),
+                AppIcon('book-1', size: 14, color: classColor),
+                SizedBox(width: 6.w),
+                Text(
+                  className,
+                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: classColor),
+                ),
+                SizedBox(width: 8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: classColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Text(
+                    '${allStudents.length} students',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: classColor),
                   ),
                 ),
-                SizedBox(width: 12.w),
-                Container(width: 1, height: 18, color: AppColors.border),
-                SizedBox(width: 12.w),
-                Text('Students', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                SizedBox(width: 6.w),
-                AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
-                SizedBox(width: 6.w),
-                Text('Class $className', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                SizedBox(width: 6.w),
-                Text('(${allStudents.length})', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                 const Spacer(),
-                // Search
                 AppSearchField(
                   controller: _searchController,
                   hintText: 'Search...',
-                  onChanged: (_) => setState(() => _studentPage = 0),
-                  width: 240.w,
-                ),
-                SizedBox(width: 12.w),
-                Tooltip(
-                  message: 'Export $className',
-                  child: InkWell(
-                    onTap: () => _exportClassStudents(className, allStudents),
-                    borderRadius: BorderRadius.circular(6.r),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6.r),
-                        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon('document-download', size: 14, color: AppColors.success),
-                          SizedBox(width: 4.w),
-                          Text('Export', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.success)),
-                        ],
-                      ),
-                    ),
-                  ),
+                  onChanged: (_) => setState(() {}),
+                  width: 260.w,
                 ),
               ],
             ),
           ),
-          // Table section
+          // Table header + rows, sharing a reserved scrollbar lane
           Expanded(
-            child: Column(
+            child: AppVerticalScrollbar(
+              header: Container(
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                color: AppColors.tableHeadBg,
+                child: Row(
                   children: [
-                    // Table header
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                      color: AppColors.tableHeadBg,
-                      child: Row(
-                        children: [
-                          Expanded(child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('ADM NO', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('COURSE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('BATCH', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('GENDER', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('MOBILE', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                          Expanded(child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        ],
-                      ),
-                    ),
-                    // Student rows
-                    Expanded(
-                      child: pagedStudents.isEmpty
-                          ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
-                          : ListView.separated(
-                              padding: EdgeInsets.zero,
-                              itemCount: pagedStudents.length,
-                              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
-                              itemBuilder: (context, index) {
-                                final s = pagedStudents[index];
-                                final serialNo = startIdx + index + 1;
-                                return InkWell(
-                                  onTap: () {
-                                    setState(() => _selectedStudent = s);
-                                    _populateStudentForm(s);
-                                  },
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                                    color: index.isEven ? Colors.white : AppColors.surface,
-                                    child: Row(
-                                      children: [
-                                        Expanded(child: Text('$serialNo', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(child: Text(s.stuadmno, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
-                                        Expanded(child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
-                                        Expanded(child: Text(s.courname ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(child: Text(s.batch ?? '-', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(child: Text(s.stugender, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(child: Text(s.stumobile, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                                        Expanded(child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent))),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                    // Pagination footer
-                    if (totalStudents > _studentsPerPage)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                        decoration: const BoxDecoration(
-                          border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(7),
-                            bottomRight: Radius.circular(7),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
-                              style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: AppIcon.linear('Double Arrow Left', size: 20),
-                              onPressed: _studentPage > 0 ? () => setState(() => _studentPage = 0) : null,
-                              tooltip: 'First page', splashRadius: 18,
-                            ),
-                            IconButton(
-                              icon: AppIcon.linear('Chevron Left', size: 20),
-                              onPressed: _studentPage > 0 ? () => setState(() => _studentPage--) : null,
-                              tooltip: 'Previous', splashRadius: 18,
-                            ),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(6.r)),
-                              child: Text('${_studentPage + 1}/$totalPages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-                            ),
-                            IconButton(
-                              icon: AppIcon.linear('Chevron Right', size: 20),
-                              onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage++) : null,
-                              tooltip: 'Next', splashRadius: 18,
-                            ),
-                            IconButton(
-                              icon: AppIcon.linear('Double Arrow Right', size: 20),
-                              onPressed: _studentPage < totalPages - 1 ? () => setState(() => _studentPage = totalPages - 1) : null,
-                              tooltip: 'Last page', splashRadius: 18,
-                            ),
-                          ],
-                        ),
-                      ),
+                    Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                   ],
                 ),
+              ),
+              builder: (context, controller) => filteredStudents.isEmpty
+                ? Center(child: Text('No students found', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)))
+                : ListView.separated(
+                    controller: controller,
+                    padding: EdgeInsets.zero,
+                    itemCount: filteredStudents.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
+                    itemBuilder: (context, index) {
+                      final s = filteredStudents[index];
+                      return InkWell(
+                        onTap: () {
+                          setState(() => _selectedStudent = s);
+                          _populateStudentForm(s);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                          color: index.isEven ? Colors.white : AppColors.surface,
+                          child: Row(
+                            children: [
+                              Expanded(flex: 1, child: Text('${index + 1}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              Expanded(flex: 2, child: Text(s.stuadmno, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                              Expanded(flex: 3, child: Text(s.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
+                              Expanded(flex: 2, child: Text(s.courname ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              Expanded(flex: 2, child: Text(s.batch ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              Expanded(flex: 1, child: Text(s.stugender, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              Expanded(flex: 2, child: Text(s.stumobile, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
+                              Expanded(flex: 1, child: Align(alignment: Alignment.centerRight, child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.accent))),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+            ),
           ),
         ],
       ),
@@ -1620,7 +1492,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 _globalSearchResults = [];
                                 _selectedClassFilter = s.stuclass;
                                 _selectedStudent = s;
-                                _studentPage = 0;
                                 _searchController.clear();
                               });
                               if (_cachedClassStudents[s.stuclass] == null) {

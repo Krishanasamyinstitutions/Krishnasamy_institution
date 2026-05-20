@@ -9,8 +9,9 @@ import '../../widgets/app_icon.dart';
 
 /// Bank account master for the active institution. Each row represents a
 /// beneficiary account a fee group can route to (school's main account,
-/// transport vendor, hostel, etc.). The screen lists existing accounts on
-/// the left and shows an add/edit form on the right.
+/// transport vendor, hostel, etc.). Layout mirrors the User Creation
+/// screen: flex 3/7 with a stacked single-column form on the left and the
+/// assignments + list (or drilldown) on the right.
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
 
@@ -38,6 +39,10 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   final _accHolderController = TextEditingController();
 
   int? _editingBanId;
+  // When non-null, the right column shows the bank detail drilldown
+  // (back button + breadcrumb + detail rows) instead of the
+  // assignments + list.
+  Map<String, dynamic>? _selectedBank;
 
   @override
   void initState() {
@@ -198,158 +203,61 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         const SnackBar(content: Text('Bank account removed'), backgroundColor: AppColors.success),
       );
       if (_editingBanId == banId) _resetForm();
+      setState(() => _selectedBank = null);
       _fetchBanks();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 900;
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: Padding(
-        padding: EdgeInsets.all(isMobile ? 16 : 24.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Page header — matches the User Creation screen.
-            Row(
-              children: [
-                AppIcon('bank', color: AppColors.accent, size: 18),
-                SizedBox(width: 10.w),
-                Text(
-                  'Bank Accounts',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            SizedBox(height: 20.h),
-            Expanded(
-              child: isMobile
-                  ? Column(
-                      children: [
-                        Expanded(flex: 3, child: _buildForm()),
-                        const SizedBox(height: 16),
-                        Expanded(flex: 2, child: _buildAssignmentsPanel()),
-                        const SizedBox(height: 16),
-                        Expanded(flex: 2, child: _buildList()),
-                      ],
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Left — Add Bank Account form
-                        Expanded(flex: 4, child: _buildForm()),
-                        SizedBox(width: 16.w),
-                        // Right — Fee Group Assignments (top) + Bank Accounts (below)
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(flex: 2, child: _buildAssignmentsPanel()),
-                              SizedBox(height: 16.h),
-                              Expanded(flex: 3, child: _buildList()),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildList() {
-    return Container(
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: AppColors.border),
-      ),
+    return SingleChildScrollView(
+      padding: EdgeInsets.zero,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Page header — matches the User Creation screen.
           Row(
             children: [
-              const AppIcon('bank', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('Bank Accounts',
-                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              const Spacer(),
-              Text('${_banks.length}',
-                  style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+              AppIcon('bank', color: AppColors.accent, size: 18),
+              SizedBox(width: 10.w),
+              Text(
+                'Bank Accounts',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ],
           ),
-          SizedBox(height: 12.h),
-          if (_isLoading)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
-          else if (_banks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text('No bank accounts yet. Add one on the right.',
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
-              ),
-            )
-          else
-            Expanded(
-              child: ListView.separated(
-                itemCount: _banks.length,
-                separatorBuilder: (_, __) => const Divider(height: 12),
-                itemBuilder: (_, i) {
-                  final b = _banks[i];
-                  final selected = b['ban_id'] == _editingBanId;
-                  return InkWell(
-                    onTap: () => _loadIntoForm(b),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.accent.withValues(alpha: 0.08) : null,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: selected ? AppColors.accent.withValues(alpha: 0.4) : AppColors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(b['banname'] ?? '',
-                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                                SizedBox(height: 2.h),
-                                Text('${b['banbranch'] ?? ''} • ${b['ifsccode'] ?? ''}',
-                                    style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
-                                SizedBox(height: 2.h),
-                                Text('A/c ${b['banaccno']} — ${b['banaccholder']}',
-                                    style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Edit',
-                            onPressed: () => _loadIntoForm(b),
-                            icon: const AppIcon('edit-2', size: 16, color: AppColors.textSecondary),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed: () => _confirmDelete(b),
-                            icon: const AppIcon('trash', size: 16, color: Colors.red),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+          SizedBox(height: 20.h),
+          // Form + right column side by side (flex 3/7 like User Creation).
+          LayoutBuilder(builder: (context, constraints) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final isCompact = screenWidth <= 1366;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left: Add/Edit form
+                Expanded(flex: 4, child: _buildForm()),
+                SizedBox(width: isCompact ? 12.w : 24.w),
+                // Right: drilldown when a bank is selected, otherwise
+                // Fee Group Assignments stacked above the Bank Accounts list.
+                Expanded(
+                  flex: 6,
+                  child: _selectedBank != null
+                      ? _buildBankDetail(_selectedBank!)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildAssignmentsPanel(),
+                            SizedBox(height: 16.h),
+                            _buildList(),
+                          ],
+                        ),
+                ),
+              ],
+            );
+          }),
         ],
       ),
     );
@@ -365,84 +273,133 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       ),
       child: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  AppIcon(_editingBanId != null ? 'edit-2' : 'add', size: 18, color: AppColors.textSecondary),
-                  SizedBox(width: 8.w),
-                  Text(_editingBanId != null ? 'Edit Bank Account' : 'Add Bank Account',
-                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  if (_editingBanId != null)
-                    TextButton.icon(
-                      onPressed: _resetForm,
-                      icon: const AppIcon('add', size: 14, color: AppColors.textSecondary),
-                      label: const Text('New'),
-                    ),
-                ],
-              ),
-              SizedBox(height: 20.h),
-              _row([
-                _field('Bank Name *', _nameController, hint: 'IOB', required: true),
-                _field('Branch *', _branchController, hint: 'Cuddalore Main', required: true),
-              ]),
-              SizedBox(height: 16.h),
-              _row([
-                _field('IFSC Code *', _ifscController, hint: 'IOBA0001234', required: true),
-                _field('Account Holder *', _accHolderController, hint: 'KCET College', required: true),
-              ]),
-              SizedBox(height: 16.h),
-              _row([
-                _field('Account Number *', _accNoController, hint: '1234567890', required: true),
-                _field('Mobile', _mobileController, hint: '+91…'),
-              ]),
-              SizedBox(height: 16.h),
-              _row([
-                _field('Email', _emailController, hint: 'finance@school.in'),
-                _field('Address Line 1 *', _addr1Controller, required: true),
-              ]),
-              SizedBox(height: 16.h),
-              _row([
-                _field('Address Line 2', _addr2Controller),
-                _field('Address Line 3', _addr3Controller),
-              ]),
-              SizedBox(height: 20.h),
-              Row(
-                children: [
-                  Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                AppIcon(_editingBanId != null ? 'edit-2' : 'add-circle',
+                    size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 8.w),
+                Text(_editingBanId != null ? 'Edit Bank Account' : 'Add Bank Account',
+                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                if (_editingBanId != null)
+                  TextButton.icon(
+                    onPressed: _resetForm,
+                    icon: const AppIcon('add', size: 14, color: AppColors.textSecondary),
+                    label: const Text('New'),
+                  ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+
+            // Two fields per row — keeps the form compact and visually
+            // balanced; the second slot is left empty when an odd field
+            // doesn't have a natural partner.
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: _labelledField('Bank Name', _nameController, hint: 'IOB', required: true)),
+              SizedBox(width: 16.w),
+              Expanded(child: _labelledField('Branch', _branchController, hint: 'Cuddalore Main', required: true)),
+            ]),
+            SizedBox(height: 16.h),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: _labelledField('IFSC Code', _ifscController, hint: 'IOBA0001234', required: true)),
+              SizedBox(width: 16.w),
+              Expanded(child: _labelledField('Account Holder', _accHolderController, hint: 'KCET College', required: true)),
+            ]),
+            SizedBox(height: 16.h),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: _labelledField('Account Number', _accNoController, hint: '1234567890', required: true)),
+              SizedBox(width: 16.w),
+              Expanded(child: _labelledField('Mobile', _mobileController, hint: '+91…', keyboardType: TextInputType.phone)),
+            ]),
+            SizedBox(height: 16.h),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: _labelledField('Email', _emailController, hint: 'finance@school.in', keyboardType: TextInputType.emailAddress)),
+              SizedBox(width: 16.w),
+              Expanded(child: _labelledField('Address Line 1', _addr1Controller, required: true)),
+            ]),
+            SizedBox(height: 16.h),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: _labelledField('Address Line 2', _addr2Controller)),
+              SizedBox(width: 16.w),
+              Expanded(child: _labelledField('Address Line 3', _addr3Controller)),
+            ]),
+            SizedBox(height: 24.h),
+
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
                     child: OutlinedButton.icon(
                       onPressed: _isSaving ? null : _resetForm,
-                      icon: const AppIcon('close-circle', size: 16),
+                      icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                       label: const Text('Clear'),
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.border),
                       ),
                     ),
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
+                ),
+                SizedBox(width: AppBtn.gap(context)),
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
                     child: ElevatedButton.icon(
                       onPressed: _isSaving ? null : _save,
                       icon: _isSaving
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                          : AppIcon(_editingBanId != null ? 'tick-circle' : 'add', size: 16, color: Colors.white),
-                      label: Text(_editingBanId != null ? 'Update' : 'Add'),
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : AppIcon(
+                              _editingBanId != null ? 'tick-circle' : 'add',
+                              size: AppBtn.iconSize(context),
+                              color: Colors.white,
+                            ),
+                      label: Text(_editingBanId != null ? 'Update' : 'Add Bank'),
                       style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _labelledField(
+    String label,
+    TextEditingController controller, {
+    String? hint,
+    bool required = false,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          required ? '$label *' : label,
+          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black),
+        ),
+        SizedBox(height: 6.h),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: _inputDecoration(context, hint ?? ''),
+          style: _inputTextStyle(context),
+          validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
+        ),
+      ],
     );
   }
 
@@ -457,88 +414,121 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const AppIcon('category-2', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('Fee Group Assignments',
-                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              const Spacer(),
-              Text(
-                'Route each fee group to a bank',
-                style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
-              ),
-            ],
+          Padding(
+            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
+            child: Row(
+              children: [
+                const AppIcon('category-2', size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 8.w),
+                Text('Fee Group Assignments',
+                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    '${_feeGroups.length} groups',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
+                  ),
+                ),
+              ],
+            ),
           ),
-          SizedBox(height: 12.h),
           if (_loadingFeeGroups)
             const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
           else if (_feeGroups.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+              padding: EdgeInsets.symmetric(vertical: 24.h),
               child: Center(
                 child: Text('No fee groups yet. Import fee groups in Master Data first.',
                     style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
               ),
             )
           else
-            Expanded(
-              child: ListView.separated(
-                itemCount: _feeGroups.length,
-                separatorBuilder: (_, __) => const Divider(height: 12),
-                itemBuilder: (_, i) {
-                  final fg = _feeGroups[i];
-                  final fgId = fg['fg_id'] as int?;
-                  final rawBanId = fg['ban_id'] as int?;
-                  // Reset to null if the saved bank was deleted — otherwise
-                  // DropdownButtonFormField asserts because no item matches.
-                  final currentBanId = rawBanId != null && _banks.any((b) => b['ban_id'] == rawBanId)
-                      ? rawBanId
-                      : null;
-                  return Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(fg['fgdesc']?.toString() ?? '',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
-                            if (fg['yrlabel'] != null)
-                              Text(fg['yrlabel'].toString(),
-                                  style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        flex: 4,
-                        child: DropdownButtonFormField<int?>(
-                          value: currentBanId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            // Inner bordered table — mirrors the User Creation list panel.
+            Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                    color: AppColors.tableHeadBg,
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: Text('FEE GROUP', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 4, child: Text('ROUTED TO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ...List.generate(_feeGroups.length, (i) {
+                    final fg = _feeGroups[i];
+                    final fgId = fg['fg_id'] as int?;
+                    final rawBanId = fg['ban_id'] as int?;
+                    // Reset to null if the saved bank was deleted — otherwise
+                    // DropdownButtonFormField asserts because no item matches.
+                    final currentBanId = rawBanId != null && _banks.any((b) => b['ban_id'] == rawBanId)
+                        ? rawBanId
+                        : null;
+                    return Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                      color: i.isEven ? Colors.white : AppColors.surface,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(fg['fgdesc']?.toString() ?? '',
+                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                                if (fg['yrlabel'] != null)
+                                  Text(fg['yrlabel'].toString(),
+                                      style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary)),
+                              ],
+                            ),
                           ),
-                          hint: const Text('— No account —'),
-                          items: [
-                            const DropdownMenuItem<int?>(value: null, child: Text('— No account —')),
-                            for (final b in _banks)
-                              DropdownMenuItem<int?>(
-                                value: b['ban_id'] as int?,
-                                child: Text(
-                                  '${b['banname']} • ${b['banaccno']}',
-                                  overflow: TextOverflow.ellipsis,
+                          Expanded(
+                            flex: 4,
+                            child: DropdownButtonFormField<int?>(
+                              value: currentBanId,
+                              isExpanded: true,
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              elevation: 6,
+                              decoration: _inputDecoration(context, '— No account —'),
+                              style: _inputTextStyle(context),
+                              hint: Text('— No account —', style: _inputTextStyle(context)),
+                              items: [
+                                DropdownMenuItem<int?>(
+                                  value: null,
+                                  child: Text('— No account —', style: _inputTextStyle(context)),
                                 ),
-                              ),
-                          ],
-                          onChanged: fgId == null ? null : (v) => _assignBank(fgId, v),
-                        ),
+                                for (final b in _banks)
+                                  DropdownMenuItem<int?>(
+                                    value: b['ban_id'] as int?,
+                                    child: Text(
+                                      '${b['banname']} • ${b['banaccno']}',
+                                      style: _inputTextStyle(context),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                              onChanged: fgId == null ? null : (v) => _assignBank(fgId, v),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  );
-                },
+                    );
+                  }),
+                ],
               ),
             ),
         ],
@@ -546,30 +536,313 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     );
   }
 
-  Widget _row(List<Widget> children) {
-    return Row(
-      children: [
-        for (int i = 0; i < children.length; i++) ...[
-          if (i > 0) SizedBox(width: 12.w),
-          Expanded(child: children[i]),
+  Widget _buildList() {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
+            child: Row(
+              children: [
+                AppIcon('bank', size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 8.w),
+                Text('Bank Accounts',
+                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text('${_banks.length} accounts',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                ),
+                SizedBox(width: 8.w),
+                SizedBox(
+                  height: AppBtn.height(context),
+                  child: ElevatedButton.icon(
+                    onPressed: _fetchBanks,
+                    icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
+                    label: const Text('Refresh'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Inner bordered table — sticky header + zebra rows + chevron,
+          // matching the Existing Users table on the User Creation page.
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                  color: AppColors.tableHeadBg,
+                  child: Row(
+                    children: [
+                      SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      SizedBox(width: 16.w),
+                      Expanded(flex: 3, child: Text('BANK', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      Expanded(flex: 2, child: Text('BRANCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      Expanded(flex: 3, child: Text('A/C NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      SizedBox(width: 30.w),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                if (_isLoading)
+                  Padding(padding: EdgeInsets.all(32.w), child: const Center(child: CircularProgressIndicator()))
+                else if (_banks.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.all(32.w),
+                    child: Center(
+                      child: Text('No bank accounts yet. Add one on the left.',
+                          style: TextStyle(color: AppColors.textPrimary)),
+                    ),
+                  )
+                else
+                  ...List.generate(_banks.length, (i) {
+                    final b = _banks[i];
+                    return InkWell(
+                      onTap: () => setState(() => _selectedBank = b),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                        color: i.isEven ? Colors.white : AppColors.surface,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 50.w,
+                              child: Text('${i + 1}',
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                b['banname']?.toString() ?? '-',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                b['banbranch']?.toString() ?? '-',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                b['banaccno']?.toString() ?? '-',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 30.w,
+                              child: AppIcon.linear('Chevron Right', size: 18, color: AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
         ],
-      ],
+      ),
     );
   }
 
-  Widget _field(String label, TextEditingController c, {String? hint, bool required = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
-        SizedBox(height: 6.h),
-        TextFormField(
-          controller: c,
-          decoration: _inputDecoration(context, hint ?? ''),
-          style: _inputTextStyle(context),
-          validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
+  /// Drilldown detail view — mirrors `_buildUserDetail` on the User Creation
+  /// page. Back button + breadcrumb on top, then bank avatar/name header,
+  /// then labelled detail rows, then Edit + Delete actions.
+  Widget _buildBankDetail(Map<String, dynamic> b) {
+    Widget detailRow(String label, String value, {String? icon, Color? valueColor}) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 20.w),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              AppIcon(icon, size: 16, color: AppColors.accent),
+              SizedBox(width: 10.w),
+            ],
+            SizedBox(
+              width: 140.w,
+              child: Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            ),
+            Expanded(
+              child: Text(value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: valueColor ?? AppColors.textPrimary)),
+            ),
+          ],
         ),
-      ],
+      );
+    }
+
+    final addressLines = <String>[
+      b['banaddress1']?.toString() ?? '',
+      b['banaddress2']?.toString() ?? '',
+      b['banaddress3']?.toString() ?? '',
+    ].where((s) => s.trim().isNotEmpty).toList();
+    final address = addressLines.isEmpty ? '-' : addressLines.join(', ');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Back button + breadcrumb
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => setState(() => _selectedBank = null),
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8.r)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon.linear('Chevron Left', size: 14, color: Colors.white),
+                        SizedBox(width: 6.w),
+                        Text('Back', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Container(width: 1, height: 18, color: AppColors.border),
+                SizedBox(width: 12.w),
+                Text('Bank Accounts', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                SizedBox(width: 6.w),
+                AppIcon.linear('Chevron Right', size: 14, color: AppColors.textSecondary),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    b['banname']?.toString() ?? '-',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Bank avatar + name header
+          Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 28.r,
+                  backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                  child: AppIcon('bank', size: 26, color: AppColors.accent),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        b['banname']?.toString() ?? '-',
+                        style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        '${b['banbranch']?.toString() ?? '-'}  •  ${b['ifsccode']?.toString() ?? '-'}',
+                        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Detail rows
+          SizedBox(height: 8.h),
+          detailRow('Account Holder', b['banaccholder']?.toString() ?? '-', icon: 'profile-circle'),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Account Number', b['banaccno']?.toString() ?? '-', icon: 'card', valueColor: AppColors.accent),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('IFSC Code', b['ifsccode']?.toString() ?? '-', icon: 'code'),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Mobile', (b['banmobile']?.toString().trim().isEmpty ?? true) ? '-' : b['banmobile'].toString(), icon: 'call'),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Email', (b['banemail']?.toString().trim().isEmpty ?? true) ? '-' : b['banemail'].toString(), icon: 'sms'),
+          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
+          detailRow('Address', address, icon: 'location'),
+          SizedBox(height: 16.h),
+          // Edit + Delete actions
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.h),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _loadIntoForm(b);
+                        setState(() => _selectedBank = null);
+                      },
+                      icon: AppIcon('edit-2', size: AppBtn.iconSize(context), color: AppColors.accent),
+                      label: const Text('Edit'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.accent,
+                        side: const BorderSide(color: AppColors.accent),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: AppBtn.gap(context)),
+                Expanded(
+                  child: SizedBox(
+                    height: AppBtn.height(context),
+                    child: ElevatedButton.icon(
+                      onPressed: () => _confirmDelete(b),
+                      icon: AppIcon('trash', size: AppBtn.iconSize(context), color: Colors.white),
+                      label: const Text('Delete'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

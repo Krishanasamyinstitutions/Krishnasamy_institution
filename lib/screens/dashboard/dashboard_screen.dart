@@ -540,36 +540,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // Nav items grouped by section
+          // Nav items grouped by section. The default desktop scrollbar is
+          // suppressed so the sidebar reads as a flat menu — items still
+          // scroll via mouse wheel / trackpad, just without a visible bar.
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: hPad),
-              children: [
-                for (var s = 0; s < orderedSections.length; s++) ...[
-                  if (!collapsed)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: s == 0 ? 4.h : 18.h,
-                        bottom: 8.h,
-                        left: 10.w,
-                      ),
-                      child: Text(
-                        orderedSections[s],
-                        style: TextStyle(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: AppColors.accent,
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              child: ListView(
+                padding: EdgeInsets.symmetric(horizontal: hPad),
+                children: [
+                  for (var s = 0; s < orderedSections.length; s++) ...[
+                    if (!collapsed)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: s == 0 ? 4.h : 18.h,
+                          bottom: 8.h,
+                          left: 10.w,
                         ),
-                      ),
-                    )
-                  else
-                    SizedBox(height: s == 0 ? 4.h : 18.h),
-                  for (final idx in groupedIndices[orderedSections[s]]!)
-                    _buildNavTile(context, idx, collapsed),
+                        child: Text(
+                          orderedSections[s],
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(height: s == 0 ? 4.h : 18.h),
+                    for (final idx in groupedIndices[orderedSections[s]]!)
+                      _buildNavTile(context, idx, collapsed),
+                  ],
+                  SizedBox(height: 16.h),
                 ],
-                SizedBox(height: 16.h),
-              ],
+              ),
             ),
           ),
         ],

@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../utils/friendly_error.dart';
 class NoticesScreen extends StatefulWidget {
   const NoticesScreen({super.key});
@@ -216,16 +217,19 @@ class _NoticesScreenState extends State<NoticesScreen> {
                   borderRadius: BorderRadius.circular(10.r),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: _isLoading
+                child: AppVerticalScrollbar(
+                  builder: (context, controller) => _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _notices.isEmpty
                         ? _buildEmptyState()
                         : ListView.separated(
+                            controller: controller,
                             padding: EdgeInsets.zero,
                             itemCount: _notices.length,
                             separatorBuilder: (_, __) => Divider(height: 1, thickness: 1, color: AppColors.border.withValues(alpha: 0.6)),
                             itemBuilder: (context, index) => _buildNoticeCard(_notices[index], index),
                           ),
+                ),
               ),
             ),
           ),
