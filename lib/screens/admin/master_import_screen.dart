@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
@@ -510,29 +511,32 @@ Widget _buildImportCard({
                                 ],
                               ),
                             )
-                          : ListView.builder(
-                              itemCount: displayRows.length,
-                              itemBuilder: (_, i) {
-                                final hasError = !showExisting && rowErrors.containsKey(i);
-                                return Tooltip(
-                                  message: hasError ? rowErrors[i]! : '',
-                                  child: Container(
-                                    padding: EdgeInsets.zero,
-                                    color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
-                                    child: Row(
-                                      children: [
-                                        _gridDataCell('${i + 1}', width: 60.w, center: true),
-                                        ...List.generate(displayHeaders.length, (j) =>
-                                          _gridDataCell(
-                                            j < displayRows[i].length ? displayRows[i][j].toString() : '',
-                                            right: rightAlignCols.contains(j),
+                          : AppVerticalScrollbar(
+                              builder: (context, controller) => ListView.builder(
+                                controller: controller,
+                                itemCount: displayRows.length,
+                                itemBuilder: (_, i) {
+                                  final hasError = !showExisting && rowErrors.containsKey(i);
+                                  return Tooltip(
+                                    message: hasError ? rowErrors[i]! : '',
+                                    child: Container(
+                                      padding: EdgeInsets.zero,
+                                      color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
+                                      child: Row(
+                                        children: [
+                                          _gridDataCell('${i + 1}', width: 60.w, center: true),
+                                          ...List.generate(displayHeaders.length, (j) =>
+                                            _gridDataCell(
+                                              j < displayRows[i].length ? displayRows[i][j].toString() : '',
+                                              right: rightAlignCols.contains(j),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
                 ),
               ],
@@ -787,14 +791,22 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       // Course name by cour_id; class name by cla_id (for succeeding class lookup).
       final courseMap = { for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString() };
       final classMap = { for (final r in rows) r['cla_id'].toString(): (r['claname'] ?? '').toString() };
-      if (mounted) setState(() {
-        _existingRows = rows.map((r) => [
-          r['claname'] ?? '',
-          courseMap['${r['cour_id'] ?? ''}'] ?? '',
-          classMap['${r['succeedingclass'] ?? ''}'] ?? '',
-        ]).toList();
-        _isLoadingExisting = false;
-      });
+      final sorted = rows.map((r) => [
+        r['claname']?.toString() ?? '',
+        courseMap['${r['cour_id'] ?? ''}'] ?? '',
+        classMap['${r['succeedingclass'] ?? ''}'] ?? '',
+      ]).toList()
+        ..sort((a, b) {
+          final byCourse = a[1].toLowerCase().compareTo(b[1].toLowerCase());
+          if (byCourse != 0) return byCourse;
+          return a[0].toLowerCase().compareTo(b[0].toLowerCase());
+        });
+      if (mounted) {
+        setState(() {
+          _existingRows = sorted;
+          _isLoadingExisting = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingExisting = false);
     }

@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -1253,8 +1254,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         ),
         child: Column(
           children: [
-            // Table header
-            Container(
+            // Table header + rows, sharing a reserved scrollbar lane
+            Expanded(
+              child: AppVerticalScrollbar(
+                header: Container(
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               color: AppColors.tableHeadBg,
               child: Row(
@@ -1270,9 +1273,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 ],
               ),
             ),
-            // List rows
-            Expanded(
-              child: ListView.separated(
+                builder: (context, controller) => ListView.separated(
+                controller: controller,
                 padding: EdgeInsets.zero,
                 itemCount: summaries.length,
                 separatorBuilder: (_, __) => const SizedBox.shrink(),
@@ -1305,6 +1307,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                     ),
                   );
                 },
+              ),
               ),
             ),
             // Total footer row
@@ -1389,10 +1392,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           borderRadius: BorderRadius.circular(8.r),
           border: Border.all(color: AppColors.border),
         ),
-        child: Column(
-            children: [
-              // Table header
-              Container(
+        child: AppVerticalScrollbar(
+                header: Container(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 color: AppColors.tableHeadBg,
                 child: Row(
@@ -1409,8 +1410,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.separated(
+                builder: (context, controller) => ListView.separated(
+                  controller: controller,
                   padding: EdgeInsets.zero,
                   itemCount: students.length,
                   separatorBuilder: (_, __) => const SizedBox.shrink(),
@@ -1492,10 +1493,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                   },
                 ),
               ),
-            ],
         ),
-      ),
-    );
+      );
   }
 
   /// Level 3: Individual fee details for selected student
@@ -1604,7 +1603,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
               Container(height: 1, color: AppColors.border),
               // Scrolling body.
               Expanded(
-                child: ListView.separated(
+                child: AppVerticalScrollbar(
+                  builder: (context, sc) => ListView.separated(
+                  controller: sc,
                   itemCount: demands.length,
                   separatorBuilder: (_, __) => Divider(
                       height: 1,
@@ -1679,6 +1680,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       ]),
                     );
                   },
+                ),
                 ),
               ),
               // Total — pinned footer.

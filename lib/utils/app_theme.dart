@@ -296,19 +296,20 @@ class AppTheme {
         thumbVisibility: WidgetStateProperty.all(true),
         trackVisibility: WidgetStateProperty.all(true),
         interactive: true,
-        thickness: WidgetStateProperty.all(11),
-        radius: const Radius.circular(6),
+        thickness: WidgetStateProperty.all(13),
+        radius: const Radius.circular(7),
+        crossAxisMargin: 0,
+        mainAxisMargin: 0,
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.dragged)) {
-            return AppColors.primary.withValues(alpha: 0.85);
+            return AppColors.primary;
           }
-          return AppColors.primary.withValues(alpha: 0.55);
+          return AppColors.primary.withValues(alpha: 0.70);
         }),
-        trackColor: WidgetStateProperty.all(
-            AppColors.border.withValues(alpha: 0.55)),
-        trackBorderColor: WidgetStateProperty.all(
-            AppColors.border.withValues(alpha: 0.6)),
+        // Solid, clearly-visible track lane + a defined edge.
+        trackColor: WidgetStateProperty.all(const Color(0xFFC9CED6)),
+        trackBorderColor: WidgetStateProperty.all(const Color(0xFF9AA2AE)),
       ),
     );
   }
