@@ -16,6 +16,8 @@ import '../../services/supabase_service.dart';
 import '../auth/register_screen.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import '../../utils/friendly_error.dart';
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -58,6 +60,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   List<_InstitutionFinanceSummary> _institutionSummaries = [];
   List<_SuperAdminTransactionRow> _recentTransactions = [];
 
+  // Horizontal scroll controllers for the two summary tables, used to drive
+  // ClassicHScrollbar (matches the modern table-bar look elsewhere).
+  final ScrollController _institutionTableScrollCtrl = ScrollController();
+  final ScrollController _recentTransactionsScrollCtrl = ScrollController();
+
   // Year filter — null means "latest per institution" (legacy behaviour).
   // Populated lazily from public.get_super_admin_year_labels() on first
   // load so we don't hold up dashboard rendering on slow networks.
@@ -82,6 +89,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     _loadAvailableYears();
     _loadInstitutions();
     _loadTrustSettings();
+  }
+
+  @override
+  void dispose() {
+    _institutionTableScrollCtrl.dispose();
+    _recentTransactionsScrollCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTrustSettings() async {
@@ -730,34 +744,37 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             ),
           ),
           Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: hPad),
-              children: [
-                for (var s = 0; s < orderedSections.length; s++) ...[
-                  if (!collapsed)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: s == 0 ? 4 : 18,
-                        bottom: 8,
-                        left: 10,
-                      ),
-                      child: Text(
-                        orderedSections[s],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: AppColors.accent,
+            child: AppVerticalScrollbar(
+              builder: (context, controller) => ListView(
+                controller: controller,
+                padding: EdgeInsets.symmetric(horizontal: hPad),
+                children: [
+                  for (var s = 0; s < orderedSections.length; s++) ...[
+                    if (!collapsed)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: s == 0 ? 4 : 18,
+                          bottom: 8,
+                          left: 10,
                         ),
-                      ),
-                    )
-                  else
-                    SizedBox(height: s == 0 ? 4 : 18),
-                  for (final idx in groupedIndices[orderedSections[s]]!)
-                    _buildNavTile(context, idx, collapsed),
+                        child: Text(
+                          orderedSections[s],
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(height: s == 0 ? 4 : 18),
+                    for (final idx in groupedIndices[orderedSections[s]]!)
+                      _buildNavTile(context, idx, collapsed),
+                  ],
+                  const SizedBox(height: 16),
                 ],
-                const SizedBox(height: 16),
-              ],
+              ),
             ),
           ),
         ],
@@ -1544,8 +1561,12 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         ? NetworkImage(s.insLogo!)
                         : null,
                     child: (s.insLogo == null || s.insLogo!.isEmpty)
-                        ? Text(s.insName[0],
-                            style: const TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.w800))
+                        ? Text(
+                            s.insCode.isNotEmpty
+                                ? s.insCode.toUpperCase()
+                                : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w800))
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -1827,9 +1848,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Center(
-                    child: Text(s.insCode.isNotEmpty ? s.insCode[0] : 'I',
+                    child: Text(
+                        s.insCode.isNotEmpty
+                            ? s.insCode.toUpperCase()
+                            : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 11,
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary))),
               ),
@@ -1846,12 +1871,6 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary)),
-                    const SizedBox(height: 2),
-                    Text(s.insCode,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -2168,9 +2187,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
+            Column(mainAxisSize: MainAxisSize.min, children: [
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              child: SingleChildScrollView(
+                controller: _institutionTableScrollCtrl,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
                 headingRowColor: WidgetStateProperty.all(
                     AppColors.primary.withValues(alpha: 0.08)),
                 columns: const [
@@ -2215,7 +2238,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   );
                 }).toList(),
               ),
-            ),
+            )),
+            ClassicHScrollbar(controller: _institutionTableScrollCtrl),
+            ]),
         ],
       ),
     );
@@ -2260,9 +2285,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
+            Column(mainAxisSize: MainAxisSize.min, children: [
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              child: SingleChildScrollView(
+                controller: _recentTransactionsScrollCtrl,
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
                 headingRowColor: WidgetStateProperty.all(
                     AppColors.primary.withValues(alpha: 0.08)),
                 columns: const [
@@ -2320,7 +2349,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   );
                 }).toList(),
               ),
-            ),
+            )),
+            ClassicHScrollbar(controller: _recentTransactionsScrollCtrl),
+            ]),
         ],
       ),
     );
@@ -2418,12 +2449,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
               ),
             ),
             Expanded(
-              child: _loadingInstitutions
+              child: AppVerticalScrollbar(
+                builder: (context, controller) => _loadingInstitutions
                   ? const Center(child: CircularProgressIndicator())
                   : _institutions.isEmpty
                       ? Center(child: Text('No institutions found',
                           style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)))
                       : ListView.separated(
+                          controller: controller,
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           itemCount: _institutions.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -2524,6 +2557,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                             );
                           },
                         ),
+            ),
             ),
           ],
         ),
@@ -2731,8 +2765,10 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                     ],
                   ),
                   SizedBox(height: 16.h),
-                  // Table header
-                  Container(
+                  // Table header + rows, sharing a reserved scrollbar lane
+                  Expanded(
+                    child: AppVerticalScrollbar(
+                      header: Container(
                     padding:
                         EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     decoration: BoxDecoration(
@@ -2775,9 +2811,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                       ],
                     ),
                   ),
-                  // Table rows
-                  Expanded(
-                    child: Container(
+                      builder: (context, controller) => Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.vertical(
@@ -2795,9 +2829,10 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                                       color: Colors.black,
                                       fontSize: 13)))
                           : ListView.separated(
+                              controller: controller,
                               itemCount: _classWiseData.length,
                               separatorBuilder: (_, __) =>
-                                  Divider(height: 1, color: AppColors.border),
+                                  const Divider(height: 1, color: AppColors.border),
                               itemBuilder: (context, index) {
                                 final row = _classWiseData[index];
                                 final cls = row['class'] as String;
@@ -2844,6 +2879,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
                               },
                             ),
                     ),
+                      ),
                   ),
                 ],
               ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import '../../utils/app_theme.dart';
@@ -304,10 +305,10 @@ Future<void> _exportTemplate(String sheetName, List<String> headers) async {
   if (bytes != null) File(savePath).writeAsBytesSync(bytes);
 }
 
-Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false}) {
+Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false, bool right = false}) {
   final child = Container(
     padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
-    alignment: center ? Alignment.center : Alignment.centerLeft,
+    alignment: right ? Alignment.centerRight : center ? Alignment.center : Alignment.centerLeft,
     child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
@@ -317,10 +318,10 @@ Widget _gridHeaderDivider() {
   return Container(width: 1, height: 36.h, color: AppColors.border);
 }
 
-Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false}) {
+Widget _gridDataCell(String text, {double? width, int flex = 1, bool center = false, bool right = false}) {
   final child = Container(
     padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
-    alignment: center ? Alignment.center : Alignment.centerLeft,
+    alignment: right ? Alignment.centerRight : center ? Alignment.center : Alignment.centerLeft,
     decoration: BoxDecoration(
       border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
     ),
@@ -351,6 +352,7 @@ Widget _buildImportCard({
   bool isLoadingExisting = false,
   VoidCallback? onSampleDownload,
   Map<int, String> rowErrors = const {},
+  Set<int> rightAlignCols = const {},
 }) {
   final bool showExisting = rows.isEmpty && existingRows.isNotEmpty;
   final displayHeaders = showExisting ? existingHeaders : headers;
@@ -472,9 +474,9 @@ Widget _buildImportCard({
                   child: Row(
                     children: [
                       _gridHeaderCell('S.No', width: 60.w, center: true),
-                      ...displayHeaders.expand((h) => [
+                      ...displayHeaders.asMap().entries.expand((e) => [
                         _gridHeaderDivider(),
-                        _gridHeaderCell(h),
+                        _gridHeaderCell(e.value, right: rightAlignCols.contains(e.key)),
                       ]),
                     ],
                   ),
@@ -509,26 +511,32 @@ Widget _buildImportCard({
                                 ],
                               ),
                             )
-                          : ListView.builder(
-                              itemCount: displayRows.length,
-                              itemBuilder: (_, i) {
-                                final hasError = !showExisting && rowErrors.containsKey(i);
-                                return Tooltip(
-                                  message: hasError ? rowErrors[i]! : '',
-                                  child: Container(
-                                    padding: EdgeInsets.zero,
-                                    color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
-                                    child: Row(
-                                      children: [
-                                        _gridDataCell('${i + 1}', width: 60.w, center: true),
-                                        ...List.generate(displayHeaders.length, (j) =>
-                                          _gridDataCell(j < displayRows[i].length ? displayRows[i][j].toString() : ''),
-                                        ),
-                                      ],
+                          : AppVerticalScrollbar(
+                              builder: (context, controller) => ListView.builder(
+                                controller: controller,
+                                itemCount: displayRows.length,
+                                itemBuilder: (_, i) {
+                                  final hasError = !showExisting && rowErrors.containsKey(i);
+                                  return Tooltip(
+                                    message: hasError ? rowErrors[i]! : '',
+                                    child: Container(
+                                      padding: EdgeInsets.zero,
+                                      color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
+                                      child: Row(
+                                        children: [
+                                          _gridDataCell('${i + 1}', width: 60.w, center: true),
+                                          ...List.generate(displayHeaders.length, (j) =>
+                                            _gridDataCell(
+                                              j < displayRows[i].length ? displayRows[i][j].toString() : '',
+                                              right: rightAlignCols.contains(j),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
                 ),
               ],
@@ -783,14 +791,22 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       // Course name by cour_id; class name by cla_id (for succeeding class lookup).
       final courseMap = { for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString() };
       final classMap = { for (final r in rows) r['cla_id'].toString(): (r['claname'] ?? '').toString() };
-      if (mounted) setState(() {
-        _existingRows = rows.map((r) => [
-          r['claname'] ?? '',
-          courseMap['${r['cour_id'] ?? ''}'] ?? '',
-          classMap['${r['succeedingclass'] ?? ''}'] ?? '',
-        ]).toList();
-        _isLoadingExisting = false;
-      });
+      final sorted = rows.map((r) => [
+        r['claname']?.toString() ?? '',
+        courseMap['${r['cour_id'] ?? ''}'] ?? '',
+        classMap['${r['succeedingclass'] ?? ''}'] ?? '',
+      ]).toList()
+        ..sort((a, b) {
+          final byCourse = a[1].toLowerCase().compareTo(b[1].toLowerCase());
+          if (byCourse != 0) return byCourse;
+          return a[0].toLowerCase().compareTo(b[0].toLowerCase());
+        });
+      if (mounted) {
+        setState(() {
+          _existingRows = sorted;
+          _isLoadingExisting = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingExisting = false);
     }
@@ -1547,6 +1563,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      rightAlignCols: const {3}, // AMOUNT
     );
   }
 }

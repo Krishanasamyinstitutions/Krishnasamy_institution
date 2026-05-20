@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import '../../utils/friendly_error.dart';
 
@@ -1383,94 +1384,192 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                               border: Border.all(color: AppColors.border),
                               borderRadius: BorderRadius.circular(10.r),
                             ),
-                            child: LayoutBuilder(
-                              builder: (ctx, constraints) => SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                                  child: SingleChildScrollView(
-                                child: DataTable(
-                                  headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                                  headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                                  dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                                  dataRowColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                    if (states.contains(WidgetState.hovered)) return AppColors.primaryLight.withValues(alpha: 0.4);
-                                    return null;
-                                  }),
-                                  columnSpacing: 24,
-                                  horizontalMargin: 20,
-                                  headingRowHeight: 44.h,
-                                  dataRowMinHeight: 43.h,
-                                  dataRowMaxHeight: 43.h,
-                                  dividerThickness: 1,
-                                  columns: const [
-                                    DataColumn(label: Text('RULE NAME')),
-                                    DataColumn(label: Text('FEE TYPE')),
-                                    DataColumn(label: Text('FROM'), numeric: true),
-                                    DataColumn(label: Text('TO'), numeric: true),
-                                    DataColumn(label: Text('TYPE')),
-                                    DataColumn(label: Text('VALUE'), numeric: true),
-                                    DataColumn(label: Text('ACTIONS')),
-                                  ],
-                                  rows: List<DataRow>.generate(_rules.length, (i) {
-                                    final r = _rules[i];
-                                    final fineType = r['fine_type']?.toString() ?? 'FIXED';
-                                    final fineValue = (r['fine_value'] as num?)?.toDouble() ?? 0;
-                                    final isFixed = fineType == 'FIXED';
-                                    final zebra = i.isOdd ? AppColors.surface : Colors.white;
-                                    return DataRow(
-                                      color: WidgetStateProperty.resolveWith<Color?>((states) {
-                                        if (states.contains(WidgetState.hovered)) return AppColors.primaryLight.withValues(alpha: 0.35);
-                                        return zebra;
-                                      }),
-                                      cells: [
-                                        DataCell(Text(
-                                          r['rulename']?.toString() ?? '',
-                                          style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                                        )),
-                                        DataCell(_chip(
-                                          label: r['feetype']?.toString() ?? 'ALL',
-                                          color: AppColors.accent,
-                                        )),
-                                        DataCell(Text('${r['from_days'] ?? 0}')),
-                                        DataCell(Text(
-                                          r['to_days'] != null ? '${r['to_days']}' : '∞',
-                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                                        )),
-                                        DataCell(_chip(
-                                          label: isFixed ? 'Fixed' : 'Percent',
-                                          color: isFixed ? AppColors.success : AppColors.warning,
-                                        )),
-                                        DataCell(Text(
-                                          isFixed ? '₹${fineValue.toStringAsFixed(0)}' : '${fineValue.toStringAsFixed(1)}%',
-                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
-                                        )),
-                                        DataCell(Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _actionBtn(
-                                              iconName: 'edit-2',
-                                              color: AppColors.accent,
-                                              tooltip: 'Edit',
-                                              onTap: () => _editRule(r),
-                                            ),
-                                            SizedBox(width: 6.w),
-                                            _actionBtn(
-                                              iconName: 'trash',
-                                              color: AppColors.error,
-                                              tooltip: 'Delete',
-                                              onTap: () => _deleteRule(r['fr_id'] as int),
-                                            ),
-                                          ],
-                                        )),
-                                      ],
-                                    );
-                                  }),
-                                ),
-                                ),
-                              ),
-                              ),
-                            ),
+                            child: Builder(builder: (ctx) {
+                              const flexes = <int>[3, 2, 1, 1, 2, 2, 2];
+                              const headers = <String>[
+                                'RULE NAME', 'FEE TYPE', 'FROM', 'TO',
+                                'TYPE', 'VALUE', 'ACTIONS',
+                              ];
+                              final hStyle = TextStyle(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                  letterSpacing: 0.3);
+                              bool rightAlign(int i) =>
+                                  i == 2 || i == 3 || i == 5;
+                              Widget cell(int i, Widget child) => Expanded(
+                                    flex: flexes[i],
+                                    child: Align(
+                                      alignment: rightAlign(i)
+                                          ? Alignment.centerRight
+                                          : Alignment.centerLeft,
+                                      child: child,
+                                    ),
+                                  );
+                              return Column(
+                                children: [
+                                  // Sticky header.
+                                  Container(
+                                    color: AppColors.tableHeadBg,
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 12.h),
+                                    child: Row(children: [
+                                      for (int i = 0;
+                                          i < headers.length;
+                                          i++)
+                                        cell(
+                                            i,
+                                            Text(headers[i],
+                                                style: hStyle)),
+                                    ]),
+                                  ),
+                                  Container(
+                                      height: 1,
+                                      color: AppColors.border),
+                                  Expanded(
+                                    child: AppVerticalScrollbar(
+                                      builder: (context, sc) =>
+                                          ListView.separated(
+                                      controller: sc,
+                                      itemCount: _rules.length,
+                                      separatorBuilder: (_, __) =>
+                                          Divider(
+                                              height: 1,
+                                              color: AppColors.border
+                                                  .withValues(
+                                                      alpha: 0.5)),
+                                      itemBuilder: (_, i) {
+                                        final r = _rules[i];
+                                        final fineType = r['fine_type']
+                                                ?.toString() ??
+                                            'FIXED';
+                                        final fineValue =
+                                            (r['fine_value'] as num?)
+                                                    ?.toDouble() ??
+                                                0;
+                                        final isFixed =
+                                            fineType == 'FIXED';
+                                        return Container(
+                                          color: i.isOdd
+                                              ? AppColors.surface
+                                              : Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 20,
+                                              vertical: 9.h),
+                                          child: Row(children: [
+                                            cell(
+                                                0,
+                                                Text(
+                                                    r['rulename']
+                                                            ?.toString() ??
+                                                        '',
+                                                    style: TextStyle(
+                                                        fontSize:
+                                                            12.5.sp,
+                                                        fontWeight:
+                                                            FontWeight
+                                                                .w600,
+                                                        color: AppColors
+                                                            .textSecondary))),
+                                            cell(
+                                                1,
+                                                _chip(
+                                                    label: r['feetype']
+                                                            ?.toString() ??
+                                                        'ALL',
+                                                    color: AppColors
+                                                        .accent)),
+                                            cell(
+                                                2,
+                                                Text(
+                                                    '${r['from_days'] ?? 0}',
+                                                    style: TextStyle(
+                                                        fontSize:
+                                                            13.sp,
+                                                        color: AppColors
+                                                            .textPrimary))),
+                                            cell(
+                                                3,
+                                                Text(
+                                                    r['to_days'] !=
+                                                            null
+                                                        ? '${r['to_days']}'
+                                                        : '∞',
+                                                    style: TextStyle(
+                                                        fontSize:
+                                                            13.sp,
+                                                        fontWeight:
+                                                            FontWeight
+                                                                .w600,
+                                                        color: AppColors
+                                                            .textSecondary))),
+                                            cell(
+                                                4,
+                                                _chip(
+                                                    label: isFixed
+                                                        ? 'Fixed'
+                                                        : 'Percent',
+                                                    color: isFixed
+                                                        ? AppColors
+                                                            .success
+                                                        : AppColors
+                                                            .warning)),
+                                            cell(
+                                                5,
+                                                Text(
+                                                    isFixed
+                                                        ? '₹${fineValue.toStringAsFixed(0)}'
+                                                        : '${fineValue.toStringAsFixed(1)}%',
+                                                    style: TextStyle(
+                                                        fontSize:
+                                                            13.sp,
+                                                        fontWeight:
+                                                            FontWeight
+                                                                .w700,
+                                                        color: AppColors
+                                                            .textSecondary))),
+                                            cell(
+                                                6,
+                                                Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize
+                                                          .min,
+                                                  children: [
+                                                    _actionBtn(
+                                                      iconName:
+                                                          'edit-2',
+                                                      color: AppColors
+                                                          .accent,
+                                                      tooltip: 'Edit',
+                                                      onTap: () =>
+                                                          _editRule(
+                                                              r),
+                                                    ),
+                                                    SizedBox(
+                                                        width: 6.w),
+                                                    _actionBtn(
+                                                      iconName:
+                                                          'trash',
+                                                      color: AppColors
+                                                          .error,
+                                                      tooltip:
+                                                          'Delete',
+                                                      onTap: () =>
+                                                          _deleteRule(
+                                                              r['fr_id']
+                                                                  as int),
+                                                    ),
+                                                  ],
+                                                )),
+                                          ]),
+                                        );
+                                      },
+                                    ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
                           ),
                         ),
                       ),

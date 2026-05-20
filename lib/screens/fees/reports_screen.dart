@@ -13,6 +13,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import '../../utils/friendly_error.dart';
 
@@ -774,6 +775,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           });
         }
         rows.add({
+          'paydate': r['paydate']?.toString() ?? '',
           'paynumber': r['paynumber']?.toString() ?? '',
           'stuadmno': r['stuadmno']?.toString() ?? '',
           'stuname': r['stuname']?.toString() ?? '',
@@ -2148,9 +2150,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 border: Border.all(color: AppColors.border),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  Container(
+              child: AppVerticalScrollbar(
+                header: Container(
                     color: AppColors.tableHeadBg,
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     child: Row(
@@ -2162,10 +2163,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: ListView.separated(
+                builder: (context, controller) => ListView.separated(
+                      controller: controller,
                       itemCount: students.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
                       itemBuilder: (ctx, i) {
                         final s = students[i];
                         return InkWell(
@@ -2185,9 +2186,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         );
                       },
                     ),
-                  ),
-                ],
-              ),
+                ),
             ),
           ),
         ] else
@@ -2527,7 +2526,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     }
                   }
                   final headers = <String>[
-                    'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'COURSE', 'CLASS',
+                    'DATE', 'RECEIPT NO', 'REG NO', 'STUDENT NAME', 'COURSE', 'CLASS',
                     ...visibleFeeTypes.map((t) => t.toUpperCase()),
                     'FINE', 'TOTAL',
                     if (showCash) 'CASH',
@@ -2536,7 +2535,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     'NET AMT',
                   ];
                   final widths = <double>[
-                    130, 130, 200, 140, 150,
+                    110, 130, 130, 200, 140, 150,
                     ...visibleFeeTypes.map((t) {
                       // Enough width for full uppercase label ("NEW ADMISSION FEES" etc.)
                       final len = t.length;
@@ -2548,13 +2547,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     if (showBank) 120,
                     130,
                   ];
-                  final numericStart = 5 + visibleFeeTypes.length - 1;
+                  // Numeric (right-aligned) columns start after the 6 text
+                  // columns: DATE, RECEIPT NO, REG NO, NAME, COURSE, CLASS.
                   final numericCols = <int>{
-                    for (int i = 5; i < headers.length; i++) i,
+                    for (int i = 6; i < headers.length; i++) i,
                   };
-                  // Decrement is unused
-                  // ignore: unused_local_variable
-                  final _ = numericStart;
                   return _stickyTable(
                     columnWidths: widths,
                     headers: headers,
@@ -2565,7 +2562,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           final fine = (r['fine'] as num?)?.toDouble() ?? 0;
                           final total = rowDisplayTotal(r);
                           final bucket = _paymentBucket(r['paymethod']?.toString() ?? '');
+                          final pd = DateTime.tryParse(r['paydate']?.toString() ?? '');
                           return <String>[
+                            pd != null ? _formatDate(pd) : (r['paydate']?.toString() ?? ''),
                             r['paynumber']?.toString() ?? '',
                             r['stuadmno']?.toString() ?? '',
                             r['stuname']?.toString() ?? '',
@@ -2582,7 +2581,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         }(),
                     ],
                     footer: <String>[
-                      'TOTAL', '', '', '', '',
+                      'TOTAL', '', '', '', '', '',
                       ...visibleFeeTypes.map((ft) => _formatNumber(ftTotals[ft] ?? 0)),
                       _formatNumber(totalFine),
                       _formatNumber(totalAmt),
@@ -2871,13 +2870,15 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         ),
         SizedBox(height: 8.h),
         // Data table
-        Expanded(child: _buildDataTable(terms, pivotData, termTotals)),
+        Expanded(
+            child: _buildDataTable(terms, pivotData, termTotals,
+                bounded: true)),
       ],
     );
   }
 
-  Widget _buildDataTable(List<String> terms, List<Map<String, dynamic>> pivotData, Map<String, double> termTotals, {bool grouped = false}) {
-    // Group by course + class for display
+  Widget _buildDataTable(List<String> terms, List<Map<String, dynamic>> pivotData, Map<String, double> termTotals, {bool bounded = false}) {
+    // Group by course + class for display.
     final Map<String, List<Map<String, dynamic>>> classGroups = {};
     for (final row in pivotData) {
       final course = row['courname']?.toString() ?? '';
@@ -2886,85 +2887,181 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       classGroups.putIfAbsent(key, () => []).add(row);
     }
 
-    final allRows = <DataRow>[];
-    int sno = 0;
+    // Fixed column widths — the pivot is wide (one column per term) and
+    // scrolls horizontally, so the header can't use flex.
+    final colWidths = <double>[
+      54, 92, 112, 190,
+      for (final _ in terms) 96,
+      86, 100, 140,
+    ];
+    final tableWidth = colWidths.fold<double>(0, (a, b) => a + b);
+    final headers = <String>[
+      'SNO', 'CLASS', 'ADMN. NO', 'STUDENT NAME',
+      for (final t in terms) t.toUpperCase(),
+      'FINE', 'TOTAL', 'REMARKS',
+    ];
+    final lastNumericIdx = 5 + terms.length; // term columns + FINE + TOTAL
+    bool rightAlign(int i) => i >= 4 && i <= lastNumericIdx;
 
+    final hStyle = TextStyle(
+        fontSize: 13.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.3);
+    Widget cell(int i, Widget child) => SizedBox(
+          width: colWidths[i],
+          child: Align(
+            alignment: rightAlign(i)
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: child,
+            ),
+          ),
+        );
+
+    // Flatten student rows + per-class total rows into row widgets.
+    final rowWidgets = <Widget>[];
+    int sno = 0;
+    var zebra = false;
     for (final entry in classGroups.entries) {
-      final classStudents = entry.value;
       final Map<String, double> classTotals = {};
       double classGrandTotal = 0;
       double classTotalFine = 0;
-
-      for (final row in classStudents) {
+      for (final row in entry.value) {
         sno++;
         final rowTotal = (row['_total'] as double?) ?? 0;
         final rowFine = (row['_fine'] as double?) ?? 0;
         classGrandTotal += rowTotal;
         classTotalFine += rowFine;
-        allRows.add(DataRow(
-          cells: [
-            DataCell(Text('$sno', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuclass']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuadmno']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            DataCell(Text(row['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp))),
-            ...terms.map((t) {
-              final val = (row[t] as double?) ?? 0;
-              if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
-              return DataCell(Text(val > 0 ? _formatNumber(val) : '', style: TextStyle(fontSize: 13.sp)));
-            }),
-            DataCell(Text(rowFine > 0 ? _formatNumber(rowFine) : '', style: TextStyle(fontSize: 13.sp, color: Colors.orange))),
-            DataCell(Text(rowTotal > 0 ? _formatNumber(rowTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-            DataCell(Text(row['_remarks']?.toString() ?? '', style: TextStyle(fontSize: 10.sp, color: AppColors.textPrimary))),
-          ],
+        for (final t in terms) {
+          final val = (row[t] as double?) ?? 0;
+          if (val > 0) classTotals[t] = (classTotals[t] ?? 0) + val;
+        }
+        final cs = TextStyle(fontSize: 13.sp, color: AppColors.textPrimary);
+        rowWidgets.add(Container(
+          color: zebra ? AppColors.surface : Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          child: Row(children: [
+            cell(0, Text('$sno', style: cs)),
+            cell(1, Text(row['stuclass']?.toString() ?? '', style: cs)),
+            cell(2, Text(row['stuadmno']?.toString() ?? '', style: cs)),
+            cell(3,
+                Text(row['stuname']?.toString() ?? '',
+                    style: cs, overflow: TextOverflow.ellipsis)),
+            for (var ti = 0; ti < terms.length; ti++)
+              cell(4 + ti, Builder(builder: (_) {
+                final v = (row[terms[ti]] as double?) ?? 0;
+                return Text(v > 0 ? _formatNumber(v) : '', style: cs);
+              })),
+            cell(
+                4 + terms.length,
+                Text(rowFine > 0 ? _formatNumber(rowFine) : '',
+                    style: TextStyle(
+                        fontSize: 13.sp, color: Colors.orange))),
+            cell(
+                5 + terms.length,
+                Text(rowTotal > 0 ? _formatNumber(rowTotal) : '',
+                    style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary))),
+            cell(
+                6 + terms.length,
+                Text(row['_remarks']?.toString() ?? '',
+                    style: TextStyle(
+                        fontSize: 10.sp,
+                        color: AppColors.textPrimary))),
+          ]),
         ));
+        zebra = !zebra;
       }
-
-      // Class total row
-      allRows.add(DataRow(
-        color: WidgetStateProperty.all(const Color(0xFFE2E8F0)),
-        cells: [
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          DataCell(Text('Total', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-          ...terms.map((t) => DataCell(Text(
-            (classTotals[t] ?? 0) > 0 ? _formatNumber(classTotals[t]!) : '',
-            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
-          ))),
-          DataCell(Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: Colors.orange))),
-          DataCell(Text(classGrandTotal > 0 ? _formatNumber(classGrandTotal) : '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
-          DataCell(Text('', style: TextStyle(fontSize: 13.sp))),
-        ],
+      // Per-class total row.
+      rowWidgets.add(Container(
+        color: const Color(0xFFE2E8F0),
+        padding: EdgeInsets.symmetric(vertical: 8.h),
+        child: Row(children: [
+          cell(0, const SizedBox()),
+          cell(
+              1,
+              Text('Total',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary))),
+          cell(2, const SizedBox()),
+          cell(3, const SizedBox()),
+          for (var ti = 0; ti < terms.length; ti++)
+            cell(
+                4 + ti,
+                Text(
+                    (classTotals[terms[ti]] ?? 0) > 0
+                        ? _formatNumber(classTotals[terms[ti]]!)
+                        : '',
+                    style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary))),
+          cell(
+              4 + terms.length,
+              Text(classTotalFine > 0 ? _formatNumber(classTotalFine) : '',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.orange))),
+          cell(
+              5 + terms.length,
+              Text(
+                  classGrandTotal > 0
+                      ? _formatNumber(classGrandTotal)
+                      : '',
+                  style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary))),
+          cell(6 + terms.length, const SizedBox()),
+        ]),
       ));
     }
 
+    final header = Container(
+      color: AppColors.tableHeadBg,
+      padding: EdgeInsets.symmetric(vertical: 10.h),
+      child: Row(children: [
+        for (var i = 0; i < headers.length; i++)
+          cell(i, Text(headers[i], style: hStyle)),
+      ]),
+    );
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-          headingTextStyle: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            letterSpacing: 0.3,
-          ),
-          dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          dividerThickness: 1,
-          // Compact column/row sizing intentional — wide pivot with many term columns.
-          columnSpacing: 14, horizontalMargin: 10, dataRowMinHeight: 30, dataRowMaxHeight: 34, headingRowHeight: 36,
-          columns: [
-            const DataColumn(label: Text('SNO')),
-            const DataColumn(label: Text('CLASS')),
-            const DataColumn(label: Text('ADMN. NO')),
-            const DataColumn(label: Text('STUDENT NAME')),
-            ...terms.map((t) => DataColumn(label: Text(t.toUpperCase()), numeric: true)),
-            const DataColumn(label: Text('FINE'), numeric: true),
-            const DataColumn(label: Text('TOTAL'), numeric: true),
-            const DataColumn(label: Text('REMARKS')),
-          ],
-          rows: allRows,
-        ),
+      child: SizedBox(
+        width: tableWidth,
+        // bounded: a fixed-height host (Collection Statement) — sticky
+        // header + internally scrolling body. Otherwise the table is
+        // content-sized and the page scrolls (course/class section views).
+        child: bounded
+            ? Column(
+                children: [
+                  header,
+                  Container(height: 1, color: AppColors.border),
+                  Expanded(
+                    child: AppVerticalScrollbar(
+                      builder: (context, sc) =>
+                          ListView(controller: sc, children: rowWidgets),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  header,
+                  Container(height: 1, color: AppColors.border),
+                  ...rowWidgets,
+                ],
+              ),
       ),
     );
   }
@@ -3914,10 +4011,15 @@ class _StickyTable extends StatefulWidget {
 
 class _StickyTableState extends State<_StickyTable> {
   final ScrollController _hController = ScrollController();
+  // Vertical scroll for the body rows. Kept separate so the custom vertical
+  // scrollbar can live in a lane pinned to the viewport, instead of off-screen
+  // at the far-right edge of the (wider) horizontally-scrolling content.
+  final ScrollController _vController = ScrollController();
 
   @override
   void dispose() {
     _hController.dispose();
+    _vController.dispose();
     super.dispose();
   }
 
@@ -3996,11 +4098,15 @@ class _StickyTableState extends State<_StickyTable> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final needsScroll = baseTotal > constraints.maxWidth;
-        final scale = needsScroll ? 1.0 : (constraints.maxWidth / baseTotal);
+        // The vertical scrollbar always occupies a 16px lane on the right, so
+        // the horizontal viewport for the table content is that much narrower.
+        const vBarWidth = 16.0;
+        final hViewport = constraints.maxWidth - vBarWidth;
+        final needsScroll = baseTotal > hViewport;
+        final scale = needsScroll ? 1.0 : (hViewport / baseTotal);
         final widths = [for (final c in widget.columnWidths) c.w * scale];
-        final width = needsScroll ? baseTotal : constraints.maxWidth;
-        final scrollbarHeight = needsScroll ? 20.0 : 0.0;
+        final width = needsScroll ? baseTotal : hViewport;
+        final scrollbarHeight = needsScroll ? 16.0 : 0.0;
         return Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -4011,36 +4117,70 @@ class _StickyTableState extends State<_StickyTable> {
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  controller: _hController,
-                  scrollDirection: Axis.horizontal,
-                  physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: width,
-                    height: constraints.maxHeight - scrollbarHeight,
-                    child: Column(
-                      children: [
-                        rowWidget(widget.headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
-                        Container(height: 1, color: AppColors.border),
-                        Expanded(
-                          child: ListView.separated(
-                            itemCount: widget.rows.length,
-                            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
-                            itemBuilder: (_, i) => rowWidget(widget.rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: _hController,
+                        scrollDirection: Axis.horizontal,
+                        physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: width,
+                          height: constraints.maxHeight - scrollbarHeight,
+                          child: Column(
+                            children: [
+                              rowWidget(widget.headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
+                              Container(height: 1, color: AppColors.border),
+                              Expanded(
+                                // Suppress the framework scrollbar; the pinned
+                                // bar on the right drives this list instead.
+                                child: ScrollConfiguration(
+                                  behavior: ScrollConfiguration.of(context)
+                                      .copyWith(scrollbars: false),
+                                  child: ListView.separated(
+                                    controller: _vController,
+                                    itemCount: widget.rows.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
+                                    itemBuilder: (_, i) => rowWidget(widget.rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                                  ),
+                                ),
+                              ),
+                              Container(height: 1, color: AppColors.border),
+                              rowWidget(widget.footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                            ],
                           ),
                         ),
-                        Container(height: 1, color: AppColors.border),
-                        rowWidget(widget.footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                      ),
+                    ),
+                    // Vertical scrollbar pinned to the viewport — top/bottom
+                    // spacers carry the header/footer colour so each band
+                    // reads as a continuous full-width strip with the bar
+                    // only between them.
+                    Column(
+                      children: [
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
+                        Expanded(child: AppScrollbarBar(controller: _vController)),
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
               if (needsScroll)
-                ClassicHScrollbar(
-                  controller: _hController,
-                  contentWidth: width,
-                  viewportWidth: constraints.maxWidth,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClassicHScrollbar(
+                        controller: _hController,
+                        contentWidth: width,
+                        viewportWidth: hViewport,
+                      ),
+                    ),
+                    // Corner gap so the horizontal bar lines up with the
+                    // content viewport, not the vertical scrollbar lane.
+                    const SizedBox(width: vBarWidth),
+                  ],
                 ),
             ],
           ),
@@ -4067,13 +4207,15 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
   final _hCtrl = ScrollController();
   final _vCtrl = ScrollController();
 
+  // Widths picked so every uppercase header fits on one line (TRANSACTION
+  // DATE / PAYMENT MODE / SETTLEMENT DATE are the long ones).
   static const _colWidths = <double>[
-    120, 220, 110, 130, 140, 110, 130, 90, 200, 100, 90, 240, 140,
+    120, 220, 110, 130, 170, 140, 130, 90, 200, 100, 90, 240, 170,
   ];
   static const _headers = <String>[
-    'Roll No', 'Name', 'Course', 'Class',
-    'Transaction Date', 'Payment Mode', 'Doc No', 'Term', 'Fee Type',
-    'Amount', 'Fine', 'Bank Name', 'Settlement Date',
+    'ROLL NO', 'NAME', 'COURSE', 'CLASS',
+    'TRANSACTION DATE', 'PAYMENT MODE', 'DOC NO', 'TERM', 'FEE TYPE',
+    'AMOUNT', 'FINE', 'BANK NAME', 'SETTLEMENT DATE',
   ];
   static const _numericColumns = <int>{9, 10};
 
@@ -4084,13 +4226,16 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
     super.dispose();
   }
 
-  Widget _headerCell(int i) {
+  Widget _headerCell(int i, double w) {
     return Container(
-      width: _colWidths[i],
+      width: w,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
       child: Text(
         _headers[i],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
         style: TextStyle(
           fontSize: 13.sp,
           fontWeight: FontWeight.w700,
@@ -4101,9 +4246,9 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
     );
   }
 
-  Widget _bodyCell(int i, String text) {
+  Widget _bodyCell(int i, String text, double w) {
     return Container(
-      width: _colWidths[i],
+      width: w,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
       child: Text(
@@ -4120,80 +4265,110 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
 
   @override
   Widget build(BuildContext context) {
-    double tableWidth = 0;
+    double baseWidth = 0;
     for (final w in _colWidths) {
-      tableWidth += w;
+      baseWidth += w;
     }
 
     return LayoutBuilder(builder: (_, constraints) {
-      final viewportWidth = constraints.maxWidth;
-      final needsScroll = tableWidth > viewportWidth;
+      // Reserve 16px for the pinned vertical scrollbar lane.
+      final viewportWidth = (constraints.maxWidth - 16).clamp(0.0, double.infinity);
+      final needsScroll = baseWidth > viewportWidth;
+      // When the viewport is wider than the fixed total, distribute the
+      // extra space proportionally so the columns fill the row instead of
+      // leaving a gap on the right.
+      final tableWidth = needsScroll ? baseWidth : viewportWidth;
+      final extra = tableWidth - baseWidth;
+      final List<double> adj = _colWidths
+          .map((w) => w + (extra * w / baseWidth))
+          .toList(growable: false);
+      // Header padding (vertical 12) + ~18px text line ≈ 42, plus the 1px
+      // divider below.
+      const headerH = 43.0;
       return Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              controller: _hCtrl,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: tableWidth,
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        color: AppColors.tableHeadBg,
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.border, width: 1),
-                        ),
-                      ),
-                      child: Row(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _hCtrl,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: tableWidth,
+                      child: Column(
                         children: [
-                          for (int i = 0; i < _headers.length; i++) _headerCell(i),
+                          Container(
+                            decoration: const BoxDecoration(
+                              color: AppColors.tableHeadBg,
+                              border: Border(
+                                bottom: BorderSide(color: AppColors.border, width: 1),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                for (int i = 0; i < _headers.length; i++) _headerCell(i, adj[i]),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            // Framework scrollbar suppressed — the pinned bar
+                            // on the right (outside the horizontal scroll)
+                            // drives the vertical scroll instead.
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: ListView.builder(
+                                controller: _vCtrl,
+                                itemCount: widget.rows.length,
+                                itemBuilder: (_, idx) {
+                                  final r = widget.rows[idx];
+                                  final amt = (r['amount'] as num?)?.toDouble() ?? 0;
+                                  final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: idx.isEven ? Colors.white : AppColors.surface,
+                                      border: const Border(
+                                        bottom: BorderSide(color: AppColors.border, width: 0.5),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        _bodyCell(0, r['stuadmno']?.toString() ?? '', adj[0]),
+                                        _bodyCell(1, r['stuname']?.toString() ?? '', adj[1]),
+                                        _bodyCell(2, r['courname']?.toString() ?? '', adj[2]),
+                                        _bodyCell(3, r['stuclass']?.toString() ?? '', adj[3]),
+                                        _bodyCell(4, widget.fmt(r['paydate']), adj[4]),
+                                        _bodyCell(5, r['paymethod']?.toString() ?? '', adj[5]),
+                                        _bodyCell(6, r['docno']?.toString() ?? '', adj[6]),
+                                        _bodyCell(7, r['demfeeterm']?.toString() ?? '', adj[7]),
+                                        _bodyCell(8, r['demfeetype']?.toString() ?? '', adj[8]),
+                                        _bodyCell(9, amt.toStringAsFixed(2), adj[9]),
+                                        _bodyCell(10, fine.toStringAsFixed(2), adj[10]),
+                                        _bodyCell(11, r['banname']?.toString() ?? '', adj[11]),
+                                        _bodyCell(12, widget.fmt(r['settlement_date']), adj[12]),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Expanded(
-                      child: Scrollbar(
-                        controller: _vCtrl,
-                        thumbVisibility: true,
-                        child: ListView.builder(
-                          controller: _vCtrl,
-                          itemCount: widget.rows.length,
-                          itemBuilder: (_, idx) {
-                            final r = widget.rows[idx];
-                            final amt = (r['amount'] as num?)?.toDouble() ?? 0;
-                            final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: idx.isEven ? Colors.white : AppColors.surface,
-                                border: const Border(
-                                  bottom: BorderSide(color: AppColors.border, width: 0.5),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  _bodyCell(0, r['stuadmno']?.toString() ?? ''),
-                                  _bodyCell(1, r['stuname']?.toString() ?? ''),
-                                  _bodyCell(2, r['courname']?.toString() ?? ''),
-                                  _bodyCell(3, r['stuclass']?.toString() ?? ''),
-                                  _bodyCell(4, widget.fmt(r['paydate'])),
-                                  _bodyCell(5, r['paymethod']?.toString() ?? ''),
-                                  _bodyCell(6, r['docno']?.toString() ?? ''),
-                                  _bodyCell(7, r['demfeeterm']?.toString() ?? ''),
-                                  _bodyCell(8, r['demfeetype']?.toString() ?? ''),
-                                  _bodyCell(9, amt.toStringAsFixed(2)),
-                                  _bodyCell(10, fine.toStringAsFixed(2)),
-                                  _bodyCell(11, r['banname']?.toString() ?? ''),
-                                  _bodyCell(12, widget.fmt(r['settlement_date'])),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  ),
+                ),
+                // Pinned vertical scrollbar — sits outside the horizontal
+                // scroll so it stays in the viewport. The top spacer carries
+                // the header colour so the band reads as one continuous strip.
+                Column(
+                  children: [
+                    Container(width: 16, height: headerH, color: AppColors.tableHeadBg),
+                    Expanded(child: AppScrollbarBar(controller: _vCtrl)),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
           if (needsScroll)

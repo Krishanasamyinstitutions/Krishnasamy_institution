@@ -7,6 +7,8 @@ import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
+import '../../widgets/classic_h_scrollbar.dart';
 import '../../utils/friendly_error.dart';
 class FeeDemandApprovalScreen extends StatefulWidget {
   const FeeDemandApprovalScreen({super.key});
@@ -31,6 +33,9 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   String? _selectedClass; // null = All Classes
 
   final _hScrollController = ScrollController();
+  // Vertical scroll for the body rows — its scrollbar sits in a pinned lane
+  // so it stays reachable without scrolling the table horizontally.
+  final _vScrollController = ScrollController();
 
   // Pagination
   int _currentPage = 1;
@@ -64,6 +69,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   void dispose() {
     _searchController.dispose();
     _hScrollController.dispose();
+    _vScrollController.dispose();
     super.dispose();
   }
 
@@ -268,7 +274,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: _buildActionBar(),
                 ),
-                Divider(height: 1, color: AppColors.border),
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
@@ -494,21 +499,25 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     final demands = _pagedDemands;
 
     if (_filteredDemands.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon('message-text',
-                size: 48.sp,
-                color: AppColors.textSecondary.withValues(alpha: 0.4)),
-            SizedBox(height: 8.h),
-            Text(
+      // Match the Bank Reconciliation empty-state look: a bordered white
+      // card with a single centered line of text — no icon stack.
+      return Padding(
+        padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Center(
+            child: Text(
               _searchQuery.isNotEmpty
                   ? 'No matching records'
                   : 'No fee demands found',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
-          ],
+          ),
         ),
       );
     }
@@ -534,7 +543,11 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
               // ── Table (header + rows) ──────────────────────────────────
               SizedBox(
                 height: tableH,
-                child: SingleChildScrollView(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                  Expanded(
+                  child: SingleChildScrollView(
                   controller: _hScrollController,
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
@@ -571,7 +584,10 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                         Expanded(
                           child: RefreshIndicator(
                             onRefresh: _loadDemands,
+                            child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                             child: ListView.separated(
+                              controller: _vScrollController,
                               padding: EdgeInsets.zero,
                               itemCount: demands.length,
                               separatorBuilder: (_, __) =>
@@ -579,17 +595,31 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                               itemBuilder: (context, i) =>
                                   _buildRow(demands[i], i),
                             ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
+                ),
+                Column(
+                  children: [
+                    Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
+                    Expanded(child: AppScrollbarBar(controller: _vScrollController)),
+                  ],
+                ),
+                  ],
+                ),
               ),
               // ── Horizontal scrollbar ───────────────────────────────────
               Positioned(
-                left: 0, right: 0, bottom: 0,
-                child: _buildWinScrollbar(viewportW, effectiveW, scrollbarH),
+                left: 0, right: 16, bottom: 0,
+                child: ClassicHScrollbar(
+                  controller: _hScrollController,
+                  contentWidth: effectiveW,
+                  viewportWidth: viewportW,
+                ),
               ),
             ],
           );

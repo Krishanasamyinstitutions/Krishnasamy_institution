@@ -2,6 +2,7 @@ import 'dart:io';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
@@ -188,6 +189,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   final ScrollController _dateListScrollCtrl = ScrollController();
   final ScrollController _dateDrilldownScrollCtrl = ScrollController();
   final ScrollController _feeDetailScrollCtrl = ScrollController();
+  final ScrollController _pendingCourseClassScrollCtrl = ScrollController();
+  final ScrollController _pendingFeeGroupScrollCtrl = ScrollController();
+  final ScrollController _pendingClassRowScrollCtrl = ScrollController();
+  final ScrollController _pendingStudentFeeScrollCtrl = ScrollController();
 
   bool _canScrollDateList = false;
   bool _canScrollDateDrilldown = false;
@@ -720,9 +725,33 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       }
     });
 
+    // Total/Today Collection drilldowns return a Column whose Payment Details
+    // card uses Expanded — wrapping that in a SingleChildScrollView would
+    // give it unbounded height and break the layout. Render those branches
+    // directly under the RefreshIndicator so the inner table fills the
+    // viewport instead of forcing the whole page to scroll.
+    if (_showTotalCollection) {
+      return RefreshIndicator(
+        onRefresh: _fetchData,
+        child: _buildCollectionDrilldown(false),
+      );
+    }
+    if (_showTodayCollection) {
+      return RefreshIndicator(
+        onRefresh: _fetchData,
+        child: _buildCollectionDrilldown(true),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _fetchData,
-      child: SingleChildScrollView(
+      // Suppress the default desktop scrollbar on this outer scroll view —
+      // the inner tables (Method-wise Summary, Payment Details, etc.) each
+      // bring their own bars, so the big outer one on the right edge was
+      // duplicating that affordance.
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
         child: Column(
@@ -825,6 +854,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               _buildDateList(),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1079,30 +1109,41 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: LayoutBuilder(builder: (context, constraints) {
-                  return Scrollbar(
-                    controller: _methodSummaryScrollCtrl,
-                    thumbVisibility: true,
-                    trackVisibility: true,
-                    child: SingleChildScrollView(
-                    controller: _methodSummaryScrollCtrl,
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 1,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-                        columns: const [
-                          DataColumn(label: Text('S No.')),
-                          DataColumn(label: Text('PAYMENT METHOD')),
-                          DataColumn(label: Text('TRANSACTIONS'), numeric: true),
-                          DataColumn(label: Text('STUDENTS'), numeric: true),
-                          DataColumn(label: Text('AMOUNT'), numeric: true),
-                        ],
-                        rows: [
+                    child: Builder(builder: (context) {
+                      const flexes = <int>[1, 3, 2, 2, 2];
+                      const headers = <String>[
+                        'S No.', 'PAYMENT METHOD', 'TRANSACTIONS',
+                        'STUDENTS', 'AMOUNT',
+                      ];
+                      final hStyle = TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: 0.3);
+                      Widget cell(int i, Widget child) => Expanded(
+                            flex: flexes[i],
+                            child: Align(
+                              alignment: i >= 2
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: child,
+                            ),
+                          );
+                      Widget rowWrap(Color bg, List<Widget> cells) =>
+                          Container(
+                            color: bg,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12.h),
+                            child: Row(children: cells),
+                          );
+                      return Column(
+                        children: [
+                          // Sticky header.
+                          rowWrap(AppColors.tableHeadBg, [
+                            for (int i = 0; i < headers.length; i++)
+                              cell(i, Text(headers[i], style: hStyle)),
+                          ]),
+                          Container(height: 1, color: AppColors.border),
                           ...methodKeys.asMap().entries.map((entry) {
                             final idx = entry.key;
                             final method = entry.value;
@@ -1110,38 +1151,98 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             double mTotal = 0;
                             final mStuIds = <String>{};
                             for (final p in items) {
-                              mTotal += (p['transtotalamount'] as num?)?.toDouble() ?? 0;
+                              mTotal += (p['transtotalamount'] as num?)
+                                      ?.toDouble() ??
+                                  0;
                               final sid = p['stu_id']?.toString();
                               if (sid != null) mStuIds.add(sid);
                             }
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
-                              DataCell(Text('${idx + 1}', style: const TextStyle(color: AppColors.textSecondary))),
-                              DataCell(Text(method, style: const TextStyle(fontWeight: FontWeight.w600))),
-                              DataCell(Text('${items.length}')),
-                              DataCell(Text('${mStuIds.length}')),
-                              DataCell(Text(_formatCurrency(mTotal), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
-                            ]);
+                            return rowWrap(
+                                idx.isEven
+                                    ? Colors.white
+                                    : AppColors.surface,
+                                [
+                                  cell(
+                                      0,
+                                      Text('${idx + 1}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textSecondary))),
+                                  cell(
+                                      1,
+                                      Text(method,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      2,
+                                      Text('${items.length}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      3,
+                                      Text('${mStuIds.length}',
+                                          style: const TextStyle(
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(
+                                      4,
+                                      Text(_formatCurrency(mTotal),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  AppColors.success))),
+                                ]);
                           }),
-                          DataRow(color: WidgetStateProperty.all(AppColors.tableHeadBg), cells: [
-                            const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text('$totalCount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text('${allStuIds.length}', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
+                          Container(height: 1, color: AppColors.border),
+                          // Grand total.
+                          rowWrap(AppColors.tableHeadBg, [
+                            cell(0, const SizedBox()),
+                            cell(
+                                1,
+                                Text('GRAND TOTAL',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                2,
+                                Text('$totalCount',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                3,
+                                Text('${allStuIds.length}',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
+                            cell(
+                                4,
+                                Text(_formatCurrency(total),
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.sp,
+                                        color: AppColors.textPrimary))),
                           ]),
                         ],
-                      ),
-                    ),
+                      );
+                    }),
                   ),
-                  );
-                })),
-              ),
+                ),
             ],
           ),
         ),
         SizedBox(height: 16.h),
-        // Individual payment list
-        Container(
+        // Individual payment list — Expanded so it fills the remaining
+        // viewport height (the inner ListView consumes the leftover space
+        // via its own Expanded). The drilldown's parent skips the outer
+        // SingleChildScrollView so this Expanded resolves to a finite size.
+        Expanded(child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1164,85 +1265,203 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               if (filtered.isEmpty)
                 const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('No payments found', style: TextStyle(color: AppColors.textSecondary))))
               else
-                Padding(
+                Expanded(child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Container(
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: LayoutBuilder(builder: (context, constraints) {
-                  return Scrollbar(
-                    controller: _paymentDetailsScrollCtrl,
-                    thumbVisibility: true,
-                    trackVisibility: true,
-                    child: SingleChildScrollView(
-                    controller: _paymentDetailsScrollCtrl,
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                      child: DataTable(dividerThickness: 1,
-                        showCheckboxColumn: false,
-                        headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-                        dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                        columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-                        columns: const [
-                          DataColumn(label: Text('S No.')),
-                          DataColumn(label: Text('PAY NO')),
-                          DataColumn(label: Text('STUDENT')),
-                          DataColumn(label: Text('COURSE')),
-                          DataColumn(label: Text('CLASS')),
-                          DataColumn(label: Text('DATE')),
-                          DataColumn(label: Text('METHOD')),
-                          DataColumn(label: Text('AMOUNT'), numeric: true),
-                        ],
-                        rows: [
-                          ...filtered.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final p = entry.value;
-                            final stuId = p['stu_id'] as int?;
-                            final stuName = p['stuname']?.toString().isNotEmpty == true ? p['stuname'].toString()
-                                : (stuId != null && _stuIdToName.containsKey(stuId)) ? _stuIdToName[stuId]!
-                                : (p['stuadmno']?.toString() ?? '-');
-                            final stuCourse = p['courname']?.toString().isNotEmpty == true ? p['courname'].toString()
-                                : (stuId != null && _stuIdToCourse.containsKey(stuId)) ? _stuIdToCourse[stuId]! : '-';
-                            final stuClass = p['stuclass']?.toString().isNotEmpty == true ? p['stuclass'].toString()
-                                : (stuId != null && _stuIdToClass.containsKey(stuId)) ? _stuIdToClass[stuId]! : '-';
-                            final amount = (p['transtotalamount'] as num?)?.toDouble() ?? 0;
-                            return DataRow(color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface), cells: [
-                              DataCell(Text('${idx + 1}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(p['paynumber']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200), child: Text(stuName, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
-                              DataCell(Text(stuCourse, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(stuClass, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(_formatDate(p['paydate']), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(p['paymethod']?.toString() ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary))),
-                              DataCell(Text(_formatCurrency(amount), style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.success))),
-                            ]);
-                          }),
-                          DataRow(color: WidgetStateProperty.all(AppColors.tableHeadBg), cells: [
-                            const DataCell(Text('')),
-                            DataCell(Text('GRAND TOTAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            const DataCell(Text('')),
-                            DataCell(Text(_formatCurrency(total), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                          ]),
-                        ],
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
                       ),
+                      child: Builder(builder: (context) {
+                        const flexes = <int>[1, 2, 3, 2, 2, 2, 2, 2];
+                        const headers = <String>[
+                          'S No.', 'PAY NO', 'STUDENT', 'COURSE',
+                          'CLASS', 'DATE', 'METHOD', 'AMOUNT',
+                        ];
+                        final hStyle = TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 0.3);
+                        const cStyle = TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary);
+                        Widget cell(int i, Widget child) => Expanded(
+                              flex: flexes[i],
+                              child: Align(
+                                alignment: i == 7
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: child,
+                              ),
+                            );
+                        return Column(
+                          children: [
+                            // Sticky header.
+                            Container(
+                              color: AppColors.tableHeadBg,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(
+                                children: [
+                                  for (int i = 0; i < headers.length; i++)
+                                    cell(i,
+                                        Text(headers[i], style: hStyle)),
+                                ],
+                              ),
+                            ),
+                            Container(height: 1, color: AppColors.border),
+                            // Scrolling body.
+                            Expanded(
+                              child: AppVerticalScrollbar(
+                                builder: (context, sc) => ListView.separated(
+                                controller: sc,
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => Divider(
+                                    height: 1,
+                                    color: AppColors.border
+                                        .withValues(alpha: 0.5)),
+                                itemBuilder: (_, idx) {
+                                  final p = filtered[idx];
+                                  final stuId = p['stu_id'] as int?;
+                                  final stuName = p['stuname']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['stuname'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToName
+                                                  .containsKey(stuId))
+                                          ? _stuIdToName[stuId]!
+                                          : (p['stuadmno']?.toString() ??
+                                              '-');
+                                  final stuCourse = p['courname']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['courname'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToCourse
+                                                  .containsKey(stuId))
+                                          ? _stuIdToCourse[stuId]!
+                                          : '-';
+                                  final stuClass = p['stuclass']
+                                              ?.toString()
+                                              .isNotEmpty ==
+                                          true
+                                      ? p['stuclass'].toString()
+                                      : (stuId != null &&
+                                              _stuIdToClass
+                                                  .containsKey(stuId))
+                                          ? _stuIdToClass[stuId]!
+                                          : '-';
+                                  final amount = (p['transtotalamount']
+                                              as num?)
+                                          ?.toDouble() ??
+                                      0;
+                                  return Container(
+                                    color: idx.isEven
+                                        ? Colors.white
+                                        : AppColors.surface,
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 11.h),
+                                    child: Row(
+                                      children: [
+                                        cell(0,
+                                            Text('${idx + 1}',
+                                                style: cStyle)),
+                                        cell(
+                                            1,
+                                            Text(
+                                                p['paynumber']
+                                                        ?.toString() ??
+                                                    '-',
+                                                style: cStyle)),
+                                        cell(
+                                            2,
+                                            Text(stuName,
+                                                overflow: TextOverflow
+                                                    .ellipsis,
+                                                style: cStyle)),
+                                        cell(3,
+                                            Text(stuCourse,
+                                                style: cStyle)),
+                                        cell(4,
+                                            Text(stuClass,
+                                                style: cStyle)),
+                                        cell(
+                                            5,
+                                            Text(
+                                                _formatDate(
+                                                    p['paydate']),
+                                                style: cStyle)),
+                                        cell(
+                                            6,
+                                            Text(
+                                                p['paymethod']
+                                                        ?.toString() ??
+                                                    '-',
+                                                style: cStyle)),
+                                        cell(
+                                            7,
+                                            Text(
+                                                _formatCurrency(amount),
+                                                style: const TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color: AppColors
+                                                        .success))),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                              ),
+                            ),
+                            // Grand total — pinned footer.
+                            Container(height: 1, color: AppColors.border),
+                            Container(
+                              color: AppColors.tableHeadBg,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(
+                                children: [
+                                  cell(0, const SizedBox()),
+                                  cell(
+                                      1,
+                                      Text('GRAND TOTAL',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14.sp,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                  cell(2, const SizedBox()),
+                                  cell(3, const SizedBox()),
+                                  cell(4, const SizedBox()),
+                                  cell(5, const SizedBox()),
+                                  cell(6, const SizedBox()),
+                                  cell(
+                                      7,
+                                      Text(_formatCurrency(total),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14.sp,
+                                              color: AppColors
+                                                  .textPrimary))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
-                  );
-                })),
-              ),
+                ),
             ],
           ),
-        ),
+        )),
       ],
     );
   }
@@ -1596,86 +1815,218 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         ),
         SizedBox(height: 12.h),
         // Fee group-wise table
-        LayoutBuilder(builder: (context, constraints) {
-          return Scrollbar(controller: _feeGroupScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeGroupScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(dividerThickness: 1,
-              showCheckboxColumn: false,
-              headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
-              dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-              columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
-              columns: const [
-                DataColumn(label: Text('S No.')),
-                DataColumn(label: Text('FEE GROUP')),
-                DataColumn(label: Text('STUDENTS'), numeric: true),
-                DataColumn(label: Text('TOTAL DEMAND'), numeric: true),
-                DataColumn(label: Text('PAID'), numeric: true),
-                DataColumn(label: Text('FINE'), numeric: true),
-                DataColumn(label: Text('BALANCE'), numeric: true),
-                DataColumn(label: Expanded(child: Text('ACTION', textAlign: TextAlign.right))),
-              ],
-              rows: groupKeys.isEmpty ? [
-                const DataRow(cells: [
-                  DataCell(Text('')), DataCell(Text('No pending fees found')), DataCell(Text('')),
-                  DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')), DataCell(Text('')),
-                ]),
-              ] : [
-                ...groupKeys.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final groupName = entry.value;
-                  final items = groupedByFeeGroup[groupName]!;
-                  double gDemand = 0, gPaid = 0, gFine = 0, gBalance = 0;
-                  final gStuIds = <String>{};
-                  for (final d in items) {
-                    gDemand += (d['feeamount'] as num?)?.toDouble() ?? 0;
-                    final pa = (d['paidamount'] as num?)?.toDouble() ?? 0;
-                    final fa = (d['fineamount'] as num?)?.toDouble() ?? 0;
-                    final isPaid = pa > 0 || d['paidstatus'] == 'P';
-                    gPaid += pa - (isPaid ? fa : 0);
-                    gFine += isPaid ? fa : 0;
-                    gBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
-                    if (((d['balancedue'] as num?)?.toDouble() ?? 0) > 0) {
-                      final sid = d['stu_id']?.toString();
-                      if (sid != null) gStuIds.add(sid);
-                    }
-                  }
-                  return DataRow(
-                    color: WidgetStateProperty.all(idx.isEven ? Colors.white : AppColors.surface),
-                    onSelectChanged: (_) => setState(() => _selectedPendingFeeGroup = groupName),
-                    cells: [
-                      DataCell(Text('${idx + 1}')),
-                      DataCell(Text(groupName, style: const TextStyle(fontWeight: FontWeight.w600))),
-                      DataCell(Text('${gStuIds.length}')),
-                      DataCell(Text(_formatCurrency(gDemand))),
-                      DataCell(Text(_formatCurrency(gPaid), style: const TextStyle(color: AppColors.success))),
-                      DataCell(Text(gFine > 0 ? _formatCurrency(gFine) : '-', style: TextStyle(color: gFine > 0 ? Colors.orange : AppColors.textSecondary))),
-                      DataCell(Text(_formatCurrency(gBalance), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
-                      DataCell(Align(
-                        alignment: Alignment.centerRight,
-                        child: AppIcon.linear('Chevron Right', size: 16, color: AppColors.textSecondary),
-                      )),
-                    ],
-                  );
-                }),
-                // Grand total row
-                DataRow(
-                  color: WidgetStateProperty.all(AppColors.tableHeadBg),
-                  cells: [
-                    const DataCell(Text('')),
-                    DataCell(Text('Total', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text('$totalStudents', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalDemand), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalPaid), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalFine), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    DataCell(Text(_formatCurrency(totalBalance), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary))),
-                    const DataCell(Text('')),
+        Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Builder(builder: (context) {
+            const flexes = <int>[1, 3, 2, 2, 2, 2, 2, 2];
+            const headers = <String>[
+              'S No.', 'FEE GROUP', 'STUDENTS', 'TOTAL DEMAND',
+              'PAID', 'FINE', 'BALANCE', 'ACTION',
+            ];
+            final hStyle = TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                letterSpacing: 0.3);
+            Widget cell(int i, Widget child) => Expanded(
+                  flex: flexes[i],
+                  child: Align(
+                    alignment: i >= 2
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: child,
+                  ),
+                );
+            Widget headerOrTotal(Color bg, List<Widget> cells) => Container(
+                  color: bg,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12.h),
+                  child: Row(children: cells),
+                );
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 420.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Sticky header.
+                  headerOrTotal(AppColors.tableHeadBg, [
+                    for (int i = 0; i < headers.length; i++)
+                      cell(i, Text(headers[i], style: hStyle)),
+                  ]),
+                  Container(height: 1, color: AppColors.border),
+                  if (groupKeys.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(28),
+                      child: Text('No pending fees found',
+                          style: TextStyle(
+                              color: AppColors.textSecondary)),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: groupKeys.length,
+                        separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: AppColors.border
+                                .withValues(alpha: 0.5)),
+                        itemBuilder: (_, idx) {
+                          final groupName = groupKeys[idx];
+                          final items = groupedByFeeGroup[groupName]!;
+                          double gDemand = 0,
+                              gPaid = 0,
+                              gFine = 0,
+                              gBalance = 0;
+                          final gStuIds = <String>{};
+                          for (final d in items) {
+                            gDemand +=
+                                (d['feeamount'] as num?)?.toDouble() ?? 0;
+                            final pa =
+                                (d['paidamount'] as num?)?.toDouble() ?? 0;
+                            final fa =
+                                (d['fineamount'] as num?)?.toDouble() ?? 0;
+                            final isPaid =
+                                pa > 0 || d['paidstatus'] == 'P';
+                            gPaid += pa - (isPaid ? fa : 0);
+                            gFine += isPaid ? fa : 0;
+                            gBalance +=
+                                (d['balancedue'] as num?)?.toDouble() ?? 0;
+                            if (((d['balancedue'] as num?)?.toDouble() ??
+                                    0) >
+                                0) {
+                              final sid = d['stu_id']?.toString();
+                              if (sid != null) gStuIds.add(sid);
+                            }
+                          }
+                          return InkWell(
+                            onTap: () => setState(() =>
+                                _selectedPendingFeeGroup = groupName),
+                            child: Container(
+                              color: idx.isEven
+                                  ? Colors.white
+                                  : AppColors.surface,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 12.h),
+                              child: Row(children: [
+                                cell(
+                                    0,
+                                    Text('${idx + 1}',
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    1,
+                                    Text(groupName,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    2,
+                                    Text('${gStuIds.length}',
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    3,
+                                    Text(_formatCurrency(gDemand),
+                                        style: const TextStyle(
+                                            color: AppColors
+                                                .textPrimary))),
+                                cell(
+                                    4,
+                                    Text(_formatCurrency(gPaid),
+                                        style: const TextStyle(
+                                            color:
+                                                AppColors.success))),
+                                cell(
+                                    5,
+                                    Text(
+                                        gFine > 0
+                                            ? _formatCurrency(gFine)
+                                            : '-',
+                                        style: TextStyle(
+                                            color: gFine > 0
+                                                ? Colors.orange
+                                                : AppColors
+                                                    .textSecondary))),
+                                cell(
+                                    6,
+                                    Text(_formatCurrency(gBalance),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.orange))),
+                                cell(
+                                    7,
+                                    AppIcon.linear('Chevron Right',
+                                        size: 16,
+                                        color:
+                                            AppColors.textSecondary)),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  if (groupKeys.isNotEmpty) ...[
+                    Container(height: 1, color: AppColors.border),
+                    headerOrTotal(AppColors.tableHeadBg, [
+                      cell(0, const SizedBox()),
+                      cell(
+                          1,
+                          Text('Total',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          2,
+                          Text('$totalStudents',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          3,
+                          Text(_formatCurrency(totalDemand),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          4,
+                          Text(_formatCurrency(totalPaid),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          5,
+                          Text(_formatCurrency(totalFine),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(
+                          6,
+                          Text(_formatCurrency(totalBalance),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary))),
+                      cell(7, const SizedBox()),
+                    ]),
                   ],
-                ),
-              ],
-            ),
-          )));
-        }),
+                ],
+              ),
+            );
+          }),
+        ),
       ],
     );
   }
@@ -1752,7 +2103,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         SizedBox(height: 12.h),
         // Fee details table
         LayoutBuilder(builder: (context, constraints) {
-          return Scrollbar(controller: _studentFeeScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: SingleChildScrollView(controller: _studentFeeScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
@@ -1817,7 +2171,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ],
             ),
-          )));
+          ))),
+          ClassicHScrollbar(controller: _studentFeeScrollCtrl),
+          ]);
         }),
       ],
     );
@@ -1924,7 +2280,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         SizedBox(height: 12.h),
         // Course + Class table
         LayoutBuilder(builder: (context, constraints) {
-          return SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: SingleChildScrollView(controller: _pendingCourseClassScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(
               dividerThickness: 1,
@@ -1989,7 +2348,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ],
             ),
-          ));
+          ))),
+          ClassicHScrollbar(controller: _pendingCourseClassScrollCtrl),
+          ]);
         }),
       ],
     );
@@ -2223,7 +2584,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         SizedBox(height: 12.h),
         // Student table
         LayoutBuilder(builder: (context, constraints) {
-          return Scrollbar(controller: _studentListScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _studentListScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: SingleChildScrollView(controller: _studentListScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
             child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
@@ -2315,7 +2679,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 ),
               ],
             ),
-          )));
+          ))),
+          ClassicHScrollbar(controller: _studentListScrollCtrl),
+          ]);
         }),
         SizedBox(height: 8.h),
         // Pagination footer
@@ -2751,8 +3117,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ),
                       ),
                     ),
-                    if (_canScrollDateList)
-                      _buildDateScrollbar(_dateListScrollCtrl),
+                    ClassicHScrollbar(controller: _dateListScrollCtrl),
                   ],
                 );
               },
@@ -3059,8 +3424,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     ),
                       ),
                     ),
-                  if (_canScrollDateDrilldown)
-                    _buildDateScrollbar(_dateDrilldownScrollCtrl),
+                  ClassicHScrollbar(controller: _dateDrilldownScrollCtrl),
                   // Pagination controls
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -3615,7 +3979,10 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       border: Border.all(color: AppColors.border),
                     ),
                     child: LayoutBuilder(builder: (context, constraints) {
-                  return Scrollbar(controller: _feeDetailScrollCtrl, thumbVisibility: true, trackVisibility: true, child: SingleChildScrollView(controller: _feeDetailScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
+                  return Column(mainAxisSize: MainAxisSize.min, children: [
+                  ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                    child: SingleChildScrollView(controller: _feeDetailScrollCtrl, scrollDirection: Axis.horizontal, child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(dividerThickness: 1,
                       showCheckboxColumn: false,
@@ -3695,7 +4062,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ),
                       ],
                     ),
-                  )));
+                  ))),
+                  ClassicHScrollbar(controller: _feeDetailScrollCtrl),
+                  ]);
                 }))),
           Padding(
             padding: EdgeInsets.fromLTRB(0, 12.h, 20.w, 16.h),
@@ -4363,6 +4732,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   String? _studentStatusFilter;
 
   final ScrollController _classTableScrollController = ScrollController();
+  final ScrollController _classBodyVerticalCtrl = ScrollController();
   final ScrollController _studentTableScrollController = ScrollController();
   final ScrollController _drilldownFeeScrollCtrl = ScrollController();
   bool _canScrollClass = false;
@@ -4424,6 +4794,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     _classTableScrollController.removeListener(_onClassScrollChanged);
     _studentTableScrollController.removeListener(_onStudentScrollChanged);
     _classTableScrollController.dispose();
+    _classBodyVerticalCtrl.dispose();
     _studentTableScrollController.dispose();
     _drilldownFeeScrollCtrl.dispose();
     super.dispose();
@@ -4567,6 +4938,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         AppIcon('book-1', size: 18, color: AppColors.accent),
                         SizedBox(width: 8.w),
                         Text('Class-Wise Fee Details', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        SizedBox(width: 8.w),
+                        Text('(${_classGroups.length} classes)', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                         const Spacer(),
                         // Search field
                         AppSearchField(
@@ -4648,6 +5021,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
 
                   // Column widths for class list table
                   const double cHMargin = 16;
+                  const double cRightExtra = 24;
                   const double cColSpacing = 20;
                   const double cSnoW = 50;
                   const double cCourseW = 90;
@@ -4661,7 +5035,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   const double cPendingW = 110;
                   const double cActionW = 130;
                   final List<double> cColWidths = [cSnoW, cCourseW, cClassW, cStudentsW, cFeeTypesW, cTotalDemandW, cPaidW, cFineW, cCollectedW, cPendingW, cActionW];
-                  final cTotalFixedWidth = cColWidths.reduce((a, b) => a + b) + (cColWidths.length - 1) * cColSpacing + 2 * cHMargin;
+                  final cTotalFixedWidth = cColWidths.reduce((a, b) => a + b) + (cColWidths.length - 1) * cColSpacing + 2 * cHMargin + cRightExtra;
                   final cTableWidth = cTotalFixedWidth > effectiveW ? cTotalFixedWidth : effectiveW;
                   final cExtraSpace = cTableWidth - cTotalFixedWidth;
                   final cSum = cColWidths.reduce((a, b) => a + b);
@@ -4687,7 +5061,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     return Container(
                       height: height,
                       color: bgColor,
-                      padding: EdgeInsets.symmetric(horizontal: cHMargin),
+                      padding: const EdgeInsets.fromLTRB(cHMargin, 0, cHMargin + cRightExtra, 0),
                       child: Row(
                         children: [
                           for (int ci = 0; ci < cells.length; ci++) ...[
@@ -4765,7 +5139,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         onTap: () => onClassTap(),
                         child: Container(
                           color: i.isEven ? Colors.white : AppColors.surface,
-                          padding: EdgeInsets.symmetric(horizontal: cHMargin, vertical: 10),
+                          padding: const EdgeInsets.fromLTRB(cHMargin, 10, cHMargin + cRightExtra, 10),
                           constraints: BoxConstraints(minHeight: 50),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4827,7 +5201,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                       cBuildCell('', 0, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell('Total', 1, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell('$_totalStudents', 2, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
-                      cBuildCell('${_classGroups.length} classes', 3, fontSize: 14.sp, color: AppColors.textPrimary),
+                      cBuildCell('', 3),
                       cBuildCell('', 4),
                       cBuildCell(_formatCurrency(_totalDemand), 5, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell(_formatCurrency(_totalPaid), 6, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
@@ -4841,43 +5215,68 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   );
 
                   _updateCanScrollClass();
-                  return Column(
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(
-                        child: SingleChildScrollView(
-                          controller: _classTableScrollController,
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(
-                            width: cTableWidth,
-                            height: constraints.maxHeight,
-                            child: Column(
-                              children: [
-                                // Fixed header
-                                classHeaderRow,
-                                // Scrollable body
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.vertical,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: classBodyChildren,
-                                    ),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                controller: _classTableScrollController,
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: cTableWidth,
+                                  height: constraints.maxHeight,
+                                  child: Column(
+                                    children: [
+                                      // Fixed header
+                                      classHeaderRow,
+                                      // Scrollable body — default scrollbar
+                                      // suppressed; the AppScrollbarBar to the
+                                      // right (outside the horizontal viewport)
+                                      // drives this scroll.
+                                      Expanded(
+                                        child: ScrollConfiguration(
+                                          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                                          child: SingleChildScrollView(
+                                            controller: _classBodyVerticalCtrl,
+                                            scrollDirection: Axis.vertical,
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                                              children: classBodyChildren,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      // Fixed footer
+                                      classFooterRow,
+                                    ],
                                   ),
                                 ),
-                                // Fixed footer
-                                classFooterRow,
-                              ],
+                              ),
                             ),
-                          ),
+                            // Horizontal scrollbar intentionally hidden — the
+                            // table still accepts mouse-wheel / trackpad scroll
+                            // via _classTableScrollController, but no visible
+                            // bar is rendered along the bottom.
+                          ],
                         ),
                       ),
-                      // Classic horizontal scrollbar with arrow buttons
-                      if (_canScrollClass)
-                        ClassicHScrollbar(
-                          controller: _classTableScrollController,
-                          contentWidth: cTableWidth,
-                          viewportWidth: viewportW,
-                        ),
+                      // Persistent vertical scrollbar in the visible viewport,
+                      // aligned with the body rows between the fixed header
+                      // and footer. Top/bottom spacers carry the same colour
+                      // as the header/footer so the bands read as continuous
+                      // full-width strips with the scrollbar only between.
+                      // `width: 16` matches AppScrollbarBar so the band shows
+                      // even when the bar collapses (no overflow case).
+                      Column(
+                        children: [
+                          Container(width: 16, height: 42, color: AppColors.tableHeadBg), // header band
+                          Expanded(child: AppScrollbarBar(controller: _classBodyVerticalCtrl)),
+                          Container(width: 16, height: 42, color: AppColors.tableHeadBg), // footer band
+                        ],
+                      ),
                     ],
                   );
                 });
@@ -5710,6 +6109,10 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   static const int _dateWisePageSize = 10;
 
   final ScrollController _tableScrollController = ScrollController();
+  // Vertical scroll for the register's body rows. Kept separate from the
+  // horizontal controller so the custom vertical scrollbar can live in the
+  // pinned viewport instead of off-screen inside the horizontal scroll.
+  final ScrollController _registerBodyController = ScrollController();
   bool _canScroll = false;
 
   @override
@@ -5726,6 +6129,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   void dispose() {
     _tableScrollController.removeListener(_onScrollChanged);
     _tableScrollController.dispose();
+    _registerBodyController.dispose();
     super.dispose();
   }
 
@@ -6411,17 +6815,17 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             const subTotalBg = AppColors.tableHeadBg;
 
                             // Column widths: SNO, RECPT.NO, ROLL NO, NAME, COURSE, CLASS, ...feeTypes, TOTAL
-                            const double colSpacing = 12;
-                            const double hMargin = 8;
+                            const double colSpacing = 8;
+                            const double hMargin = 6;
                             const double snoW = 40;
                             const double recptW = 80;
                             const double admnW = 100;   // ROLL NO — fits 12-digit numbers
                             const double nameW = 140;
                             const double courseW = 80;
-                            const double classW = 110;  // CLASS — fits "B.E CSE -II" / "B.TECH (IT) -III"
-                            const double feeColW = 70;  // each fee type column (short codes)
-                            const double fineColW = 60;
-                            const double totalColW = 80;
+                            const double classW = 80;
+                            const double feeColW = 75;  // each fee type column (short codes)
+                            const double fineColW = 75;
+                            const double totalColW = 90;
                             final int feeCount = activeDisplayFeeTypes.length;
 
                             // Build column widths list (FINE col before TOTAL)
@@ -6591,138 +6995,69 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               height: 40,
                             );
 
-                            return SingleChildScrollView(
-                              controller: _tableScrollController,
-                              scrollDirection: Axis.horizontal,
-                              child: SizedBox(
-                                width: tableWidth,
-                                height: constraints.maxHeight,
-                                child: Column(
-                                  children: [
-                                    // Fixed header
-                                    headerRow,
-                                    // Scrollable body
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                                          children: bodyChildren,
-                                        ),
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Horizontally-scrolling table viewport
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    controller: _tableScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: tableWidth,
+                                      height: constraints.maxHeight,
+                                      child: Column(
+                                        children: [
+                                          // Fixed header
+                                          headerRow,
+                                          // Scrollable body — the framework
+                                          // scrollbar is suppressed; the pinned
+                                          // bar on the right drives it.
+                                          Expanded(
+                                            child: ScrollConfiguration(
+                                              behavior: ScrollConfiguration.of(context)
+                                                  .copyWith(scrollbars: false),
+                                              child: SingleChildScrollView(
+                                                controller: _registerBodyController,
+                                                scrollDirection: Axis.vertical,
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                  children: bodyChildren,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          // Fixed footer
+                                          footerRow,
+                                        ],
                                       ),
                                     ),
-                                    // Fixed footer
-                                    footerRow,
+                                  ),
+                                ),
+                                // Vertical scrollbar pinned to the viewport so
+                                // it's always reachable without scrolling the
+                                // table horizontally. Top/bottom spacers carry
+                                // the header/footer colour so the bands read
+                                // as continuous full-width strips. `width: 16`
+                                // matches AppScrollbarBar so the bands keep
+                                // their width even when the bar collapses.
+                                Column(
+                                  children: [
+                                    Container(width: 16, height: 40, color: AppColors.tableHeadBg), // header band
+                                    Expanded(child: AppScrollbarBar(controller: _registerBodyController)),
+                                    Container(width: 16, height: 40, color: AppColors.tableHeadBg), // footer band
                                   ],
                                 ),
-                              ),
+                              ],
                             );
                           },
                         )),
-                        // Classic horizontal scrollbar with arrow buttons
+                        // Modern horizontal scrollbar — matches Class-wise
+                        // Demand styling. Widths self-derive from the
+                        // controller since tableWidth is computed inside the
+                        // inner LayoutBuilder above.
                         if (_canScroll)
-                          Container(
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF0F0F0),
-                              border: Border(top: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                            ),
-                            child: Row(
-                              children: [
-                                // Left arrow button
-                                InkWell(
-                                  onTap: () {
-                                    _tableScrollController.animateTo(
-                                      (_tableScrollController.offset - 100).clamp(0.0, _tableScrollController.position.maxScrollExtent),
-                                      duration: const Duration(milliseconds: 200),
-                                      curve: Curves.easeOut,
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFE0E0E0),
-                                      border: Border(right: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                    ),
-                                    child: AppIcon.linear('Chevron Left', size: 16, color: const Color(0xFF333333)),
-                                  ),
-                                ),
-                                // Scrollbar track + thumb
-                                Expanded(
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final maxExtent = _tableScrollController.hasClients &&
-                                              _tableScrollController.positions.isNotEmpty &&
-                                              _tableScrollController.position.hasContentDimensions
-                                          ? _tableScrollController.position.maxScrollExtent
-                                          : 1.0;
-                                      final viewportWidth = _tableScrollController.hasClients &&
-                                              _tableScrollController.positions.isNotEmpty &&
-                                              _tableScrollController.position.hasContentDimensions
-                                          ? _tableScrollController.position.viewportDimension
-                                          : constraints.maxWidth;
-                                      final totalContentWidth = maxExtent + viewportWidth;
-                                      final thumbRatio = (viewportWidth / totalContentWidth).clamp(0.1, 1.0);
-                                      final thumbWidth = (constraints.maxWidth * thumbRatio).clamp(30.0, constraints.maxWidth);
-                                      final trackSpace = constraints.maxWidth - thumbWidth;
-                                      final scrollRatio = maxExtent > 0 ? (_tableScrollController.offset / maxExtent).clamp(0.0, 1.0) : 0.0;
-                                      final thumbOffset = trackSpace * scrollRatio;
-
-                                      return GestureDetector(
-                                        onHorizontalDragUpdate: (details) {
-                                          if (trackSpace > 0) {
-                                            final newRatio = ((thumbOffset + details.delta.dx) / trackSpace).clamp(0.0, 1.0);
-                                            _tableScrollController.jumpTo(newRatio * maxExtent);
-                                          }
-                                        },
-                                        child: Container(
-                                          color: const Color(0xFFF0F0F0),
-                                          height: 20,
-                                          child: Stack(
-                                            children: [
-                                              Positioned(
-                                                left: thumbOffset,
-                                                top: 2,
-                                                child: Container(
-                                                  width: thumbWidth,
-                                                  height: 16,
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFFC0C0C0),
-                                                    borderRadius: BorderRadius.circular(2),
-                                                    border: Border.all(color: const Color(0xFFB0B0B0)),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                // Right arrow button
-                                InkWell(
-                                  onTap: () {
-                                    _tableScrollController.animateTo(
-                                      (_tableScrollController.offset + 100).clamp(0.0, _tableScrollController.position.maxScrollExtent),
-                                      duration: const Duration(milliseconds: 200),
-                                      curve: Curves.easeOut,
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFE0E0E0),
-                                      border: Border(left: BorderSide(color: Color(0xFFD0D0D0), width: 1)),
-                                    ),
-                                    child: AppIcon.linear('Chevron Right', size: 16, color: const Color(0xFF333333)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ClassicHScrollbar(controller: _tableScrollController),
                       ],
                     )))),
                 ],

@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
@@ -15,6 +16,7 @@ import '../../services/supabase_service.dart';
 import '../../models/payment_model.dart';
 import '../../models/student_model.dart';
 import '../../widgets/receipt_widget.dart';
+import '../../utils/receipt_pdf.dart';
 import '../../utils/friendly_error.dart';
 
 class FailedTransactionsScreen extends StatefulWidget {
@@ -77,12 +79,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     return filtered;
   }
 
-  // 'all' | 'paid' | 'failed' — toggled by tapping the summary cards.
-  String _statusFilter = 'all';
+  // null = main view with summary cards; 'all' | 'paid' | 'failed' =
+  // an in-place drill-down opened by tapping a summary card.
+  String? _drilldownFilter;
 
   List<PaymentModel> get _allTransactions {
     final List<PaymentModel> all;
-    switch (_statusFilter) {
+    switch (_drilldownFilter ?? 'all') {
       case 'paid':
         all = [..._paidTransactions];
         break;
@@ -107,9 +110,35 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     _fetchData();
   }
 
+  /// Opens an in-place drill-down filtered to [filter].
+  void _openDrilldown(String filter) {
+    setState(() => _drilldownFilter = filter);
+  }
+
+  void _closeDrilldown() {
+    setState(() => _drilldownFilter = null);
+  }
+
+  String _drilldownTitle() {
+    switch (_drilldownFilter) {
+      case 'paid':
+        return 'Paid Transactions';
+      case 'failed':
+        return 'Failed Transactions';
+      default:
+        return 'All Transactions';
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
+    for (final c in _hCtrls.values) {
+      c.dispose();
+    }
+    for (final c in _vCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -353,7 +382,15 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
+  /// Builds the receipt PDF via the shared B5 builder so every screen
+  /// produces the identical Figma receipt design.
   Future<pw.Document> _buildReceiptPdf(PaymentModel t) async {
+    final data = await _buildReceiptData(t);
+    return buildReceiptPdf(data);
+  }
+
+  // ignore: unused_element
+  Future<pw.Document> _legacyReceiptPdf(PaymentModel t) async {
     final data = await _buildReceiptData(t);
 
     final font = await PdfGoogleFonts.montserratRegular();
@@ -718,12 +755,16 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDrilldown = _drilldownFilter != null;
     return Column(
       children: [
-        // Summary cards
-        _buildSummaryCards(),
-        SizedBox(height: 10.h),
-
+        if (isDrilldown)
+          _buildDrilldownHeader()
+        else ...[
+          // Summary cards
+          _buildSummaryCards(),
+          SizedBox(height: 10.h),
+        ],
         // 3. Combined header + table card
         Expanded(
           child: Container(
@@ -749,57 +790,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                             ),
                       ),
                       const Spacer(),
-                      AppSearchField(
-                        controller: _searchController,
-                        hintText: 'Search by name, pay no, reference...',
-                        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
-                        width: 320,
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? Padding(
-                                padding: const EdgeInsets.only(right: 10),
-                                child: IconButton(
-                                  icon: const AppIcon('close-circle', size: 14),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _searchQuery = '');
-                                  },
-                                  splashRadius: 12,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              )
-                            : null,
-                      ),
-                      SizedBox(width: AppBtn.gap(context)),
-                      SizedBox(
-                        height: AppBtn.height(context),
-                        child: OutlinedButton.icon(
-                          onPressed: _openDateRangeDialog,
-                          icon: AppIcon.linear('calendar', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                          label: Text(
-                            _dateRangeLabel(),
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 14.w),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: AppBtn.gap(context)),
-                      SizedBox(
-                        height: AppBtn.height(context),
-                        child: ElevatedButton.icon(
-                          onPressed: _fetchData,
-                          icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
-                          label: const Text('Refresh'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
+                      // In drill-down mode these move to the back-button card.
+                      if (!isDrilldown) ..._toolbarActions(),
                     ],
                   ),
                 ),
@@ -814,6 +806,136 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Search + date/method filter + refresh — shared by the table-card
+  /// header (main view) and the drill-down header card.
+  List<Widget> _toolbarActions() {
+    return [
+      AppSearchField(
+        controller: _searchController,
+        hintText: 'Search by name, pay no, reference...',
+        onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+        width: 320,
+        suffixIcon: _searchQuery.isNotEmpty
+            ? Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: IconButton(
+                  icon: const AppIcon('close-circle', size: 14),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  splashRadius: 12,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              )
+            : null,
+      ),
+      SizedBox(width: AppBtn.gap(context)),
+      SizedBox(
+        height: AppBtn.height(context),
+        child: OutlinedButton.icon(
+          onPressed: _openDateRangeDialog,
+          icon: AppIcon.linear('calendar',
+              size: AppBtn.iconSize(context), color: AppColors.textPrimary),
+          label: Text(_dateRangeLabel(),
+              style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary)),
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            side: const BorderSide(color: AppColors.border),
+          ),
+        ),
+      ),
+      SizedBox(width: AppBtn.gap(context)),
+      SizedBox(
+        height: AppBtn.height(context),
+        child: ElevatedButton.icon(
+          onPressed: _fetchData,
+          icon: AppIcon('refresh',
+              size: AppBtn.iconSize(context), color: Colors.white),
+          label: const Text('Refresh'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+        ),
+      ),
+    ];
+  }
+
+  /// Drill-down header — Back button + breadcrumb inside a white card,
+  /// matching the Fee Collection › Total Collection drill-down design.
+  Widget _buildDrilldownHeader() {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final radius = compact ? 6.0 : 10.0;
+    final textSize = compact ? 11.0 : 13.0;
+    final innerGap = compact ? 4.0 : 6.0;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10.h),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: _closeDrilldown,
+              borderRadius: BorderRadius.circular(radius),
+              child: Container(
+                height: AppBtn.height(context),
+                padding: EdgeInsets.symmetric(horizontal: hPad),
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(radius),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIcon.linear('Chevron Left',
+                        size: AppBtn.iconSize(context), color: Colors.white),
+                    SizedBox(width: innerGap),
+                    Text('Back',
+                        style: TextStyle(
+                            fontSize: textSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Container(width: 1, height: 18, color: AppColors.border),
+            SizedBox(width: 12.w),
+            Text('Transactions',
+                style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary)),
+            SizedBox(width: 6.w),
+            AppIcon.linear('Chevron Right',
+                size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 6.w),
+            Text(_drilldownTitle(),
+                style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
+            const Spacer(),
+            ..._toolbarActions(),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1091,9 +1213,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredPaid.length} transactions',
             Colors.green,
             'tick-circle',
-            selected: _statusFilter == 'paid',
-            onTap: () => setState(() =>
-                _statusFilter = _statusFilter == 'paid' ? 'all' : 'paid'),
+            onTap: () => _openDrilldown('paid'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1104,9 +1224,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             '${filteredFailed.length} transactions',
             Colors.red,
             'info-circle',
-            selected: _statusFilter == 'failed',
-            onTap: () => setState(() =>
-                _statusFilter = _statusFilter == 'failed' ? 'all' : 'failed'),
+            onTap: () => _openDrilldown('failed'),
           ),
         ),
         SizedBox(width: 16.w),
@@ -1117,8 +1235,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             'All records',
             AppColors.primary,
             'receipt-2',
-            selected: _statusFilter == 'all',
-            onTap: () => setState(() => _statusFilter = 'all'),
+            onTap: () => _openDrilldown('all'),
           ),
         ),
       ],
@@ -1127,77 +1244,92 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
   Widget _buildSummaryCard(
       String title, String value, String subtitle, Color color, String icon,
-      {bool selected = false, VoidCallback? onTap}) {
+      {VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10.r),
+      borderRadius: BorderRadius.circular(14.r),
       child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? color.withValues(alpha: 0.06) : Colors.white,
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: selected ? color : AppColors.border, width: selected ? 1.5 : 1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8.r),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: AppIcon(icon, color: color, size: 22),
             ),
-            child: AppIcon(icon, color: color, size: 16),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                    color: color,
+                  SizedBox(height: 4.h),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 21.sp,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                      height: 1.1,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    color: AppColors.textSecondary.withValues(alpha: 0.7),
+                  SizedBox(height: 4.h),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary.withValues(alpha: 0.85),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+            SizedBox(width: 8.w),
+            AppIcon.linear('Chevron Right',
+                size: 18, color: AppColors.textSecondary),
+          ],
+        ),
       ),
     );
   }
 
   // ── Sticky-header table ──
-  static const _txColWidths = <double>[60, 90, 180, 110, 120, 100, 90, 100, 160, 110, 90, 140];
+  static const _txColWidths = <double>[60, 110, 100, 180, 110, 120, 120, 100, 160, 90, 140];
   static const _txHeaders = <String>[
-    'S NO.', 'PAY NO', 'STUDENT', 'COURSE', 'CLASS', 'AMOUNT',
-    'CURRENCY', 'METHOD', 'REFERENCE', 'DATE', 'STATUS', 'DOWNLOAD RECEIPT',
+    'S NO.', 'DATE', 'RECEIPT NO', 'NAME', 'COURSE', 'CLASS',
+    'PAYMENT METHOD', 'AMOUNT', 'REFERENCE', 'STATUS', 'DOWNLOAD RECEIPT',
   ];
 
   // Persistent horizontal scroll controllers per tab so the scrollbar thumb tracks scroll state
   final Map<String, ScrollController> _hCtrls = {};
   ScrollController _hCtrlFor(String key) => _hCtrls.putIfAbsent(key, () => ScrollController());
+
+  // Vertical scroll controllers, one per table (all/paid/failed). Kept
+  // separate from the horizontal ones so the custom vertical scrollbar can
+  // live in a lane pinned to the viewport instead of off-screen at the
+  // far-right edge of the (wider) horizontally-scrolling content.
+  final Map<String, ScrollController> _vCtrls = {};
+  ScrollController _vCtrlFor(String key) => _vCtrls.putIfAbsent(key, () => ScrollController());
 
   Widget _buildStickyTable(List<PaymentModel> transactions, {bool? fixedIsPaid}) {
     final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
@@ -1206,6 +1338,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     final baseTotal = _txColWidths.fold<double>(0, (a, b) => a + b) + 32;
     final ctrlKey = fixedIsPaid == null ? 'all' : (fixedIsPaid ? 'paid' : 'failed');
     final hController = _hCtrlFor(ctrlKey);
+    final vController = _vCtrlFor(ctrlKey);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
@@ -1217,14 +1350,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           border: Border.all(color: AppColors.border),
         ),
         child: LayoutBuilder(builder: (ctx, constraints) {
-          final viewportW = constraints.maxWidth;
+          // The vertical scrollbar always occupies a 16px lane on the right,
+          // so the horizontal viewport for the content is that much narrower.
+          const vBarWidth = 16.0;
+          final viewportW = constraints.maxWidth - vBarWidth;
           final needsHScroll = baseTotal > viewportW;
           // If viewport is wider than the base width, scale columns up proportionally
           // so the table fills the available width. Otherwise keep fixed widths and scroll.
           final scale = needsHScroll ? 1.0 : (viewportW / baseTotal);
           final widths = [for (final w in _txColWidths) w * scale];
           final contentWidth = needsHScroll ? baseTotal : viewportW;
-          final scrollbarHeight = needsHScroll ? 20.0 : 0.0;
+          final scrollbarHeight = needsHScroll ? 16.0 : 0.0;
 
           Widget headerRow = Container(
             color: AppColors.tableHeadBg,
@@ -1256,17 +1392,16 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
               child: Row(
                 children: [
                   SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
-                  SizedBox(width: widths[1], child: Text(t.paynumber ?? '—', style: cellStyle)),
-                  SizedBox(width: widths[2], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: widths[3], child: Text(stu?.courname ?? '-', style: cellStyle)),
-                  SizedBox(width: widths[4], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
-                  SizedBox(width: widths[5], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
-                  SizedBox(width: widths[6], child: Text(t.transcurrency, style: cellStyle)),
-                  SizedBox(width: widths[7], child: Text(t.paymethod ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[1], child: Text(dateStr, style: cellStyle)),
+                  SizedBox(width: widths[2], child: Text(t.paynumber ?? '—', style: cellStyle)),
+                  SizedBox(width: widths[3], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
+                  SizedBox(width: widths[4], child: Text(stu?.courname ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[5], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[6], child: Text(t.paymethod ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[7], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
                   SizedBox(width: widths[8], child: Text(t.payreference ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: widths[9], child: Text(dateStr, style: cellStyle)),
                   SizedBox(
-                    width: widths[10],
+                    width: widths[9],
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
@@ -1276,43 +1411,74 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       ),
                     ),
                   ),
-                  SizedBox(width: widths[11], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
+                  SizedBox(width: widths[10], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                 ],
               ),
             );
           }
 
-          final body = ListView.separated(
-            itemCount: transactions.length,
-            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
-            itemBuilder: (_, i) => bodyRow(i),
+          // Body list — framework scrollbar suppressed; the pinned bar on the
+          // right drives it instead.
+          final body = ScrollConfiguration(
+            behavior: ScrollConfiguration.of(ctx).copyWith(scrollbars: false),
+            child: ListView.separated(
+              controller: vController,
+              itemCount: transactions.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
+              itemBuilder: (_, i) => bodyRow(i),
+            ),
           );
 
           return Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  controller: hController,
-                  scrollDirection: Axis.horizontal,
-                  physics: needsHScroll ? null : const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: contentWidth,
-                    height: constraints.maxHeight - scrollbarHeight,
-                    child: Column(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: hController,
+                        scrollDirection: Axis.horizontal,
+                        physics: needsHScroll ? null : const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: contentWidth,
+                          height: constraints.maxHeight - scrollbarHeight,
+                          child: Column(
+                            children: [
+                              headerRow,
+                              Container(height: 1, color: AppColors.border),
+                              Expanded(child: body),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Vertical scrollbar pinned to the viewport — top spacer
+                    // carries the header colour so the band reads as a
+                    // continuous full-width strip with the bar only below it.
+                    Column(
                       children: [
-                        headerRow,
-                        Container(height: 1, color: AppColors.border),
-                        Expanded(child: body),
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
+                        Expanded(child: AppScrollbarBar(controller: vController)),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
               if (needsHScroll)
-                ClassicHScrollbar(
-                  controller: hController,
-                  contentWidth: contentWidth,
-                  viewportWidth: viewportW,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClassicHScrollbar(
+                        controller: hController,
+                        contentWidth: contentWidth,
+                        viewportWidth: viewportW,
+                      ),
+                    ),
+                    // Corner gap aligning the horizontal bar with the content
+                    // viewport, not the vertical scrollbar lane.
+                    const SizedBox(width: vBarWidth),
+                  ],
                 ),
             ],
           );

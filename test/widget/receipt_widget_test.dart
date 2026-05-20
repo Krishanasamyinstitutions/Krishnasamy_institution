@@ -70,8 +70,11 @@ void main() {
       _setSurfaceSize(tester);
       await tester.pumpWidget(_wrap(ReceiptWidget(data: _sampleReceipt())));
       await tester.pump();
-      expect(find.textContaining('TEST STUDENT'), findsWidgets);
-      expect(find.textContaining('SF25/00091'), findsWidgets);
+      // Name / Receipt No render inside RichText kv-rows.
+      expect(find.textContaining('TEST STUDENT', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('SF25/00091', findRichText: true),
+          findsWidgets);
     });
 
     testWidgets('renders school name and address', (tester) async {
@@ -91,15 +94,15 @@ void main() {
       expect(find.textContaining('6'), findsWidgets);
     });
 
-    testWidgets('renders Paid badge when status=paid and reconStatus=R',
-        (tester) async {
+    testWidgets('renders RECEIPT title and cashier footer', (tester) async {
       _setSurfaceSize(tester);
-      await tester.pumpWidget(_wrap(
-        ReceiptWidget(data: _sampleReceipt(status: 'paid', reconStatus: 'R')),
-      ));
+      await tester.pumpWidget(_wrap(ReceiptWidget(data: _sampleReceipt())));
       await tester.pump();
-      // The widget shows a "PAID" stamp with status colour for fully reconciled
-      expect(find.textContaining('PAID', findRichText: true), findsWidgets);
+      // B5 design: centered RECEIPT title + a Cashier signature line.
+      expect(find.textContaining('RECEIPT', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('Cashier', findRichText: true),
+          findsWidgets);
     });
 
     testWidgets('renders multiple terms', (tester) async {
@@ -120,10 +123,16 @@ void main() {
         ),
       )));
       await tester.pump();
-      expect(find.textContaining('I SEMESTER'), findsWidgets);
-      expect(find.textContaining('II SEMESTER'), findsWidgets);
-      expect(find.textContaining('BOOK FEES'), findsWidgets);
-      expect(find.textContaining('SCHOOL FEES'), findsWidgets);
+      // Distinct terms appear in the RichText "Semester" kv-row; fee types
+      // appear in the particulars list.
+      expect(find.textContaining('I SEMESTER', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('II SEMESTER', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('BOOK FEES', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('SCHOOL FEES', findRichText: true),
+          findsWidgets);
     });
 
     testWidgets('overflow paginates into multiple pages', (tester) async {

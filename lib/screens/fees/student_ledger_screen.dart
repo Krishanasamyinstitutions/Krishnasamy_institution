@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:excel/excel.dart' as xl;
 import 'package:file_picker/file_picker.dart';
 import '../../utils/app_theme.dart';
@@ -33,6 +34,11 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   String? _selectedClass;
   final Map<String, List<StudentModel>> _cachedClassStudents = {};
   bool _loadingStudents = false;
+
+  // Single-open accordion state for the course list — opening one course
+  // auto-collapses any previously open course.
+  String? _expandedCourse;
+  final Map<String, ExpansibleController> _courseExpansionCtrls = {};
 
   // Search in student list
   final _searchController = TextEditingController();
@@ -365,9 +371,31 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                               k: rawClassCounts[k]!,
                           };
                           final courseTotal = classCounts.values.fold<int>(0, (s, c) => s + c);
+                          final controller = _courseExpansionCtrls.putIfAbsent(
+                            courseName,
+                            () => ExpansibleController(),
+                          );
 
                           return ExpansionTile(
-                            initiallyExpanded: false,
+                            key: PageStorageKey<String>('course-$courseName'),
+                            controller: controller,
+                            initiallyExpanded: _expandedCourse == courseName,
+                            onExpansionChanged: (isExpanded) {
+                              if (isExpanded) {
+                                final prev = _expandedCourse;
+                                if (prev != null && prev != courseName) {
+                                  final prevCtrl = _courseExpansionCtrls[prev];
+                                  try {
+                                    prevCtrl?.collapse();
+                                  } catch (_) {
+                                    // Controller not attached (tile off-screen).
+                                  }
+                                }
+                                setState(() => _expandedCourse = courseName);
+                              } else if (_expandedCourse == courseName) {
+                                setState(() => _expandedCourse = null);
+                              }
+                            },
                             tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
                             title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
                             trailing: Row(
@@ -528,7 +556,9 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   ),
                   Container(height: 1, color: AppColors.border),
                   Expanded(
-                    child: ListView.separated(
+                    child: AppVerticalScrollbar(
+                      builder: (context, scrollCtrl) => ListView.separated(
+                      controller: scrollCtrl,
                       itemCount: students.length,
                       separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
                       itemBuilder: (context, i) {
@@ -557,6 +587,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           ),
                         );
                       },
+                    ),
                     ),
                   ),
                 ],
@@ -617,8 +648,10 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           ),
         ),
 
-        // Table header
-        Container(
+        // Table header + rows, sharing a reserved scrollbar lane
+        Expanded(
+          child: AppVerticalScrollbar(
+            header: Container(
           color: AppColors.tableHeadBg,
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
@@ -633,14 +666,12 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             ],
           ),
         ),
-
-        // Rows
-        Expanded(
-          child: _loadingStudents
+            builder: (context, controller) => _loadingStudents
               ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
               : students.isEmpty
                   ? Center(child: Text('No students found', style: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400)))
                   : ListView.separated(
+                      controller: controller,
                       itemCount: students.length,
                       separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
                       itemBuilder: (context, i) {
@@ -668,6 +699,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         );
                       },
                     ),
+            ),
         ),
       ],
     );
@@ -802,6 +834,11 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         ),
         child: Column(
       children: [
+        Expanded(
+          child: AppVerticalScrollbar(
+            header: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
         // ── Column header ──
         Container(
           color: AppColors.tableHeadBg,
@@ -820,10 +857,9 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           ),
         ),
         Container(height: 1, color: AppColors.border),
-
-        // ── Data rows ──
-        Expanded(
-          child: rows.isEmpty
+              ],
+            ),
+            builder: (context, controller) => rows.isEmpty
               ? Column(
                   children: [
                     Expanded(
@@ -842,6 +878,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   ],
                 )
               : ListView.separated(
+                  controller: controller,
                   itemCount: rows.length,
                   separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEEEEEE)),
                   itemBuilder: (context, i) {
@@ -939,6 +976,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     );
                   },
                 ),
+            ),
         ),
 
         // ── Footer ──

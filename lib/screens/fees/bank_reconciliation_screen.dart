@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/pill_tab.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:excel/excel.dart' hide Border, BorderStyle;
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
@@ -280,13 +281,13 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             // total of all receipts sharing this reference must match the
             // bank amount (handles a single UTR split across multiple
             // receipts the same way cheques are grouped below).
-            if ((payMethod == 'qr_upi' || payMethod == 'razorpay') &&
+            if ((payMethod == 'upi' || payMethod == 'qr_upi' || payMethod == 'razorpay') &&
                 _normalizeReference(payRef).contains(normalizedBankRef)) {
               final refPayments = _pendingPayments
                   .where((p) {
                     final pm = p['paymethod']?.toString() ?? '';
                     final pr = p['payreference']?.toString() ?? '';
-                    return (pm == 'qr_upi' || pm == 'razorpay') &&
+                    return (pm == 'upi' || pm == 'qr_upi' || pm == 'razorpay') &&
                         !usedPayIds.contains(p['pay_id']) &&
                         _normalizeReference(pr).contains(normalizedBankRef);
                   })
@@ -658,7 +659,12 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                       ? Center(child: Text('No pending payments for reconciliation', style: TextStyle(color: AppColors.textSecondary)))
                       : Column(
                           children: [
-                        // Header
+                        // Header + rows, sharing a reserved scrollbar lane
+                        Expanded(
+                          child: AppVerticalScrollbar(
+                            header: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                           color: AppColors.tableHeadBg,
@@ -689,9 +695,10 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                           ),
                         ),
                         const Divider(height: 1),
-                        // Rows
-                        Expanded(
-                          child: SingleChildScrollView(
+                              ],
+                            ),
+                            builder: (context, controller) => SingleChildScrollView(
+                            controller: controller,
                             child: Column(
                               children: [
                                 ...filteredPending.asMap().entries.map((entry) {
@@ -725,6 +732,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                                 }),
                               ],
                             ),
+                          ),
                           ),
                         ),
                       ],
@@ -847,7 +855,12 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
               ),
               child: Column(
                 children: [
-                  // Table header
+                  // Table header + rows, sharing a reserved scrollbar lane
+                  Expanded(
+                    child: AppVerticalScrollbar(
+                      header: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
@@ -863,8 +876,9 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                     ),
                   ),
                   const Divider(height: 1),
-                  Expanded(
-                    child: _bankStatementRows.isEmpty
+                        ],
+                      ),
+                      builder: (context, controller) => _bankStatementRows.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
@@ -876,6 +890,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                             ),
                           )
                         : SingleChildScrollView(
+                            controller: controller,
                             child: Column(
                               children: [
                                 ..._bankStatementRows.asMap().entries.map((entry) {
@@ -924,6 +939,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                               ],
                             ),
                           ),
+                      ),
                   ),
                 ],
               ),
@@ -988,6 +1004,11 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
             ? Center(child: Text('No reconciled payments yet', style: TextStyle(color: AppColors.textSecondary)))
             : Column(
                 children: [
+                  Expanded(
+                    child: AppVerticalScrollbar(
+                      header: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
                     color: AppColors.tableHeadBg,
@@ -1005,8 +1026,10 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                     ),
                   ),
                   const Divider(height: 1),
-                  Expanded(
-                    child: SingleChildScrollView(
+                        ],
+                      ),
+                      builder: (context, controller) => SingleChildScrollView(
+                      controller: controller,
                       child: Column(
                         children: [
                           ...pageRows.asMap().entries.map((entry) {
@@ -1032,6 +1055,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                           }),
                         ],
                       ),
+                    ),
                     ),
                   ),
                   if (filteredReconciled.length > _reconciledPageSize)
@@ -1117,6 +1141,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         return 'Cash';
       case 'razorpay':
         return 'Razorpay';
+      case 'upi':
       case 'qr_upi':
         return 'Bank';
       case 'cheque':

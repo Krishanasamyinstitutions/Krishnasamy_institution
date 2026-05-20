@@ -290,6 +290,27 @@ class AppTheme {
           color: AppColors.textPrimary,
         ),
       ),
+      // Always-visible scrollbars — app-wide, on tables and any vertical
+      // (or horizontal) overflow area. Prominent thumb so it reads clearly.
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStateProperty.all(true),
+        trackVisibility: WidgetStateProperty.all(true),
+        interactive: true,
+        thickness: WidgetStateProperty.all(13),
+        radius: const Radius.circular(7),
+        crossAxisMargin: 0,
+        mainAxisMargin: 0,
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.dragged)) {
+            return AppColors.primary;
+          }
+          return AppColors.primary.withValues(alpha: 0.70);
+        }),
+        // Solid, clearly-visible track lane + a defined edge.
+        trackColor: WidgetStateProperty.all(const Color(0xFFC9CED6)),
+        trackBorderColor: WidgetStateProperty.all(const Color(0xFF9AA2AE)),
+      ),
     );
   }
 
