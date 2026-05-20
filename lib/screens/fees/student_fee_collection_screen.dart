@@ -14,6 +14,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
 import '../../utils/receipt_pdf.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/receipt_widget.dart';
 
@@ -1177,8 +1178,10 @@ class _StudentFeeCollectionScreenState
         ),
         child: Column(
       children: [
-        // Table header
-        Container(
+        // Table header + rows, sharing a reserved scrollbar lane
+        Expanded(
+          child: AppVerticalScrollbar(
+            header: Container(
           color: AppColors.tableHeadBg,
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
@@ -1220,10 +1223,8 @@ class _StudentFeeCollectionScreenState
             ],
           ),
         ),
-
-        // Rows
-        Expanded(
-          child: ListView.separated(
+            builder: (context, controller) => ListView.separated(
+            controller: controller,
             itemCount: demands.length,
             separatorBuilder: (_, __) =>
                 const Divider(height: 1, color: Color(0xFFEEEEEE)),
@@ -1358,6 +1359,7 @@ class _StudentFeeCollectionScreenState
               );
             },
           ),
+            ),
         ),
 
         // Footer

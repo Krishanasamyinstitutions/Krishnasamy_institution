@@ -13,6 +13,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import '../../utils/friendly_error.dart';
 
@@ -2149,9 +2150,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 border: Border.all(color: AppColors.border),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  Container(
+              child: AppVerticalScrollbar(
+                header: Container(
                     color: AppColors.tableHeadBg,
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                     child: Row(
@@ -2163,10 +2163,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: ListView.separated(
+                builder: (context, controller) => ListView.separated(
+                      controller: controller,
                       itemCount: students.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
                       itemBuilder: (ctx, i) {
                         final s = students[i];
                         return InkWell(
@@ -2186,9 +2186,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         );
                       },
                     ),
-                  ),
-                ],
-              ),
+                ),
             ),
           ),
         ] else
@@ -3048,7 +3046,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 children: [
                   header,
                   Container(height: 1, color: AppColors.border),
-                  Expanded(child: ListView(children: rowWidgets)),
+                  Expanded(
+                    child: AppVerticalScrollbar(
+                      builder: (context, sc) =>
+                          ListView(controller: sc, children: rowWidgets),
+                    ),
+                  ),
                 ],
               )
             : Column(
@@ -4008,10 +4011,15 @@ class _StickyTable extends StatefulWidget {
 
 class _StickyTableState extends State<_StickyTable> {
   final ScrollController _hController = ScrollController();
+  // Vertical scroll for the body rows. Kept separate so the custom vertical
+  // scrollbar can live in a lane pinned to the viewport, instead of off-screen
+  // at the far-right edge of the (wider) horizontally-scrolling content.
+  final ScrollController _vController = ScrollController();
 
   @override
   void dispose() {
     _hController.dispose();
+    _vController.dispose();
     super.dispose();
   }
 
@@ -4090,11 +4098,15 @@ class _StickyTableState extends State<_StickyTable> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final needsScroll = baseTotal > constraints.maxWidth;
-        final scale = needsScroll ? 1.0 : (constraints.maxWidth / baseTotal);
+        // The vertical scrollbar always occupies a 16px lane on the right, so
+        // the horizontal viewport for the table content is that much narrower.
+        const vBarWidth = 16.0;
+        final hViewport = constraints.maxWidth - vBarWidth;
+        final needsScroll = baseTotal > hViewport;
+        final scale = needsScroll ? 1.0 : (hViewport / baseTotal);
         final widths = [for (final c in widget.columnWidths) c.w * scale];
-        final width = needsScroll ? baseTotal : constraints.maxWidth;
-        final scrollbarHeight = needsScroll ? 20.0 : 0.0;
+        final width = needsScroll ? baseTotal : hViewport;
+        final scrollbarHeight = needsScroll ? 16.0 : 0.0;
         return Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -4105,36 +4117,70 @@ class _StickyTableState extends State<_StickyTable> {
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  controller: _hController,
-                  scrollDirection: Axis.horizontal,
-                  physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: width,
-                    height: constraints.maxHeight - scrollbarHeight,
-                    child: Column(
-                      children: [
-                        rowWidget(widget.headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
-                        Container(height: 1, color: AppColors.border),
-                        Expanded(
-                          child: ListView.separated(
-                            itemCount: widget.rows.length,
-                            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
-                            itemBuilder: (_, i) => rowWidget(widget.rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: _hController,
+                        scrollDirection: Axis.horizontal,
+                        physics: needsScroll ? null : const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: width,
+                          height: constraints.maxHeight - scrollbarHeight,
+                          child: Column(
+                            children: [
+                              rowWidget(widget.headers, widths, bg: AppColors.tableHeadBg, style: headerStyle),
+                              Container(height: 1, color: AppColors.border),
+                              Expanded(
+                                // Suppress the framework scrollbar; the pinned
+                                // bar on the right drives this list instead.
+                                child: ScrollConfiguration(
+                                  behavior: ScrollConfiguration.of(context)
+                                      .copyWith(scrollbars: false),
+                                  child: ListView.separated(
+                                    controller: _vController,
+                                    itemCount: widget.rows.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
+                                    itemBuilder: (_, i) => rowWidget(widget.rows[i], widths, bg: i.isEven ? Colors.white : AppColors.surface),
+                                  ),
+                                ),
+                              ),
+                              Container(height: 1, color: AppColors.border),
+                              rowWidget(widget.footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                            ],
                           ),
                         ),
-                        Container(height: 1, color: AppColors.border),
-                        rowWidget(widget.footer, widths, bg: AppColors.tableHeadBg, style: footerStyle),
+                      ),
+                    ),
+                    // Vertical scrollbar pinned to the viewport — top/bottom
+                    // spacers carry the header/footer colour so each band
+                    // reads as a continuous full-width strip with the bar
+                    // only between them.
+                    Column(
+                      children: [
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
+                        Expanded(child: AppScrollbarBar(controller: _vController)),
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
               if (needsScroll)
-                ClassicHScrollbar(
-                  controller: _hController,
-                  contentWidth: width,
-                  viewportWidth: constraints.maxWidth,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClassicHScrollbar(
+                        controller: _hController,
+                        contentWidth: width,
+                        viewportWidth: hViewport,
+                      ),
+                    ),
+                    // Corner gap so the horizontal bar lines up with the
+                    // content viewport, not the vertical scrollbar lane.
+                    const SizedBox(width: vBarWidth),
+                  ],
                 ),
             ],
           ),
@@ -4161,13 +4207,15 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
   final _hCtrl = ScrollController();
   final _vCtrl = ScrollController();
 
+  // Widths picked so every uppercase header fits on one line (TRANSACTION
+  // DATE / PAYMENT MODE / SETTLEMENT DATE are the long ones).
   static const _colWidths = <double>[
-    120, 220, 110, 130, 140, 110, 130, 90, 200, 100, 90, 240, 140,
+    120, 220, 110, 130, 170, 140, 130, 90, 200, 100, 90, 240, 170,
   ];
   static const _headers = <String>[
-    'Roll No', 'Name', 'Course', 'Class',
-    'Transaction Date', 'Payment Mode', 'Doc No', 'Term', 'Fee Type',
-    'Amount', 'Fine', 'Bank Name', 'Settlement Date',
+    'ROLL NO', 'NAME', 'COURSE', 'CLASS',
+    'TRANSACTION DATE', 'PAYMENT MODE', 'DOC NO', 'TERM', 'FEE TYPE',
+    'AMOUNT', 'FINE', 'BANK NAME', 'SETTLEMENT DATE',
   ];
   static const _numericColumns = <int>{9, 10};
 
@@ -4178,13 +4226,16 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
     super.dispose();
   }
 
-  Widget _headerCell(int i) {
+  Widget _headerCell(int i, double w) {
     return Container(
-      width: _colWidths[i],
+      width: w,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
       child: Text(
         _headers[i],
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
         style: TextStyle(
           fontSize: 13.sp,
           fontWeight: FontWeight.w700,
@@ -4195,9 +4246,9 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
     );
   }
 
-  Widget _bodyCell(int i, String text) {
+  Widget _bodyCell(int i, String text, double w) {
     return Container(
-      width: _colWidths[i],
+      width: w,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       alignment: _numericColumns.contains(i) ? Alignment.centerRight : Alignment.centerLeft,
       child: Text(
@@ -4214,80 +4265,110 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
 
   @override
   Widget build(BuildContext context) {
-    double tableWidth = 0;
+    double baseWidth = 0;
     for (final w in _colWidths) {
-      tableWidth += w;
+      baseWidth += w;
     }
 
     return LayoutBuilder(builder: (_, constraints) {
-      final viewportWidth = constraints.maxWidth;
-      final needsScroll = tableWidth > viewportWidth;
+      // Reserve 16px for the pinned vertical scrollbar lane.
+      final viewportWidth = (constraints.maxWidth - 16).clamp(0.0, double.infinity);
+      final needsScroll = baseWidth > viewportWidth;
+      // When the viewport is wider than the fixed total, distribute the
+      // extra space proportionally so the columns fill the row instead of
+      // leaving a gap on the right.
+      final tableWidth = needsScroll ? baseWidth : viewportWidth;
+      final extra = tableWidth - baseWidth;
+      final List<double> adj = _colWidths
+          .map((w) => w + (extra * w / baseWidth))
+          .toList(growable: false);
+      // Header padding (vertical 12) + ~18px text line ≈ 42, plus the 1px
+      // divider below.
+      const headerH = 43.0;
       return Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              controller: _hCtrl,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: tableWidth,
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        color: AppColors.tableHeadBg,
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.border, width: 1),
-                        ),
-                      ),
-                      child: Row(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _hCtrl,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: tableWidth,
+                      child: Column(
                         children: [
-                          for (int i = 0; i < _headers.length; i++) _headerCell(i),
+                          Container(
+                            decoration: const BoxDecoration(
+                              color: AppColors.tableHeadBg,
+                              border: Border(
+                                bottom: BorderSide(color: AppColors.border, width: 1),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                for (int i = 0; i < _headers.length; i++) _headerCell(i, adj[i]),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            // Framework scrollbar suppressed — the pinned bar
+                            // on the right (outside the horizontal scroll)
+                            // drives the vertical scroll instead.
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: ListView.builder(
+                                controller: _vCtrl,
+                                itemCount: widget.rows.length,
+                                itemBuilder: (_, idx) {
+                                  final r = widget.rows[idx];
+                                  final amt = (r['amount'] as num?)?.toDouble() ?? 0;
+                                  final fine = (r['fine'] as num?)?.toDouble() ?? 0;
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: idx.isEven ? Colors.white : AppColors.surface,
+                                      border: const Border(
+                                        bottom: BorderSide(color: AppColors.border, width: 0.5),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        _bodyCell(0, r['stuadmno']?.toString() ?? '', adj[0]),
+                                        _bodyCell(1, r['stuname']?.toString() ?? '', adj[1]),
+                                        _bodyCell(2, r['courname']?.toString() ?? '', adj[2]),
+                                        _bodyCell(3, r['stuclass']?.toString() ?? '', adj[3]),
+                                        _bodyCell(4, widget.fmt(r['paydate']), adj[4]),
+                                        _bodyCell(5, r['paymethod']?.toString() ?? '', adj[5]),
+                                        _bodyCell(6, r['docno']?.toString() ?? '', adj[6]),
+                                        _bodyCell(7, r['demfeeterm']?.toString() ?? '', adj[7]),
+                                        _bodyCell(8, r['demfeetype']?.toString() ?? '', adj[8]),
+                                        _bodyCell(9, amt.toStringAsFixed(2), adj[9]),
+                                        _bodyCell(10, fine.toStringAsFixed(2), adj[10]),
+                                        _bodyCell(11, r['banname']?.toString() ?? '', adj[11]),
+                                        _bodyCell(12, widget.fmt(r['settlement_date']), adj[12]),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Expanded(
-                      child: Scrollbar(
-                        controller: _vCtrl,
-                        thumbVisibility: true,
-                        child: ListView.builder(
-                          controller: _vCtrl,
-                          itemCount: widget.rows.length,
-                          itemBuilder: (_, idx) {
-                            final r = widget.rows[idx];
-                            final amt = (r['amount'] as num?)?.toDouble() ?? 0;
-                            final fine = (r['fine'] as num?)?.toDouble() ?? 0;
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: idx.isEven ? Colors.white : AppColors.surface,
-                                border: const Border(
-                                  bottom: BorderSide(color: AppColors.border, width: 0.5),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  _bodyCell(0, r['stuadmno']?.toString() ?? ''),
-                                  _bodyCell(1, r['stuname']?.toString() ?? ''),
-                                  _bodyCell(2, r['courname']?.toString() ?? ''),
-                                  _bodyCell(3, r['stuclass']?.toString() ?? ''),
-                                  _bodyCell(4, widget.fmt(r['paydate'])),
-                                  _bodyCell(5, r['paymethod']?.toString() ?? ''),
-                                  _bodyCell(6, r['docno']?.toString() ?? ''),
-                                  _bodyCell(7, r['demfeeterm']?.toString() ?? ''),
-                                  _bodyCell(8, r['demfeetype']?.toString() ?? ''),
-                                  _bodyCell(9, amt.toStringAsFixed(2)),
-                                  _bodyCell(10, fine.toStringAsFixed(2)),
-                                  _bodyCell(11, r['banname']?.toString() ?? ''),
-                                  _bodyCell(12, widget.fmt(r['settlement_date'])),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  ),
+                ),
+                // Pinned vertical scrollbar — sits outside the horizontal
+                // scroll so it stays in the viewport. The top spacer carries
+                // the header colour so the band reads as one continuous strip.
+                Column(
+                  children: [
+                    Container(width: 16, height: headerH, color: AppColors.tableHeadBg),
+                    Expanded(child: AppScrollbarBar(controller: _vCtrl)),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
           if (needsScroll)

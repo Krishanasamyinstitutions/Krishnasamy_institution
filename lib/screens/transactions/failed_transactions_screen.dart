@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:file_picker/file_picker.dart';
@@ -132,6 +133,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    for (final c in _hCtrls.values) {
+      c.dispose();
+    }
+    for (final c in _vCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -1317,6 +1324,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   final Map<String, ScrollController> _hCtrls = {};
   ScrollController _hCtrlFor(String key) => _hCtrls.putIfAbsent(key, () => ScrollController());
 
+  // Vertical scroll controllers, one per table (all/paid/failed). Kept
+  // separate from the horizontal ones so the custom vertical scrollbar can
+  // live in a lane pinned to the viewport instead of off-screen at the
+  // far-right edge of the (wider) horizontally-scrolling content.
+  final Map<String, ScrollController> _vCtrls = {};
+  ScrollController _vCtrlFor(String key) => _vCtrls.putIfAbsent(key, () => ScrollController());
+
   Widget _buildStickyTable(List<PaymentModel> transactions, {bool? fixedIsPaid}) {
     final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
     final headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary, letterSpacing: 0.3);
@@ -1324,6 +1338,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     final baseTotal = _txColWidths.fold<double>(0, (a, b) => a + b) + 32;
     final ctrlKey = fixedIsPaid == null ? 'all' : (fixedIsPaid ? 'paid' : 'failed');
     final hController = _hCtrlFor(ctrlKey);
+    final vController = _vCtrlFor(ctrlKey);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
@@ -1335,14 +1350,17 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
           border: Border.all(color: AppColors.border),
         ),
         child: LayoutBuilder(builder: (ctx, constraints) {
-          final viewportW = constraints.maxWidth;
+          // The vertical scrollbar always occupies a 16px lane on the right,
+          // so the horizontal viewport for the content is that much narrower.
+          const vBarWidth = 16.0;
+          final viewportW = constraints.maxWidth - vBarWidth;
           final needsHScroll = baseTotal > viewportW;
           // If viewport is wider than the base width, scale columns up proportionally
           // so the table fills the available width. Otherwise keep fixed widths and scroll.
           final scale = needsHScroll ? 1.0 : (viewportW / baseTotal);
           final widths = [for (final w in _txColWidths) w * scale];
           final contentWidth = needsHScroll ? baseTotal : viewportW;
-          final scrollbarHeight = needsHScroll ? 20.0 : 0.0;
+          final scrollbarHeight = needsHScroll ? 16.0 : 0.0;
 
           Widget headerRow = Container(
             color: AppColors.tableHeadBg,
@@ -1399,37 +1417,68 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             );
           }
 
-          final body = ListView.separated(
-            itemCount: transactions.length,
-            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
-            itemBuilder: (_, i) => bodyRow(i),
+          // Body list — framework scrollbar suppressed; the pinned bar on the
+          // right drives it instead.
+          final body = ScrollConfiguration(
+            behavior: ScrollConfiguration.of(ctx).copyWith(scrollbars: false),
+            child: ListView.separated(
+              controller: vController,
+              itemCount: transactions.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.4)),
+              itemBuilder: (_, i) => bodyRow(i),
+            ),
           );
 
           return Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  controller: hController,
-                  scrollDirection: Axis.horizontal,
-                  physics: needsHScroll ? null : const NeverScrollableScrollPhysics(),
-                  child: SizedBox(
-                    width: contentWidth,
-                    height: constraints.maxHeight - scrollbarHeight,
-                    child: Column(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: hController,
+                        scrollDirection: Axis.horizontal,
+                        physics: needsHScroll ? null : const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          width: contentWidth,
+                          height: constraints.maxHeight - scrollbarHeight,
+                          child: Column(
+                            children: [
+                              headerRow,
+                              Container(height: 1, color: AppColors.border),
+                              Expanded(child: body),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Vertical scrollbar pinned to the viewport — top spacer
+                    // carries the header colour so the band reads as a
+                    // continuous full-width strip with the bar only below it.
+                    Column(
                       children: [
-                        headerRow,
-                        Container(height: 1, color: AppColors.border),
-                        Expanded(child: body),
+                        Container(width: 16, color: AppColors.tableHeadBg, child: SizedBox(height: 12.h * 2 + 18)),
+                        Expanded(child: AppScrollbarBar(controller: vController)),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
               if (needsHScroll)
-                ClassicHScrollbar(
-                  controller: hController,
-                  contentWidth: contentWidth,
-                  viewportWidth: viewportW,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClassicHScrollbar(
+                        controller: hController,
+                        contentWidth: contentWidth,
+                        viewportWidth: viewportW,
+                      ),
+                    ),
+                    // Corner gap aligning the horizontal bar with the content
+                    // viewport, not the vertical scrollbar lane.
+                    const SizedBox(width: vBarWidth),
+                  ],
                 ),
             ],
           );

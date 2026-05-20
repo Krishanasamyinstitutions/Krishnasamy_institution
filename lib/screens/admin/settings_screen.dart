@@ -5,6 +5,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import '../../utils/friendly_error.dart';
 
@@ -1426,7 +1427,10 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                       height: 1,
                                       color: AppColors.border),
                                   Expanded(
-                                    child: ListView.separated(
+                                    child: AppVerticalScrollbar(
+                                      builder: (context, sc) =>
+                                          ListView.separated(
+                                      controller: sc,
                                       itemCount: _rules.length,
                                       separatorBuilder: (_, __) =>
                                           Divider(
@@ -1560,6 +1564,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                           ]),
                                         );
                                       },
+                                    ),
                                     ),
                                   ),
                                 ],
