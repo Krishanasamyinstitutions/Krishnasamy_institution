@@ -821,11 +821,19 @@ class SupabaseService {
   static Future<List<InstitutionUserModel>> getInstitutionUsers(
       int insId) async {
     try {
+      // Explicit column list — anon has SELECT revoked on `usepassword`
+      // (security hardening), so `select('*')` would be denied wholesale.
       final response = await client.from('institutionusers')
-          .select('*')
+          .select('use_id, ins_id, inscode, usename, usemail, usephone, '
+              'usestadate, usemaiotp, usemobotp, useotpstatus, usedob, '
+              'usecategory, ur_id, urname, des_id, desname, userepto, '
+              'approvedby, approveddate, suspendeddate, suspendedby, '
+              'terminateddate, terminatedby, activestatus, terminatedreason')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
-          .order('usename', ascending: true);
+          .order('usename', ascending: true)
+          // Don't let a slow/hung request leave the list spinning forever.
+          .timeout(const Duration(seconds: 15));
       return (response as List)
           .map((e) => InstitutionUserModel.fromJson(e))
           .toList();

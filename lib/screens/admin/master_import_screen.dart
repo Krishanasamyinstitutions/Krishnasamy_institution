@@ -766,6 +766,10 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   static const _headers = ['Class ID *', 'Class Name *', 'Active Status', 'Course ID', 'Succeeding Class', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
+  // Existing course IDs for this institution — _validate uses these to flag
+  // rows whose Course ID isn't backed by a real course (otherwise the FK
+  // insert fails silently and rows are skipped).
+  Set<int> _courIds = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -791,6 +795,12 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       // Course name by cour_id; class name by cla_id (for succeeding class lookup).
       final courseMap = { for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString() };
       final classMap = { for (final r in rows) r['cla_id'].toString(): (r['claname'] ?? '').toString() };
+      final courIdSet = courseRows
+          .map((c) => c['cour_id'] is int ? c['cour_id'] as int : int.tryParse('${c['cour_id'] ?? ''}'))
+          .whereType<int>()
+          .toSet();
+      // Sort by course, then class name, so existing rows read top-to-bottom
+      // one course at a time instead of cla_id interleaved.
       final sorted = rows.map((r) => [
         r['claname']?.toString() ?? '',
         courseMap['${r['cour_id'] ?? ''}'] ?? '',
@@ -804,6 +814,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       if (mounted) {
         setState(() {
           _existingRows = sorted;
+          _courIds = courIdSet;
           _isLoadingExisting = false;
         });
       }
@@ -851,7 +862,15 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       if (courRaw.isNotEmpty && int.tryParse(courRaw) == null) missing.add('Course ID must be integer');
       if (succRaw.isNotEmpty && int.tryParse(succRaw) == null) missing.add('Succeeding Class must be integer');
       if (actRaw.isNotEmpty && int.tryParse(actRaw) == null) missing.add('Active Status must be 0 or 1');
-      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+      if (missing.isNotEmpty) { rowErrs[i] = 'Missing: ${missing.join(', ')}'; continue; }
+      // Course ID must match an existing course for this institution before
+      // a Class can be imported (FK on class.cour_id).
+      if (courRaw.isNotEmpty && _courIds.isNotEmpty) {
+        final cid = int.tryParse(courRaw);
+        if (cid != null && !_courIds.contains(cid)) {
+          rowErrs[i] = 'Course ID "$courRaw" not found — import the course first';
+        }
+      }
     }
     setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
@@ -1089,6 +1108,10 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   static const _headers = ['Fee ID *', 'Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
+  // Lowercased fee-group names for the current institution — used by _validate
+  // to flag rows whose Fee Group doesn't exist (otherwise the server import
+  // silently skips them).
+  Set<String> _fgNames = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -1106,9 +1129,16 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     setState(() => _isLoadingExisting = true);
     try {
       final feeGroups = await SupabaseService.getFeeGroups(insId);
-      if (feeGroups.isEmpty) { if (mounted) setState(() => _isLoadingExisting = false); return; }
+      if (feeGroups.isEmpty) {
+        if (mounted) setState(() { _fgNames = {}; _isLoadingExisting = false; });
+        return;
+      }
       final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
       final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
+      final fgNameSet = feeGroups
+          .map((fg) => (fg['fgdesc']?.toString() ?? '').trim().toLowerCase())
+          .where((s) => s.isNotEmpty)
+          .toSet();
       final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id', ascending: true);
       if (mounted) setState(() {
         const fineLabels = {'1': 'Yes', '0': 'No'};
@@ -1121,6 +1151,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
             fineLabels['${t['feefineapplicable'] ?? 0}'] ?? 'No',
           ];
         }).toList();
+        _fgNames = fgNameSet;
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -1162,7 +1193,16 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+      if (missing.isNotEmpty) {
+        rowErrs[i] = 'Missing: ${missing.join(', ')}';
+        continue;
+      }
+      // Fee Group must already exist for this institution. Otherwise the
+      // server-side join in process_master_import drops the row silently.
+      final fg = (_rows[i].length > 3 ? _rows[i][3]?.toString().trim() ?? '' : '').toLowerCase();
+      if (fg.isNotEmpty && _fgNames.isNotEmpty && !_fgNames.contains(fg)) {
+        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found — import it first';
+      }
     }
     setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {

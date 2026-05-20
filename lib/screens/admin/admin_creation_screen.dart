@@ -76,6 +76,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     setState(() => _isLoading = true);
     try {
       final users = await SupabaseService.getInstitutionUsers(insId);
+      if (!mounted) return;
       setState(() => _users = users);
     } catch (e) {
       debugPrint('Error loading users: $e');

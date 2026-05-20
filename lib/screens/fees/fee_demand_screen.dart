@@ -438,8 +438,16 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         missing.add(_importFieldLabels[reqKey] ?? reqKey);
       }
     }
-    if (missing.isEmpty) return null;
-    return 'Missing: ${missing.join(', ')}';
+    if (missing.isNotEmpty) return 'Missing: ${missing.join(', ')}';
+    // Fee Type must already exist for this institution. Otherwise the row
+    // can't be linked to a feetype row and the demand is meaningless.
+    final ft = _cellByKey(row, 'demfeetype');
+    if (ft != null && _feeTypes.isNotEmpty) {
+      final ftLower = ft.toLowerCase();
+      final ok = _feeTypes.any((f) => f.toLowerCase() == ftLower);
+      if (!ok) return 'Fee Type "$ft" not found — import it first';
+    }
+    return null;
   }
 
   String? _cellByKey(List<dynamic> row, String fieldKey) {
@@ -2012,18 +2020,20 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     // Remove default Sheet1
     excel.delete('Sheet1');
 
+    // Asterisk marks columns the importer requires (matches _requiredFields:
+    // stuadmno, stuclass, demfeetype, yr_id, demfeeterm, feeamount, duedate).
     final headers = [
       'Demand No',
-      'Roll No',
-      'Class',
+      'Roll No *',
+      'Class *',
       'Course',
-      'Fee Type',
-      'Fee Year',
-      'Semester',
+      'Fee Type *',
+      'Fee Year *',
+      'Semester *',
       'Concession',
-      'Fee Amount',
+      'Fee Amount *',
       'Concession Amount',
-      'Due Date',
+      'Due Date *',
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2074,7 +2084,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final sheet = excel['Fee Demands'];
     excel.delete('Sheet1');
 
-    final headers = ['Demand No', 'Roll No', 'Class', 'Course', 'Fee Type', 'Fee Year', 'Semester', 'Concession', 'Fee Amount', 'Concession Amount', 'Due Date'];
+    final headers = ['Demand No', 'Roll No *', 'Class *', 'Course', 'Fee Type *', 'Fee Year *', 'Semester *', 'Concession', 'Fee Amount *', 'Concession Amount', 'Due Date *'];
     final sampleRows = [
       ['', 'CS001', 'I Year', 'BSC-CS', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
       ['', 'CS001', 'I Year', 'BSC-CS', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],

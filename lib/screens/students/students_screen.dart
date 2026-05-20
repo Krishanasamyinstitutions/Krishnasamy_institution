@@ -2128,7 +2128,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   /// Auto-map header text to field key (case-insensitive)
   static String _autoMapHeader(String header) {
-    final h = header.trim().toLowerCase();
+    // Strip the trailing "*" used to flag mandatory columns in our templates
+    // ("Roll No *" → "roll no") so re-uploaded templates still auto-map.
+    final h = header.replaceAll('*', '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     const map = {
       'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno', 'roll no': 'stuadmno', 'rollno': 'stuadmno', 'roll number': 'stuadmno',
       'name': 'stuname', 'student name': 'stuname', 'stuname': 'stuname',
@@ -2281,13 +2283,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final sheet = excel['Students'];
     excel.delete('Sheet1');
 
+    // Asterisk marks the columns the importer requires
+    // (_importRequiredFields = stuadmno, stuname, stugender, stuclass,
+    // payincharge, payinchargemob).
     final headers = [
-      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Roll No *', 'Name *', 'Gender *', 'DOB', 'Admission Date', 'Class *', 'Course', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
-      'Payment In Charge', 'Payment Mobile',
+      'Payment In Charge *', 'Payment Mobile *',
       'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
 
@@ -2338,12 +2343,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
     excel.delete('Sheet1');
 
     final headers = [
-      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Roll No *', 'Name *', 'Gender *', 'DOB', 'Admission Date', 'Class *', 'Course', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
-      'Payment In Charge', 'Payment Mobile',
+      'Payment In Charge *', 'Payment Mobile *',
       'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
     final sampleRows = [
