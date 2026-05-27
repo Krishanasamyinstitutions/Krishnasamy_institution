@@ -105,7 +105,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
   List<String> _importHeaders = [];
   List<List<dynamic>> _importRows = [];
   bool _importValidated = false;
-  Map<int, String> _rowErrors = {}; // rowIndex -> error message
+  Map<int, String> _rowErrors = {}; // rowIndex -> tooltip message (composed from cell errors)
+  Map<int, Map<String, String>> _cellErrors = {}; // rowIndex -> {fieldKey -> reason}
   List<String?> _importMappings = [];
   int _importStep = 0; // 0=grid, 2=importing, 3=done
   int _importedCount = 0;
@@ -114,8 +115,15 @@ class _StudentsScreenState extends State<StudentsScreen> {
   List<String> _importErrors = [];
   String? _importErrorMsg;
 
+  // Class + course masters cached at file-pick time so _validateImportRow can
+  // reject rows whose class/course doesn't exist or whose class→course
+  // mapping disagrees with the master.
+  Set<String> _importClassNames = {};         // normalized claname
+  Set<String> _importCourseNames = {};        // normalized courname
+  Map<String, String?> _importClassToCourse = {}; // normalized claname → normalized course name (from class.cour_id)
+
   static const _importGridKeys = [
-    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'stuclass', 'courname',
+    'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'courname', 'stuclass',
     'stumobile', 'stuemail', 'concession',
     'stuaddress', 'stucity', 'stustate', 'stucountry',
     'stupin', 'stubloodgrp',
@@ -773,7 +781,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             .eq('ins_id', insId);
         successes.add(fileName);
       } catch (e) {
-        failed.add('$fileName: ${e.toString()}');
+        failed.add('$fileName: ${friendlyError(e)}');
       } finally {
         if (mounted) setState(() => _photoUploadDone++);
       }
@@ -826,12 +834,29 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   List<StudentModel> get _filteredStudents {
     final q = _searchController.text.toLowerCase();
-    if (q.isEmpty) return _students;
-    return _students.where((s) =>
-      s.stuname.toLowerCase().contains(q) ||
-      s.stuadmno.toLowerCase().contains(q) ||
-      s.stuclass.toLowerCase().contains(q),
-    ).toList();
+    final filtered = q.isEmpty
+        ? List<StudentModel>.from(_students)
+        : _students.where((s) =>
+            s.stuname.toLowerCase().contains(q) ||
+            s.stuadmno.toLowerCase().contains(q) ||
+            s.stuclass.toLowerCase().contains(q),
+          ).toList();
+    // Sort by course ordid → class ordid → name so the main list mirrors the
+    // sidebar grouping (which is also driven by the same master ordids).
+    int courseOrd(StudentModel s) =>
+        _courseOrdMap[(s.courname ?? '').trim()] ?? 1 << 30;
+    int classOrd(StudentModel s) =>
+        _classOrdMap[s.stuclass.trim()] ?? 1 << 30;
+    filtered.sort((a, b) {
+      final ca = courseOrd(a);
+      final cb = courseOrd(b);
+      if (ca != cb) return ca.compareTo(cb);
+      final la = classOrd(a);
+      final lb = classOrd(b);
+      if (la != lb) return la.compareTo(lb);
+      return a.stuname.toLowerCase().compareTo(b.stuname.toLowerCase());
+    });
+    return filtered;
   }
 
   /// Group filtered students by class, ordered by [_classOrder].
@@ -1291,7 +1316,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           onTap: () => _populateStudentForm(s),
                           child: Container(
                             color: index.isEven ? Colors.white : AppColors.surface,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
                             child: Row(
                               children: [
                                 Expanded(flex: 1, child: Text('$serialNo', style: cellStyle)),
@@ -1423,7 +1448,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                           _populateStudentForm(s);
                         },
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 6.h),
                           color: index.isEven ? Colors.white : AppColors.surface,
                           child: Row(
                             children: [
@@ -1887,6 +1912,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
             style: _inputStyle,
             keyboardType: TextInputType.emailAddress,
           )),
+          _fieldFull(label: 'Course', child: TextFormField(
+            initialValue: _selectedStudent?.courname ?? '',
+            decoration: _dec('Course'),
+            style: _inputStyle,
+            enabled: false,
+          )),
+        ),
+        SizedBox(height: 14.h),
+
+        _row3(
           _fieldFull(label: 'Class *', child: Builder(builder: (_) {
             final classOptions = [
               ..._classes,
@@ -1907,16 +1942,6 @@ class _StudentsScreenState extends State<StudentsScreen> {
               validator: (v) => v == null ? 'Required' : null,
             );
           })),
-        ),
-        SizedBox(height: 14.h),
-
-        _row3(
-          _fieldFull(label: 'Course', child: TextFormField(
-            initialValue: _selectedStudent?.courname ?? '',
-            decoration: _dec('Course'),
-            style: _inputStyle,
-            enabled: false,
-          )),
           _fieldFull(label: 'Blood Group', child: DropdownButtonFormField<String>(
             initialValue: _selectedBloodGroup,
             isExpanded: true,
@@ -1928,54 +1953,75 @@ class _StudentsScreenState extends State<StudentsScreen> {
             items: _bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
           )),
-          _fieldFull(label: 'Concession', child: DropdownButtonFormField<String>(
-            initialValue: _selectedConId,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            elevation: 6,
-            decoration: _dec('Select concession'),
-            style: _inputStyle,
-            items: _concessions.map((c) => DropdownMenuItem(
-              value: c['con_id'].toString(),
-              child: Text(c['condesc'], overflow: TextOverflow.ellipsis),
-            )).toList(),
-            onChanged: (v) => setState(() {
-              _selectedConId = v;
-            }),
-          )),
+          _fieldFull(label: 'Concession', child: Builder(builder: (_) {
+            // Dedupe by con_id — duplicate master rows would otherwise crash
+            // DropdownButton with "2 or more items with the same value".
+            final seen = <String>{};
+            final items = <DropdownMenuItem<String>>[];
+            for (final c in _concessions) {
+              final v = c['con_id']?.toString();
+              if (v == null || !seen.add(v)) continue;
+              items.add(DropdownMenuItem(value: v, child: Text((c['condesc'] ?? '').toString(), overflow: TextOverflow.ellipsis)));
+            }
+            final value = seen.contains(_selectedConId) ? _selectedConId : null;
+            return DropdownButtonFormField<String>(
+              initialValue: value,
+              isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
+              decoration: _dec('Select concession'),
+              style: _inputStyle,
+              items: items,
+              onChanged: (v) => setState(() => _selectedConId = v),
+            );
+          })),
         ),
         SizedBox(height: 14.h),
 
         _row3(
-          _fieldFull(label: 'Admission Type', child: DropdownButtonFormField<String>(
-            initialValue: _selectedAdmName,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            elevation: 6,
-            decoration: _dec('Select admission type'),
-            style: _inputStyle,
-            items: _admissionTypes.map((a) => DropdownMenuItem(
-              value: a['admname']?.toString(),
-              child: Text(a['admname']?.toString() ?? '', overflow: TextOverflow.ellipsis),
-            )).toList(),
-            onChanged: (v) => setState(() => _selectedAdmName = v),
-          )),
-          _fieldFull(label: 'Quota', child: DropdownButtonFormField<String>(
-            initialValue: _selectedQuoName,
-            isExpanded: true,
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            elevation: 6,
-            decoration: _dec('Select quota'),
-            style: _inputStyle,
-            items: _quotas.map((q) => DropdownMenuItem(
-              value: q['quoname']?.toString(),
-              child: Text(q['quoname']?.toString() ?? '', overflow: TextOverflow.ellipsis),
-            )).toList(),
-            onChanged: (v) => setState(() => _selectedQuoName = v),
-          )),
+          _fieldFull(label: 'Admission Type', child: Builder(builder: (_) {
+            final seen = <String>{};
+            final items = <DropdownMenuItem<String>>[];
+            for (final a in _admissionTypes) {
+              final v = a['admname']?.toString();
+              if (v == null || v.isEmpty || !seen.add(v)) continue;
+              items.add(DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis)));
+            }
+            final value = seen.contains(_selectedAdmName) ? _selectedAdmName : null;
+            return DropdownButtonFormField<String>(
+              initialValue: value,
+              isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
+              decoration: _dec('Select admission type'),
+              style: _inputStyle,
+              items: items,
+              onChanged: (v) => setState(() => _selectedAdmName = v),
+            );
+          })),
+          _fieldFull(label: 'Quota', child: Builder(builder: (_) {
+            final seen = <String>{};
+            final items = <DropdownMenuItem<String>>[];
+            for (final q in _quotas) {
+              final v = q['quoname']?.toString();
+              if (v == null || v.isEmpty || !seen.add(v)) continue;
+              items.add(DropdownMenuItem(value: v, child: Text(v, overflow: TextOverflow.ellipsis)));
+            }
+            final value = seen.contains(_selectedQuoName) ? _selectedQuoName : null;
+            return DropdownButtonFormField<String>(
+              initialValue: value,
+              isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
+              decoration: _dec('Select quota'),
+              style: _inputStyle,
+              items: items,
+              onChanged: (v) => setState(() => _selectedQuoName = v),
+            );
+          })),
           _fieldFull(label: 'Batch', child: TextFormField(
             controller: _batchController,
             decoration: _dec('e.g. 2024-2028'),
@@ -2128,7 +2174,9 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   /// Auto-map header text to field key (case-insensitive)
   static String _autoMapHeader(String header) {
-    final h = header.trim().toLowerCase();
+    // Strip the trailing "*" used to flag mandatory columns in our templates
+    // ("Roll No *" → "roll no") so re-uploaded templates still auto-map.
+    final h = header.replaceAll('*', '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     const map = {
       'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno', 'roll no': 'stuadmno', 'rollno': 'stuadmno', 'roll number': 'stuadmno',
       'name': 'stuname', 'student name': 'stuname', 'stuname': 'stuname',
@@ -2221,6 +2269,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _importErrors = [];
       _importErrorMsg = null;
       _rowErrors = {};
+      _cellErrors = {};
     });
   }
 
@@ -2271,8 +2320,127 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _importStep = 1;
         _importErrorMsg = null;
       });
+      await _loadImportMasters();
     } catch (e) {
-      setState(() => _importErrorMsg = 'Failed to parse file: $e');
+      setState(() => _importErrorMsg = friendlyError(e));
+    }
+  }
+
+  /// Fetch class + course masters so _validateImportRow can flag rows whose
+  /// class/course doesn't exist or whose mapping disagrees with the master.
+  Future<void> _loadImportMasters() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    try {
+      final results = await Future.wait([
+        SupabaseService.fromSchema('class')
+            .select('cla_id, claname, cour_id')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1),
+        SupabaseService.fromSchema('course')
+            .select('cour_id, courname')
+            .eq('ins_id', insId),
+      ]);
+      final classRows = results[0] as List;
+      final courseRows = results[1] as List;
+      final courNameById = <int, String>{
+        for (final c in courseRows)
+          if (c['cour_id'] is int && (c['courname']?.toString() ?? '').isNotEmpty)
+            c['cour_id'] as int: c['courname'].toString().trim(),
+      };
+      final classNames = <String>{};
+      final classToCourse = <String, String?>{};
+      for (final r in classRows) {
+        final name = (r['claname']?.toString() ?? '').trim();
+        if (name.isEmpty) continue;
+        final k = norm(name);
+        classNames.add(k);
+        final cid = r['cour_id'];
+        if (cid is int && courNameById.containsKey(cid)) {
+          classToCourse[k] = norm(courNameById[cid]!);
+        }
+      }
+      final courseNames = courNameById.values.map(norm).toSet();
+      if (mounted) {
+        setState(() {
+          _importClassNames = classNames;
+          _importCourseNames = courseNames;
+          _importClassToCourse = classToCourse;
+        });
+      }
+    } catch (e) {
+      debugPrint('Load import masters failed: $e');
+    }
+  }
+
+  /// Export the currently-loaded rows back to Excel with an extra "Error"
+  /// column populated for each failed row, so the user can fix the issues
+  /// offline and re-import the corrected file.
+  Future<void> _exportImportRowsWithErrors() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Students'];
+    excel.delete('Sheet1');
+
+    final origHeaders = List<String>.from(_importHeaders);
+    final headers = [...origHeaders, 'Error'];
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+    final errorCellStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FFFCE4E4'),
+    );
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, i == headers.length - 1 ? 40.0 : 18.0);
+    }
+    sheet.setRowHeight(0, 32);
+
+    for (int r = 0; r < _importRows.length; r++) {
+      final row = _importRows[r];
+      final cellErrs = _cellErrors[r] ?? const <String, String>{};
+      for (int c = 0; c < origHeaders.length; c++) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+        final raw = c < row.length ? row[c].toString() : '';
+        cell.value = xl.TextCellValue(raw);
+        final mappedKey = c < _importMappings.length ? _importMappings[c] : null;
+        if (mappedKey != null && cellErrs.containsKey(mappedKey)) {
+          cell.cellStyle = errorCellStyle;
+        }
+      }
+      // Error column
+      final errorCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: origHeaders.length, rowIndex: r + 1));
+      errorCell.value = xl.TextCellValue(_rowErrors[r] ?? '');
+      if (cellErrs.isNotEmpty) errorCell.cellStyle = errorCellStyle;
+    }
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save File with Errors',
+        fileName: 'student_import_errors.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error report exported'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -2281,13 +2449,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final sheet = excel['Students'];
     excel.delete('Sheet1');
 
+    // Asterisk marks the columns the importer requires
+    // (_importRequiredFields = stuadmno, stuname, stugender, stuclass,
+    // payincharge, payinchargemob).
     final headers = [
-      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Roll No *', 'Name *', 'Gender *', 'DOB', 'Admission Date', 'Course', 'Class *', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
-      'Payment In Charge', 'Payment Mobile',
+      'Payment In Charge *', 'Payment Mobile *',
       'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
 
@@ -2338,19 +2509,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
     excel.delete('Sheet1');
 
     final headers = [
-      'Roll No', 'Name', 'Gender', 'DOB', 'Admission Date', 'Class', 'Course', 'Mobile', 'Email', 'Concession',
+      'Roll No *', 'Name *', 'Gender *', 'DOB', 'Admission Date', 'Course', 'Class *', 'Mobile', 'Email', 'Concession',
       'Address', 'City', 'State', 'Country', 'PIN', 'Blood Group',
       'Father Name', 'Father Mobile', 'Father Occupation',
       'Mother Name', 'Mother Mobile', 'Mother Occupation',
       'Guardian Name', 'Guardian Mobile', 'Guardian Occupation',
-      'Payment In Charge', 'Payment Mobile',
+      'Payment In Charge *', 'Payment Mobile *',
       'Admission Type', 'Quota', 'Batch', 'Admitted Year',
     ];
     final sampleRows = [
-      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'I Year', 'BSC-CS', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210', 'GEN', 'GQ', '2025-2026', '25-26'],
-      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'I Year', 'BSC-CS', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220', 'GEN', 'GQ', '2025-2026', '25-26'],
-      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'II Year', 'BBA', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230', 'GEN', 'GQ', '2025-2026', '25-26'],
-      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'I Year', 'MCA', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['CS001', 'RAHUL KUMAR', 'Male', '2004-06-15', '2025-06-01', 'BSC-CS', 'I Year', '9876543210', 'rahul@email.com', 'GENERAL', 'No.5 Main Street', 'Chennai', 'Tamil Nadu', 'India', '600001', 'B+', 'KUMAR S', '9876543210', 'Business', 'LAKSHMI K', '9876543211', 'Teacher', '', '', '', 'KUMAR S', '9876543210', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['CS002', 'PRIYA S', 'Female', '2004-03-22', '2025-06-01', 'BSC-CS', 'I Year', '9876543220', '', 'GENERAL', 'No.10 Anna Nagar', 'Chennai', 'Tamil Nadu', 'India', '600040', 'O+', 'SENTHIL S', '9876543220', 'Engineer', 'MEENA S', '9876543221', 'Homemaker', '', '', '', 'SENTHIL S', '9876543220', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['BBA001', 'ARUN M', 'Male', '2003-11-08', '2025-06-01', 'BBA', 'II Year', '9876543230', 'arun@email.com', 'GENERAL', 'No.15 Park Road', 'Madurai', 'Tamil Nadu', 'India', '625001', 'A+', 'MURUGAN A', '9876543230', 'Doctor', 'SELVI M', '9876543231', 'Nurse', '', '', '', 'MURUGAN A', '9876543230', 'GEN', 'GQ', '2025-2026', '25-26'],
+      ['MCA001', 'DIVYA R', 'Female', '2002-08-30', '2025-06-01', 'MCA', 'I Year', '9876543240', '', 'GENERAL', 'No.20 Lake View', 'Coimbatore', 'Tamil Nadu', 'India', '641001', 'AB+', 'RAJAN D', '9876543240', 'Farmer', 'KALA R', '9876543241', 'Homemaker', '', '', '', 'RAJAN D', '9876543240', 'GEN', 'GQ', '2025-2026', '25-26'],
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2431,17 +2602,57 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return regex.hasMatch(e) ? e : null;
   }
 
-  String? _validateImportRow(int rowIdx) {
+  /// Per-field validation. Returns a map of fieldKey → reason for every cell
+  /// that's invalid. Empty map means the row passes.
+  Map<String, String> _validateImportRow(int rowIdx) {
     final row = _importRows[rowIdx];
-    final missing = <String>[];
+    final errors = <String, String>{};
     for (final reqKey in _importRequiredFields) {
       final colIdx = _importMappings.indexOf(reqKey);
       if (colIdx < 0 || colIdx >= row.length || row[colIdx].toString().trim().isEmpty) {
-        missing.add(_importGridLabels[reqKey] ?? _importFields[reqKey] ?? reqKey);
+        errors[reqKey] = 'Required';
       }
     }
-    if (missing.isEmpty) return null;
-    return 'Missing: ${missing.join(', ')}';
+    // Class + course must exist in the master and (if both supplied) agree
+    // with the class-course mapping. Skip if masters haven't loaded yet —
+    // server enforces too.
+    String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    final classRaw = (_importCellByKey(row, 'stuclass') ?? '').trim();
+    final courseRaw = (_importCellByKey(row, 'courname') ?? '').trim();
+    if (classRaw.isNotEmpty && _importClassNames.isNotEmpty) {
+      final k = norm(classRaw);
+      if (!_importClassNames.contains(k)) {
+        errors['stuclass'] = 'Class "$classRaw" not found in master';
+      } else if (courseRaw.isNotEmpty && _importCourseNames.isNotEmpty) {
+        final ck = norm(courseRaw);
+        if (!_importCourseNames.contains(ck)) {
+          errors['courname'] = 'Course "$courseRaw" not found in master';
+        } else {
+          final expected = _importClassToCourse[k];
+          if (expected != null && expected != ck) {
+            errors['courname'] = 'Class "$classRaw" belongs to "$expected"';
+          }
+        }
+      }
+    }
+    return errors;
+  }
+
+  /// Compose a row-level tooltip from the per-field errors.
+  String _composeRowError(Map<String, String> fieldErrors) {
+    final missing = <String>[];
+    final detail = <String>[];
+    fieldErrors.forEach((k, v) {
+      if (v == 'Required') {
+        missing.add(_importGridLabels[k] ?? _importFields[k] ?? k);
+      } else {
+        detail.add(v);
+      }
+    });
+    final parts = <String>[];
+    if (missing.isNotEmpty) parts.add('Missing: ${missing.join(', ')}');
+    parts.addAll(detail);
+    return parts.join(' • ');
   }
 
   static String _friendlyError(String msg) {
@@ -2472,22 +2683,27 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   void _validateImportData() {
-    final errors = <int, String>{};
+    final cellErrors = <int, Map<String, String>>{};
+    final rowErrors = <int, String>{};
     for (int i = 0; i < _importRows.length; i++) {
-      final err = _validateImportRow(i);
-      if (err != null) errors[i] = err;
+      final fields = _validateImportRow(i);
+      if (fields.isNotEmpty) {
+        cellErrors[i] = fields;
+        rowErrors[i] = _composeRowError(fields);
+      }
     }
     setState(() {
-      _rowErrors = errors;
-      _importValidated = errors.isEmpty;
+      _cellErrors = cellErrors;
+      _rowErrors = rowErrors;
+      _importValidated = rowErrors.isEmpty;
     });
-    if (errors.isEmpty) {
+    if (rowErrors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${errors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('${rowErrors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -2560,10 +2776,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
     // 1. Validate and build staging rows
     final stagingRows = <Map<String, dynamic>>[];
     for (int i = 0; i < _importRows.length; i++) {
-      final err = _validateImportRow(i);
-      if (err != null) {
+      final fields = _validateImportRow(i);
+      if (fields.isNotEmpty) {
         _skippedCount++;
-        _importErrors.add('Row ${i + 2}: $err');
+        _importErrors.add('Row ${i + 2}: ${_composeRowError(fields)}');
         continue;
       }
       final row = _importRows[i];
@@ -2697,7 +2913,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           .inFilter('status', ['DONE', 'ERROR', 'NO_PARENT']);
 
     } catch (e) {
-      _importErrors.add('Import failed: $e');
+      _importErrors.add(friendlyError(e));
     }
 
     setState(() => _importStep = 3);
@@ -2771,18 +2987,25 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 ),
               ),
               SizedBox(width: 8.w),
-              ElevatedButton.icon(
-                onPressed: _exportStudentTemplate,
-                icon: AppIcon('grid-1', size: 16),
-                label: const Text('Format to Excel'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF217346),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                ),
-              ),
+              Builder(builder: (_) {
+                // After Validate, if there are cell-level errors the button
+                // exports the loaded rows with an annotated "Error" column so
+                // the user can fix issues offline and re-import. Otherwise it
+                // still downloads the blank template.
+                final hasErrors = _importRows.isNotEmpty && _cellErrors.isNotEmpty;
+                return ElevatedButton.icon(
+                  onPressed: hasErrors ? _exportImportRowsWithErrors : _exportStudentTemplate,
+                  icon: AppIcon(hasErrors ? 'document-download' : 'grid-1', size: 16),
+                  label: Text(hasErrors ? 'Export with Errors' : 'Format to Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF217346),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
+                );
+              }),
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportSampleData,
@@ -2875,27 +3098,33 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                         itemBuilder: (context, index) {
                                           final row = _importRows[index];
                                           final isEven = index % 2 == 0;
-                                          final hasError = _rowErrors.containsKey(index);
-                                          return Tooltip(
-                                            message: hasError ? _rowErrors[index]! : '',
-                                            child: Container(
-                                              color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
-                                              padding: EdgeInsets.symmetric(vertical: 6.h),
-                                              child: Row(
-                                                children: [
-                                                  _gridDataCell('${index + 1}', width: sNoW, center: true),
-                                                  for (final key in _importGridKeys)
-                                                    _gridDataCell(_importMappedCell(row, key), width: colW(key)),
-                                                  if (hasError)
-                                                    Padding(
-                                                      padding: EdgeInsets.only(right: 8.w),
-                                                      child: Tooltip(
-                                                        message: _rowErrors[index]!,
-                                                        child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
-                                                      ),
+                                          final cellErrs = _cellErrors[index] ?? const <String, String>{};
+                                          final hasError = cellErrs.isNotEmpty;
+                                          return Container(
+                                            color: isEven ? Colors.white : AppColors.surface,
+                                            padding: EdgeInsets.symmetric(vertical: 6.h),
+                                            child: Row(
+                                              children: [
+                                                _gridDataCell('${index + 1}', width: sNoW, center: true),
+                                                for (final key in _importGridKeys)
+                                                  cellErrs.containsKey(key)
+                                                      ? Tooltip(
+                                                          message: cellErrs[key]!,
+                                                          child: Container(
+                                                            color: const Color(0xFFFCE4E4),
+                                                            child: _gridDataCell(_importMappedCell(row, key), width: colW(key)),
+                                                          ),
+                                                        )
+                                                      : _gridDataCell(_importMappedCell(row, key), width: colW(key)),
+                                                if (hasError)
+                                                  Padding(
+                                                    padding: EdgeInsets.only(right: 8.w),
+                                                    child: Tooltip(
+                                                      message: _rowErrors[index] ?? '',
+                                                      child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
                                                     ),
-                                                ],
-                                              ),
+                                                  ),
+                                              ],
                                             ),
                                           );
                                         },

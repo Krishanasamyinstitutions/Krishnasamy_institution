@@ -381,20 +381,28 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             controller: controller,
                             initiallyExpanded: _expandedCourse == courseName,
                             onExpansionChanged: (isExpanded) {
-                              if (isExpanded) {
-                                final prev = _expandedCourse;
-                                if (prev != null && prev != courseName) {
-                                  final prevCtrl = _courseExpansionCtrls[prev];
-                                  try {
-                                    prevCtrl?.collapse();
-                                  } catch (_) {
-                                    // Controller not attached (tile off-screen).
+                              // Defer to the next frame so we don't trigger
+                              // setState while another ExpansionTile is still
+                              // notifying its controller during the current
+                              // build (collapse() chains into onExpansionChanged
+                              // synchronously).
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (!mounted) return;
+                                if (isExpanded) {
+                                  final prev = _expandedCourse;
+                                  if (prev != null && prev != courseName) {
+                                    final prevCtrl = _courseExpansionCtrls[prev];
+                                    try {
+                                      prevCtrl?.collapse();
+                                    } catch (_) {
+                                      // Controller not attached (tile off-screen).
+                                    }
                                   }
+                                  setState(() => _expandedCourse = courseName);
+                                } else if (_expandedCourse == courseName) {
+                                  setState(() => _expandedCourse = null);
                                 }
-                                setState(() => _expandedCourse = courseName);
-                              } else if (_expandedCourse == courseName) {
-                                setState(() => _expandedCourse = null);
-                              }
+                              });
                             },
                             tilePadding: EdgeInsets.symmetric(horizontal: 14.w),
                             title: Text(courseName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
@@ -888,7 +896,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     final isDemand = r['type'] == 'demand';
                     return Container(
                       color: i.isOdd ? AppColors.surface : Colors.white,
-                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
                       child: Row(
                         children: [
                           SizedBox(

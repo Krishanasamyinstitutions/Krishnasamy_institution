@@ -279,6 +279,58 @@ Future<void> _exportSampleData(String sheetName, List<String> headers, List<List
   if (bytes != null) File(savePath).writeAsBytesSync(bytes);
 }
 
+/// Re-export the loaded import rows with an extra "Error" column populated
+/// for failed rows, plus red shading on the offending cells. Use this when
+/// validation surfaces problems so the user can fix them in Excel and
+/// re-import the corrected file.
+Future<void> _exportRowsWithErrors({
+  required String sheetName,
+  required List<String> headers,
+  required List<List<dynamic>> rows,
+  required Map<int, Set<int>> cellErrors,
+  required Map<int, String> rowErrors,
+}) async {
+  final savePath = await FilePicker.platform.saveFile(
+    dialogTitle: 'Save File with Errors',
+    fileName: '${sheetName.toLowerCase().replaceAll(' ', '_')}_errors.xlsx',
+    type: FileType.custom,
+    allowedExtensions: ['xlsx'],
+  );
+  if (savePath == null) return;
+  final workbook = xl.Excel.createExcel();
+  final sheet = workbook[sheetName];
+  final headerStyle = xl.CellStyle(
+    bold: true,
+    backgroundColorHex: xl.ExcelColor.fromHexString('#1B2A4A'),
+    fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+  );
+  final errorCellStyle = xl.CellStyle(
+    backgroundColorHex: xl.ExcelColor.fromHexString('#FCE4E4'),
+  );
+  final allHeaders = [...headers, 'Error'];
+  for (int i = 0; i < allHeaders.length; i++) {
+    final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+    cell.value = xl.TextCellValue(allHeaders[i]);
+    cell.cellStyle = headerStyle;
+    sheet.setColumnWidth(i, i == allHeaders.length - 1 ? 40 : 20);
+  }
+  for (int r = 0; r < rows.length; r++) {
+    final row = rows[r];
+    final errs = cellErrors[r] ?? const <int>{};
+    for (int c = 0; c < headers.length; c++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+      cell.value = xl.TextCellValue(c < row.length ? row[c].toString() : '');
+      if (errs.contains(c)) cell.cellStyle = errorCellStyle;
+    }
+    final errorCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: headers.length, rowIndex: r + 1));
+    errorCell.value = xl.TextCellValue(rowErrors[r] ?? '');
+    if (errs.isNotEmpty) errorCell.cellStyle = errorCellStyle;
+  }
+  workbook.delete('Sheet1');
+  final bytes = workbook.encode();
+  if (bytes != null) File(savePath).writeAsBytesSync(bytes);
+}
+
 Future<void> _exportTemplate(String sheetName, List<String> headers) async {
   final savePath = await FilePicker.platform.saveFile(
     dialogTitle: 'Save Template',
@@ -303,6 +355,45 @@ Future<void> _exportTemplate(String sheetName, List<String> headers) async {
   workbook.delete('Sheet1');
   final bytes = workbook.encode();
   if (bytes != null) File(savePath).writeAsBytesSync(bytes);
+}
+
+/// Convert per-row error messages into per-cell column indices by parsing
+/// the canonical patterns the tabs emit:
+///   - "Missing: A, B"  → highlight headers matching A and B (case-insensitive)
+///   - "Fee Group "X" not found ..."  → highlight the "Fee Group" header
+///   - "Class ID "X" not found ..."   → highlight the "Class ID" header
+///   - Otherwise no specific cell is flagged (icon only).
+Map<int, Set<int>> _deriveCellErrors(Map<int, String> rowErrs, List<String> headers) {
+  String hnorm(String s) => s.replaceAll('*', '').trim().toLowerCase();
+  final headerNorm = headers.map(hnorm).toList();
+  int? headerIndexFor(String token) {
+    final t = token.toLowerCase();
+    for (int i = 0; i < headerNorm.length; i++) {
+      if (headerNorm[i] == t) return i;
+    }
+    for (int i = 0; i < headerNorm.length; i++) {
+      if (headerNorm[i].contains(t) || t.contains(headerNorm[i])) return i;
+    }
+    return null;
+  }
+  final out = <int, Set<int>>{};
+  for (final entry in rowErrs.entries) {
+    final msg = entry.value;
+    final cells = <int>{};
+    final missing = RegExp(r'Missing:\s*([^•]+)').firstMatch(msg);
+    if (missing != null) {
+      for (final raw in missing.group(1)!.split(',')) {
+        final idx = headerIndexFor(raw.trim());
+        if (idx != null) cells.add(idx);
+      }
+    }
+    for (final m in RegExp(r'^([A-Za-z ]+?)\s*"').allMatches(msg)) {
+      final idx = headerIndexFor(m.group(1)!.trim());
+      if (idx != null) cells.add(idx);
+    }
+    if (cells.isNotEmpty) out[entry.key] = cells;
+  }
+  return out;
 }
 
 Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = false, bool right = false}) {
@@ -352,11 +443,16 @@ Widget _buildImportCard({
   bool isLoadingExisting = false,
   VoidCallback? onSampleDownload,
   Map<int, String> rowErrors = const {},
+  // rowIdx → set of column indices that failed validation. When non-empty,
+  // the Format to Excel button switches to "Export with Errors" so the user
+  // can fix issues offline and re-import.
+  Map<int, Set<int>> cellErrors = const {},
   Set<int> rightAlignCols = const {},
 }) {
   final bool showExisting = rows.isEmpty && existingRows.isNotEmpty;
   final displayHeaders = showExisting ? existingHeaders : headers;
   final displayRows = showExisting ? existingRows : rows;
+  final bool hasCellErrors = !showExisting && cellErrors.isNotEmpty;
   return Container(
     padding: EdgeInsets.all(16.w),
     decoration: BoxDecoration(
@@ -391,9 +487,17 @@ Widget _buildImportCard({
             ),
             SizedBox(width: 8.w),
             ElevatedButton.icon(
-              onPressed: onTemplate,
-              icon: AppIcon('grid-1', size: 16),
-              label: const Text('Format to Excel'),
+              onPressed: hasCellErrors
+                  ? () => _exportRowsWithErrors(
+                        sheetName: title,
+                        headers: headers,
+                        rows: rows,
+                        cellErrors: cellErrors,
+                        rowErrors: rowErrors,
+                      )
+                  : onTemplate,
+              icon: AppIcon(hasCellErrors ? 'document-download' : 'grid-1', size: 16),
+              label: Text(hasCellErrors ? 'Export with Errors' : 'Format to Excel'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF217346),
                 foregroundColor: Colors.white,
@@ -516,23 +620,47 @@ Widget _buildImportCard({
                                 controller: controller,
                                 itemCount: displayRows.length,
                                 itemBuilder: (_, i) {
-                                  final hasError = !showExisting && rowErrors.containsKey(i);
-                                  return Tooltip(
-                                    message: hasError ? rowErrors[i]! : '',
-                                    child: Container(
-                                      padding: EdgeInsets.zero,
-                                      color: hasError ? const Color(0xFFFCE4E4) : (i.isEven ? Colors.white : AppColors.surface),
-                                      child: Row(
-                                        children: [
-                                          _gridDataCell('${i + 1}', width: 60.w, center: true),
-                                          ...List.generate(displayHeaders.length, (j) =>
-                                            _gridDataCell(
-                                              j < displayRows[i].length ? displayRows[i][j].toString() : '',
-                                              right: rightAlignCols.contains(j),
+                                  final cellErrs = !showExisting ? (cellErrors[i] ?? const <int>{}) : const <int>{};
+                                  final hasRowError = !showExisting && rowErrors.containsKey(i);
+                                  return Container(
+                                    padding: EdgeInsets.zero,
+                                    color: i.isEven ? Colors.white : AppColors.surface,
+                                    child: Row(
+                                      children: [
+                                        _gridDataCell('${i + 1}', width: 60.w, center: true),
+                                        ...List.generate(displayHeaders.length, (j) {
+                                          final text = j < displayRows[i].length ? displayRows[i][j].toString() : '';
+                                          if (!cellErrs.contains(j)) {
+                                            return _gridDataCell(text, right: rightAlignCols.contains(j));
+                                          }
+                                          // Cell-level highlight: rebuild the cell inline with a red
+                                          // background, since _gridDataCell already wraps the inner
+                                          // container with Expanded.
+                                          return Expanded(
+                                            flex: 1,
+                                            child: Tooltip(
+                                              message: rowErrors[i] ?? '',
+                                              child: Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+                                                alignment: rightAlignCols.contains(j) ? Alignment.centerRight : Alignment.centerLeft,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFCE4E4),
+                                                  border: Border(right: BorderSide(color: AppColors.border.withValues(alpha: 0.3))),
+                                                ),
+                                                child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                        if (hasRowError)
+                                          Padding(
+                                            padding: EdgeInsets.only(right: 8.w),
+                                            child: Tooltip(
+                                              message: rowErrors[i] ?? '',
+                                              child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                      ],
                                     ),
                                   );
                                 },
@@ -614,6 +742,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Course ID *', 'Course Name *', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -633,9 +762,19 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     if (insId == null) return;
     setState(() => _isLoadingExisting = true);
     try {
-      final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId).order('cour_id', ascending: true);
+      final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId);
+      // Sort client-side by ordid (NULLS last), then courname — mirrors the
+      // master-defined order used by the Students sidebar and drilldowns.
+      final sorted = List<Map<String, dynamic>>.from(rows.cast<Map<String, dynamic>>())
+        ..sort((a, b) {
+          final oa = (a['ordid'] is num) ? (a['ordid'] as num).toInt() : 1 << 30;
+          final ob = (b['ordid'] is num) ? (b['ordid'] as num).toInt() : 1 << 30;
+          if (oa != ob) return oa.compareTo(ob);
+          return (a['courname'] ?? '').toString().toLowerCase()
+              .compareTo((b['courname'] ?? '').toString().toLowerCase());
+        });
       if (mounted) setState(() {
-        _existingRows = (rows as List).map((r) => [r['courname'] ?? '']).toList();
+        _existingRows = sorted.map((r) => [r['courname'] ?? '']).toList();
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -665,7 +804,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -676,7 +815,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
       if (idRaw.isEmpty || int.tryParse(idRaw) == null) { rowErrs[i] = 'Invalid Course ID'; continue; }
       if (name.isEmpty) rowErrs[i] = 'Missing: Course Name';
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors'), backgroundColor: Colors.red));
     } else {
@@ -711,7 +850,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
         _errors.add('${row[1]}: ${_friendlyError(e.toString())}');
       }
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
   }
 
@@ -741,6 +880,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
       existingHeaders: const ['Course Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -763,9 +903,14 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Class ID *', 'Class Name *', 'Active Status', 'Course ID', 'Succeeding Class', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
+  // Existing course IDs for this institution — _validate uses these to flag
+  // rows whose Course ID isn't backed by a real course (otherwise the FK
+  // insert fails silently and rows are skipped).
+  Set<int> _courIds = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -784,26 +929,52 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
     try {
       final results = await Future.wait([
         SupabaseService.fromSchema('class').select('*').eq('ins_id', insId).order('cla_id', ascending: true),
-        SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId),
+        SupabaseService.fromSchema('course').select('cour_id, courname, ordid').eq('ins_id', insId),
       ]);
       final rows = results[0] as List;
       final courseRows = results[1] as List;
-      // Course name by cour_id; class name by cla_id (for succeeding class lookup).
+      // Course name + ordid by cour_id; class name by cla_id (for succeeding class lookup).
       final courseMap = { for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString() };
+      final courseOrd = <String, int>{
+        for (final c in courseRows)
+          if (c['ordid'] != null)
+            c['cour_id'].toString(): (c['ordid'] as num).toInt(),
+      };
       final classMap = { for (final r in rows) r['cla_id'].toString(): (r['claname'] ?? '').toString() };
-      final sorted = rows.map((r) => [
-        r['claname']?.toString() ?? '',
-        courseMap['${r['cour_id'] ?? ''}'] ?? '',
-        classMap['${r['succeedingclass'] ?? ''}'] ?? '',
-      ]).toList()
+      final courIdSet = courseRows
+          .map((c) => c['cour_id'] is int ? c['cour_id'] as int : int.tryParse('${c['cour_id'] ?? ''}'))
+          .whereType<int>()
+          .toSet();
+      // Sort by course.ordid → class.ordid (NULLs to the end). Existing
+      // rows read in master-defined order — same as the Students sidebar.
+      final enriched = rows.map((r) {
+        final courIdKey = '${r['cour_id'] ?? ''}';
+        return {
+          'cells': [
+            courseMap[courIdKey] ?? '',
+            r['claname']?.toString() ?? '',
+            classMap['${r['succeedingclass'] ?? ''}'] ?? '',
+          ],
+          'courseOrd': courseOrd[courIdKey] ?? 1 << 30,
+          'classOrd': (r['ordid'] is num) ? (r['ordid'] as num).toInt() : 1 << 30,
+        };
+      }).toList()
         ..sort((a, b) {
-          final byCourse = a[1].toLowerCase().compareTo(b[1].toLowerCase());
-          if (byCourse != 0) return byCourse;
-          return a[0].toLowerCase().compareTo(b[0].toLowerCase());
+          final co = (a['courseOrd'] as int).compareTo(b['courseOrd'] as int);
+          if (co != 0) return co;
+          final cl = (a['classOrd'] as int).compareTo(b['classOrd'] as int);
+          if (cl != 0) return cl;
+          // cells now: [course, claname, succeeding]. Class name (idx 1) is
+          // the final tiebreaker.
+          final acells = a['cells'] as List;
+          final bcells = b['cells'] as List;
+          return (acells[1] as String).toLowerCase().compareTo((bcells[1] as String).toLowerCase());
         });
+      final sorted = enriched.map((e) => e['cells'] as List).toList();
       if (mounted) {
         setState(() {
           _existingRows = sorted;
+          _courIds = courIdSet;
           _isLoadingExisting = false;
         });
       }
@@ -834,7 +1005,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -851,9 +1022,17 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       if (courRaw.isNotEmpty && int.tryParse(courRaw) == null) missing.add('Course ID must be integer');
       if (succRaw.isNotEmpty && int.tryParse(succRaw) == null) missing.add('Succeeding Class must be integer');
       if (actRaw.isNotEmpty && int.tryParse(actRaw) == null) missing.add('Active Status must be 0 or 1');
-      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+      if (missing.isNotEmpty) { rowErrs[i] = 'Missing: ${missing.join(', ')}'; continue; }
+      // Course ID must match an existing course for this institution before
+      // a Class can be imported (FK on class.cour_id).
+      if (courRaw.isNotEmpty && _courIds.isNotEmpty) {
+        final cid = int.tryParse(courRaw);
+        if (cid != null && !_courIds.contains(cid)) {
+          rowErrs[i] = 'Course ID "$courRaw" not found — import the course first';
+        }
+      }
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors'), backgroundColor: Colors.red));
     } else {
@@ -894,7 +1073,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
         _errors.add('${row[1]}: ${_friendlyError(e.toString())}');
       }
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
   }
 
@@ -919,9 +1098,10 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class Name', 'Course', 'Succeeding Class'],
+      existingHeaders: const ['Course', 'Class Name', 'Succeeding Class'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -942,6 +1122,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Fee Group ID *', 'Group Name *', 'Year *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -993,7 +1174,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -1007,7 +1188,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       }
       if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
@@ -1032,7 +1213,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     } catch (e) {
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1063,6 +1244,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
       existingHeaders: const ['Group Name', 'Year'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -1086,9 +1268,14 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Fee ID *', 'Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
+  // Lowercased fee-group names for the current institution — used by _validate
+  // to flag rows whose Fee Group doesn't exist (otherwise the server import
+  // silently skips them).
+  Set<String> _fgNames = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -1106,9 +1293,16 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     setState(() => _isLoadingExisting = true);
     try {
       final feeGroups = await SupabaseService.getFeeGroups(insId);
-      if (feeGroups.isEmpty) { if (mounted) setState(() => _isLoadingExisting = false); return; }
+      if (feeGroups.isEmpty) {
+        if (mounted) setState(() { _fgNames = {}; _isLoadingExisting = false; });
+        return;
+      }
       final fgIds = feeGroups.map((fg) => fg['fg_id'] as int).toList();
       final fgNameMap = { for (final fg in feeGroups) fg['fg_id'] as int: fg['fgdesc']?.toString() ?? '' };
+      final fgNameSet = feeGroups
+          .map((fg) => (fg['fgdesc']?.toString() ?? '').trim().toLowerCase())
+          .where((s) => s.isNotEmpty)
+          .toSet();
       final types = await SupabaseService.fromSchema('feetype').select('*').inFilter('fg_id', fgIds).eq('activestatus', 1).order('fee_id', ascending: true);
       if (mounted) setState(() {
         const fineLabels = {'1': 'Yes', '0': 'No'};
@@ -1121,6 +1315,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
             fineLabels['${t['feefineapplicable'] ?? 0}'] ?? 'No',
           ];
         }).toList();
+        _fgNames = fgNameSet;
         _isLoadingExisting = false;
       });
     } catch (e) {
@@ -1150,7 +1345,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -1162,9 +1357,18 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
         final val = _rows[i].length > j ? _rows[i][j]?.toString().trim() ?? '' : '';
         if (val.isEmpty) missing.add(labels[j]);
       }
-      if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
+      if (missing.isNotEmpty) {
+        rowErrs[i] = 'Missing: ${missing.join(', ')}';
+        continue;
+      }
+      // Fee Group must already exist for this institution. Otherwise the
+      // server-side join in process_master_import drops the row silently.
+      final fg = (_rows[i].length > 3 ? _rows[i][3]?.toString().trim() ?? '' : '').toLowerCase();
+      if (fg.isNotEmpty && _fgNames.isNotEmpty && !_fgNames.contains(fg)) {
+        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found — import it first';
+      }
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
@@ -1172,7 +1376,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; _cellErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -1198,7 +1402,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
     } catch (e) {
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1229,6 +1433,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       existingHeaders: const ['Fee Name', 'Short Name', 'Fee Group', 'Year', 'Fine Applicable'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -1252,6 +1457,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Concession ID *', 'Concession Name *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -1303,7 +1509,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -1317,7 +1523,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       }
       if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
@@ -1325,7 +1531,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; _cellErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -1340,7 +1546,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     } catch (e) {
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1371,6 +1577,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
       existingHeaders: const ['Concession Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -1394,6 +1601,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Class *', 'Semester *', 'Fee Type *', 'Amount *', 'Due Date *', 'Admission Type *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -1416,12 +1624,28 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       final results = await Future.wait([
         SupabaseService.fromSchema('classfeedemand').select('*'),
         SupabaseService.fromSchema('admissiontype').select('adm_id, admname').eq('ins_id', insId).eq('activestatus', 1),
+        SupabaseService.fromSchema('class').select('claname, cour_id').eq('ins_id', insId).eq('activestatus', 1),
+        SupabaseService.fromSchema('course').select('cour_id, courname').eq('ins_id', insId),
       ]);
-      final rows = results[0];
-      final admRows = results[1];
-      final admMap = { for (final a in (admRows as List)) a['adm_id'].toString(): (a['admname'] ?? '').toString() };
+      final rows = results[0] as List;
+      final admRows = results[1] as List;
+      final classRows = results[2] as List;
+      final courseRows = results[3] as List;
+      final admMap = { for (final a in admRows) a['adm_id'].toString(): (a['admname'] ?? '').toString() };
+      final courseById = <String, String>{
+        for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString(),
+      };
+      String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+      // Class name → course name lookup, derived from class.cour_id.
+      final classToCourse = <String, String>{};
+      for (final cl in classRows) {
+        final name = (cl['claname']?.toString() ?? '').trim();
+        if (name.isEmpty) continue;
+        final cid = cl['cour_id']?.toString() ?? '';
+        classToCourse[norm(name)] = courseById[cid] ?? '';
+      }
       if (mounted) setState(() {
-        final sorted = List<Map<String, dynamic>>.from(rows as List);
+        final sorted = List<Map<String, dynamic>>.from(rows.cast<Map<String, dynamic>>());
         sorted.sort((a, b) {
           final ca = (a['cfclass']?.toString() ?? '').toLowerCase();
           final cb = (b['cfclass']?.toString() ?? '').toLowerCase();
@@ -1429,6 +1653,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
           return (a['cfterm']?.toString() ?? '').compareTo(b['cfterm']?.toString() ?? '');
         });
         _existingRows = sorted.map((r) => [
+          classToCourse[norm(r['cfclass']?.toString() ?? '')] ?? '',
           r['cfclass'] ?? '',
           r['cfterm'] ?? '',
           r['cffeetype'] ?? '',
@@ -1493,7 +1718,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       }
       if (missing.isNotEmpty) rowErrs[i] = 'Missing: ${missing.join(', ')}';
     }
-    setState(() { _rowErrors = rowErrs; _isValidated = rowErrs.isEmpty; });
+    setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
     } else {
@@ -1501,7 +1726,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     }
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; _cellErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -1532,7 +1757,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     } catch (e) {
       _errors = ['Import failed: ${_friendlyError(e.toString())}'];
     }
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1560,10 +1785,11 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
       onClose: _close,
       isValidated: _isValidated,
       existingRows: _existingRows,
-      existingHeaders: const ['Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
+      existingHeaders: const ['Course', 'Class', 'Semester', 'Fee Type', 'Amount', 'Due Date', 'Admission Type'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
-      rightAlignCols: const {3}, // AMOUNT
+      cellErrors: _cellErrors,
+      rightAlignCols: const {4}, // AMOUNT
     );
   }
 }
@@ -1625,6 +1851,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Adm ID *', 'Admission Name *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -1672,7 +1899,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -1690,7 +1917,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
     ));
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; _cellErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -1705,7 +1932,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
     _imported = result['imported'] ?? 0;
     _skipped = result['skipped'] ?? 0;
     _errors = errs;
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1735,6 +1962,7 @@ class _AdmissionTypeTabState extends State<_AdmissionTypeTab> with AutomaticKeep
       existingHeaders: const ['Admission Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }
@@ -1753,6 +1981,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
   int _imported = 0, _skipped = 0;
   List<String> _errors = [];
   Map<int, String> _rowErrors = {};
+  Map<int, Set<int>> _cellErrors = {};
   static const _headers = ['Quo ID *', 'Quota Name *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
@@ -1801,7 +2030,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
       }
       return;
     }
-    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; });
+    setState(() { _fileName = result.files.single.name; _rows = parsed.sublist(1); _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
   }
 
   void _validate() {
@@ -1819,7 +2048,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
     ));
   }
 
-  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; }); }
+  void _close() { setState(() { _rows = []; _fileName = null; _isValidated = false; _errors = []; _rowErrors = {}; _cellErrors = {}; }); }
 
   Future<void> _save() async {
     if (_rows.isEmpty) return;
@@ -1834,7 +2063,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
     _imported = result['imported'] ?? 0;
     _skipped = result['skipped'] ?? 0;
     _errors = errs;
-    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; });
+    setState(() { _saving = false; _rows = []; _fileName = null; _isValidated = false; _rowErrors = {}; _cellErrors = {}; });
     if (mounted) {
       _showImportResultDialog(context, imported: _imported, skipped: _skipped, errors: _errors, onDone: _loadExisting);
     }
@@ -1865,6 +2094,7 @@ class _QuotaTabState extends State<_QuotaTab> with AutomaticKeepAliveClientMixin
       existingHeaders: const ['Quota Name'],
       isLoadingExisting: _isLoadingExisting,
       rowErrors: _rowErrors,
+      cellErrors: _cellErrors,
     );
   }
 }

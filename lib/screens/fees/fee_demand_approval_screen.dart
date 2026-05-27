@@ -99,7 +99,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMsg = 'Failed to load data: $e';
+          _errorMsg = friendlyError(e);
           _loading = false;
         });
       }

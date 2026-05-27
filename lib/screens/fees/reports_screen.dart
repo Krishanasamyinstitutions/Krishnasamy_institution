@@ -142,7 +142,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   String _dailyDateMethodLabel() {
     final hasDate = _dailyFrom != null || _dailyTo != null;
     final hasMode = _selectedMode != null;
-    if (!hasDate && !hasMode) return 'Date & Method';
+    if (!hasDate && !hasMode) return 'Date';
     String datePart;
     if (!hasDate) {
       datePart = 'All Dates';
@@ -738,7 +738,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = friendlyError(e); _loading = false; });
     }
   }
 
@@ -2173,7 +2173,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                           onTap: () => _loadStudentLedger(s['stuadmno']),
                           child: Container(
                             color: i.isOdd ? AppColors.surface : Colors.white,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
                             child: Row(
                               children: [
                                 Expanded(child: Text(s['stuadmno'] ?? '-', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
@@ -3614,7 +3614,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     if (_pcRows.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No reconciled payments in this date range.'), backgroundColor: Colors.orange),
+          const SnackBar(content: Text('No payments in this date range.'), backgroundColor: Colors.orange),
         );
       }
       return;
@@ -3679,7 +3679,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         fineCell.value = xl.DoubleCellValue(fine);
         fineCell.cellStyle = numStyle;
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = xl.TextCellValue(r['banname']?.toString() ?? '');
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = xl.TextCellValue(fmtDate(r['settlement_date']));
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = xl.TextCellValue(r['settlement_id']?.toString() ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: row)).value = xl.TextCellValue(fmtDate(r['settlement_date']));
       }
 
       // Grand total row
@@ -3707,7 +3708,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       sheet.setColumnWidth(9, 12);
       sheet.setColumnWidth(10, 10);
       sheet.setColumnWidth(11, 22);
-      sheet.setColumnWidth(12, 16);
+      sheet.setColumnWidth(12, 18);
+      sheet.setColumnWidth(13, 16);
 
       await _saveExcel(excel, 'PowerCollege_${_formatDateCompact(_pcFrom!)}_${_formatDateCompact(_pcTo!)}');
     } catch (e) {
@@ -3778,7 +3780,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           child: _pcRows.isEmpty
               ? _emptyState(_pcLoading
                   ? 'Loading reconciled payments…'
-                  : 'No reconciled payments in this range')
+                  : 'No payments in this range')
               : Container(
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
@@ -4069,7 +4071,7 @@ class _StickyTableState extends State<_StickyTable> {
       return Container(
         width: double.infinity,
         color: bg,
-        padding: EdgeInsets.symmetric(vertical: 12.h),
+        padding: EdgeInsets.symmetric(vertical: 6.h),
         child: Row(
           mainAxisSize: MainAxisSize.max,
           children: [
@@ -4210,12 +4212,12 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
   // Widths picked so every uppercase header fits on one line (TRANSACTION
   // DATE / PAYMENT MODE / SETTLEMENT DATE are the long ones).
   static const _colWidths = <double>[
-    120, 220, 110, 130, 170, 140, 130, 90, 200, 100, 90, 240, 170,
+    120, 220, 110, 130, 170, 140, 130, 90, 200, 100, 90, 240, 180, 170,
   ];
   static const _headers = <String>[
     'ROLL NO', 'NAME', 'COURSE', 'CLASS',
     'TRANSACTION DATE', 'PAYMENT MODE', 'DOC NO', 'TERM', 'FEE TYPE',
-    'AMOUNT', 'FINE', 'BANK NAME', 'SETTLEMENT DATE',
+    'AMOUNT', 'FINE', 'BANK NAME', 'SETTLEMENT ID', 'SETTLEMENT DATE',
   ];
   static const _numericColumns = <int>{9, 10};
 
@@ -4346,7 +4348,8 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
                                         _bodyCell(9, amt.toStringAsFixed(2), adj[9]),
                                         _bodyCell(10, fine.toStringAsFixed(2), adj[10]),
                                         _bodyCell(11, r['banname']?.toString() ?? '', adj[11]),
-                                        _bodyCell(12, widget.fmt(r['settlement_date']), adj[12]),
+                                        _bodyCell(12, r['settlement_id']?.toString() ?? '', adj[12]),
+                                        _bodyCell(13, widget.fmt(r['settlement_date']), adj[13]),
                                       ],
                                     ),
                                   );

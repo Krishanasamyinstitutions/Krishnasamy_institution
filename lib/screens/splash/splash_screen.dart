@@ -164,7 +164,7 @@ class _SplashScreenState extends State<SplashScreen>
                 delay: const Duration(milliseconds: 600),
                 duration: const Duration(milliseconds: 800),
                 child: Text(
-                  'School Administration Platform',
+                  'College Administration Platform',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppColors.textLight.withValues(alpha: 0.8),
                         letterSpacing: 1.w,

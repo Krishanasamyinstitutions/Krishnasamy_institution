@@ -329,7 +329,8 @@ class ReceiptWidget extends StatelessWidget {
             child: _infoCell([
               _kv('Name', data.studentName),
               _kv('Reg. No', data.admissionNo),
-              _kv('Branch', data.courseName),
+              _kv('Branch', data.className),
+              _kv('Mode', data.paymentMethod.isEmpty ? '-' : data.paymentMethod),
             ]),
           ),
           Container(width: 1, color: Colors.black),
@@ -337,7 +338,8 @@ class ReceiptWidget extends StatelessWidget {
             child: _infoCell([
               _kv('Receipt No', data.receiptNo),
               _kv('Date', data.date),
-              _kv('Semester', receiptSemesterLabel(data)),
+              _kv('Sem', 'FEE (UP TO DATE)'),
+              _kv('Txn ID', (data.paymentReference ?? '').trim().isEmpty ? '-' : data.paymentReference!.trim()),
             ]),
           ),
         ],
@@ -491,8 +493,12 @@ class ReceiptWidget extends StatelessWidget {
     );
   }
 
-  // Amount in words + cashier signature line.
+  // Amount in words + cashier signature line. When the payment isn't
+  // reconciled yet (cheque clearance pending, UPI not yet matched, etc.) a
+  // "* Subject to Realization" note prints on the left so the student sees
+  // the receipt isn't a settled-cash equivalent.
   Widget _footerRow() {
+    final isPending = data.reconStatus != 'R';
     return Container(
       height: 110,
       decoration: const BoxDecoration(border: Border(top: _border)),
@@ -502,6 +508,11 @@ class ReceiptWidget extends StatelessWidget {
         children: [
           Text(amountInWords(data.total),
               style: _body(size: 11, weight: FontWeight.w500)),
+          if (isPending) ...[
+            const SizedBox(height: 4),
+            Text('* Subject to Realization',
+                style: _body(size: 10, weight: FontWeight.w600).copyWith(color: const Color(0xFFB85C00))),
+          ],
           const Spacer(),
           Padding(
             padding: const EdgeInsets.only(right: 34),

@@ -204,24 +204,63 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       final headers = allRows[headerRowIdx].map((h) => h.toString().toLowerCase().trim()).toList();
       final rows = allRows.sublist(headerRowIdx);
 
-      final dateIdx = headers.indexWhere((h) => h.contains('date') && !h.contains('value'));
-      final refIdx = headers.indexWhere((h) => h.contains('ref') || h.contains('chq') || h.contains('cheque') || h.contains('transaction') || h.contains('utr') || h.contains('instrument') || h.contains('inst'));
-      final narrationIdx = headers.indexWhere((h) => h.contains('narration') || h.contains('desc') || h.contains('particular') || h.contains('remark'));
+      // Generic header sniffer — works across HDFC, ICICI, SBI, Axis, Yes,
+      // Federal, IOB and most CSV/Excel statements. Picks the FIRST column
+      // whose header matches the bank's varied conventions.
 
-      // Prefer distinct Deposit / Credit columns. Fall back to a generic
-      // Amount column only when no deposit column exists, so HDFC-style
-      // statements that have BOTH "Amount" and "Deposit Amt" don't pick
-      // the ambiguous Amount column.
-      int depositIdx = headers.indexWhere((h) =>
-          (h.contains('deposit') || h.contains('credit') || h.contains('cr amount')) &&
+      // DATE — Transaction Date / Txn Date / Tran Date / Trans Date /
+      // Posting Date / Posted Date / Date. Prefer the transaction-style
+      // variants so a bank that has both "Transaction Date" and "Value Date"
+      // doesn't accidentally pick Value Date.
+      var dateIdx = headers.indexWhere((h) =>
+          h.contains('txn date') || h.contains('transaction date') ||
+          h.contains('tran date') || h.contains('trans date') ||
+          h.contains('posting date') || h.contains('posted date') ||
+          h.contains('post date'));
+      if (dateIdx < 0) {
+        dateIdx = headers.indexWhere((h) => h.contains('date') && !h.contains('value'));
+      }
+
+      // REFERENCE / UTR / RRN / Cheque-no — exclude bare "transaction" which
+      // would collide with "Transaction Date".
+      final refIdx = headers.indexWhere((h) =>
+          h.contains('utr') || h.contains('rrn') ||
+          h.contains('chq') || h.contains('cheque') ||
+          h.contains('ref no') || h.contains('ref.no') ||
+          h.contains('reference') || h.contains('ref ') || h == 'ref' ||
+          h.contains('instrument') || h.contains('inst no') || h.contains('inst.no') ||
+          h.contains('txn id') || h.contains('txn ref') || h.contains('txn no') ||
+          h.contains('transaction id') || h.contains('transaction ref') || h.contains('transaction no'));
+      final narrationIdx = headers.indexWhere((h) =>
+          h.contains('narration') || h.contains('description') ||
+          h.contains('particular') || h.contains('remark') ||
+          h.contains('details') || h == 'desc');
+
+      // Distinct Credit / Deposit column. Falls back to a generic Amount
+      // column only when no deposit column exists, so banks that have BOTH
+      // "Amount" and "Deposit Amt" don't pick the ambiguous Amount column.
+      final depositIdx = headers.indexWhere((h) =>
+          (h.contains('deposit') || h.contains('credit') ||
+           h.contains('cr amount') || h.contains('cr amt') ||
+           h.contains('credit amount') || h.contains('credit amt')) &&
           !h.contains('debit'));
-      int withdrawalIdx = headers.indexWhere((h) =>
-          h.contains('withdrawal') || h.contains('debit') || h.contains('dr amount'));
-      int amountIdx = depositIdx >= 0 ? depositIdx : headers.indexWhere((h) => h == 'amount' || h.endsWith(' amount') || h.startsWith('amount '));
+      final withdrawalIdx = headers.indexWhere((h) =>
+          h.contains('withdrawal') || h.contains('debit') ||
+          h.contains('dr amount') || h.contains('dr amt') ||
+          h.contains('debit amount') || h.contains('debit amt'));
+      final amountIdx = depositIdx >= 0
+          ? depositIdx
+          : headers.indexWhere((h) =>
+              h == 'amount' || h == 'amt' ||
+              h.endsWith(' amount') || h.endsWith(' amt') ||
+              h.startsWith('amount ') || h.startsWith('amt '));
 
-      // Dr/Cr marker column: when banks report amounts in a single column
-      // with a separate type flag, we need to skip debits.
-      final drCrIdx = headers.indexWhere((h) => h == 'dr/cr' || h == 'cr/dr' || h == 'type' || h == 'txn type');
+      // Single-column-amount banks ship a separate Dr/Cr flag — skip rows
+      // marked as debit. Match the common header spellings.
+      final drCrIdx = headers.indexWhere((h) =>
+          h == 'dr/cr' || h == 'cr/dr' || h == 'type' ||
+          h == 'txn type' || h == 'debit/credit' || h == 'credit/debit' ||
+          h == 'dr cr' || h == 'cr dr');
 
       final bankRows = <Map<String, dynamic>>[];
       final usedPayIds = <int>{};
@@ -342,6 +381,15 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                 bankRow['matched_pay_ids'] = chequePayIds;
                 bankRow['match_type'] = 'Cheque + Amount Match (${chequePayIds.length} receipts)';
                 usedPayIds.addAll(chequePayIds);
+                break;
+              }
+              // Single-receipt fallback — when several payments share the
+              // same cheque number but the bank only cleared one of them,
+              // match just the receipt whose amount equals the bank line.
+              if (isAmountMatch) {
+                bankRow['matched_pay_id'] = payment['pay_id'];
+                bankRow['match_type'] = 'Cheque + Amount Match';
+                usedPayIds.add(payment['pay_id'] as int);
                 break;
               }
             }
@@ -519,7 +567,16 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         );
       }
     } catch (e) {
+      // Log the raw exception so it shows up in the Flutter run console —
+      // friendlyError() collapses unknown errors into "Something went wrong"
+      // which makes diagnosis impossible. Both go to the user/log.
+      debugPrint('Reconcile from bank statement failed: $e');
       failureMessage = friendlyError(e);
+      // Append a short tail of the raw message for the snackbar — keeps the
+      // friendly summary but surfaces the actual cause to the user.
+      final raw = e.toString();
+      final tail = raw.length > 120 ? raw.substring(0, 120) + '…' : raw;
+      failureMessage = '$failureMessage\n($tail)';
     }
 
     await _loadPayments();
@@ -528,7 +585,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         failureMessage != null
-            ? SnackBar(content: Text('Reconcile failed: $failureMessage'), backgroundColor: Colors.red)
+            ? SnackBar(content: Text('Reconcile failed: $failureMessage'), backgroundColor: Colors.red, duration: const Duration(seconds: 8))
             : SnackBar(content: Text('$count payment(s) reconciled from bank statement'), backgroundColor: AppColors.success),
       );
     }

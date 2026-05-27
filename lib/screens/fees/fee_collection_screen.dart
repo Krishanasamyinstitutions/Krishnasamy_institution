@@ -1028,7 +1028,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     ),
                     child: DropdownButton<String?>(
                       value: _collectionMethodFilter,
-                      hint: Text('All Methods', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      hint: Text('All Modes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                       icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
                       isDense: true,
@@ -1037,7 +1037,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       elevation: 6,
                       // Cash vs Bank matches the Method-wise Summary grouping.
                       items: const [
-                        DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                        DropdownMenuItem<String?>(value: null, child: Text('All Modes')),
                         DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
                         DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
                       ],
@@ -1278,7 +1278,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         const flexes = <int>[1, 2, 3, 2, 2, 2, 2, 2];
                         const headers = <String>[
                           'S No.', 'PAY NO', 'STUDENT', 'COURSE',
-                          'CLASS', 'DATE', 'METHOD', 'AMOUNT',
+                          'CLASS', 'DATE', 'MODE', 'AMOUNT',
                         ];
                         final hStyle = TextStyle(
                             fontSize: 13.sp,
@@ -2987,7 +2987,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   child: OutlinedButton.icon(
                     onPressed: _openDateMethodFilter,
                     icon: AppIcon.linear('calendar-1', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                    label: Text('Date & Method', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    label: Text('Date', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppColors.border),
                       padding: EdgeInsets.symmetric(horizontal: 14.w),
@@ -3281,7 +3281,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         ),
                         child: DropdownButton<String?>(
                           value: _dateDrilldownMethodFilter,
-                          hint: Text('All Methods', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          hint: Text('All Modes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                           style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                           dropdownColor: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -3291,7 +3291,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           // (qr_upi, razorpay, cheque…) was confusing for
                           // accountants who just want cash-hand totals.
                           items: const [
-                            DropdownMenuItem<String?>(value: null, child: Text('All Methods')),
+                            DropdownMenuItem<String?>(value: null, child: Text('All Modes')),
                             DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
                             DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
                           ],
@@ -3357,7 +3357,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           DataColumn(label: Text('STUDENT NAME')),
                           DataColumn(label: Text('COURSE')),
                           DataColumn(label: Text('CLASS')),
-                          DataColumn(label: Text('METHOD')),
+                          DataColumn(label: Text('MODE')),
                           DataColumn(label: Text('COLLECTION'), numeric: true),
                           DataColumn(label: Text('FINE'), numeric: true),
                           DataColumn(label: Text('TOTAL'), numeric: true),
@@ -3805,7 +3805,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                                 DataColumn(label: Text('STUDENT NAME')),
                                 DataColumn(label: Text('COURSE')),
                                 DataColumn(label: Text('CLASS')),
-                                DataColumn(label: Text('METHOD')),
+                                DataColumn(label: Text('MODE')),
                                 DataColumn(label: Text('COLLECTION'), numeric: true),
                                 DataColumn(label: Text('FINE'), numeric: true),
                                 DataColumn(label: Text('TOTAL'), numeric: true),
@@ -4817,6 +4817,13 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     return a.compareTo(b);
   }
 
+  // Lookup maps for ordid-based class sort. Filled by _fetchData and read by
+  // _buildClassGroupsFromSummary's comparator. Default to a high ordid for
+  // unknown names so they sink to the bottom instead of jumping to the top.
+  Map<String, int> _classOrdid = {};
+  Map<String, int> _courseOrdidByName = {};
+  Map<String, int> _classCourseOrdid = {}; // claname → course.ordid via class.cour_id
+
   Future<void> _fetchData() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
@@ -4824,19 +4831,56 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
 
     setState(() => _isLoading = true);
 
-    // Aggregate summary + feetype master so chips render the short code.
+    // Aggregate summary + feetype master + class/course masters so the table
+    // is ordered by course.ordid → class.ordid instead of alphabetical.
     final results = await Future.wait([
       SupabaseService.getFeeDemandSummary(insId),
       SupabaseService.fromSchema('feetype')
           .select('feedesc, feeshort')
           .eq('ins_id', insId)
           .eq('activestatus', 1),
+      SupabaseService.fromSchema('class')
+          .select('claname, ordid, cour_id')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1),
+      SupabaseService.fromSchema('course')
+          .select('cour_id, courname, ordid')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1),
     ]);
     final summaryRows = results[0] as List<Map<String, dynamic>>;
     final feeTypeMaster = results[1] as List;
+    final classMaster = results[2] as List;
+    final courseMaster = results[3] as List;
+
+    final courseOrdidById = <int, int>{};
+    final courseNameById = <int, String>{};
+    final courseOrdidByName = <String, int>{};
+    for (final c in courseMaster) {
+      final id = (c['cour_id'] as num?)?.toInt();
+      final ord = (c['ordid'] as num?)?.toInt() ?? 9999;
+      final nm = c['courname']?.toString() ?? '';
+      if (id != null) {
+        courseOrdidById[id] = ord;
+        courseNameById[id] = nm;
+      }
+      if (nm.isNotEmpty) courseOrdidByName[nm] = ord;
+    }
+    final classOrdid = <String, int>{};
+    final classCourseOrdid = <String, int>{};
+    for (final c in classMaster) {
+      final nm = c['claname']?.toString() ?? '';
+      if (nm.isEmpty) continue;
+      classOrdid[nm] = (c['ordid'] as num?)?.toInt() ?? 9999;
+      final cid = (c['cour_id'] as num?)?.toInt();
+      classCourseOrdid[nm] = (cid != null ? courseOrdidById[cid] : null) ?? 9999;
+    }
 
     if (mounted) {
       setState(() {
+        _courseOrdidByName = courseOrdidByName;
+        _classOrdid = classOrdid;
+        _classCourseOrdid = classCourseOrdid;
         _classGroups = _buildClassGroupsFromSummary(summaryRows);
         _feeShortByDesc = {
           for (final r in feeTypeMaster)
@@ -4870,8 +4914,21 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         feeTypes: feeTypes,
       );
     }).toList();
-    // Order by course alphabetically, then by class.
+    // Sort by course.ordid (resolved via the class's cour_id, falling back
+    // to the course name lookup) then by class.ordid. Falls back to the old
+    // string compare when neither master has a matching row.
+    int courseOrd(_ClassGroup g) {
+      final byClass = _classCourseOrdid[g.className];
+      if (byClass != null) return byClass;
+      return _courseOrdidByName[g.courseName ?? ''] ?? 9999;
+    }
+    int classOrd(_ClassGroup g) => _classOrdid[g.className] ?? 9999;
     groups.sort((a, b) {
+      final c = courseOrd(a).compareTo(courseOrd(b));
+      if (c != 0) return c;
+      final cl = classOrd(a).compareTo(classOrd(b));
+      if (cl != 0) return cl;
+      // Tiebreaker for classes both missing from master.
       final courseCmp = (a.courseName ?? '').compareTo(b.courseName ?? '');
       if (courseCmp != 0) return courseCmp;
       return _compareClass(a.className, b.className);
@@ -5196,12 +5253,15 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   }
 
                   // --- FOOTER (GRAND TOTAL) ---
+                  // Align each summary to the matching header column:
+                  //  0:S No | 1:COURSE | 2:CLASS | 3:STUDENTS | 4:FEE TYPES
+                  //  5:TOTAL DEMAND | 6:PAID | 7:FINE | 8:%COLLECTED | 9:PENDING
                   final classFooterRow = cBuildRow(
                     [
                       cBuildCell('', 0, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell('Total', 1, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
-                      cBuildCell('$_totalStudents', 2, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
-                      cBuildCell('', 3),
+                      cBuildCell('', 2),
+                      cBuildCell('$_totalStudents', 3, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell('', 4),
                       cBuildCell(_formatCurrency(_totalDemand), 5, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                       cBuildCell(_formatCurrency(_totalPaid), 6, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
@@ -6738,7 +6798,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                           child: OutlinedButton.icon(
                             onPressed: _openDateMethodFilter,
                             icon: AppIcon.linear('calendar-1', size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                            label: Text('Date & Method', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            label: Text('Date', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: AppColors.border),
                               padding: EdgeInsets.symmetric(horizontal: 14.w),

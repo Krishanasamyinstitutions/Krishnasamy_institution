@@ -1025,6 +1025,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
   bool _loading = true;
 
   final _ruleNameCtrl = TextEditingController();
+  String? _ruleNameError;
   final _fromDaysCtrl = TextEditingController();
   final _toDaysCtrl = TextEditingController();
   final _fineValueCtrl = TextEditingController();
@@ -1136,6 +1137,10 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
       );
       return;
     }
+    if (ruleName.length > 50) {
+      setState(() => _ruleNameError = 'Rule name must be less than 50 characters');
+      return;
+    }
 
     final data = {
       'ins_id': insId,
@@ -1213,7 +1218,14 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                   TextField(
                     controller: _ruleNameCtrl,
                     style: _fieldTextStyle(),
-                    decoration: _fieldDecoration(hint: 'e.g., 1 Week Overdue'),
+                    onChanged: (v) {
+                      final overflow = v.trim().length > 50;
+                      final next = overflow ? 'Rule name must be less than 50 characters' : null;
+                      if (_ruleNameError != next) {
+                        setState(() => _ruleNameError = next);
+                      }
+                    },
+                    decoration: _fieldDecoration(hint: 'e.g., 1 Week Overdue').copyWith(errorText: _ruleNameError, errorMaxLines: 3),
                   ),
                   SizedBox(height: 14.h),
                   _fieldLabel('Fee Type'),
@@ -1395,15 +1407,25 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary,
                                   letterSpacing: 0.3);
-                              bool rightAlign(int i) =>
-                                  i == 2 || i == 3 || i == 5;
+                              // Per-column alignment so the header text and
+                              // the data underneath stay visually aligned.
+                              // FROM/TO/VALUE → centerRight (numbers).
+                              // ACTIONS → centerRight (icons sit at far right
+                              // matching the header). Everything else → left.
+                              Alignment alignOf(int i) {
+                                if (i == 2 || i == 3 || i == 5 || i == 6) {
+                                  return Alignment.centerRight;
+                                }
+                                return Alignment.centerLeft;
+                              }
                               Widget cell(int i, Widget child) => Expanded(
                                     flex: flexes[i],
-                                    child: Align(
-                                      alignment: rightAlign(i)
-                                          ? Alignment.centerRight
-                                          : Alignment.centerLeft,
-                                      child: child,
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8.w),
+                                      child: Align(
+                                        alignment: alignOf(i),
+                                        child: child,
+                                      ),
                                     ),
                                   );
                               return Column(

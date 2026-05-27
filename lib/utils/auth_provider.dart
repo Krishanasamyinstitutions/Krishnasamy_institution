@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/supabase_service.dart';
 import '../models/institution_user_model.dart';
+import 'friendly_error.dart';
 
 const _kEmail = 'saved_email';
 const _kPassword = 'saved_password';
@@ -130,7 +131,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Login failed: ${e.toString()}';
+      _errorMessage = friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -151,7 +152,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Registration failed: ${e.toString()}';
+      _errorMessage = friendlyError(e);
       _isLoading = false;
       notifyListeners();
       return false;
