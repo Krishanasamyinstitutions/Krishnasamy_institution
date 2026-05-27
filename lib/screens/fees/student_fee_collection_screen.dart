@@ -54,6 +54,10 @@ class _StudentFeeCollectionScreenState
   final _remarksController = TextEditingController();
   final _chequeNoController = TextEditingController();
   final _upiRefController = TextEditingController();
+  // Cash mode: cashier enters the tender amount; refund is computed.
+  final _tenderAmountController = TextEditingController();
+  double? _cashTenderAmount;
+  double? _cashRefundAmount;
   final _chequeDateController = TextEditingController();
   final _bankNameController = TextEditingController();
   DateTime? _chequeDate;
@@ -77,11 +81,21 @@ class _StudentFeeCollectionScreenState
   bool _loadingDemands = false;
 
   String? _selectedTerm; // null = All
-  String _paymentMode = 'Cash';
+  // Payment mode — null = nothing selected yet. The cashier picks one via
+  // the inline chips in the bottom bar before the action button is enabled.
+  String? _paymentMode;
 
   // Per-row controllers: keyed by dem_id
   final Map<String, TextEditingController> _fineCtrl = {};
   final Map<String, TextEditingController> _conCtrl = {};
+  // Persistent FocusNodes per row so a setState that rebuilds the row table
+  // doesn't make the active TextField lose focus mid-typing.
+  final Map<String, FocusNode> _fineFocus = {};
+  final Map<String, FocusNode> _conFocus = {};
+  // Debounce the auto-check setState — pure typing within a row shouldn't
+  // rebuild the table on every keystroke (which loses focus). A short pause
+  // (~350ms) after the last digit triggers the actual selection flip.
+  final Map<String, Timer> _conFlipTimers = {};
   final Set<String> _selected = {};
   List<Map<String, dynamic>> _fineRules = [];
 
@@ -130,8 +144,8 @@ class _StudentFeeCollectionScreenState
           try {
             await SupabaseService.client.rpc('complete_payment_grouped', params: {
               'p_pay_id': payId,
-              'p_pay_method': 'razorpay',
-              'p_pay_reference': 'Razorpay: $paymentId (recovered)',
+              'p_pay_method': 'online',
+              'p_pay_reference': paymentId,
               'p_items': items,
               'p_ins_id': insId,
               'p_status': 'C',
@@ -187,8 +201,8 @@ class _StudentFeeCollectionScreenState
       try {
         await SupabaseService.client.rpc('complete_payment_grouped', params: {
           'p_pay_id': payId,
-          'p_pay_method': 'razorpay',
-          'p_pay_reference': 'Razorpay: $paymentId (recovered via Check Status)',
+          'p_pay_method': 'online',
+          'p_pay_reference': paymentId,
           'p_items': items,
           'p_ins_id': insId,
           'p_status': 'C',
@@ -362,10 +376,14 @@ class _StudentFeeCollectionScreenState
     _remarksController.dispose();
     _chequeNoController.dispose();
     _upiRefController.dispose();
+    _tenderAmountController.dispose();
     _chequeDateController.dispose();
     _bankNameController.dispose();
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
+    for (final f in _fineFocus.values) f.dispose();
+    for (final f in _conFocus.values) f.dispose();
+    for (final t in _conFlipTimers.values) t.cancel();
     super.dispose();
   }
 
@@ -390,8 +408,12 @@ class _StudentFeeCollectionScreenState
   void _clear() {
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
+    for (final f in _fineFocus.values) f.dispose();
+    for (final f in _conFocus.values) f.dispose();
     _fineCtrl.clear();
     _conCtrl.clear();
+    _fineFocus.clear();
+    _conFocus.clear();
     setState(() {
       _admNoController.clear();
       _nameController.clear();
@@ -408,7 +430,7 @@ class _StudentFeeCollectionScreenState
       _errorMsg = null;
       _selectedTerm = null;
       _selected.clear();
-      _paymentMode = 'Cash';
+      _paymentMode = null;
       _chequeNoController.clear();
       _chequeDateController.clear();
       _bankNameController.clear();
@@ -455,6 +477,28 @@ class _StudentFeeCollectionScreenState
     } catch (_) {}
   }
 
+  /// Combined suggestion search — matches Roll No (prefix) OR Student Name
+  /// (substring) so the single search field works for both.
+  Future<void> _searchByAdmNoOrName(String q) async {
+    final term = q.trim();
+    if (term.length < 2) {
+      setState(() => _studentSuggestions = []);
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    try {
+      final rows = await SupabaseService.fromSchema('students')
+          .select('stu_id, stuname, stuadmno, stuclass, courname')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1)
+          .or('stuadmno.ilike.$term%,stuname.ilike.%$term%')
+          .limit(10);
+      setState(() => _studentSuggestions = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
+  }
+
   void _selectSuggestion(Map<String, dynamic> student) {
     _admNoController.text = student['stuadmno']?.toString() ?? '';
     _nameController.text = student['stuname']?.toString() ?? '';
@@ -474,11 +518,15 @@ class _StudentFeeCollectionScreenState
     final insId = auth.insId;
     if (insId == null) return;
 
-    // Dispose old controllers
+    // Dispose old controllers + focus nodes from any previous search
     for (final c in _fineCtrl.values) c.dispose();
     for (final c in _conCtrl.values) c.dispose();
+    for (final f in _fineFocus.values) f.dispose();
+    for (final f in _conFocus.values) f.dispose();
     _fineCtrl.clear();
     _conCtrl.clear();
+    _fineFocus.clear();
+    _conFocus.clear();
 
     setState(() {
       _searching = true;
@@ -491,7 +539,11 @@ class _StudentFeeCollectionScreenState
     });
 
     try {
-      final studentRows = await SupabaseService.fromSchema('students')
+      // The combined search field accepts a Roll No OR a Student Name. Try
+      // exact roll-no match first; if nothing, fall back to a name search
+      // and use the first match (e.g. user typed a full name and hit Enter
+      // without clicking a suggestion).
+      var studentRows = await SupabaseService.fromSchema('students')
           .select('stu_id, stuname, stuadmno, stuclass, stugender, stumobile, stuphoto, courname')
           .eq('ins_id', insId)
           .eq('stuadmno', admNo)
@@ -499,8 +551,17 @@ class _StudentFeeCollectionScreenState
           .limit(1);
 
       if ((studentRows as List).isEmpty) {
+        studentRows = await SupabaseService.fromSchema('students')
+            .select('stu_id, stuname, stuadmno, stuclass, stugender, stumobile, stuphoto, courname')
+            .eq('ins_id', insId)
+            .eq('activestatus', 1)
+            .ilike('stuname', '%$admNo%')
+            .limit(1);
+      }
+
+      if ((studentRows as List).isEmpty) {
         setState(() {
-          _errorMsg = 'No student found with roll no "$admNo"';
+          _errorMsg = 'No student found matching "$admNo"';
           _searching = false;
         });
         return;
@@ -508,9 +569,15 @@ class _StudentFeeCollectionScreenState
 
       final student = Map<String, dynamic>.from(studentRows.first as Map);
       final stuId = student['stu_id'] as int;
+      // Use the resolved student's actual roll number for downstream lookups
+      // (the search field may now hold the student name, not the admno).
+      final stuAdmno = student['stuadmno']?.toString() ?? '';
 
       _nameController.text = student['stuname']?.toString() ?? '';
       _classController.text = student['stuclass']?.toString() ?? '';
+      // Show the student name in the combined search field once a match is
+      // resolved — easier to read than the raw roll no.
+      _admNoController.text = student['stuname']?.toString() ?? '';
       final stuClass = student['stuclass']?.toString();
       final stuCourse = student['courname']?.toString();
 
@@ -536,13 +603,15 @@ class _StudentFeeCollectionScreenState
       // cashier sees the calculated fine via _calculateFine below; if they
       // abandon without paying, the DB column stays empty.
 
-      // Fetch parent and demands in parallel
-      final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: admNo);
+      // Fetch parent and demands in parallel — use the resolved student's
+      // actual stuadmno so the join works even when the user searched by
+      // student name in the combined search field.
+      final parentFuture = SupabaseService.getStudentParent(stuId, stuadmno: stuAdmno);
       final demandsFuture = SupabaseService.fromSchema('feedemand')
           .select(
               'dem_id, demno, yr_id, demfeeyear, demfeetype, demfeeterm, feeamount, conamount, balancedue, paidamount, fineamount, duedate, paidstatus, stuclass')
           .eq('ins_id', insId)
-          .eq('stuadmno', admNo)
+          .eq('stuadmno', stuAdmno)
           .eq('paidstatus', 'U')
           .gt('balancedue', 0)
           .order('duedate', ascending: true);
@@ -565,13 +634,19 @@ class _StudentFeeCollectionScreenState
 
       // Per-row controllers: prefer the server-computed fineamount column;
       // fall back to client-side rule calculation if server hasn't populated it.
+      // Default behaviour on student search: every demand row is pre-checked
+      // and Col Amount is pre-filled with the balance — cashier just tweaks
+      // values then hits Proceed to Pay.
+      _selected.clear();
       for (final d in demandList) {
         final key = d['dem_id']?.toString() ?? '';
         if (key.isNotEmpty) {
           final serverFine = (d['fineamount'] as num?)?.toDouble() ?? 0;
           final fine = serverFine > 0 ? serverFine : _calculateFine(d);
+          final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
           _fineCtrl[key] = TextEditingController(text: fine > 0 ? fine.toStringAsFixed(0) : '');
-          _conCtrl[key] = TextEditingController();
+          _conCtrl[key] = TextEditingController(text: bal > 0 ? bal.toStringAsFixed(0) : '');
+          if (bal > 0) _selected.add(key);
         }
       }
 
@@ -581,7 +656,7 @@ class _StudentFeeCollectionScreenState
       });
     } catch (e) {
       setState(() {
-        _errorMsg = 'Error: $e';
+        _errorMsg = friendlyError(e);
         _searching = false;
         _loadingDemands = false;
       });
@@ -591,13 +666,15 @@ class _StudentFeeCollectionScreenState
   List<Map<String, dynamic>> get _filteredDemands {
     if (_selectedTerm == null) return _allDemands;
     return _allDemands.where((d) =>
-        (d['demfeeterm']?.toString() ?? '') == _selectedTerm).toList();
+        (d['demfeetype']?.toString() ?? '') == _selectedTerm).toList();
   }
 
+  /// Unique Fee Type values across the current student's demands. Used by
+  /// the in-table filter dropdown (label: "Fee Type").
   List<String> get _terms {
     final seen = <String>[];
     for (final d in _allDemands) {
-      final t = d['demfeeterm']?.toString() ?? '';
+      final t = d['demfeetype']?.toString() ?? '';
       if (t.isNotEmpty && !seen.contains(t)) seen.add(t);
     }
     return seen;
@@ -613,29 +690,22 @@ class _StudentFeeCollectionScreenState
       double.tryParse(_conCtrl[key]?.text ?? '') ?? 0;
 
   double _netAmt(Map<String, dynamic> d) {
+    // Net the cashier is actually collecting = Col Amount + Fine. When
+    // nothing's typed in Col Amount the row contributes 0 so the cashier
+    // sees exactly what they will collect.
     final key = _demKey(d);
-    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-    final fine = _fine(key);
-    return bal + fine;
-  }
-
-  double _payableAmt(Map<String, dynamic> d) {
-    final key = _demKey(d);
-    final col = _con(key);
-    final fine = _fine(key);
-    if (col > 0) return col + fine;
-    final bal = (d['balancedue'] as num?)?.toDouble() ?? 0;
-    return bal + fine;
+    return _con(key) + _fine(key);
   }
 
   double get _totalNetSelected {
-    return _selected.fold(0.0, (sum, key) {
-      final d = _allDemands.firstWhere(
-          (x) => _demKey(x) == key,
-          orElse: () => {});
-      if (d.isEmpty) return sum;
-      return sum + _payableAmt(d);
-    });
+    // Bottom NET AMOUNT = sum of every row's actual NET AMT (col + fine).
+    // Stays in lockstep with the per-row column so a row with Col Amount = 0
+    // contributes 0 to the total even if the checkbox is still ticked.
+    var sum = 0.0;
+    for (final d in _allDemands) {
+      sum += _netAmt(d);
+    }
+    return sum;
   }
 
   @override
@@ -754,92 +824,13 @@ class _StudentFeeCollectionScreenState
             ],
           ),
           SizedBox(height: 14.h),
+          // Single-line filter row: Course | Class | Search by Roll/Name.
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 40,
-                        child: TextField(
-                          controller: _admNoController,
-                          onSubmitted: (_) => _search(),
-                          onChanged: _searchByAdmNo,
-                          decoration: _inputDec('Roll No').copyWith(
-                            border: const OutlineInputBorder(
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(8),
-                                bottomLeft: Radius.circular(8),
-                              ),
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
-                            enabledBorder: const OutlineInputBorder(
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(8),
-                                bottomLeft: Radius.circular(8),
-                              ),
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
-                            focusedBorder: const OutlineInputBorder(
-                              borderRadius: BorderRadius.only(
-                                topLeft: Radius.circular(8),
-                                bottomLeft: Radius.circular(8),
-                              ),
-                              borderSide: BorderSide(color: AppColors.accent, width: 1.5),
-                            ),
-                          ),
-                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 40,
-                      width: 40,
-                      child: ElevatedButton(
-                        onPressed: _searching ? null : _search,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: Colors.white,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.only(
-                              topRight: Radius.circular(8),
-                              bottomRight: Radius.circular(8),
-                            ),
-                          ),
-                          padding: EdgeInsets.zero,
-                          elevation: 0,
-                        ),
-                        child: _searching
-                            ? SizedBox(
-                                width: 18.w,
-                                height: 18.h,
-                                child: const CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const AppIcon.linear('search-normal', size: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(width: 10.w),
-              Expanded(
                 child: SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: _nameController,
-                    decoration: _inputDec('Student Name'),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    onChanged: _searchByName,
-                  ),
-                ),
-              ),
-              SizedBox(width: 10.w),
-              Expanded(
-                child: SizedBox(
-                  height: 40,
+                  height: 34,
                   child: DropdownButtonFormField<String>(
                     value: _selectedCourse,
                     isExpanded: true,
@@ -873,27 +864,50 @@ class _StudentFeeCollectionScreenState
               SizedBox(width: 10.w),
               Expanded(
                 child: SizedBox(
-                  height: 40,
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey(_selectedCourse),
-                    value: _selectedClass,
-                    isExpanded: true,
-                    dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    elevation: 6,
-                    decoration: _inputDec('Class'),
+                  height: 34,
+                  child: Builder(builder: (_) {
+                    final seen = <String>{};
+                    final items = <DropdownMenuItem<String>>[];
+                    for (final c in _classList) {
+                      if (c.isEmpty || !seen.add(c)) continue;
+                      items.add(DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))));
+                    }
+                    final value = seen.contains(_selectedClass) ? _selectedClass : null;
+                    return DropdownButtonFormField<String>(
+                      key: ValueKey(_selectedCourse),
+                      value: value,
+                      isExpanded: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      elevation: 6,
+                      decoration: _inputDec('Class'),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      items: items,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedClass = val;
+                          _classController.text = val ?? '';
+                          _classSuggestions = [];
+                        });
+                        if (val != null) _searchByClass(val);
+                      },
+                    );
+                  }),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: SizedBox(
+                  height: 34,
+                  child: TextField(
+                    controller: _admNoController,
+                    onSubmitted: (_) => _search(),
+                    onChanged: _searchByAdmNoOrName,
+                    decoration: _inputDec('Search by Roll No or Name'),
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    items: _classList.map((c) {
-                      return DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)));
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedClass = val;
-                        _classController.text = val ?? '';
-                        _classSuggestions = [];
-                      });
-                      if (val != null) _searchByClass(val);
-                    },
+                    expands: true,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.center,
                   ),
                 ),
               ),
@@ -1061,54 +1075,23 @@ class _StudentFeeCollectionScreenState
                   ),
                 ],
                 const Spacer(),
-                if (_selected.isNotEmpty) ...[
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('NET AMOUNT: ',
-                            style: TextStyle(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                                letterSpacing: 0.3)),
-                        Text(
-                          'Rs.${_totalNetSelected.toStringAsFixed(2)}',
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.accent),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                ],
                 if (_student != null && _terms.isNotEmpty) ...[
-                  Text('Semester:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                  Text('Fee Type:', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                   SizedBox(width: 8.w),
                   SizedBox(
-                    width: 180.w,
-                    height: 40,
+                    width: 200.w,
+                    height: 50,
                     child: DropdownButtonFormField<String?>(
                       value: _selectedTerm,
                       isExpanded: true,
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                        isDense: true,
-                      ),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      decoration: _headerDropdownDec(),
                       items: [
-                        DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))),
-                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis))),
+                        DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
+                        ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis))),
                       ],
                       onChanged: (v) => setState(() => _selectedTerm = v),
                     ),
@@ -1194,11 +1177,20 @@ class _StudentFeeCollectionScreenState
                     setState(() {
                       if (v == true) {
                         for (final d in demands) {
-                          _selected.add(_demKey(d));
+                          final k = _demKey(d);
+                          _selected.add(k);
+                          final b = (d['balancedue'] as num?)?.toDouble() ?? 0;
+                          final ctrl = _conCtrl[k];
+                          if (ctrl != null && b > 0) {
+                            ctrl.text = b.toStringAsFixed(0);
+                          }
                         }
                       } else {
                         for (final d in demands) {
-                          _selected.remove(_demKey(d));
+                          final k = _demKey(d);
+                          _selected.remove(k);
+                          final ctrl = _conCtrl[k];
+                          if (ctrl != null) ctrl.text = '0';
                         }
                       }
                     });
@@ -1240,9 +1232,9 @@ class _StudentFeeCollectionScreenState
               final shortDate = dueDate.length >= 10
                   ? _formatDate(dueDate.substring(0, 10))
                   : dueDate;
-              final netAmt = _netAmt(d);
 
               return Container(
+                key: ValueKey('row-$key'),
                 color: isSelected
                     ? AppColors.accent.withValues(alpha: 0.04)
                     : null,
@@ -1255,11 +1247,19 @@ class _StudentFeeCollectionScreenState
                       child: Checkbox(
                         value: isSelected,
                         onChanged: (v) {
+                          // Checking auto-fills Col Amount with the row's
+                          // balance; unchecking resets it to 0 so it
+                          // doesn't get included in any subsequent total.
+                          final colCtrl = _conCtrl[key];
                           setState(() {
                             if (v == true) {
                               _selected.add(key);
+                              if (colCtrl != null && bal > 0) {
+                                colCtrl.text = bal.toStringAsFixed(0);
+                              }
                             } else {
                               _selected.remove(key);
+                              if (colCtrl != null) colCtrl.text = '0';
                             }
                           });
                         },
@@ -1300,21 +1300,31 @@ class _StudentFeeCollectionScreenState
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFFE87722))),
-                    // Col Amount editable — clamp to balance due
+                    // Col Amount editable — clamp to balance due. Typing a
+                    // positive amount auto-checks the row; clearing it back
+                    // to 0 / empty auto-unchecks. setState is gated so it
+                    // only fires when the selection actually flips (or on
+                    // clamp), so the TextField keeps focus on every
+                    // keystroke within the same state. The selected-tint and
+                    // NET AMOUNT total still refresh on those flips.
                     Expanded(
                       flex: 2,
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
                         child: _numField(_conCtrl[key], () {
                           final ctrl = _conCtrl[key];
+                          double entered = 0;
+                          bool clamped = false;
                           if (ctrl != null) {
-                            final entered = double.tryParse(ctrl.text) ?? 0;
+                            entered = double.tryParse(ctrl.text) ?? 0;
                             if (entered > bal) {
-                              final clamped = bal.toStringAsFixed(0);
+                              final clampedText = bal.toStringAsFixed(0);
                               ctrl.value = TextEditingValue(
-                                text: clamped,
-                                selection: TextSelection.collapsed(offset: clamped.length),
+                                text: clampedText,
+                                selection: TextSelection.collapsed(offset: clampedText.length),
                               );
+                              entered = bal;
+                              clamped = true;
                               if (mounted) {
                                 ScaffoldMessenger.of(context)
                                   ..hideCurrentSnackBar()
@@ -1328,30 +1338,80 @@ class _StudentFeeCollectionScreenState
                               }
                             }
                           }
-                          setState(() {});
-                        }),
+                          // Debounce the auto-check setState — keystrokes
+                          // within the same row reset a 350ms timer. The
+                          // setState fires only once after typing pauses, so
+                          // the user can type 5000 without losing focus per
+                          // digit. Clamp errors are surfaced immediately,
+                          // since those require a snackbar.
+                          if (clamped) {
+                            setState(() {});
+                          }
+                          _conFlipTimers[key]?.cancel();
+                          _conFlipTimers[key] = Timer(const Duration(milliseconds: 350), () {
+                            if (!mounted) return;
+                            final c = _conCtrl[key];
+                            if (c == null) return;
+                            final v = double.tryParse(c.text) ?? 0;
+                            final shouldSelect = v > 0;
+                            final isAlready = _selected.contains(key);
+                            if (shouldSelect == isAlready) return;
+                            // Capture focus before the rebuild and re-grab
+                            // it afterwards. Without this the row's
+                            // selection-state rebuild can drop focus on the
+                            // Col Amount field — particularly when the user
+                            // is back-spacing the value down to 0.
+                            final node = _conCtrl[key] != null ? _conFocus[key] : null;
+                            final hadFocus = node?.hasFocus ?? false;
+                            setState(() {
+                              if (shouldSelect) {
+                                _selected.add(key);
+                              } else {
+                                _selected.remove(key);
+                              }
+                            });
+                            if (hadFocus && node != null) {
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted && !node.hasFocus) node.requestFocus();
+                              });
+                            }
+                          });
+                        }, fieldKey: 'col-$key', focusNode: _conFocus.putIfAbsent(key, () => FocusNode())),
                       ),
                     ),
-                    // Fine editable
+                    // Fine editable — only when the row is checked. The
+                    // cashier has to tick the row (or type a Col Amount that
+                    // auto-checks it) before adjusting the fine.
                     Expanded(
                       flex: 2,
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4.w),
-                        child: _numField(_fineCtrl[key], () => setState(() {}), maxLength: 4),
+                        child: _numField(_fineCtrl[key], () => setState(() {}), maxLength: 4, fieldKey: 'fine-$key', focusNode: _fineFocus.putIfAbsent(key, () => FocusNode()), enabled: isSelected),
                       ),
                     ),
-                    // Net Amt
+                    // Net Amt — listens to the row's Col + Fine controllers
+                    // so it refreshes on every keystroke instead of waiting
+                    // for the debounce-driven setState.
                     Expanded(
                       flex: 1,
-                      child: Text(
-                        netAmt.toStringAsFixed(2),
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w600,
-                            color: netAmt > 0
-                                ? AppColors.error
-                                : AppColors.textPrimary),
+                      child: ListenableBuilder(
+                        listenable: Listenable.merge([
+                          if (_conCtrl[key] != null) _conCtrl[key]!,
+                          if (_fineCtrl[key] != null) _fineCtrl[key]!,
+                        ]),
+                        builder: (_, __) {
+                          final live = _netAmt(d);
+                          return Text(
+                            live.toStringAsFixed(2),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: live > 0
+                                    ? AppColors.error
+                                    : AppColors.textPrimary),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -1382,22 +1442,112 @@ class _StudentFeeCollectionScreenState
                     fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
               ),
               const Spacer(),
-              ElevatedButton.icon(
-                onPressed:
-                    _selected.isEmpty ? null : _onCollectAndReceipt,
-                icon: AppIcon('wallet-money', size: 16),
-                label: const Text('Proceed to Pay'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade200,
-                  disabledForegroundColor: AppColors.textSecondary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.r)),
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 24.w, vertical: 16.h),
-                  textStyle: TextStyle(
-                      fontSize: 13.sp, fontWeight: FontWeight.w600),
+              if (_selected.isNotEmpty) ...[
+                Container(
+                  height: 58,
+                  padding: EdgeInsets.symmetric(horizontal: 22.w),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    // Stronger fill + border so the figure pops against the
+                    // surrounding white footer bar.
+                    color: AppColors.accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.45), width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('NET AMOUNT: ',
+                          style: TextStyle(
+                              fontSize: 19.sp,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: 0.3)),
+                      // Live total — subscribes to every visible row's
+                      // col/fine controller so it ticks per keystroke
+                      // without rebuilding the TextField (which would steal
+                      // focus mid-typing).
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          ..._conCtrl.values,
+                          ..._fineCtrl.values,
+                        ]),
+                        builder: (_, __) => Text(
+                          'Rs.${_totalNetSelected.toStringAsFixed(2)}',
+                          style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.accent),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 14.w),
+              ],
+              SizedBox(width: 6.w),
+              // Payment-mode dropdown — sits just before the Save / Proceed
+              // to Pay button so the cashier picks the mode and commits in
+              // one motion.
+              // Wrap a borderless DropdownButton in the same padded
+              // container shape as the NET AMOUNT pill so the two visually
+              // match in height + corner radius.
+              Container(
+                width: 200.w,
+                height: 58,
+                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  // Match the NET AMOUNT pill's accent-tinted fill so the
+                  // Mode field is visually clearly distinguished from the
+                  // plain footer background.
+                  color: AppColors.accent.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.45), width: 1.2),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _paymentMode,
+                    isExpanded: true,
+                    isDense: false,
+                    hint: Text('SELECT MODE', style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: 0.3)),
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 6,
+                    style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.accent, letterSpacing: 0.3),
+                    items: const [
+                      DropdownMenuItem(value: 'Cash', child: Text('CASH')),
+                      DropdownMenuItem(value: 'QR/UPI', child: Text('QR/UPI')),
+                      DropdownMenuItem(value: 'Online', child: Text('ONLINE')),
+                      DropdownMenuItem(value: 'Cheque', child: Text('CHEQUE')),
+                    ],
+                    onChanged: _selected.isEmpty ? null : (v) => setState(() => _paymentMode = v),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              // Match the NET AMOUNT pill + Mode dropdown visually: same
+              // accent-tinted fill, same border, same height, same corner
+              // radius. Keeps the three footer elements as a unified triple.
+              SizedBox(
+                height: 58,
+                child: ElevatedButton.icon(
+                  onPressed: (_selected.isEmpty || _paymentMode == null)
+                      ? null
+                      : (_paymentMode == 'Cash' ? _saveCashPayment : _onCollectAndReceipt),
+                  icon: AppIcon(_paymentMode == 'Cash' ? 'save-2' : 'wallet-money', size: 20),
+                  label: Text(_paymentMode == 'Cash' ? 'SAVE' : 'PROCEED TO PAY'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.18),
+                    foregroundColor: AppColors.accent,
+                    disabledBackgroundColor: Colors.grey.shade100,
+                    disabledForegroundColor: AppColors.textSecondary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                      side: BorderSide(color: AppColors.accent.withValues(alpha: 0.45), width: 1.2),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 32.w),
+                    textStyle: TextStyle(
+                        fontSize: 19.sp, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                  ),
                 ),
               ),
             ],
@@ -1411,53 +1561,212 @@ class _StudentFeeCollectionScreenState
 
   bool _processing = false;
 
-  Future<void> _onCollectAndReceipt() async {
-    // Check if sequences exist for all fee groups in selected demands
+  /// Save a Cash payment. Runs the sequence pre-check then shows a small
+  /// dialog asking for the tender amount; the refund (change) is computed
+  /// live as the cashier types. Both values are stored on the payment row.
+  Future<void> _saveCashPayment() async {
+    final ok = await _ensureSequencesExist();
+    if (!ok) return;
+    _paymentMode = 'Cash';
+    final total = _totalNetSelected;
+    _tenderAmountController.text = total.toStringAsFixed(0);
+    _cashTenderAmount = total;
+    _cashRefundAmount = 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) {
+        void recompute() {
+          final t = double.tryParse(_tenderAmountController.text) ?? 0;
+          setSt(() {
+            _cashTenderAmount = t;
+            _cashRefundAmount = (t - total).clamp(0, double.infinity).toDouble();
+          });
+        }
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+          insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 420.w),
+            child: Padding(
+              padding: EdgeInsets.all(22.w),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Cash Payment',
+                      style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  SizedBox(height: 12.h),
+                  _cashRow('Net Amount', 'Rs.${total.toStringAsFixed(2)}', highlight: true),
+                  SizedBox(height: 14.h),
+                  Text('Tender Amount *', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 6.h),
+                  TextField(
+                    controller: _tenderAmountController,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    onChanged: (_) => recompute(),
+                    decoration: InputDecoration(
+                      hintText: 'Enter cash received',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                    ),
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                  ),
+                  if ((_cashTenderAmount ?? 0) < total && (_cashTenderAmount ?? 0) > 0) ...[
+                    SizedBox(height: 6.h),
+                    Text(
+                      'Tender must be at least Rs.${total.toStringAsFixed(2)}',
+                      style: TextStyle(fontSize: 12.sp, color: AppColors.error, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                  SizedBox(height: 14.h),
+                  _cashRow('Refund (Change)', 'Rs.${(_cashRefundAmount ?? 0).toStringAsFixed(2)}'),
+                  SizedBox(height: 20.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      SizedBox(width: 8.w),
+                      Builder(builder: (_) {
+                        final t = double.tryParse(_tenderAmountController.text) ?? 0;
+                        final canConfirm = t >= total && total > 0;
+                        return ElevatedButton(
+                          onPressed: !canConfirm
+                              ? null
+                              : () {
+                                  _cashTenderAmount = t;
+                                  _cashRefundAmount = (t - total).clamp(0, double.infinity).toDouble();
+                                  Navigator.pop(ctx, true);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade300,
+                            disabledForegroundColor: Colors.grey.shade600,
+                            padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 12.h),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                          ),
+                          child: const Text('Confirm'),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+    if (confirmed != true) return;
+    await _processPayment();
+  }
+
+  Widget _cashRow(String label, String value, {bool highlight = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+        Text(value,
+            style: TextStyle(
+              fontSize: highlight ? 16.sp : 14.sp,
+              fontWeight: FontWeight.w700,
+              color: highlight ? AppColors.accent : AppColors.textPrimary,
+            )),
+      ],
+    );
+  }
+
+  /// Shared pre-check: every fee group in the selected demands must have
+  ///   (a) a payment sequence configured AND
+  ///   (b) a bank account mapped (feegroup.ban_id).
+  /// Returns false (with a snackbar) on the first missing requirement so the
+  /// caller can abort the collection.
+  Future<bool> _ensureSequencesExist() async {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId;
-    if (insId != null) {
-      try {
-        final sequences = await SupabaseService.fromSchema('sequence')
+    if (insId == null) return true;
+    try {
+      final sequences = await SupabaseService.fromSchema('sequence')
+          .select('fg_id')
+          .eq('ins_id', insId);
+      final seqFgIds = (sequences as List).map((s) => s['fg_id']).toSet();
+      final feeGroups = await SupabaseService.fromSchema('feegroup')
+          .select('fg_id, fgdesc, ban_id')
+          .eq('ins_id', insId);
+      final fgInfo = <int, Map<String, dynamic>>{
+        for (final g in (feeGroups as List))
+          (g['fg_id'] as int): Map<String, dynamic>.from(g as Map),
+      };
+      for (final key in _selected) {
+        final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
+        if (d.isEmpty) continue;
+        final demfeetype = d['demfeetype']?.toString() ?? '';
+        final ftResult = await SupabaseService.fromSchema('feetype')
             .select('fg_id')
-            .eq('ins_id', insId);
-        final seqFgIds = (sequences as List).map((s) => s['fg_id']).toSet();
-
-        // Get fee groups for selected demands
-        for (final key in _selected) {
-          final d = _allDemands.firstWhere((x) => _demKey(x) == key, orElse: () => {});
-          if (d.isEmpty) continue;
-          final demfeetype = d['demfeetype']?.toString() ?? '';
-          final ftResult = await SupabaseService.fromSchema('feetype')
-              .select('fg_id')
-              .eq('feedesc', demfeetype)
-              .eq('activestatus', 1)
-              .limit(1)
-              .maybeSingle();
-          final fgId = ftResult?['fg_id'];
-          if (fgId != null && !seqFgIds.contains(fgId)) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Please create payment sequence for all fee groups first (Settings > Sequence Creation)'),
-                  backgroundColor: Colors.red,
-                  duration: const Duration(seconds: 4),
-                ),
-              );
-            }
-            return;
+            .eq('feedesc', demfeetype)
+            .eq('activestatus', 1)
+            .limit(1)
+            .maybeSingle();
+        final fgId = ftResult?['fg_id'];
+        if (fgId == null) continue;
+        final fgRow = fgInfo[fgId];
+        final fgName = fgRow?['fgdesc']?.toString() ?? 'this fee group';
+        if (!seqFgIds.contains(fgId)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Payment sequence missing for "$fgName". Create one in Sequence Creation before collecting.'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
           }
+          return false;
         }
-      } catch (_) {}
-    }
+        if (fgRow?['ban_id'] == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('No bank account mapped to "$fgName". Assign one in Bank Accounts → Fee Group Assignments before collecting.'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+          return false;
+        }
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  Future<void> _onCollectAndReceipt() async {
+    // Same pre-flight as Cash: every selected fee group must have BOTH a
+    // payment sequence AND a bank account mapped in feegroup.ban_id.
+    final ok = await _ensureSequencesExist();
+    if (!ok) return;
 
     final totalNet = _totalNetSelected;
-    _paymentMode = 'Cash';
+    // _paymentMode is already set by the inline chips in the bottom bar — don't
+    // reset it to Cash here; preserve the user's choice (QR/UPI / Online / Cheque).
     _chequeNoController.clear();
     _chequeDateController.clear();
     _bankNameController.clear();
     _upiRefController.clear();
     _chequeDate = null;
 
+    String? upiErr;
+    String? chequeNoErr;
+    String? chequeDateErr;
+    String? bankNameErr;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1498,18 +1807,12 @@ class _StudentFeeCollectionScreenState
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Proceed to Pay',
-                          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700),
-                        ),
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: AppIcon.linear('close-circle', size: 18, color: AppColors.textSecondary),
-                        ),
-                      ],
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: AppIcon.linear('close-circle', size: 18, color: AppColors.textSecondary),
+                      ),
                     ),
                     SizedBox(height: 14.h),
                     Text(
@@ -1533,28 +1836,11 @@ class _StudentFeeCollectionScreenState
                     SizedBox(height: 18.h),
                     Divider(color: AppColors.border, height: 1),
                     SizedBox(height: 18.h),
-                    Text(
-                      'Payment Mode *',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                    ),
-                    SizedBox(height: 12.h),
-                    Wrap(
-                      spacing: 10.w,
-                      runSpacing: 10.h,
-                      children: ['Cash', 'QR/UPI', 'Online', 'Cheque']
-                          .map(
-                            (mode) => _buildPaymentModeChip(
-                              mode: mode,
-                              selected: _paymentMode == mode,
-                              onTap: () => setDialogState(
-                                () => setState(() => _paymentMode = mode),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
+                    // Payment mode is selected via the inline chips in the
+                    // bottom bar before opening this dialog — so we don't
+                    // re-show the mode picker here; only the inputs for the
+                    // already-chosen mode appear below.
                     if (_paymentMode == 'QR/UPI') ...[
-                      SizedBox(height: 18.h),
                       Container(
                         padding: EdgeInsets.all(12.w),
                         decoration: BoxDecoration(
@@ -1585,19 +1871,11 @@ class _StudentFeeCollectionScreenState
                         label: 'UPI Transaction ID *',
                         child: TextField(
                           controller: _upiRefController,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. 412345678901',
-                            prefixIcon: AppIcon('receipt-2', size: 18),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12.w,
-                              vertical: 12.h,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.r),
-                            ),
-                            isDense: true,
-                          ),
-                          style: TextStyle(fontSize: 13.sp),
+                          onChanged: (_) {
+                            if (upiErr != null) setDialogState(() => upiErr = null);
+                          },
+                          decoration: _dialogInputDec(hint: 'e.g. 412345678901', prefix: AppIcon('receipt-2', size: 18, color: AppColors.accent)).copyWith(errorText: upiErr, errorMaxLines: 2),
+                          style: _dialogInputStyle(),
                         ),
                       ),
                     ],
@@ -1611,18 +1889,11 @@ class _StudentFeeCollectionScreenState
                               label: 'Cheque No *',
                               child: TextField(
                                 controller: _chequeNoController,
-                                decoration: InputDecoration(
-                                  hintText: 'Enter cheque number',
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12.w,
-                                    vertical: 12.h,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12.r),
-                                  ),
-                                  isDense: true,
-                                ),
-                                style: TextStyle(fontSize: 13.sp),
+                                onChanged: (_) {
+                                  if (chequeNoErr != null) setDialogState(() => chequeNoErr = null);
+                                },
+                                decoration: _dialogInputDec(hint: 'Enter cheque number').copyWith(errorText: chequeNoErr, errorMaxLines: 2),
+                                style: _dialogInputStyle(),
                               ),
                             ),
                           ),
@@ -1644,26 +1915,19 @@ class _StudentFeeCollectionScreenState
                                     _chequeDate = picked;
                                     _chequeDateController.text =
                                         '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                    setDialogState(() {});
+                                    setDialogState(() => chequeDateErr = null);
                                   }
                                 },
-                                decoration: InputDecoration(
-                                  hintText: 'DD/MM/YYYY',
+                                decoration: _dialogInputDec(hint: 'DD/MM/YYYY').copyWith(
                                   suffixIcon: Padding(
                                     padding: EdgeInsets.only(right: 8.w),
-                                    child: AppIcon.linear('calendar', size: 14),
+                                    child: AppIcon.linear('calendar', size: 16, color: AppColors.accent),
                                   ),
                                   suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12.w,
-                                    vertical: 12.h,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12.r),
-                                  ),
-                                  isDense: true,
+                                  errorText: chequeDateErr,
+                                  errorMaxLines: 2,
                                 ),
-                                style: TextStyle(fontSize: 13.sp),
+                                style: _dialogInputStyle(),
                               ),
                             ),
                           ),
@@ -1674,18 +1938,11 @@ class _StudentFeeCollectionScreenState
                         label: 'Bank Name *',
                         child: TextField(
                           controller: _bankNameController,
-                          decoration: InputDecoration(
-                            hintText: 'Enter bank name',
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12.w,
-                              vertical: 12.h,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.r),
-                            ),
-                            isDense: true,
-                          ),
-                          style: TextStyle(fontSize: 13.sp),
+                          onChanged: (_) {
+                            if (bankNameErr != null) setDialogState(() => bankNameErr = null);
+                          },
+                          decoration: _dialogInputDec(hint: 'Enter bank name').copyWith(errorText: bankNameErr, errorMaxLines: 2),
+                          style: _dialogInputStyle(),
                         ),
                       ),
                     ],
@@ -1734,27 +1991,20 @@ class _StudentFeeCollectionScreenState
                           onPressed: () {
                             if (_paymentMode == 'QR/UPI') {
                               if (_upiRefController.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter UPI Transaction ID'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                setDialogState(() => upiErr = 'Enter the UPI Transaction ID');
                                 return;
                               }
                             }
                             if (_paymentMode == 'Cheque') {
-                              if (_chequeNoController.text.trim().isEmpty ||
-                                  _chequeDateController.text.trim().isEmpty ||
-                                  _bankNameController.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please fill Cheque No, Cheque Date and Bank Name',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                              final no = _chequeNoController.text.trim().isEmpty;
+                              final dt = _chequeDateController.text.trim().isEmpty;
+                              final bk = _bankNameController.text.trim().isEmpty;
+                              if (no || dt || bk) {
+                                setDialogState(() {
+                                  chequeNoErr = no ? 'Cheque number is required' : null;
+                                  chequeDateErr = dt ? 'Cheque date is required' : null;
+                                  bankNameErr = bk ? 'Bank name is required' : null;
+                                });
                                 return;
                               }
                             }
@@ -1774,7 +2024,7 @@ class _StudentFeeCollectionScreenState
                             ),
                           ),
                           child: Text(
-                            'Confirm Payment',
+                            _paymentMode == 'Online' ? 'Confirm Payment' : 'Save',
                             style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -1784,37 +2034,6 @@ class _StudentFeeCollectionScreenState
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentModeChip({
-    required String mode,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16.r),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 11.h),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accent : const Color(0xFFF3F6FD),
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
-            color: selected ? AppColors.accent : AppColors.border,
-          ),
-        ),
-        child: Text(
-          mode,
-          style: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.textSecondary,
           ),
         ),
       ),
@@ -2239,18 +2458,19 @@ class _StudentFeeCollectionScreenState
         });
       }
 
-      // Build payment reference
-      String payReference = '$_paymentMode collection by $createdBy';
-      String payMethod = _paymentMode.toLowerCase();
+      // Build payment reference. _paymentMode is non-null here because the
+      // bottom-bar button is disabled until the cashier picks a mode. We
+      // store JUST the txn / cheque id (no narrative prefix) so the
+      // PowerCollege SETTLEMENT ID column shows the clean value.
+      final mode = _paymentMode ?? 'Cash';
+      String payReference = '';
+      String payMethod = mode.toLowerCase();
 
       if (_paymentMode == 'QR/UPI') {
-        final upiRef = _upiRefController.text.trim();
-        payReference = 'UPI Txn: $upiRef by $createdBy';
+        payReference = _upiRefController.text.trim();
         payMethod = 'upi';
       } else if (_paymentMode == 'Cheque') {
-        final chequeNo = _chequeNoController.text.trim();
-        final bankName = _bankNameController.text.trim();
-        payReference = 'Cheque $chequeNo ($bankName) by $createdBy';
+        payReference = _chequeNoController.text.trim();
         payMethod = 'cheque';
       }
 
@@ -2292,6 +2512,20 @@ class _StudentFeeCollectionScreenState
                   ? '${_chequeDate!.year}-${_chequeDate!.month.toString().padLeft(2, '0')}-${_chequeDate!.day.toString().padLeft(2, '0')}'
                   : null,
               'paybankname': _bankNameController.text.trim(),
+            }).eq('pay_id', payId).eq('ins_id', insId!);
+          }
+        }
+      }
+
+      // Record tender/refund on every Cash payment row so the cashbook
+      // shows what was actually handed over and what change went back.
+      if (_paymentMode == 'Cash' && receipts.isNotEmpty && _cashTenderAmount != null) {
+        for (final r in receipts) {
+          final payId = r is Map ? r['pay_id'] : null;
+          if (payId != null) {
+            await SupabaseService.fromSchema('payment').update({
+              'tender_amount': _cashTenderAmount,
+              'refund_amount': _cashRefundAmount,
             }).eq('pay_id', payId).eq('ins_id', insId!);
           }
         }
@@ -2870,12 +3104,15 @@ class _StudentFeeCollectionScreenState
         });
       }
 
-      String payRef = status == 'C' ? 'Razorpay: $rpRef' : (result == 'F' ? 'Razorpay Failed: $rpRef' : 'Cancelled by user');
+      // Store just the gateway txn id (no narrative prefix) so the
+      // PowerCollege SETTLEMENT ID column shows it cleanly. Failed /
+      // cancelled flows still get a short tag so they're distinguishable.
+      String payRef = status == 'C' ? rpRef : (result == 'F' ? 'FAILED:$rpRef' : 'CANCELLED');
 
       try {
         final rpResult = await SupabaseService.client.rpc('complete_payment_grouped', params: {
           'p_pay_id': payId,
-          'p_pay_method': 'razorpay',
+          'p_pay_method': 'online',
           'p_pay_reference': payRef,
           'p_items': items,
           'p_ins_id': insId,
@@ -2955,13 +3192,68 @@ class _StudentFeeCollectionScreenState
     );
   }
 
+  // Shared decoration for the Mode + Fee Type header dropdowns so they
+  // render at the exact same height regardless of focus/value state.
+  InputDecoration _headerDropdownDec() {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10.r),
+      borderSide: const BorderSide(color: AppColors.border),
+    );
+    return InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border,
+      disabledBorder: border,
+    );
+  }
+
+  // Shared styling for the Cheque / UPI / Online dialog input fields so
+  // every input renders with the same bold-visible look.
+  InputDecoration _dialogInputDec({required String hint, Widget? prefix}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14.sp,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textSecondary,
+      ),
+      prefixIcon: prefix,
+      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: BorderSide(color: AppColors.border, width: 1.4),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: BorderSide(color: AppColors.border, width: 1.4),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.8),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      isDense: true,
+    );
+  }
+
+  TextStyle _dialogInputStyle() => TextStyle(
+        fontSize: 15.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.4,
+      );
+
   InputDecoration _inputDec(String hint) {
     return InputDecoration(
       hintText: hint,
       hintStyle:
           TextStyle(fontSize: 13.sp, color: AppColors.textLight),
+      isDense: true,
       contentPadding:
-          EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+          EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.r),
           borderSide: BorderSide(color: AppColors.border)),
@@ -3018,12 +3310,15 @@ class _StudentFeeCollectionScreenState
     );
   }
 
-  Widget _numField(TextEditingController? ctrl, VoidCallback onChange, {int? maxLength}) {
+  Widget _numField(TextEditingController? ctrl, VoidCallback onChange, {int? maxLength, String? fieldKey, FocusNode? focusNode, bool enabled = true}) {
     if (ctrl == null) return const SizedBox();
     return SizedBox(
       height: 28.h,
       child: TextField(
+        key: fieldKey != null ? ValueKey(fieldKey) : null,
         controller: ctrl,
+        focusNode: focusNode,
+        enabled: enabled,
         onChanged: (_) => onChange(),
         keyboardType:
             const TextInputType.numberWithOptions(decimal: true),

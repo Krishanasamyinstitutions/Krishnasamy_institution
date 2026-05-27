@@ -156,25 +156,19 @@ class SupabaseService {
           }
         }
 
-        // Last resort: build user from RPC result directly
+        // Institute login REQUIRES a real institutionusers row for the
+        // selected institution. Without this guard, a user belonging to
+        // institution A could log into institution B by picking it on the
+        // dropdown — the old "build from RPC result" fallback let that
+        // through and seeded ins_id with whatever the user picked.
         if (response == null) {
-          debugPrint('LOGIN: All lookups failed, building from RPC result');
-          response = {
-            'use_id': row['use_id'],
-            'ins_id': insId,
-            'inscode': '',
-            'usename': row['usename'],
-            'usemail': row['usemail'],
-            'usephone': '',
-            'usestadate': DateTime.now().toIso8601String().split('T').first,
-            'usedob': '2000-01-01',
-            'ur_id': 0,
-            'urname': row['urname'],
-            'des_id': 0,
-            'desname': row['desname'],
-            'userepto': 0,
-            'activestatus': 1,
-          };
+          debugPrint('LOGIN: No institutionusers row for use_id=$useId ins_id=$insId — denying login');
+          return null;
+        }
+        // Belt-and-braces: enforce ins_id equality on the row we found.
+        if (insId != null && response['ins_id'] != insId) {
+          debugPrint('LOGIN: row ins_id=${response['ins_id']} != selected $insId — denying login');
+          return null;
         }
       }
 
@@ -223,7 +217,7 @@ class SupabaseService {
       );
     } catch (e) {
       debugPrint('Subscription check error: $e');
-      return (isActive: false, yearLabel: null, endDate: null, reason: 'Check failed: $e');
+      return (isActive: false, yearLabel: null, endDate: null, reason: 'Unable to verify subscription status. Please check your internet connection.');
     }
   }
 
@@ -821,11 +815,19 @@ class SupabaseService {
   static Future<List<InstitutionUserModel>> getInstitutionUsers(
       int insId) async {
     try {
+      // Explicit column list — anon has SELECT revoked on `usepassword`
+      // (security hardening), so `select('*')` would be denied wholesale.
       final response = await client.from('institutionusers')
-          .select('*')
+          .select('use_id, ins_id, inscode, usename, usemail, usephone, '
+              'usestadate, usemaiotp, usemobotp, useotpstatus, usedob, '
+              'usecategory, ur_id, urname, des_id, desname, userepto, '
+              'approvedby, approveddate, suspendeddate, suspendedby, '
+              'terminateddate, terminatedby, activestatus, terminatedreason')
           .eq('ins_id', insId)
           .eq('activestatus', 1)
-          .order('usename', ascending: true);
+          .order('usename', ascending: true)
+          // Don't let a slow/hung request leave the list spinning forever.
+          .timeout(const Duration(seconds: 15));
       return (response as List)
           .map((e) => InstitutionUserModel.fromJson(e))
           .toList();
@@ -1305,6 +1307,36 @@ class SupabaseService {
     } catch (e) {
       debugPrint('RPC get_fee_demand_summary failed: $e');
       return [];
+    }
+  }
+
+  /// Fetch ordering maps for the institution's courses and classes
+  /// (course.ordid keyed by courname, class.ordid keyed by claname). Used by
+  /// summary screens that need to sort rows by master-data order rather than
+  /// alphabetic / hard-coded class order.
+  static Future<({Map<String, int> courseOrd, Map<String, int> classOrd})>
+      getCourseClassOrdering(int insId) async {
+    try {
+      final results = await Future.wait<dynamic>([
+        fromSchema('course').select('courname, ordid').eq('ins_id', insId).eq('activestatus', 1),
+        fromSchema('class').select('claname, ordid').eq('ins_id', insId).eq('activestatus', 1),
+      ]);
+      final courseOrd = <String, int>{};
+      for (final r in (results[0] as List)) {
+        final name = (r['courname'] as String?)?.trim();
+        final ord = (r['ordid'] as num?)?.toInt();
+        if (name != null && name.isNotEmpty && ord != null) courseOrd[name] = ord;
+      }
+      final classOrd = <String, int>{};
+      for (final r in (results[1] as List)) {
+        final name = (r['claname'] as String?)?.trim();
+        final ord = (r['ordid'] as num?)?.toInt();
+        if (name != null && name.isNotEmpty && ord != null) classOrd[name] = ord;
+      }
+      return (courseOrd: courseOrd, classOrd: classOrd);
+    } catch (e) {
+      debugPrint('getCourseClassOrdering failed: $e');
+      return (courseOrd: <String, int>{}, classOrd: <String, int>{});
     }
   }
 

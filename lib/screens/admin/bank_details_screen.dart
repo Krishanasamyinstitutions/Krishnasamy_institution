@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
@@ -298,33 +299,44 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             // balanced; the second slot is left empty when an odd field
             // doesn't have a natural partner.
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _labelledField('Bank Name', _nameController, hint: 'IOB', required: true)),
+              Expanded(child: _labelledField('Bank Name', _nameController, hint: 'IOB', required: true, validator: _vName)),
               SizedBox(width: 16.w),
-              Expanded(child: _labelledField('Branch', _branchController, hint: 'Cuddalore Main', required: true)),
+              Expanded(child: _labelledField('Branch', _branchController, hint: 'Cuddalore Main', required: true, validator: _vBranch)),
             ]),
             SizedBox(height: 16.h),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _labelledField('IFSC Code', _ifscController, hint: 'IOBA0001234', required: true)),
+              Expanded(child: _labelledField('IFSC Code', _ifscController, hint: 'IOBA0001234', required: true,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(11),
+                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                  TextInputFormatter.withFunction((oldV, newV) => newV.copyWith(text: newV.text.toUpperCase())),
+                ],
+                validator: _vIfsc)),
               SizedBox(width: 16.w),
-              Expanded(child: _labelledField('Account Holder', _accHolderController, hint: 'KCET College', required: true)),
+              Expanded(child: _labelledField('Account Holder', _accHolderController, hint: 'KCET College', required: true, validator: _vAccHolder)),
             ]),
             SizedBox(height: 16.h),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _labelledField('Account Number', _accNoController, hint: '1234567890', required: true)),
+              Expanded(child: _labelledField('Account Number', _accNoController, hint: '1234567890', required: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(18)],
+                validator: _vAccNo)),
               SizedBox(width: 16.w),
-              Expanded(child: _labelledField('Mobile', _mobileController, hint: '+91…', keyboardType: TextInputType.phone)),
+              Expanded(child: _labelledField('Mobile', _mobileController, hint: '10-digit mobile', keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                validator: _vMobile)),
             ]),
             SizedBox(height: 16.h),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _labelledField('Email', _emailController, hint: 'finance@school.in', keyboardType: TextInputType.emailAddress)),
+              Expanded(child: _labelledField('Email', _emailController, hint: 'finance@school.in', keyboardType: TextInputType.emailAddress, validator: _vEmail)),
               SizedBox(width: 16.w),
-              Expanded(child: _labelledField('Address Line 1', _addr1Controller, required: true)),
+              Expanded(child: _labelledField('Address Line 1', _addr1Controller, required: true, validator: _vAddr1)),
             ]),
             SizedBox(height: 16.h),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: _labelledField('Address Line 2', _addr2Controller)),
+              Expanded(child: _labelledField('Address Line 2', _addr2Controller, validator: _vAddrOpt)),
               SizedBox(width: 16.w),
-              Expanded(child: _labelledField('Address Line 3', _addr3Controller)),
+              Expanded(child: _labelledField('Address Line 3', _addr3Controller, validator: _vAddrOpt)),
             ]),
             SizedBox(height: 24.h),
 
@@ -383,6 +395,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     String? hint,
     bool required = false,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,12 +409,70 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          decoration: _inputDecoration(context, hint ?? ''),
+          inputFormatters: inputFormatters,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          decoration: _inputDecoration(context, hint ?? '').copyWith(errorMaxLines: 3),
           style: _inputTextStyle(context),
-          validator: required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null,
+          validator: validator ?? (required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null),
         ),
       ],
     );
+  }
+
+  // ── Validators ────────────────────────────────────────────────
+  String? _vName(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length > 45) return 'Bank name must be less than 45 characters';
+    return null;
+  }
+  String? _vBranch(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length > 80) return 'Branch must be less than 80 characters';
+    return null;
+  }
+  String? _vIfsc(String? v) {
+    final s = (v ?? '').trim().toUpperCase();
+    if (s.isEmpty) return 'Required';
+    if (!RegExp(r'^[A-Z]{4}0[A-Z0-9]{6}$').hasMatch(s)) return 'IFSC must be 11 chars (e.g. IOBA0001234)';
+    return null;
+  }
+  String? _vAccHolder(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length > 50) return 'Account holder must be less than 50 characters';
+    return null;
+  }
+  String? _vAccNo(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length < 9 || s.length > 18) return 'Account number must be 9 to 18 digits';
+    return null;
+  }
+  String? _vMobile(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return null;
+    if (s.length != 10) return 'Mobile must be 10 digits';
+    return null;
+  }
+  String? _vEmail(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return null;
+    if (!RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$').hasMatch(s)) return 'Enter a valid email address';
+    if (s.length > 60) return 'Email must be less than 60 characters';
+    return null;
+  }
+  String? _vAddr1(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length > 50) return 'Address must be less than 50 characters';
+    return null;
+  }
+  String? _vAddrOpt(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.length > 50) return 'Address must be less than 50 characters';
+    return null;
   }
 
   Widget _buildAssignmentsPanel() {

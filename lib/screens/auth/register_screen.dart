@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -77,6 +78,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirm = true;
   bool _isCreating = false;
   bool _requestingCode = false;
+  bool _validatingCode = false;
+  // null = not checked yet, true = verified against license_keys, false = rejected.
+  bool? _codeValidated;
+  String? _codeValidationMsg;
+  // Snapshot of the code text at the moment validation succeeded — re-typing
+  // any character invalidates the verified state so a tampered code can't
+  // bypass the gate.
+  String _validatedCodeSnapshot = '';
 
   @override
   void dispose() {
@@ -244,6 +253,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } finally {
       if (mounted) setState(() => _requestingCode = false);
+    }
+  }
+
+  Future<void> _validateActivationCode() async {
+    final code = _activationCodeController.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _codeValidated = false;
+        _codeValidationMsg = 'Enter the activation code first';
+      });
+      return;
+    }
+    setState(() {
+      _validatingCode = true;
+      _codeValidationMsg = null;
+    });
+    try {
+      final result = await SupabaseService.verifyLicenseKey(code);
+      final ok = result['valid'] == true;
+      if (!mounted) return;
+      setState(() {
+        _validatingCode = false;
+        _codeValidated = ok;
+        _codeValidationMsg = (result['message'] as String?) ?? (ok ? 'Activation code verified' : 'Invalid activation code');
+        _validatedCodeSnapshot = ok ? code : '';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _validatingCode = false;
+        _codeValidated = false;
+        _codeValidationMsg = friendlyError(e);
+        _validatedCodeSnapshot = '';
+      });
     }
   }
 
@@ -694,7 +737,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Name *'),
-                  TextFormField(controller: _institutionNameController, decoration: _inputDec('Enter institution name'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                  TextFormField(
+                    controller: _institutionNameController,
+                    decoration: _inputDec('Enter institution name').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => _vRequiredMax(v, 80, 'Institution name'),
+                  ),
                 ]),
               ]),
               SizedBox(height: 16.h),
@@ -763,11 +812,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Short Name *'),
-                  TextFormField(controller: _institutionShortNameController, decoration: _inputDec('e.g. KCET'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                  TextFormField(
+                    controller: _institutionShortNameController,
+                    decoration: _inputDec('e.g. KCET').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => _vRequiredMax(v, 30, 'Short name'),
+                  ),
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Code *'),
-                  TextFormField(controller: _institutionCodeController, decoration: _inputDec('Enter code'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                  TextFormField(
+                    controller: _institutionCodeController,
+                    decoration: _inputDec('Enter code').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                    validator: (v) => _vRequiredMax(v, 10, 'Code'),
+                  ),
                 ]),
               ]),
               SizedBox(height: 16.h),
@@ -788,11 +850,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Authorized Username'),
-                  TextFormField(controller: _authorizedUsernameController, decoration: _inputDec('Enter authorized username'), style: _fieldStyle()),
+                  TextFormField(
+                    controller: _authorizedUsernameController,
+                    decoration: _inputDec('Enter authorized username').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => _vOptionalMax(v, 50, 'Authorized username'),
+                  ),
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Designation'),
-                  TextFormField(controller: _designationController, decoration: _inputDec('Enter designation'), style: _fieldStyle()),
+                  TextFormField(
+                    controller: _designationController,
+                    decoration: _inputDec('Enter designation').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: (v) => _vOptionalMax(v, 30, 'Designation'),
+                  ),
                 ]),
               ]),
               SizedBox(height: 16.h),
@@ -800,7 +874,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _formRow(context, [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Mobile Number'),
-                  TextFormField(controller: _mobileNumberController, decoration: _inputDec('Enter mobile number'), style: _fieldStyle(), keyboardType: TextInputType.phone),
+                  TextFormField(
+                    controller: _mobileNumberController,
+                    decoration: _inputDec('Enter mobile number').copyWith(errorMaxLines: 2),
+                    style: _fieldStyle(),
+                    keyboardType: TextInputType.phone,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                    validator: _vMobile10,
+                  ),
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _fieldLabel('Institution Recognized'),
@@ -822,10 +904,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Email *'),
                   TextFormField(
                     controller: _emailController,
-                    decoration: _inputDec('Enter email address'),
+                    decoration: _inputDec('Enter email address').copyWith(errorMaxLines: 2),
                     style: _fieldStyle(),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: _vEmail,
                   ),
                 ]),
               ]),
@@ -836,9 +919,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Activation Code *'),
                   TextFormField(
                     controller: _activationCodeController,
-                    decoration: _inputDec('Enter activation code'),
+                    decoration: _inputDec('Enter activation code').copyWith(
+                      errorMaxLines: 2,
+                      suffixIcon: _codeValidated == true
+                          ? const Icon(Icons.check_circle, color: Colors.green, size: 18)
+                          : (_codeValidated == false ? const Icon(Icons.cancel, color: Colors.red, size: 18) : null),
+                    ),
                     style: _fieldStyle(),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Activation code is required' : null,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (v) {
+                      // Any edit after a successful verify invalidates the
+                      // gate so the cashier can't tamper with a verified
+                      // code and slip past.
+                      if (_codeValidated != null && v.trim() != _validatedCodeSnapshot) {
+                        setState(() {
+                          _codeValidated = null;
+                          _codeValidationMsg = null;
+                        });
+                      }
+                    },
+                    validator: (v) {
+                      final s = v?.trim() ?? '';
+                      if (s.isEmpty) return 'Activation code is required';
+                      if (_codeValidated != true || s != _validatedCodeSnapshot) {
+                        return 'Verify the activation code before proceeding';
+                      }
+                      return null;
+                    },
+                  ),
+                  if (_codeValidationMsg != null) ...[
+                    SizedBox(height: 6.h),
+                    Text(
+                      _codeValidationMsg!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _codeValidated == true ? Colors.green.shade700 : AppColors.error,
+                      ),
+                    ),
+                  ],
+                ]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  SizedBox(height: 22.h),
+                  SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: (_validatingCode || _requestingCode) ? null : _validateActivationCode,
+                      icon: _validatingCode
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.verified_outlined, size: 18),
+                      label: Text(_validatingCode ? 'Validating…' : 'Validate'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 18.w),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      ),
+                    ),
                   ),
                 ]),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -860,7 +997,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                 ]),
-                const SizedBox.shrink(),
               ]),
             ],
           ),
@@ -918,11 +1054,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _formRow(context, [
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Institution Affiliation'),
-                      TextFormField(controller: _affiliationController, decoration: _inputDec('Enter affiliation'), style: _fieldStyle()),
+                      TextFormField(
+                        controller: _affiliationController,
+                        decoration: _inputDec('Enter affiliation').copyWith(errorMaxLines: 2),
+                        style: _fieldStyle(),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: (v) => _vOptionalMax(v, 70, 'Affiliation'),
+                      ),
                     ]),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Affiliation Number'),
-                      TextFormField(controller: _affiliationNumberController, decoration: _inputDec('Enter affiliation number'), style: _fieldStyle()),
+                      TextFormField(
+                        controller: _affiliationNumberController,
+                        decoration: _inputDec('Enter affiliation number').copyWith(errorMaxLines: 2),
+                        style: _fieldStyle(),
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: (v) => _vOptionalMax(v, 25, 'Affiliation number'),
+                      ),
                     ]),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       _fieldLabel('Affiliation Start Year'),
@@ -983,34 +1131,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _formRow(context, [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 1 *'),
-                    TextFormField(controller: _address1Controller, decoration: _inputDec('Enter address line 1'), style: _fieldStyle(), validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null),
+                    TextFormField(
+                      controller: _address1Controller,
+                      decoration: _inputDec('Enter address line 1').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vRequiredMax(v, 60, 'Address'),
+                    ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 2'),
-                    TextFormField(controller: _address2Controller, decoration: _inputDec('Enter address line 2'), style: _fieldStyle()),
+                    TextFormField(
+                      controller: _address2Controller,
+                      decoration: _inputDec('Enter address line 2').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vOptionalMax(v, 60, 'Address'),
+                    ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Address Line 3'),
-                    TextFormField(controller: _address3Controller, decoration: _inputDec('Enter address line 3'), style: _fieldStyle()),
+                    TextFormField(
+                      controller: _address3Controller,
+                      decoration: _inputDec('Enter address line 3').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vOptionalMax(v, 60, 'Address'),
+                    ),
                   ]),
                 ]),
                 SizedBox(height: 14.h),
                 _formRow(context, [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _fieldLabel('Pin Code'),
-                    TextFormField(controller: _pinCodeController, decoration: _inputDec('Enter pin code'), style: _fieldStyle(), keyboardType: TextInputType.number),
+                    _fieldLabel('Pin Code *'),
+                    TextFormField(
+                      controller: _pinCodeController,
+                      decoration: _inputDec('Enter pin code').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      keyboardType: TextInputType.number,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                      validator: _vPincode,
+                    ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('City'),
-                    TextFormField(controller: _cityController, decoration: _inputDec('Enter city'), style: _fieldStyle()),
+                    TextFormField(
+                      controller: _cityController,
+                      decoration: _inputDec('Enter city').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vOptionalMax(v, 50, 'City'),
+                    ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('State'),
-                    TextFormField(controller: _stateController, decoration: _inputDec('Enter state'), style: _fieldStyle()),
+                    TextFormField(
+                      controller: _stateController,
+                      decoration: _inputDec('Enter state').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vOptionalMax(v, 35, 'State'),
+                    ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     _fieldLabel('Country'),
-                    TextFormField(controller: _countryController, decoration: _inputDec('Enter country'), style: _fieldStyle()),
+                    TextFormField(
+                      controller: _countryController,
+                      decoration: _inputDec('Enter country').copyWith(errorMaxLines: 2),
+                      style: _fieldStyle(),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vOptionalMax(v, 35, 'Country'),
+                    ),
                   ]),
                 ]),
               ],
@@ -1158,9 +1350,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _adminNameController,
                       decoration: _inputDec('Enter admin name').copyWith(
                         prefixIcon: AppIcon('user', size: 14, color: AppColors.textSecondary),
+                        errorMaxLines: 2,
                       ),
                       style: _fieldStyle(),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) => _vRequiredMax(v, 50, 'Admin name'),
                     ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1192,10 +1386,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _adminEmailController,
                       decoration: _inputDec('Enter email').copyWith(
                         prefixIcon: AppIcon('sms', size: 12, color: AppColors.textSecondary),
+                        errorMaxLines: 2,
                       ),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.emailAddress,
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Email is required' : null,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: _vEmail,
                     ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1204,38 +1400,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _adminPhoneController,
                       decoration: _inputDec('Enter phone').copyWith(
                         prefixIcon: AppIcon('call', size: 12, color: AppColors.textSecondary),
+                        errorMaxLines: 2,
                       ),
                       style: _fieldStyle(),
                       keyboardType: TextInputType.phone,
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Phone is required' : null,
-                    ),
-                  ]),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _fieldLabel('Date of Birth *'),
-                    SizedBox(
-                      height: 48,
-                      child: InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _adminDob ?? DateTime(1990),
-                            firstDate: DateTime(1940),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) setState(() => _adminDob = picked);
-                        },
-                        child: InputDecorator(
-                          decoration: _inputDec('Select date of birth').copyWith(
-                            prefixIcon: AppIcon('calendar-1', size: 12, color: AppColors.textSecondary),
-                          ),
-                          child: Text(
-                            _adminDob != null
-                                ? '${_adminDob!.day.toString().padLeft(2, '0')}/${_adminDob!.month.toString().padLeft(2, '0')}/${_adminDob!.year}'
-                                : 'Select date of birth',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _adminDob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6)),
-                          ),
-                        ),
-                      ),
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                      validator: _vMobile10,
                     ),
                   ]),
                 ]),
@@ -1267,11 +1438,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
                       style: _fieldStyle(),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Password is required';
-                        if (v.length < 6) return 'Password must be at least 6 characters';
-                        return null;
-                      },
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: _vPassword,
                     ),
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1364,6 +1532,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
   TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary);
 
   static const Color _kFieldFill = Color(0xFFF3F4F6);
+
+  // ── Validators (mapped to public.institution column types) ───
+  String? _vRequiredMax(String? v, int max, String label) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length > max) return '$label must be less than $max characters';
+    return null;
+  }
+  String? _vOptionalMax(String? v, int max, String label) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return null;
+    if (s.length > max) return '$label must be less than $max characters';
+    return null;
+  }
+  String? _vEmail(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Email is required';
+    if (!RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$').hasMatch(s)) return 'Enter a valid email address';
+    return null;
+  }
+  String? _vMobile10(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length != 10) return 'Mobile must be 10 digits';
+    return null;
+  }
+  String? _vPincode(String? v) {
+    final s = v?.trim() ?? '';
+    if (s.isEmpty) return 'Required';
+    if (s.length != 6) return 'Pin code must be 6 digits';
+    return null;
+  }
+  String? _vPassword(String? v) {
+    final s = v ?? '';
+    if (s.isEmpty) return 'Password is required';
+    if (s.length < 8) return 'Password must be at least 8 characters';
+    return null;
+  }
 
   InputDecoration _inputDec(String hint) => InputDecoration(
     hintText: hint,

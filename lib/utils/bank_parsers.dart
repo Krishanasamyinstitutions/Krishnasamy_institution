@@ -19,14 +19,70 @@ String? toIsoDate(String? raw) {
   if (raw == null) return null;
   final s = raw.trim();
   if (s.isEmpty) return null;
+
+  // ISO-ish: 2026-05-25 or 2026-05-25T10:23:00 or 2026-05-25 10:23
   if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(s)) return s.substring(0, 10);
+
+  // YYYY/MM/DD with slash or dot
+  final iso2 = RegExp(r'^(\d{4})[/.](\d{1,2})[/.](\d{1,2})').firstMatch(s);
+  if (iso2 != null) {
+    final y = iso2.group(1)!;
+    final mo = int.parse(iso2.group(2)!);
+    final d = int.parse(iso2.group(3)!);
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return '$y-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+    }
+  }
+
+  // 25-MAY-2026 / 25 May 26 / 25/May/2026 / 25.May.2026
+  const monthNames = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    'january': 1, 'february': 2, 'march': 3, 'april': 4, 'june': 6,
+    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+  };
+  final dmName = RegExp(r'^(\d{1,2})[\s/\-.]+([A-Za-z]{3,9})[\s/\-.]+(\d{2,4})').firstMatch(s);
+  if (dmName != null) {
+    final d = int.parse(dmName.group(1)!);
+    final mo = monthNames[dmName.group(2)!.toLowerCase()];
+    var y = dmName.group(3)!;
+    if (mo != null && d >= 1 && d <= 31) {
+      if (y.length == 2) y = (int.parse(y) >= 70 ? '19' : '20') + y;
+      return '$y-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+    }
+  }
+  // May 25, 2026 / May-25-2026
+  final mNameDay = RegExp(r'^([A-Za-z]{3,9})[\s/\-.,]+(\d{1,2})[\s/\-.,]+(\d{2,4})').firstMatch(s);
+  if (mNameDay != null) {
+    final mo = monthNames[mNameDay.group(1)!.toLowerCase()];
+    final d = int.parse(mNameDay.group(2)!);
+    var y = mNameDay.group(3)!;
+    if (mo != null && d >= 1 && d <= 31) {
+      if (y.length == 2) y = (int.parse(y) >= 70 ? '19' : '20') + y;
+      return '$y-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+    }
+  }
+
+  // Numeric DD/MM/YYYY or MM/DD/YYYY (slash, dash, dot separators)
   final m = RegExp(r'^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})').firstMatch(s);
   if (m == null) return null;
-  final d = m.group(1)!.padLeft(2, '0');
-  final mo = m.group(2)!.padLeft(2, '0');
+  var first = int.parse(m.group(1)!);
+  var second = int.parse(m.group(2)!);
   var y = m.group(3)!;
   if (y.length == 2) y = (int.parse(y) >= 70 ? '19' : '20') + y;
-  return '$y-$mo-$d';
+  // Resolve ambiguous DD/MM vs MM/DD orderings:
+  //   • If the second token is >12, only DD interpretation fits → swap.
+  //   • If the first token is >12, only DD-first fits → keep.
+  //   • Otherwise default to DD/MM (Indian convention used by most callers).
+  int d;
+  int mo;
+  if (second > 12 && first <= 12) {
+    mo = first; d = second;
+  } else {
+    d = first;  mo = second;
+  }
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return '$y-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
 }
 
 /// Decode bank statement bytes. Strips a UTF-8 BOM, tries strict UTF-8, and

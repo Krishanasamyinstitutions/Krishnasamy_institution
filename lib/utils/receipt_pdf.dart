@@ -32,8 +32,10 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
   }
 
   const black = PdfColors.black;
-  // ISO B5 — 176 × 250 mm.
-  final b5 = PdfPageFormat(176 * PdfPageFormat.mm, 250 * PdfPageFormat.mm);
+  // ISO A5 — 148 × 210 mm. Receipts are printed on A5 paper; using B5 made
+  // the printer scale the page down, leaving a wide blank border and
+  // truncating the amount column.
+  final a5 = PdfPageFormat(148 * PdfPageFormat.mm, 210 * PdfPageFormat.mm);
   const divider = pw.BorderSide(color: black, width: 1);
   const amountColWidth = 120.0;
 
@@ -67,8 +69,8 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
   final pdf = pw.Document();
   pdf.addPage(
     pw.Page(
-      pageFormat: b5,
-      margin: const pw.EdgeInsets.all(40),
+      pageFormat: a5,
+      margin: const pw.EdgeInsets.all(24),
       theme: pw.ThemeData.withFont(base: reg, bold: bold),
       build: (ctx) {
         return pw.Column(
@@ -146,22 +148,24 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                 children: [
                   // Info row — student details | receipt details.
                   pw.Container(
-                    height: 74,
+                    height: 90,
                     child: pw.Row(
                       children: [
                         pw.Expanded(
                           child: infoCell([
                             kv('Name', data.studentName),
                             kv('Reg. No', data.admissionNo),
-                            kv('Branch', data.courseName),
+                            kv('Branch', data.className),
+                            kv('Mode', data.paymentMethod.isEmpty ? '-' : data.paymentMethod),
                           ]),
                         ),
-                        pw.Container(width: 1, height: 74, color: black),
+                        pw.Container(width: 1, color: black),
                         pw.Expanded(
                           child: infoCell([
                             kv('Receipt No', data.receiptNo),
                             kv('Date', data.date),
-                            kv('Semester', receiptSemesterLabel(data)),
+                            kv('Sem', 'FEE (UP TO DATE)'),
+                            kv('Txn ID', (data.paymentReference ?? '').trim().isEmpty ? '-' : data.paymentReference!.trim()),
                           ]),
                         ),
                       ],
@@ -197,14 +201,14 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                   ),
                   // Particulars.
                   pw.Container(
-                    height: 240,
+                    height: 150,
                     decoration: const pw.BoxDecoration(
                         border: pw.Border(top: divider)),
                     child: pw.Row(
                       children: [
                         pw.Expanded(
                           child: pw.Container(
-                            height: 240,
+                            height: 150,
                             padding: const pw.EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
                             child: pw.Column(
@@ -226,7 +230,7 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                         pw.Container(width: 1, height: 240, color: black),
                         pw.Container(
                           width: amountColWidth,
-                          height: 240,
+                          height: 150,
                           padding: const pw.EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
                           child: pw.Column(
@@ -278,7 +282,7 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                   ),
                   // Footer — amount in words + cashier signature line.
                   pw.Container(
-                    height: 110,
+                    height: 78,
                     decoration: const pw.BoxDecoration(
                         border: pw.Border(top: divider)),
                     padding: const pw.EdgeInsets.symmetric(
@@ -288,6 +292,13 @@ Future<pw.Document> buildReceiptPdf(ReceiptData data) async {
                       children: [
                         pw.Text(amountInWords(data.total),
                             style: st(11, med)),
+                        // Receipt is not a settled-cash equivalent until the
+                        // institution reconciles the bank/UPI/cheque entry.
+                        if (data.reconStatus != 'R') ...[
+                          pw.SizedBox(height: 4),
+                          pw.Text('* Subject to Realization',
+                              style: pw.TextStyle(font: med, fontSize: 10, color: PdfColor.fromInt(0xFFB85C00))),
+                        ],
                         pw.Spacer(),
                         pw.Container(
                           width: double.infinity,

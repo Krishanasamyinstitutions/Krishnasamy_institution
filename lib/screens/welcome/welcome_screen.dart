@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
+import '../../utils/friendly_error.dart';
 import '../../widgets/app_icon.dart';
 
 class _PinkPalette {
@@ -181,7 +182,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     } catch (e) {
       setState(() {
         _fpLoading = false;
-        _fpError = 'OTP request failed: $e';
+        _fpError = friendlyError(e);
       });
     }
   }
