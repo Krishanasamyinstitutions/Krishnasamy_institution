@@ -123,15 +123,15 @@ void main() {
         ),
       )));
       await tester.pump();
-      // Distinct terms appear in the RichText "Semester" kv-row; fee types
-      // appear in the particulars list.
-      expect(find.textContaining('I SEMESTER', findRichText: true),
-          findsWidgets);
-      expect(find.textContaining('II SEMESTER', findRichText: true),
-          findsWidgets);
+      // Receipt flattens fees from every term into the particulars list, so
+      // both fee types must render even when they come from different terms.
+      // The header now shows a fixed "Sem: FEE (UP TO DATE)" line instead of
+      // per-term labels, so the term names themselves are not asserted here.
       expect(find.textContaining('BOOK FEES', findRichText: true),
           findsWidgets);
       expect(find.textContaining('SCHOOL FEES', findRichText: true),
+          findsWidgets);
+      expect(find.textContaining('FEE (UP TO DATE)', findRichText: true),
           findsWidgets);
     });
 
