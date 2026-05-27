@@ -66,14 +66,14 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         return _filterMethods.contains(m);
       }).toList();
     }
-    // Search filter
+    // Search filter — name, roll no, class.
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((t) {
         final name = _getStudentName(t).toLowerCase();
-        final payNo = (t.paynumber ?? '${t.payId}').toLowerCase();
-        final ref = (t.payreference ?? '').toLowerCase();
-        final method = (t.paymethod ?? '').toLowerCase();
-        return name.contains(_searchQuery) || payNo.contains(_searchQuery) || ref.contains(_searchQuery) || method.contains(_searchQuery);
+        final stu = t.stuId != null ? _stuIdToStudent[t.stuId] : null;
+        final rollNo = (stu?.stuadmno ?? '').toLowerCase();
+        final cls = (stu?.stuclass ?? '').toLowerCase();
+        return name.contains(_searchQuery) || rollNo.contains(_searchQuery) || cls.contains(_searchQuery);
       }).toList();
     }
     return filtered;
@@ -210,12 +210,20 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     if (!isReconciled) {
       return Text('Pending Approval', style: TextStyle(fontSize: 12.sp, color: AppColors.error, fontWeight: FontWeight.w600));
     }
-    return TextButton.icon(
-      onPressed: () => _showReceiptOptions(t),
-      icon: AppIcon('document-download', size: 18, color: AppColors.accent),
-      label: Text('Download', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
-      style: TextButton.styleFrom(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+    // No internal horizontal padding so the icon + label start flush with
+    // the RECEIPT header text in the column above.
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _showReceiptOptions(t),
+        icon: AppIcon('document-download', size: 16, color: AppColors.accent),
+        label: Text('Download', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent), overflow: TextOverflow.visible, softWrap: false, maxLines: 1),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(0, 0),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          alignment: Alignment.centerLeft,
+        ),
       ),
     );
   }
@@ -815,7 +823,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     return [
       AppSearchField(
         controller: _searchController,
-        hintText: 'Search by name, pay no, reference...',
+        hintText: 'Search by name, roll no or class…',
         onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
         width: 320,
         suffixIcon: _searchQuery.isNotEmpty
@@ -945,7 +953,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   String _dateRangeLabel() {
     final hasDate = _filterFromDate != null || _filterToDate != null;
     final hasMethod = _filterMethods.isNotEmpty;
-    if (!hasDate && !hasMethod) return 'Date & Method';
+    if (!hasDate && !hasMethod) return 'Date';
 
     String datePart;
     if (!hasDate) {
@@ -964,7 +972,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   Future<void> _openDateRangeDialog() async {
-    // Collect available methods from transactions
+    // Build the chip set from the modes actually present in the loaded
+    // transactions — keeps the filter list tight to what the user can act on.
     final availableMethods = <String>{};
     for (final t in _allTransactions) {
       final m = (t.paymethod ?? '').toLowerCase().trim();
@@ -1314,10 +1323,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
   }
 
   // ── Sticky-header table ──
-  static const _txColWidths = <double>[60, 110, 100, 180, 110, 120, 120, 100, 160, 90, 140];
+  // Reference column was dropped — the same details surface via the receipt
+  // download. Payment Method renamed to "Mode" for brevity.
+  static const _txColWidths = <double>[60, 110, 100, 130, 180, 120, 120, 100, 90, 120];
   static const _txHeaders = <String>[
-    'S NO.', 'DATE', 'RECEIPT NO', 'NAME', 'COURSE', 'CLASS',
-    'PAYMENT METHOD', 'AMOUNT', 'REFERENCE', 'STATUS', 'DOWNLOAD RECEIPT',
+    'S NO.', 'DATE', 'RECEIPT NO', 'ROLL NO', 'NAME', 'CLASS',
+    'MODE', 'AMOUNT', 'STATUS', 'RECEIPT',
   ];
 
   // Persistent horizontal scroll controllers per tab so the scrollbar thumb tracks scroll state
@@ -1387,21 +1398,20 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 : '-';
             return Container(
               color: i.isEven ? Colors.white : AppColors.surface,
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
               width: contentWidth,
               child: Row(
                 children: [
                   SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
                   SizedBox(width: widths[1], child: Text(dateStr, style: cellStyle)),
                   SizedBox(width: widths[2], child: Text(t.paynumber ?? '—', style: cellStyle)),
-                  SizedBox(width: widths[3], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
-                  SizedBox(width: widths[4], child: Text(stu?.courname ?? '-', style: cellStyle)),
+                  SizedBox(width: widths[3], child: Text(stu?.stuadmno ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
+                  SizedBox(width: widths[4], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
                   SizedBox(width: widths[5], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
                   SizedBox(width: widths[6], child: Text(t.paymethod ?? '-', style: cellStyle)),
                   SizedBox(width: widths[7], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
-                  SizedBox(width: widths[8], child: Text(t.payreference ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
                   SizedBox(
-                    width: widths[9],
+                    width: widths[8],
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
@@ -1411,7 +1421,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       ),
                     ),
                   ),
-                  SizedBox(width: widths[10], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
+                  SizedBox(width: widths[9], child: t.isSuccess ? _buildDownloadButton(t) : const SizedBox.shrink()),
                 ],
               ),
             );

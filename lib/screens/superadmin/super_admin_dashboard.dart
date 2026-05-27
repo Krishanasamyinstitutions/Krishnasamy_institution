@@ -30,6 +30,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   int _selectedNavIndex = 0;
   bool _sidebarCollapsed = false;
 
+  // Deterministic accent colour per institution code so each KCxx badge
+  // in the Institutions Overview gets its own visually distinct highlight
+  // without depending on a server-supplied palette.
+  static const List<Color> _insCodePalette = [
+    Color(0xFFE65100), // deep orange
+    Color(0xFF1565C0), // strong blue
+    Color(0xFF2E7D32), // forest green
+    Color(0xFF6A1B9A), // purple
+    Color(0xFFC62828), // crimson
+    Color(0xFF00838F), // teal
+    Color(0xFFEF6C00), // amber
+  ];
+  Color _colorForInsCode(String code) {
+    if (code.isEmpty) return _insCodePalette[0];
+    final h = code.codeUnits.fold<int>(0, (a, b) => a + b);
+    return _insCodePalette[h % _insCodePalette.length];
+  }
+
   static const List<_SANavItem> _navItems = [
     _SANavItem('element-3', 'Dashboard', section: 'MAIN MENU'),
     _SANavItem('building', 'Register Institution', section: 'INSTITUTIONS'),
@@ -497,7 +515,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Dashboard RPC failed: $e',
+            content: Text('Dashboard load failed. ${friendlyError(e)}',
                 style: const TextStyle(fontSize: 12)),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 10),
@@ -1840,24 +1858,31 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Center(
+              Builder(builder: (_) {
+                final codeColor = _colorForInsCode(s.insCode);
+                return Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: codeColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: codeColor.withValues(alpha: 0.55), width: 1.2),
+                  ),
+                  child: Center(
                     child: Text(
-                        s.insCode.isNotEmpty
-                            ? s.insCode.toUpperCase()
-                            : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary))),
-              ),
+                      s.insCode.isNotEmpty
+                          ? s.insCode.toUpperCase()
+                          : (s.insName.isNotEmpty ? s.insName[0] : 'I'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: codeColor,
+                      ),
+                    ),
+                  ),
+                );
+              }),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -3481,30 +3506,19 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
 
     final rows = <Widget>[];
     grouped.forEach((course, classRows) {
-      // Section header — course name, accent text on a pale accent fill.
-      rows.add(Container(
-        width: double.infinity,
-        color: AppColors.accent.withValues(alpha: 0.10),
-        padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 10),
-        child: Text(course,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.accent)),
-      ));
-
-      // Per-class rows — zebra restarts within each course section.
+      // Per-class rows. Course name shows in the COURSE column on the first
+      // row of each group (grouped-table style); blank on subsequent rows so
+      // the eye groups them visually without a separate banner.
       for (var i = 0; i < classRows.length; i++) {
         final r = classRows[i];
         final amount = (r[widget.mode] as num?)?.toDouble() ?? 0;
         rows.add(Container(
           color: i.isEven ? Colors.white : AppColors.surface,
-          padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 14),
+          padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 8),
           child: Row(
             children: [
-              cell('', 3),
+              cell(i == 0 ? course : '', 3,
+                  weight: FontWeight.w700, color: AppColors.accent),
               cell('${r['class'] ?? ''}', 2),
               cell('${_studentsOf(r)}', 2, align: TextAlign.right),
               cell(_fmt(amount), 4,
@@ -3523,7 +3537,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
           0, (s, r) => s + ((r[widget.mode] as num?)?.toDouble() ?? 0));
       rows.add(Container(
         color: AppColors.tableHeadBg,
-        padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: rowPadH, vertical: 7),
         child: Row(
           children: [
             cell('S.Total', 3,
@@ -4484,76 +4498,27 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                   ])),
                 ]),
               const SizedBox(height: 14),
-              if (isMobile) ...[
-                _label('Mobile No'),
-                TextFormField(
-                  controller: _phoneCtrl,
-                  readOnly: true,
-                  canRequestFocus: false,
-                  decoration: _inputDec('Enter 10-digit mobile number'),
-                  style: _fieldStyle(),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                  validator: (v) {
-                    final t = (v ?? '').trim();
-                    if (t.isEmpty) return null; // optional
-                    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) {
-                      return 'Enter a valid 10-digit mobile number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                _label('Date of Birth'),
-                TextFormField(
-                  controller: _dobCtrl,
-                  readOnly: true,
-                  canRequestFocus: false,
-                  decoration: _inputDec('Select date of birth',
-                      suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
-                  style: _fieldStyle(),
-                ),
-              ] else
-                Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _label('Mobile No'),
-                    TextFormField(
-                      controller: _phoneCtrl,
-                      readOnly: true,
-                      canRequestFocus: false,
-                      decoration: _inputDec('Enter 10-digit mobile number'),
-                      style: _fieldStyle(),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      validator: (v) {
-                        final t = (v ?? '').trim();
-                        if (t.isEmpty) return null; // optional
-                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) {
-                          return 'Enter a valid 10-digit mobile number';
-                        }
-                        return null;
-                      },
-                    ),
-                  ])),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _label('Date of Birth'),
-                    TextFormField(
-                      controller: _dobCtrl,
-                      readOnly: true,
-                      canRequestFocus: false,
-                      decoration: _inputDec('Select date of birth',
-                          suffix: const Icon(Icons.calendar_today_rounded, size: 16)),
-                      style: _fieldStyle(),
-                    ),
-                  ])),
-                ]),
+              _label('Mobile No'),
+              TextFormField(
+                controller: _phoneCtrl,
+                readOnly: true,
+                canRequestFocus: false,
+                decoration: _inputDec('Enter 10-digit mobile number'),
+                style: _fieldStyle(),
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return null; // optional
+                  if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) {
+                    return 'Enter a valid 10-digit mobile number';
+                  }
+                  return null;
+                },
+              ),
               const SizedBox(height: 24),
               Row(
                 children: [

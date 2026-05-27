@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../../utils/app_theme.dart';
@@ -89,6 +90,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   void _showAddDesignationDialog() {
     final controller = TextEditingController();
     int? reportsTo;
+    String? nameError;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -109,10 +111,18 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               TextField(
                 controller: controller,
                 autofocus: true,
+                onChanged: (v) {
+                  final overflow = v.trim().length > 50;
+                  final next = overflow ? 'Designation must be less than 50 characters' : null;
+                  if (nameError != next) {
+                    setDialogState(() => nameError = next);
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'Enter designation name',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                  errorText: nameError,
                 ),
               ),
               SizedBox(height: 16.h),
@@ -145,7 +155,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h)),
               onPressed: () async {
                 final name = controller.text.trim();
-                if (name.isEmpty) return;
+                if (name.isEmpty) {
+                  setDialogState(() => nameError = 'Designation name is required');
+                  return;
+                }
+                if (name.length > 50) {
+                  setDialogState(() => nameError = 'Designation cannot exceed 50 characters');
+                  return;
+                }
                 final auth = Provider.of<AuthProvider>(ctx, listen: false);
                 final insId = auth.insId;
                 if (insId == null) return;
@@ -433,8 +450,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               controller: _nameController,
               decoration: _inputDecoration(context, 'Enter user name'),
               style: _inputTextStyle(context),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) {
+                final s = v?.trim() ?? '';
+                if (s.isEmpty) return 'Required';
+                if (s.length > 50) return 'User name must be less than 50 characters';
+                return null;
+              },
             ),
             SizedBox(height: 16.h),
 
@@ -450,8 +472,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               decoration: _inputDecoration(context, 'Enter email'),
               style: _inputTextStyle(context),
               keyboardType: TextInputType.emailAddress,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              validator: (v) {
+                final s = v?.trim() ?? '';
+                if (s.isEmpty) return 'Required';
+                final emailRe = RegExp(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
+                if (!emailRe.hasMatch(s)) return 'Enter a valid email address';
+                return null;
+              },
             ),
             SizedBox(height: 16.h),
 
@@ -467,8 +494,16 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               decoration: _inputDecoration(context, 'Enter phone number'),
               style: _inputTextStyle(context),
               keyboardType: TextInputType.phone,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              validator: (v) {
+                final s = v?.trim() ?? '';
+                if (s.isEmpty) return 'Required';
+                if (s.length != 10) return 'Phone must be 10 digits';
+                return null;
+              },
             ),
             SizedBox(height: 16.h),
 
@@ -494,8 +529,12 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               ),
               style: _inputTextStyle(context),
               obscureText: _obscurePassword,
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Required' : null,
+              validator: (v) {
+                final s = v ?? '';
+                if (s.isEmpty) return 'Required';
+                if (s.length < 8) return 'Password must be at least 8 characters';
+                return null;
+              },
             ),
             SizedBox(height: 24.h),
 
@@ -834,8 +873,6 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
           detailRow('Reports To', reportTo ?? 'None', icon: 'profile-circle'),
           Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
           detailRow('Start Date', '${u.usestadate.day.toString().padLeft(2, '0')}/${u.usestadate.month.toString().padLeft(2, '0')}/${u.usestadate.year}', icon: 'calendar-1'),
-          Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
-          detailRow('Date of Birth', '${u.usedob.day.toString().padLeft(2, '0')}/${u.usedob.month.toString().padLeft(2, '0')}/${u.usedob.year}', icon: 'cake'),
           if (u.usecategory != null && u.usecategory!.isNotEmpty) ...[
             Divider(height: 1, indent: 20, endIndent: 20, color: AppColors.border.withValues(alpha: 0.5)),
             detailRow('Category', u.usecategory!, icon: 'category'),

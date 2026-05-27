@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../utils/app_theme.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/friendly_error.dart';
 import '../../widgets/app_icon.dart';
 
 /// Three-step forgot-password flow for institution users (admin/staff/
@@ -79,7 +80,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'OTP request failed: $e';
+        _errorMessage = friendlyError(e);
       });
     }
   }

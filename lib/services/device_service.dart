@@ -67,6 +67,11 @@ class DeviceService {
   }
 
   /// True if this PC has been activated for any role.
+  ///
+  /// Only the local secure_storage is consulted. On a fresh install (after
+  /// the user uninstalled+reinstalled the app) the storage is wiped, so
+  /// this returns false and the activation-code prompt is shown again — the
+  /// office can audit each install and re-bind the PC explicitly.
   static Future<bool> isActivated() async {
     final bound = await _storage.read(key: _kBoundInsId);
     final sa = await _storage.read(key: _kIsSuperAdmin);

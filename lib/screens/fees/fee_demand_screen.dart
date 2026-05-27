@@ -40,6 +40,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   List<Map<String, dynamic>> _concessions = [];
   List<String> _concessionList = [];
 
+  // Students master cached at file-pick time so _validateRow can flag rows
+  // whose Roll No doesn't exist, or whose Class/Course disagrees with the
+  // student's stored class/course (so a demand can't be filed against the
+  // wrong roll number by mistake).
+  Map<String, Map<String, String>> _importStudentByAdmno = {};
+
   bool _isLoading = false;
   bool _isSaving = false;
 
@@ -49,6 +55,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   List<String> _headers = [];
   List<List<dynamic>> _rows = [];
   Map<int, String> _rowErrors = {};
+  // rowIdx → set of field keys whose value failed validation. Field keys
+  // match _importFieldLabels (e.g. 'stuadmno', 'stuclass', 'demfeetype').
+  Map<int, Set<String>> _cellErrors = {};
   List<String?> _mappings = [];
   int _importStep = 0; // 0=pick, 1=map, 2=importing, 3=done
   int _imported = 0;
@@ -165,20 +174,30 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
     setState(() => _loadingDemands = true);
     try {
-      final summary = await SupabaseService.getFeeDemandSummary(insId);
+      final results = await Future.wait<dynamic>([
+        SupabaseService.getFeeDemandSummary(insId),
+        SupabaseService.getCourseClassOrdering(insId),
+      ]);
+      final summary = results[0] as List<Map<String, dynamic>>;
+      final ord = results[1] as ({Map<String, int> courseOrd, Map<String, int> classOrd});
       if (mounted) {
-        const classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'I Year', 'II Year', 'III Year'];
+        // Sort by course.ordid then class.ordid (master-data order).
+        // Rows with no matching master row fall to the end, then break ties by name.
+        const tail = 1 << 30;
+        int courseKey(String name) => ord.courseOrd[name.trim()] ?? tail;
+        int classKey(String name) => ord.classOrd[name.trim()] ?? tail;
         summary.sort((a, b) {
-          // Course alphabetical first, then class order.
           final aCourse = a['courname']?.toString() ?? '';
           final bCourse = b['courname']?.toString() ?? '';
-          final courseCmp = aCourse.compareTo(bCourse);
-          if (courseCmp != 0) return courseCmp;
+          final c = courseKey(aCourse).compareTo(courseKey(bCourse));
+          if (c != 0) return c;
+          final nameCmp = aCourse.compareTo(bCourse);
+          if (nameCmp != 0) return nameCmp;
           final aClass = a['stuclass']?.toString() ?? '';
           final bClass = b['stuclass']?.toString() ?? '';
-          final aIdx = classOrder.indexOf(aClass);
-          final bIdx = classOrder.indexOf(bClass);
-          return (aIdx == -1 ? 999 : aIdx).compareTo(bIdx == -1 ? 999 : bIdx);
+          final ck = classKey(aClass).compareTo(classKey(bClass));
+          if (ck != 0) return ck;
+          return aClass.compareTo(bClass);
         });
         setState(() {
           _classSummary = summary;
@@ -423,31 +442,104 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
         _mappings = mappings;
         _importStep = 1;
         _errorMsg = null;
+        _rowErrors = {};
+        _cellErrors = {};
       });
+      await _loadStudentMaster();
     } catch (e) {
-      setState(() => _errorMsg = 'Failed to parse file: $e');
+      setState(() => _errorMsg = friendlyError(e));
     }
   }
 
-  String? _validateRow(int rowIdx) {
+  /// Load the students master keyed by roll number so _validateRow can flag
+  /// imported rows whose Roll No doesn't exist, or whose Class/Course
+  /// disagrees with what the student is registered under.
+  Future<void> _loadStudentMaster() async {
+    final auth = context.read<AuthProvider>();
+    final insId = auth.insId;
+    if (insId == null) return;
+    String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    try {
+      final rows = await SupabaseService.fromSchema('students')
+          .select('stuadmno, stuclass, courname')
+          .eq('ins_id', insId)
+          .eq('activestatus', 1);
+      final map = <String, Map<String, String>>{};
+      for (final s in (rows as List)) {
+        final adm = (s['stuadmno']?.toString() ?? '').trim();
+        if (adm.isEmpty) continue;
+        map[norm(adm)] = {
+          'stuclass': (s['stuclass']?.toString() ?? '').trim(),
+          'courname': (s['courname']?.toString() ?? '').trim(),
+        };
+      }
+      if (mounted) setState(() => _importStudentByAdmno = map);
+    } catch (e) {
+      debugPrint('Load student master failed: $e');
+    }
+  }
+
+  /// Per-field validation. Returns fieldKey → reason for every cell that
+  /// failed (empty map ⇒ row passes).
+  Map<String, String> _validateRowFields(int rowIdx) {
     final row = _rows[rowIdx];
-    final missing = <String>[];
+    final errors = <String, String>{};
     for (final reqKey in _requiredFields) {
       final colIdx = _mappings.indexOf(reqKey);
       if (colIdx < 0 || colIdx >= row.length || row[colIdx].toString().trim().isEmpty) {
-        missing.add(_importFieldLabels[reqKey] ?? reqKey);
+        errors[reqKey] = 'Required';
       }
     }
-    if (missing.isNotEmpty) return 'Missing: ${missing.join(', ')}';
-    // Fee Type must already exist for this institution. Otherwise the row
-    // can't be linked to a feetype row and the demand is meaningless.
     final ft = _cellByKey(row, 'demfeetype');
     if (ft != null && _feeTypes.isNotEmpty) {
       final ftLower = ft.toLowerCase();
-      final ok = _feeTypes.any((f) => f.toLowerCase() == ftLower);
-      if (!ok) return 'Fee Type "$ft" not found — import it first';
+      if (!_feeTypes.any((f) => f.toLowerCase() == ftLower)) {
+        errors['demfeetype'] = 'Fee Type "$ft" not found — import it first';
+      }
     }
-    return null;
+    String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+    final admRaw = _cellByKey(row, 'stuadmno');
+    if (admRaw != null && _importStudentByAdmno.isNotEmpty) {
+      final student = _importStudentByAdmno[norm(admRaw)];
+      if (student == null) {
+        errors['stuadmno'] = 'Roll No "$admRaw" not found in students master';
+      } else {
+        final clsRaw = _cellByKey(row, 'stuclass');
+        if (clsRaw != null && (student['stuclass'] ?? '').isNotEmpty
+            && norm(clsRaw) != norm(student['stuclass']!)) {
+          errors['stuclass'] = 'Class "$clsRaw" doesn\'t match student (registered as "${student['stuclass']}")';
+        }
+        final courRaw = _cellByKey(row, 'courname');
+        if (courRaw != null && (student['courname'] ?? '').isNotEmpty
+            && norm(courRaw) != norm(student['courname']!)) {
+          errors['courname'] = 'Course "$courRaw" doesn\'t match student (registered as "${student['courname']}")';
+        }
+      }
+    }
+    return errors;
+  }
+
+  /// Back-compat single-string helper, used by the staging-build save path.
+  String? _validateRow(int rowIdx) {
+    final fields = _validateRowFields(rowIdx);
+    if (fields.isEmpty) return null;
+    return _composeRowError(fields);
+  }
+
+  String _composeRowError(Map<String, String> fields) {
+    final missing = <String>[];
+    final detail = <String>[];
+    fields.forEach((k, v) {
+      if (v == 'Required') {
+        missing.add(_importFieldLabels[k] ?? k);
+      } else {
+        detail.add(v);
+      }
+    });
+    final parts = <String>[];
+    if (missing.isNotEmpty) parts.add('Missing: ${missing.join(', ')}');
+    parts.addAll(detail);
+    return parts.join(' • ');
   }
 
   String? _cellByKey(List<dynamic> row, String fieldKey) {
@@ -920,31 +1012,49 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
                     // Class
                     _buildLabel('Class'),
-                    DropdownButtonFormField<String>(
-                      value: _selectedClass,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      elevation: 6,
-                      decoration: _inputDecoration('Select class'),
-                      items: _classes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                      onChanged: (v) => setState(() => _selectedClass = v),
-                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    ),
+                    Builder(builder: (_) {
+                      final seen = <String>{};
+                      final items = <DropdownMenuItem<String>>[];
+                      for (final c in _classes) {
+                        if (c.isEmpty || !seen.add(c)) continue;
+                        items.add(DropdownMenuItem(value: c, child: Text(c)));
+                      }
+                      final value = seen.contains(_selectedClass) ? _selectedClass : null;
+                      return DropdownButtonFormField<String>(
+                        value: value,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
+                        decoration: _inputDecoration('Select class'),
+                        items: items,
+                        onChanged: (v) => setState(() => _selectedClass = v),
+                        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                      );
+                    }),
                     SizedBox(height: 16.h),
 
                     // Fee Type
                     _buildLabel('Fee Type *'),
-                    DropdownButtonFormField<String>(
-                      value: _selectedFeeType,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      elevation: 6,
-                      decoration: _inputDecoration('Select fee type'),
-                      items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                      onChanged: (v) => setState(() => _selectedFeeType = v),
-                      validator: (v) => v == null ? 'Required' : null,
-                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    ),
+                    Builder(builder: (_) {
+                      final seen = <String>{};
+                      final items = <DropdownMenuItem<String>>[];
+                      for (final f in _feeTypes) {
+                        if (f.isEmpty || !seen.add(f)) continue;
+                        items.add(DropdownMenuItem(value: f, child: Text(f)));
+                      }
+                      final value = seen.contains(_selectedFeeType) ? _selectedFeeType : null;
+                      return DropdownButtonFormField<String>(
+                        value: value,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
+                        decoration: _inputDecoration('Select fee type'),
+                        items: items,
+                        onChanged: (v) => setState(() => _selectedFeeType = v),
+                        validator: (v) => v == null ? 'Required' : null,
+                        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                      );
+                    }),
                     SizedBox(height: 16.h),
 
                     // Fee Year & Fee Term (side by side)
@@ -955,16 +1065,26 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildLabel('Fee Year'),
-                              DropdownButtonFormField<String>(
-                                value: _selectedFeeYear,
-                                dropdownColor: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                elevation: 6,
-                                decoration: _inputDecoration('Select year'),
-                                items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']?.toString() ?? '-'))).toList(),
-                                onChanged: (v) => setState(() => _selectedFeeYear = v),
-                                style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                              ),
+                              Builder(builder: (_) {
+                                final seen = <String>{};
+                                final items = <DropdownMenuItem<String>>[];
+                                for (final y in _years) {
+                                  final v = y['yr_id']?.toString();
+                                  if (v == null || v.isEmpty || !seen.add(v)) continue;
+                                  items.add(DropdownMenuItem(value: v, child: Text(y['yrlabel']?.toString() ?? '-')));
+                                }
+                                final value = seen.contains(_selectedFeeYear) ? _selectedFeeYear : null;
+                                return DropdownButtonFormField<String>(
+                                  value: value,
+                                  dropdownColor: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  elevation: 6,
+                                  decoration: _inputDecoration('Select year'),
+                                  items: items,
+                                  onChanged: (v) => setState(() => _selectedFeeYear = v),
+                                  style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                                );
+                              }),
                             ],
                           ),
                         ),
@@ -988,16 +1108,26 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
                     // Concession
                     _buildLabel('Concession'),
-                    DropdownButtonFormField<String>(
-                      value: _selectedConcession,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      elevation: 6,
-                      decoration: _inputDecoration('Select concession'),
-                      items: _concessions.map((c) => DropdownMenuItem(value: c['con_id'].toString(), child: Text(c['condesc']?.toString() ?? '-'))).toList(),
-                      onChanged: (v) => setState(() => _selectedConcession = v),
-                      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    ),
+                    Builder(builder: (_) {
+                      final seen = <String>{};
+                      final items = <DropdownMenuItem<String>>[];
+                      for (final c in _concessions) {
+                        final v = c['con_id']?.toString();
+                        if (v == null || !seen.add(v)) continue;
+                        items.add(DropdownMenuItem(value: v, child: Text(c['condesc']?.toString() ?? '-')));
+                      }
+                      final value = seen.contains(_selectedConcession) ? _selectedConcession : null;
+                      return DropdownButtonFormField<String>(
+                        value: value,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        elevation: 6,
+                        decoration: _inputDecoration('Select concession'),
+                        items: items,
+                        onChanged: (v) => setState(() => _selectedConcession = v),
+                        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+                      );
+                    }),
                     SizedBox(height: 16.h),
 
                     // Fee Amount & Concession Amount (side by side)
@@ -1796,18 +1926,21 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 ),
               ),
               SizedBox(width: 8.w),
-              ElevatedButton.icon(
-                onPressed: _exportTemplate,
-                icon: AppIcon('grid-1', size: 16),
-                label: const Text('Format to Excel'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF217346),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                  textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-                ),
-              ),
+              Builder(builder: (_) {
+                final hasErrors = _rows.isNotEmpty && _cellErrors.isNotEmpty;
+                return ElevatedButton.icon(
+                  onPressed: hasErrors ? _exportRowsWithErrors : _exportTemplate,
+                  icon: AppIcon(hasErrors ? 'document-download' : 'grid-1', size: 16),
+                  label: Text(hasErrors ? 'Export with Errors' : 'Format to Excel'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF217346),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 20.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                  ),
+                );
+              }),
               SizedBox(width: 8.w),
               ElevatedButton.icon(
                 onPressed: _exportSampleData,
@@ -1855,9 +1988,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         _gridHeaderDivider(),
                         _gridHeaderCell('Roll No *', flex: 3),
                         _gridHeaderDivider(),
-                        _gridHeaderCell('Class *', flex: 2),
-                        _gridHeaderDivider(),
                         _gridHeaderCell('Course', flex: 2),
+                        _gridHeaderDivider(),
+                        _gridHeaderCell('Class *', flex: 2),
                         _gridHeaderDivider(),
                         _gridHeaderCell('Fee Type *', flex: 3),
                         _gridHeaderDivider(),
@@ -1895,28 +2028,54 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                             itemBuilder: (context, index) {
                               final row = _rows[index];
                               final isEven = index % 2 == 0;
-                              final hasError = _rowErrors.containsKey(index);
-                              return Tooltip(
-                                message: hasError ? _rowErrors[index]! : '',
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                                  color: hasError ? const Color(0xFFFCE4E4) : (isEven ? Colors.white : AppColors.surface),
-                                  child: Row(
-                                    children: [
-                                      _gridDataCell('${index + 1}', width: 60, center: true),
-                                      _gridDataCell(_mappedCell(row, 'demno'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'stuadmno'), flex: 3),
-                                      _gridDataCell(_mappedCell(row, 'stuclass'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'courname'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'demfeetype'), flex: 3),
-                                      _gridDataCell(_mappedCell(row, 'yr_id'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'demfeeterm'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'con_id'), flex: 2),
-                                      _gridDataCell(_mappedCell(row, 'feeamount'), flex: 2, center: true),
-                                      _gridDataCell(_mappedCell(row, 'conamount'), flex: 2, center: true),
-                                      _gridDataCell(_mappedCell(row, 'duedate'), flex: 3, center: true),
-                                    ],
+                              final cellErrs = _cellErrors[index] ?? const <String>{};
+                              final rowTooltip = _rowErrors[index] ?? '';
+                              Widget cell(String key, int flex, {bool center = false}) {
+                                final w = _gridDataCell(_mappedCell(row, key), flex: flex, center: center);
+                                if (!cellErrs.contains(key)) return w;
+                                return Expanded(
+                                  flex: flex,
+                                  child: Tooltip(
+                                    message: rowTooltip,
+                                    child: Container(
+                                      color: const Color(0xFFFCE4E4),
+                                      alignment: center ? Alignment.center : Alignment.centerLeft,
+                                      padding: EdgeInsets.symmetric(horizontal: 8.w),
+                                      child: Text(
+                                        _mappedCell(row, key),
+                                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ),
+                                );
+                              }
+                              return Container(
+                                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                                color: isEven ? Colors.white : AppColors.surface,
+                                child: Row(
+                                  children: [
+                                    _gridDataCell('${index + 1}', width: 60, center: true),
+                                    cell('demno', 2),
+                                    cell('stuadmno', 3),
+                                    cell('courname', 2),
+                                    cell('stuclass', 2),
+                                    cell('demfeetype', 3),
+                                    cell('yr_id', 2),
+                                    cell('demfeeterm', 2),
+                                    cell('con_id', 2),
+                                    cell('feeamount', 2, center: true),
+                                    cell('conamount', 2, center: true),
+                                    cell('duedate', 3, center: true),
+                                    if (cellErrs.isNotEmpty)
+                                      Padding(
+                                        padding: EdgeInsets.only(left: 8.w),
+                                        child: Tooltip(
+                                          message: rowTooltip,
+                                          child: AppIcon.linear('info-circle', color: AppColors.error, size: 16),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               );
                             },
@@ -2014,6 +2173,76 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
 
+  /// Export the currently-loaded rows back to Excel with offending cells
+  /// shaded red and an extra "Error" column describing each row's issue.
+  Future<void> _exportRowsWithErrors() async {
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Fee Demands'];
+    excel.delete('Sheet1');
+
+    final origHeaders = List<String>.from(_headers);
+    final allHeaders = [...origHeaders, 'Error'];
+    final headerStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FF2D3748'),
+      fontColorHex: xl.ExcelColor.fromHexString('#FFFFFFFF'),
+      bold: true,
+    );
+    final errStyle = xl.CellStyle(
+      backgroundColorHex: xl.ExcelColor.fromHexString('#FFFCE4E4'),
+    );
+    for (int i = 0; i < allHeaders.length; i++) {
+      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = xl.TextCellValue(allHeaders[i]);
+      cell.cellStyle = headerStyle;
+      sheet.setColumnWidth(i, i == allHeaders.length - 1 ? 40 : 18);
+    }
+    sheet.setRowHeight(0, 32);
+
+    for (int r = 0; r < _rows.length; r++) {
+      final row = _rows[r];
+      final cellErrs = _cellErrors[r] ?? const <String>{};
+      // Map each error field key back to the source column index so the
+      // matching cell gets the red shade.
+      final errCols = <int>{};
+      for (final fk in cellErrs) {
+        final idx = _mappings.indexOf(fk);
+        if (idx >= 0) errCols.add(idx);
+      }
+      for (int c = 0; c < origHeaders.length; c++) {
+        final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1));
+        cell.value = xl.TextCellValue(c < row.length ? row[c].toString() : '');
+        if (errCols.contains(c)) cell.cellStyle = errStyle;
+      }
+      final errorCell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: origHeaders.length, rowIndex: r + 1));
+      errorCell.value = xl.TextCellValue(_rowErrors[r] ?? '');
+      if (cellErrs.isNotEmpty) errorCell.cellStyle = errStyle;
+    }
+
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save File with Errors',
+        fileName: 'fee_demand_errors.xlsx',
+        type: FileType.custom,
+        allowedExtensions: ['xlsx'],
+      );
+      if (savePath == null) return;
+      final bytes = excel.encode();
+      if (bytes == null) return;
+      await File(savePath).writeAsBytes(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error report exported'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed. ${friendlyError(e)}'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   Future<void> _exportTemplate() async {
     final excel = xl.Excel.createExcel();
     final sheet = excel['Fee Demands'];
@@ -2025,8 +2254,8 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final headers = [
       'Demand No',
       'Roll No *',
-      'Class *',
       'Course',
+      'Class *',
       'Fee Type *',
       'Fee Year *',
       'Semester *',
@@ -2084,12 +2313,12 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final sheet = excel['Fee Demands'];
     excel.delete('Sheet1');
 
-    final headers = ['Demand No', 'Roll No *', 'Class *', 'Course', 'Fee Type *', 'Fee Year *', 'Semester *', 'Concession', 'Fee Amount *', 'Concession Amount', 'Due Date *'];
+    final headers = ['Demand No', 'Roll No *', 'Course', 'Class *', 'Fee Type *', 'Fee Year *', 'Semester *', 'Concession', 'Fee Amount *', 'Concession Amount', 'Due Date *'];
     final sampleRows = [
-      ['', 'CS001', 'I Year', 'BSC-CS', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
-      ['', 'CS001', 'I Year', 'BSC-CS', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],
-      ['', 'BBA001', 'II Year', 'BBA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '2000', '2026-05-31'],
-      ['', 'MCA001', 'I Year', 'MCA', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '6500', '0', '2026-05-31'],
+      ['', 'CS001', 'BSC-CS', 'I Year', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '0', '2026-05-31'],
+      ['', 'CS001', 'BSC-CS', 'I Year', 'TUITION FEES', '2026-2027', 'JUNE', 'GENERAL', '700', '0', '2026-06-30'],
+      ['', 'BBA001', 'BBA', 'II Year', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '10080', '2000', '2026-05-31'],
+      ['', 'MCA001', 'MCA', 'I Year', 'SCHOOL FEES', '2026-2027', 'I TERM', 'GENERAL', '6500', '0', '2026-05-31'],
     ];
 
     final headerStyle = xl.CellStyle(
@@ -2137,21 +2366,25 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
   }
 
   void _validateImportData() {
-    final errors = <int, String>{};
+    final rowErrors = <int, String>{};
+    final cellErrors = <int, Set<String>>{};
     for (int i = 0; i < _rows.length; i++) {
-      final err = _validateRow(i);
-      if (err != null) errors[i] = err;
+      final fields = _validateRowFields(i);
+      if (fields.isEmpty) continue;
+      rowErrors[i] = _composeRowError(fields);
+      cellErrors[i] = fields.keys.toSet();
     }
     setState(() {
-      _rowErrors = errors;
+      _rowErrors = rowErrors;
+      _cellErrors = cellErrors;
     });
-    if (errors.isEmpty) {
+    if (rowErrors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('All rows are valid'), backgroundColor: AppColors.success),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${errors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('${rowErrors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }
