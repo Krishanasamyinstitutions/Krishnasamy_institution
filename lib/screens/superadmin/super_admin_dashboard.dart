@@ -13,6 +13,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/app_routes.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/formatters.dart';
 import '../auth/register_screen.dart';
 
 import '../../widgets/app_icon.dart';
@@ -1834,13 +1835,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   String _formatAmount(double amount) {
-    if (amount == amount.roundToDouble()) {
-      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
-    }
-    final parts = amount.toStringAsFixed(2).split('.');
-    final intPart = parts[0].replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
-    return '₹$intPart.${parts[1]}';
+    return formatIndianNumber(amount);
   }
 
   Widget _buildInstitutionCard(
@@ -2383,13 +2378,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   String _formatCurrency(double value) {
-    final fixed = value.toStringAsFixed(2);
-    final parts = fixed.split('.');
-    final whole = parts[0].replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (match) => ',',
-    );
-    return 'Rs. $whole.${parts[1]}';
+    return formatIndianNumber(value);
   }
 
   String _formatDate(DateTime date) {
@@ -2692,13 +2681,7 @@ class _InstitutionDetailPageState extends State<_InstitutionDetailPage> {
   }
 
   String _fmt(double amount) {
-    if (amount == amount.roundToDouble()) {
-      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
-    }
-    final parts = amount.toStringAsFixed(2).split('.');
-    final intPart = parts[0].replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
-    return '₹$intPart.${parts[1]}';
+    return formatIndianNumber(amount);
   }
 
   @override
@@ -3459,13 +3442,7 @@ class _CourseWiseCollectionPageState extends State<_CourseWiseCollectionPage> {
   }
 
   String _fmt(double amount) {
-    if (amount == amount.roundToDouble()) {
-      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
-    }
-    final parts = amount.toStringAsFixed(2).split('.');
-    final intPart = parts[0].replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
-    return '₹$intPart.${parts[1]}';
+    return formatIndianNumber(amount);
   }
 
   int _studentsOf(Map<String, dynamic> r) {
@@ -4722,13 +4699,7 @@ class _AggregateDrilldownPage extends StatelessWidget {
   }
 
   String _formatAmount(double amount) {
-    if (amount == amount.roundToDouble()) {
-      return '₹${amount.toInt().toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},')}';
-    }
-    final parts = amount.toStringAsFixed(2).split('.');
-    final intPart = parts[0].replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{2})+(\d)(?!\d))'), (m) => '${m[1]},');
-    return '₹$intPart.${parts[1]}';
+    return formatIndianNumber(amount);
   }
 
   double _value(_InstitutionFinanceSummary s) {

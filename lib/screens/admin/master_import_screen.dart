@@ -11,6 +11,7 @@ import '../../services/supabase_service.dart';
 import 'package:provider/provider.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
+import '../../utils/formatters.dart';
 
 void _showImportResultDialog(BuildContext context, {required int imported, required int skipped, List<String> errors = const [], VoidCallback? onDone}) {
   showDialog(
@@ -105,7 +106,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tabs (pill style, same as Reports) — hidden when driven by sidebar sub-menu
+        // Tabs (pill style, same as Reports) â€” hidden when driven by sidebar sub-menu
         if (widget.showInternalTabs)
           ListenableBuilder(
             listenable: _tabCtrl,
@@ -161,9 +162,9 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // STAGING TABLE IMPORT HELPER
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 Future<Map<String, int>> _stagingImport({
   required int insId,
@@ -236,9 +237,9 @@ String _friendlyError(String msg) {
   return msg.length > 120 ? '${msg.substring(0, 120)}...' : msg;
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // GENERIC HELPERS
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 List<List<dynamic>> _parseExcel(String path) {
   final bytes = File(path).readAsBytesSync();
@@ -359,9 +360,9 @@ Future<void> _exportTemplate(String sheetName, List<String> headers) async {
 
 /// Convert per-row error messages into per-cell column indices by parsing
 /// the canonical patterns the tabs emit:
-///   - "Missing: A, B"  → highlight headers matching A and B (case-insensitive)
-///   - "Fee Group "X" not found ..."  → highlight the "Fee Group" header
-///   - "Class ID "X" not found ..."   → highlight the "Class ID" header
+///   - "Missing: A, B"  â†’ highlight headers matching A and B (case-insensitive)
+///   - "Fee Group "X" not found ..."  â†’ highlight the "Fee Group" header
+///   - "Class ID "X" not found ..."   â†’ highlight the "Class ID" header
 ///   - Otherwise no specific cell is flagged (icon only).
 Map<int, Set<int>> _deriveCellErrors(Map<int, String> rowErrs, List<String> headers) {
   String hnorm(String s) => s.replaceAll('*', '').trim().toLowerCase();
@@ -380,7 +381,7 @@ Map<int, Set<int>> _deriveCellErrors(Map<int, String> rowErrs, List<String> head
   for (final entry in rowErrs.entries) {
     final msg = entry.value;
     final cells = <int>{};
-    final missing = RegExp(r'Missing:\s*([^•]+)').firstMatch(msg);
+    final missing = RegExp(r'Missing:\s*([^â€¢]+)').firstMatch(msg);
     if (missing != null) {
       for (final raw in missing.group(1)!.split(',')) {
         final idx = headerIndexFor(raw.trim());
@@ -400,7 +401,7 @@ Widget _gridHeaderCell(String text, {double? width, int flex = 1, bool center = 
   final child = Container(
     padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
     alignment: right ? Alignment.centerRight : center ? Alignment.center : Alignment.centerLeft,
-    child: Text(text.toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
+    child: Text(text.toUpperCase(), style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w)),
   );
   return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
 }
@@ -443,7 +444,7 @@ Widget _buildImportCard({
   bool isLoadingExisting = false,
   VoidCallback? onSampleDownload,
   Map<int, String> rowErrors = const {},
-  // rowIdx → set of column indices that failed validation. When non-empty,
+  // rowIdx â†’ set of column indices that failed validation. When non-empty,
   // the Format to Excel button switches to "Export with Errors" so the user
   // can fix issues offline and re-import.
   Map<int, Set<int>> cellErrors = const {},
@@ -722,11 +723,11 @@ Widget _buildImportCard({
   );
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 1. FEE GROUP TAB
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // COURSE TAB
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _CourseTab extends StatefulWidget {
   const _CourseTab();
@@ -763,7 +764,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     setState(() => _isLoadingExisting = true);
     try {
       final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId);
-      // Sort client-side by ordid (NULLS last), then courname — mirrors the
+      // Sort client-side by ordid (NULLS last), then courname â€” mirrors the
       // master-defined order used by the Students sidebar and drilldowns.
       final sorted = List<Map<String, dynamic>>.from(rows.cast<Map<String, dynamic>>())
         ..sort((a, b) {
@@ -885,9 +886,9 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CLASS TAB
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ClassTab extends StatefulWidget {
   const _ClassTab();
@@ -907,7 +908,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   static const _headers = ['Class ID *', 'Class Name *', 'Active Status', 'Course ID', 'Succeeding Class', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
-  // Existing course IDs for this institution — _validate uses these to flag
+  // Existing course IDs for this institution â€” _validate uses these to flag
   // rows whose Course ID isn't backed by a real course (otherwise the FK
   // insert fails silently and rows are skipped).
   Set<int> _courIds = {};
@@ -945,8 +946,8 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
           .map((c) => c['cour_id'] is int ? c['cour_id'] as int : int.tryParse('${c['cour_id'] ?? ''}'))
           .whereType<int>()
           .toSet();
-      // Sort by course.ordid → class.ordid (NULLs to the end). Existing
-      // rows read in master-defined order — same as the Students sidebar.
+      // Sort by course.ordid â†’ class.ordid (NULLs to the end). Existing
+      // rows read in master-defined order â€” same as the Students sidebar.
       final enriched = rows.map((r) {
         final courIdKey = '${r['cour_id'] ?? ''}';
         return {
@@ -1028,7 +1029,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       if (courRaw.isNotEmpty && _courIds.isNotEmpty) {
         final cid = int.tryParse(courRaw);
         if (cid != null && !_courIds.contains(cid)) {
-          rowErrs[i] = 'Course ID "$courRaw" not found — import the course first';
+          rowErrs[i] = 'Course ID "$courRaw" not found â€” import the course first';
         }
       }
     }
@@ -1106,7 +1107,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _FeeGroupTab extends StatefulWidget {
   const _FeeGroupTab();
@@ -1190,7 +1191,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1249,10 +1250,10 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 2. FEE TYPE TAB
 // Columns: Fee Name *, Short Name *, Fee Group *, Optional, Category
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _FeeTypeTab extends StatefulWidget {
   const _FeeTypeTab();
@@ -1272,7 +1273,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   static const _headers = ['Fee ID *', 'Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
-  // Lowercased fee-group names for the current institution — used by _validate
+  // Lowercased fee-group names for the current institution â€” used by _validate
   // to flag rows whose Fee Group doesn't exist (otherwise the server import
   // silently skips them).
   Set<String> _fgNames = {};
@@ -1365,12 +1366,12 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       // server-side join in process_master_import drops the row silently.
       final fg = (_rows[i].length > 3 ? _rows[i][3]?.toString().trim() ?? '' : '').toLowerCase();
       if (fg.isNotEmpty && _fgNames.isNotEmpty && !_fgNames.contains(fg)) {
-        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found — import it first';
+        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found â€” import it first';
       }
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1438,10 +1439,10 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 3. CONCESSION TAB
 // Columns: Concession Name *, Order
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ConcessionTab extends StatefulWidget {
   const _ConcessionTab();
@@ -1525,7 +1526,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1582,10 +1583,10 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 4. CLASS FEE DEMAND TAB
 // Columns: Class *, Term, Fee Type *, Amount, Due Date, Admission Type
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class _ClassFeeDemandTab extends StatefulWidget {
   const _ClassFeeDemandTab();
@@ -1636,7 +1637,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
         for (final c in courseRows) c['cour_id'].toString(): (c['courname'] ?? '').toString(),
       };
       String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
-      // Class name → course name lookup, derived from class.cour_id.
+      // Class name â†’ course name lookup, derived from class.cour_id.
       final classToCourse = <String, String>{};
       for (final cl in classRows) {
         final name = (cl['claname']?.toString() ?? '').trim();
@@ -1652,12 +1653,18 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
           if (ca != cb) return ca.compareTo(cb);
           return (a['cfterm']?.toString() ?? '').compareTo(b['cfterm']?.toString() ?? '');
         });
+        // Amounts come back as raw doubles (e.g. 1750.0); show them as xxxx.xx.
+        String fmtAmount(dynamic v) {
+          if (v == null || v.toString().trim().isEmpty) return '';
+          final d = v is num ? v.toDouble() : double.tryParse(v.toString());
+          return d == null ? v.toString() : formatIndianNumber(d);
+        }
         _existingRows = sorted.map((r) => [
           classToCourse[norm(r['cfclass']?.toString() ?? '')] ?? '',
           r['cfclass'] ?? '',
           r['cfterm'] ?? '',
           r['cffeetype'] ?? '',
-          r['cfamount'] ?? '',
+          fmtAmount(r['cfamount']),
           r['cfdduedate'] ?? '',
           admMap['${r['admissiontype'] ?? ''}'] ?? '${r['admissiontype'] ?? ''}',
         ]).toList();
@@ -1720,7 +1727,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors — highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1746,7 +1753,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
         while (mapped.length < 6) mapped.add('');
         // Admission Type passes through as a name (e.g. "MANAGEMENT QUOTA");
         // the SQL staging-promote looks up admissiontype.adm_id by admname.
-        // Prepend a placeholder col1 (row number) — real cf_id is assigned
+        // Prepend a placeholder col1 (row number) â€” real cf_id is assigned
         // server-side by the set_cf_id trigger.
         return [(i + 1).toString(), ...mapped];
       }).toList();
@@ -1794,10 +1801,10 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
   }
 }
 
-// ═══════════════════════════════════════════════
-// ADMISSION TYPE / QUOTA — simple lookup tables
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ADMISSION TYPE / QUOTA â€” simple lookup tables
 // (ids are user-supplied; no auto-trigger)
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 Future<Map<String, int>> _directLookupImport({
   required int insId,

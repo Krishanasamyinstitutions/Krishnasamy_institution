@@ -216,7 +216,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Page header — matches the User Creation screen.
+          // Page header â€” matches the User Creation screen.
           Row(
             children: [
               AppIcon('bank', color: AppColors.accent, size: 18),
@@ -295,7 +295,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             ),
             SizedBox(height: 20.h),
 
-            // Two fields per row — keeps the form compact and visually
+            // Two fields per row â€” keeps the form compact and visually
             // balanced; the second slot is left empty when an odd field
             // doesn't have a natural partner.
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -419,7 +419,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     );
   }
 
-  // ── Validators ────────────────────────────────────────────────
+  // â”€â”€ Validators â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String? _vName(String? v) {
     final s = v?.trim() ?? '';
     if (s.isEmpty) return 'Required';
@@ -493,7 +493,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                 const AppIcon('category-2', size: 18, color: AppColors.accent),
                 SizedBox(width: 8.w),
                 Text('Fee Group Assignments',
-                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -503,7 +503,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   ),
                   child: Text(
                     '${_feeGroups.length} groups',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
+                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
                   ),
                 ),
               ],
@@ -520,7 +520,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
               ),
             )
           else
-            // Inner bordered table — mirrors the User Creation list panel.
+            // Inner bordered table â€” mirrors the User Creation list panel.
             Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
@@ -534,8 +534,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        Expanded(flex: 3, child: Text('FEE GROUP', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 4, child: Text('ROUTED TO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('FEE GROUP', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 4, child: Text('ROUTED TO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -544,7 +544,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     final fg = _feeGroups[i];
                     final fgId = fg['fg_id'] as int?;
                     final rawBanId = fg['ban_id'] as int?;
-                    // Reset to null if the saved bank was deleted — otherwise
+                    // Reset to null if the saved bank was deleted â€” otherwise
                     // DropdownButtonFormField asserts because no item matches.
                     final currentBanId = rawBanId != null && _banks.any((b) => b['ban_id'] == rawBanId)
                         ? rawBanId
@@ -575,19 +575,19 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                               dropdownColor: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               elevation: 6,
-                              decoration: _inputDecoration(context, '— No account —'),
+                              decoration: _inputDecoration(context, 'â€” No account â€”'),
                               style: _inputTextStyle(context),
-                              hint: Text('— No account —', style: _inputTextStyle(context)),
+                              hint: Text('â€” No account â€”', style: _inputTextStyle(context)),
                               items: [
                                 DropdownMenuItem<int?>(
                                   value: null,
-                                  child: Text('— No account —', style: _inputTextStyle(context)),
+                                  child: Text('â€” No account â€”', style: _inputTextStyle(context)),
                                 ),
                                 for (final b in _banks)
                                   DropdownMenuItem<int?>(
                                     value: b['ban_id'] as int?,
                                     child: Text(
-                                      '${b['banname']} • ${b['banaccno']}',
+                                      '${b['banname']} â€¢ ${b['banaccno']}',
                                       style: _inputTextStyle(context),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -653,7 +653,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
               ],
             ),
           ),
-          // Inner bordered table — sticky header + zebra rows + chevron,
+          // Inner bordered table â€” sticky header + zebra rows + chevron,
           // matching the Existing Users table on the User Creation page.
           Container(
             clipBehavior: Clip.antiAlias,
@@ -668,11 +668,11 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   color: AppColors.tableHeadBg,
                   child: Row(
                     children: [
-                      SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      SizedBox(width: 50.w, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       SizedBox(width: 16.w),
-                      Expanded(flex: 3, child: Text('BANK', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                      Expanded(flex: 2, child: Text('BRANCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                      Expanded(flex: 3, child: Text('A/C NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      Expanded(flex: 3, child: Text('BANK', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      Expanded(flex: 2, child: Text('BRANCH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                      Expanded(flex: 3, child: Text('A/C NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       SizedBox(width: 30.w),
                     ],
                   ),
@@ -745,7 +745,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     );
   }
 
-  /// Drilldown detail view — mirrors `_buildUserDetail` on the User Creation
+  /// Drilldown detail view â€” mirrors `_buildUserDetail` on the User Creation
   /// page. Back button + breadcrumb on top, then bank avatar/name header,
   /// then labelled detail rows, then Edit + Delete actions.
   Widget _buildBankDetail(Map<String, dynamic> b) {
@@ -848,7 +848,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        '${b['banbranch']?.toString() ?? '-'}  •  ${b['ifsccode']?.toString() ?? '-'}',
+                        '${b['banbranch']?.toString() ?? '-'}  â€¢  ${b['ifsccode']?.toString() ?? '-'}',
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),

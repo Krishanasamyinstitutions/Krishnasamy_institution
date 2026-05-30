@@ -19,6 +19,7 @@ import '../../models/fee_model.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/receipt_pdf.dart';
 import '../../widgets/receipt_widget.dart';
+import '../../utils/formatters.dart';
 
 /// Signals when a drilldown view is active inside the Fee Collection tab.
 /// Parent screen listens to hide the tabs row while drilled in.
@@ -62,7 +63,7 @@ class _FeeCollectionScreenState extends State<FeeCollectionScreen> with SingleTi
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Pill-style tabs (matches Reports page) — hidden when a drilldown is active.
+        // Pill-style tabs (matches Reports page) â€” hidden when a drilldown is active.
         ValueListenableBuilder<bool>(
           valueListenable: _feeCollectionDrilldownActive,
           builder: (context, isDrilldown, _) {
@@ -390,7 +391,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     setState(() => _isLoading = true);
 
-    // Stage 1: Fast — payments + fee group map + fee totals (single RPCs)
+    // Stage 1: Fast â€” payments + fee group map + fee totals (single RPCs)
     final fastResults = await Future.wait([
       SupabaseService.getPaymentsByDateRange(insId, fromDate: _fromDate, toDate: _toDate),
       SupabaseService.getFeeGroupMaps(insId),
@@ -510,7 +511,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       });
     }
 
-    // Stage 2: Deferred — load demands only when needed (Class-wise tab or Pending click)
+    // Stage 2: Deferred â€” load demands only when needed (Class-wise tab or Pending click)
     // This reduces startup DB load significantly
   }
 
@@ -584,10 +585,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
   }
 
   String _formatCurrency(double amount) {
-    final str = amount.toStringAsFixed(0);
-    final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
-    return '₹$formatted';
+    return formatIndianNumber(amount);
   }
 
   Future<void> _pickDate(bool isFrom) async {
@@ -726,7 +724,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     });
 
     // Total/Today Collection drilldowns return a Column whose Payment Details
-    // card uses Expanded — wrapping that in a SingleChildScrollView would
+    // card uses Expanded â€” wrapping that in a SingleChildScrollView would
     // give it unbounded height and break the layout. Render those branches
     // directly under the RefreshIndicator so the inner table fills the
     // viewport instead of forcing the whole page to scroll.
@@ -745,7 +743,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
     return RefreshIndicator(
       onRefresh: _fetchData,
-      // Suppress the default desktop scrollbar on this outer scroll view —
+      // Suppress the default desktop scrollbar on this outer scroll view â€”
       // the inner tables (Method-wise Summary, Payment Details, etc.) each
       // bring their own bars, so the big outer one on the right edge was
       // duplicating that affordance.
@@ -758,7 +756,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!isDrilldown) ...[
-            // Summary cards — IntrinsicHeight makes all 3 cards the same height
+            // Summary cards â€” IntrinsicHeight makes all 3 cards the same height
             // so the Pending card stretches to match the breakdown cards.
             IntrinsicHeight(
             child: Row(
@@ -886,7 +884,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }
     final classes = classSet.toList()..sort(_compareClass);
 
-    // Apply filters — Total/Today drilldown shows only reconciled payments;
+    // Apply filters â€” Total/Today drilldown shows only reconciled payments;
     // pending-approval rows live behind the Pending Approval card.
     final filtered = basePayments.where((p) {
       if ((p['recon_status']?.toString() ?? 'P') != 'R') return false;
@@ -912,8 +910,8 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       return true;
     }).toList();
 
-    // Group by payment method — cash stays as 'cash', everything else (cheque,
-    // qr_upi, razorpay, …) is lumped under 'Bank' for the summary.
+    // Group by payment method â€” cash stays as 'cash', everything else (cheque,
+    // qr_upi, razorpay, â€¦) is lumped under 'Bank' for the summary.
     final Map<String, List<Map<String, dynamic>>> byMethod = {};
     for (final p in filtered) {
       final raw = (p['paymethod']?.toString() ?? 'Unknown').toLowerCase();
@@ -922,7 +920,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     }
     final methodKeys = byMethod.keys.toList()..sort();
 
-    // Totals — Total/Today drilldown only includes reconciled rows (filtered
+    // Totals â€” Total/Today drilldown only includes reconciled rows (filtered
     // earlier) so the totals card just shows the rolled-up amount.
     double total = 0;
     int totalCount = 0;
@@ -937,7 +935,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Back + breadcrumb — white card
+        // Back + breadcrumb â€” white card
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -1116,7 +1114,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         'STUDENTS', 'AMOUNT',
                       ];
                       final hStyle = TextStyle(
-                          fontSize: 13.sp,
+                          fontSize: 12.sp,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                           letterSpacing: 0.3);
@@ -1238,7 +1236,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           ),
         ),
         SizedBox(height: 16.h),
-        // Individual payment list — Expanded so it fills the remaining
+        // Individual payment list â€” Expanded so it fills the remaining
         // viewport height (the inner ListView consumes the leftover space
         // via its own Expanded). The drilldown's parent skips the outer
         // SingleChildScrollView so this Expanded resolves to a finite size.
@@ -1281,7 +1279,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           'CLASS', 'DATE', 'MODE', 'AMOUNT',
                         ];
                         final hStyle = TextStyle(
-                            fontSize: 13.sp,
+                            fontSize: 12.sp,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                             letterSpacing: 0.3);
@@ -1420,7 +1418,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               ),
                               ),
                             ),
-                            // Grand total — pinned footer.
+                            // Grand total â€” pinned footer.
                             Container(height: 1, color: AppColors.border),
                             Container(
                               color: AppColors.tableHeadBg,
@@ -1504,7 +1502,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top half — icon + large value + label
+              // Top half â€” icon + large value + label
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
                 child: Row(
@@ -1544,7 +1542,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   ],
                 ),
               ),
-              // Bottom half — split bar with FEE (green tint) + FINE (orange tint)
+              // Bottom half â€” split bar with FEE (green tint) + FINE (orange tint)
               if (showBreakdown)
                 Row(
                   children: [
@@ -1615,7 +1613,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       return true;
     }).toList();
 
-    // Group by fee group (all active — for table display)
+    // Group by fee group (all active â€” for table display)
     final Map<String, List<Map<String, dynamic>>> groupedByFeeGroup = {};
     for (final d in filtered) {
       final feeId = d['fee_id'] as int?;
@@ -1829,7 +1827,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               'PAID', 'FINE', 'BALANCE', 'ACTION',
             ];
             final hStyle = TextStyle(
-                fontSize: 13.sp,
+                fontSize: 12.sp,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
                 letterSpacing: 0.3);
@@ -2086,7 +2084,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             SizedBox(width: 6.w),
             Text(stuName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             SizedBox(width: 6.w),
-            Text('($admNo · $stuClass)', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+            Text('($admNo Â· $stuClass)', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
           ],
         ),
         SizedBox(height: 12.h),
@@ -2111,7 +2109,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+              headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
               dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
@@ -2179,7 +2177,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
     );
   }
 
-  /// Intermediate drilldown: Fee Group → Course + Class groups.
+  /// Intermediate drilldown: Fee Group â†’ Course + Class groups.
   /// Shown between "Pending Fees > SCHOOL FEES" and the student list.
   Widget _buildPendingCourseClassList(String feeGroupName, List<Map<String, dynamic>> groupDemands) {
     // Group demands by "COURSE|CLASS"
@@ -2289,7 +2287,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+              headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
               dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
@@ -2592,7 +2590,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             child: DataTable(dividerThickness: 1,
               showCheckboxColumn: false,
               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+              headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
               dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
               columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
               columns: const [
@@ -2688,7 +2686,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
         Row(
           children: [
             Text(
-              'Showing ${totalStudents == 0 ? 0 : startIdx + 1}–$endIdx of $totalStudents students',
+              'Showing ${totalStudents == 0 ? 0 : startIdx + 1}â€“$endIdx of $totalStudents students',
               style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary),
             ),
             const Spacer(),
@@ -2912,7 +2910,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   sectionLabel('CUSTOM RANGE'),
                   Row(children: [
                     Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('â€”')),
                     Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
                   ]),
                   if (methodList.isNotEmpty) ...[
@@ -3061,7 +3059,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         child: DataTable(dividerThickness: 1,
                           showCheckboxColumn: false,
                           headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                          headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+                          headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
                           dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                           columnSpacing: 24,
                           horizontalMargin: 20,
@@ -3159,7 +3157,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
 
   Future<void> _onPaymentTap(Map<String, dynamic> payment) async {
     // Replaced the per-payment semester drilldown with a direct receipt
-    // download — clicking a row in the date-wise drilldown saves the PDF.
+    // download â€” clicking a row in the date-wise drilldown saves the PDF.
     await _downloadReceiptForPayment(payment);
   }
 
@@ -3286,9 +3284,9 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                           dropdownColor: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           elevation: 6,
-                          // Only Cash vs Bank — matches the Method-wise
+                          // Only Cash vs Bank â€” matches the Method-wise
                           // Summary buckets above. Listing raw methods
-                          // (qr_upi, razorpay, cheque…) was confusing for
+                          // (qr_upi, razorpay, chequeâ€¦) was confusing for
                           // accountants who just want cash-hand totals.
                           items: const [
                             DropdownMenuItem<String?>(value: null, child: Text('All Modes')),
@@ -3346,7 +3344,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DataTable(dividerThickness: 1,
                         showCheckboxColumn: false,
                         headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                        headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+                        headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
                         dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                         columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                         columns: const [
@@ -3430,7 +3428,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                     child: Row(
                       children: [
-                        Text('${ddStart + 1}–$ddEnd of $ddTotalItems', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
+                        Text('${ddStart + 1}â€“$ddEnd of $ddTotalItems', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                         const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.chevron_left_rounded),
@@ -3483,7 +3481,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
       }
     }
 
-    // Build fee details grouped by term — fine is shown as a separate line item
+    // Build fee details grouped by term â€” fine is shown as a separate line item
     List<ReceiptTermDetail> termDetails = [];
     if (feeDetails != null && feeDetails.isNotEmpty) {
       const monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
@@ -3568,7 +3566,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
             };
           }
         }
-        // Fetch parent's payinchargemob — used as Mobile No on receipt
+        // Fetch parent's payinchargemob â€” used as Mobile No on receipt
         final stuadmno = (payment['students'] as Map<String, dynamic>?)?['stuadmno']?.toString();
         final parent = await SupabaseService.getStudentParent(stuId, stuadmno: stuadmno);
         if (parent != null) {
@@ -3797,7 +3795,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                               dividerThickness: 1,
                               showCheckboxColumn: false,
                               headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                              headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+                              headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
                               dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                               columnSpacing: 8, horizontalMargin: 10, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                               columns: const [
@@ -3990,7 +3988,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     child: DataTable(dividerThickness: 1,
                       showCheckboxColumn: false,
                       headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                      headingTextStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
+                      headingTextStyle: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3),
                       dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                       columnSpacing: 24, horizontalMargin: 20, dataRowMinHeight: 43.h, dataRowMaxHeight: 43.h, headingRowHeight: 44.h,
                       columns: const [
@@ -4804,10 +4802,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   }
 
   String _formatCurrency(double amount) {
-    final str = amount.toStringAsFixed(0);
-    final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
-    return '₹$formatted';
+    return formatIndianNumber(amount);
   }
 
   int _compareClass(String a, String b) {
@@ -4825,7 +4820,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   // unknown names so they sink to the bottom instead of jumping to the top.
   Map<String, int> _classOrdid = {};
   Map<String, int> _courseOrdidByName = {};
-  Map<String, int> _classCourseOrdid = {}; // claname → course.ordid via class.cour_id
+  Map<String, int> _classCourseOrdid = {}; // claname â†’ course.ordid via class.cour_id
 
   Future<void> _fetchData() async {
     final auth = context.read<AuthProvider>();
@@ -4835,7 +4830,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
     setState(() => _isLoading = true);
 
     // Aggregate summary + feetype master + class/course masters so the table
-    // is ordered by course.ordid → class.ordid instead of alphabetical.
+    // is ordered by course.ordid â†’ class.ordid instead of alphabetical.
     final results = await Future.wait([
       SupabaseService.getFeeDemandSummary(insId),
       SupabaseService.fromSchema('feetype')
@@ -4980,7 +4975,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           ],
         ),
         SizedBox(height: 16.h),
-        // Class-wise table card — Expanded so height is bounded
+        // Class-wise table card â€” Expanded so height is bounded
         Expanded(
           child: Container(
             decoration: BoxDecoration(
@@ -5295,7 +5290,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                     children: [
                                       // Fixed header
                                       classHeaderRow,
-                                      // Scrollable body — default scrollbar
+                                      // Scrollable body â€” default scrollbar
                                       // suppressed; the AppScrollbarBar to the
                                       // right (outside the horizontal viewport)
                                       // drives this scroll.
@@ -5319,7 +5314,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 ),
                               ),
                             ),
-                            // Horizontal scrollbar intentionally hidden — the
+                            // Horizontal scrollbar intentionally hidden â€” the
                             // table still accepts mouse-wheel / trackpad scroll
                             // via _classTableScrollController, but no visible
                             // bar is rendered along the bottom.
@@ -5353,10 +5348,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
   }
 
   String _formatCurrencyLocal(double amount) {
-    final str = amount.toStringAsFixed(0);
-    final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
-    return '₹$formatted';
+    return formatIndianNumber(amount);
   }
 
   Widget _buildStudentFeeDetail() {
@@ -5384,7 +5376,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
               children: [
                 InkWell(
                   onTap: () => setState(() {
-                    // Go back one level — to the student list (keep class + demands loaded).
+                    // Go back one level â€” to the student list (keep class + demands loaded).
                     _drilldownAdmNo = null;
                   }),
                   borderRadius: BorderRadius.circular(10.r),
@@ -5461,7 +5453,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             totalFine += isPaid ? fa : 0;
             totalBalance += (d['balancedue'] as num?)?.toDouble() ?? 0;
           }
-          // Custom layout so we can give every non–S No. column the same
+          // Custom layout so we can give every nonâ€“S No. column the same
           // width (S No. is the only narrow one).
           const double dHMargin = 16;
           const double dColSpacing = 12;
@@ -5475,7 +5467,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
             return SizedBox(
               width: dWidths[col],
               child: Align(
-                // S No., SEMESTER, FEE TYPE → left; AMOUNT/PAID/FINE/BALANCE → right; STATUS → left
+                // S No., SEMESTER, FEE TYPE â†’ left; AMOUNT/PAID/FINE/BALANCE â†’ right; STATUS â†’ left
                 alignment: (col >= 3 && col <= 6) ? Alignment.centerRight : Alignment.centerLeft,
                 child: Text(
                   text,
@@ -5635,7 +5627,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           return false;
         }
       }
-      // Status filter — uses reconciliation status, not paidstatus, so the
+      // Status filter â€” uses reconciliation status, not paidstatus, so the
       // class-wise tab only marks rows Paid after bank reconciliation.
       if (_studentStatusFilter != null) {
         bool isReconciled(Map d) {
@@ -6079,7 +6071,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
           ),
           child: Row(
             children: [
-              _winArrowBtn('◄', canScroll ? () => scrollBy(-60) : null, btnW, barH),
+              _winArrowBtn('â—„', canScroll ? () => scrollBy(-60) : null, btnW, barH),
               Expanded(
                 child: GestureDetector(
                   onTapDown: (d) {
@@ -6115,7 +6107,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                   ),
                 ),
               ),
-              _winArrowBtn('►', canScroll ? () => scrollBy(60) : null, btnW, barH),
+              _winArrowBtn('â–º', canScroll ? () => scrollBy(60) : null, btnW, barH),
             ],
           ),
         );
@@ -6132,8 +6124,8 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: const Color(0xFFB0B0B0),
-          border: Border(right: BorderSide(color: const Color(0xFF555555), width: arrow == '◄' ? 1 : 0),
-                        left: BorderSide(color: const Color(0xFF555555), width: arrow == '►' ? 1 : 0)),
+          border: Border(right: BorderSide(color: const Color(0xFF555555), width: arrow == 'â—„' ? 1 : 0),
+                        left: BorderSide(color: const Color(0xFF555555), width: arrow == 'â–º' ? 1 : 0)),
         ),
         child: Text(arrow, style: TextStyle(fontSize: 8.sp, color: onTap != null ? const Color(0xFF333333) : const Color(0xFFAAAAAA))),
       ),
@@ -6217,10 +6209,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
   }
 
   String _formatCurrency(double amount) {
-    final str = amount.toStringAsFixed(0);
-    final pattern = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
-    final formatted = str.replaceAllMapped(pattern, (m) => '${m[1]},');
-    return '\u20B9$formatted';
+    return formatIndianNumber(amount);
   }
 
   String _formatDisplayDate(String isoDate) {
@@ -6274,7 +6263,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                 r['feedesc'].toString(): r['feeshort'].toString(),
           };
           _summaryTotalDemand = feeTotals['totalDemand'] ?? 0;
-          // totalPaid already includes fine — don't add it again.
+          // totalPaid already includes fine â€” don't add it again.
           _summaryTotalPaid = feeTotals['totalPaid'] ?? 0;
           _summaryTotalPending = feeTotals['totalPending'] ?? 0;
           _isLoading = false;
@@ -6470,7 +6459,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                   sectionLabel('CUSTOM RANGE'),
                   Row(children: [
                     Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('â€”')),
                     Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
                   ]),
                 ],
@@ -6882,7 +6871,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             const double hMargin = 6;
                             const double snoW = 40;
                             const double recptW = 80;
-                            const double admnW = 100;   // ROLL NO — fits 12-digit numbers
+                            const double admnW = 100;   // ROLL NO â€” fits 12-digit numbers
                             const double nameW = 140;
                             const double courseW = 80;
                             const double classW = 80;
@@ -6899,7 +6888,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               totalColW,
                             ];
                             final totalFixedWidth = colWidths.reduce((a, b) => a + b) + (colWidths.length - 1) * colSpacing + 2 * hMargin;
-                            // Table is at least viewport width, but grows larger if columns need more room → horizontal scroll kicks in.
+                            // Table is at least viewport width, but grows larger if columns need more room â†’ horizontal scroll kicks in.
                             final tableWidth = totalFixedWidth > constraints.maxWidth
                                 ? totalFixedWidth
                                 : constraints.maxWidth;
@@ -6996,11 +6985,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                     for (int i = 0; i < feeCount; i++)
                                       buildCell(
                                         (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
-                                            ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                            ? formatIndianNumber(feeAmts[activeDisplayFeeTypes[i]]!) : '',
                                         6 + i, fontWeight: FontWeight.w700, color: AppColors.textPrimary,
                                       ),
-                                    buildCell(fine > 0 ? fine.toStringAsFixed(0) : '', 6 + feeCount, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                                    buildCell(total.toStringAsFixed(0), 7 + feeCount, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                    buildCell(fine > 0 ? formatIndianNumber(fine) : '', 6 + feeCount, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                                    buildCell(formatIndianNumber(total), 7 + feeCount, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                                   ],
                                   bgColor: subTotalBg,
                                   height: 36,
@@ -7020,12 +7009,12 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                     for (int i = 0; i < feeCount; i++)
                                       buildCell(
                                         (feeAmts[activeDisplayFeeTypes[i]] ?? 0) > 0
-                                            ? (feeAmts[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                            ? formatIndianNumber(feeAmts[activeDisplayFeeTypes[i]]!) : '',
                                         6 + i,
                                       ),
-                                    buildCell(fine > 0 ? fine.toStringAsFixed(0) : '', 6 + feeCount),
+                                    buildCell(fine > 0 ? formatIndianNumber(fine) : '', 6 + feeCount),
                                     buildCell(
-                                      (row['total'] as double).toStringAsFixed(0),
+                                      formatIndianNumber(row['total'] as double),
                                       7 + feeCount, fontWeight: FontWeight.w600,
                                     ),
                                   ],
@@ -7048,11 +7037,11 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                 for (int i = 0; i < feeCount; i++)
                                   buildCell(
                                     (grandFeeTypeTotals[activeDisplayFeeTypes[i]] ?? 0) > 0
-                                        ? (grandFeeTypeTotals[activeDisplayFeeTypes[i]]!).toStringAsFixed(0) : '',
+                                        ? formatIndianNumber(grandFeeTypeTotals[activeDisplayFeeTypes[i]]!) : '',
                                     6 + i, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary,
                                   ),
-                                buildCell(grandFine > 0 ? grandFine.toStringAsFixed(0) : '', 6 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
-                                buildCell(grandTotal.toStringAsFixed(0), 7 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+                                buildCell(grandFine > 0 ? formatIndianNumber(grandFine) : '', 6 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
+                                buildCell(formatIndianNumber(grandTotal), 7 + feeCount, fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary),
                               ],
                               bgColor: headerBg,
                               height: 40,
@@ -7073,7 +7062,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                         children: [
                                           // Fixed header
                                           headerRow,
-                                          // Scrollable body — the framework
+                                          // Scrollable body â€” the framework
                                           // scrollbar is suppressed; the pinned
                                           // bar on the right drives it.
                                           Expanded(
@@ -7115,7 +7104,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                             );
                           },
                         )),
-                        // Modern horizontal scrollbar — matches Class-wise
+                        // Modern horizontal scrollbar â€” matches Class-wise
                         // Demand styling. Widths self-derive from the
                         // controller since tableWidth is computed inside the
                         // inner LayoutBuilder above.

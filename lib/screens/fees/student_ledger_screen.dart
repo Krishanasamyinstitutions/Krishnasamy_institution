@@ -12,6 +12,7 @@ import '../../utils/auth_provider.dart';
 import '../../utils/ledger_logic.dart' as ledger;
 import '../../services/supabase_service.dart';
 import '../../models/student_model.dart';
+import '../../utils/formatters.dart';
 
 class StudentLedgerScreen extends StatefulWidget {
   const StudentLedgerScreen({super.key});
@@ -35,7 +36,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   final Map<String, List<StudentModel>> _cachedClassStudents = {};
   bool _loadingStudents = false;
 
-  // Single-open accordion state for the course list — opening one course
+  // Single-open accordion state for the course list â€” opening one course
   // auto-collapses any previously open course.
   String? _expandedCourse;
   final Map<String, ExpansibleController> _courseExpansionCtrls = {};
@@ -86,7 +87,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     try {
       final results = await Future.wait<dynamic>([
         SupabaseService.getStudents(insId),
-        // class + course masters with ordid for sidebar ordering — same
+        // class + course masters with ordid for sidebar ordering â€” same
         // source the Students screen sidebar uses.
         SupabaseService.fromSchema('class').select('claname, ordid').eq('ins_id', insId).eq('activestatus', 1),
         SupabaseService.fromSchema('course').select('courname, ordid').eq('ins_id', insId).eq('activestatus', 1),
@@ -268,7 +269,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         'type': 'demand',
       });
 
-      // Payment row (credit) — only show for reconciled rows so RECEIVED
+      // Payment row (credit) â€” only show for reconciled rows so RECEIVED
       // entries match the Paid card. Unreconciled rows surface as a Demand
       // with Pending balance only.
       final amt = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
@@ -308,7 +309,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // ── Left: Class list ──
+        // â”€â”€ Left: Class list â”€â”€
         Container(
           width: 260.w,
           decoration: BoxDecoration(
@@ -326,7 +327,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     SizedBox(width: 8.w),
                     Expanded(
                       child: Text('Students',
-                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                     ),
                     if (!_loadingClasses)
                       Container(
@@ -337,7 +338,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                         ),
                         child: Text(
                           '${_classCounts.values.fold(0, (a, b) => a + b)}',
-                          style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w700),
+                          style: TextStyle(fontSize: 12.sp, color: AppColors.accent, fontWeight: FontWeight.w600),
                         ),
                       ),
                   ],
@@ -480,7 +481,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
 
         SizedBox(width: 12.w),
 
-        // ── Right: Student list OR Ledger ──
+        // â”€â”€ Right: Student list OR Ledger â”€â”€
         Expanded(
           child: Container(
             decoration: BoxDecoration(
@@ -499,7 +500,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     );
   }
 
-  // ── All Students List (default view) ──
+  // â”€â”€ All Students List (default view) â”€â”€
   Widget _buildAllStudentsList() {
     final q = _searchController.text.toLowerCase();
     final students = q.isEmpty
@@ -551,14 +552,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -607,7 +608,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     );
   }
 
-  // ── Student List ──
+  // â”€â”€ Student List â”€â”€
   Widget _buildStudentList() {
     final cls = _selectedClass!;
     final color = _classColor(cls);
@@ -664,13 +665,13 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Row(
             children: [
-              Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-              Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+              Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
             ],
           ),
         ),
@@ -713,7 +714,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     );
   }
 
-  // ── Ledger ──
+  // â”€â”€ Ledger â”€â”€
   Widget _buildLedger() {
     final s = _selectedStudent!;
     final fatherName = _parent?['fathername']?.toString() ?? '-';
@@ -772,17 +773,17 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.stuname, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Roll: ${s.stuadmno}  •  ${s.courname ?? ''} ${s.stuclass}  •  Father: $fatherName',
+                    Text('Roll: ${s.stuadmno}  â€¢  ${s.courname ?? ''} ${s.stuclass}  â€¢  Father: $fatherName',
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
               if (!_loadingLedger) ...[
-                _chip('Demand', '₹${_totalDemand.toStringAsFixed(0)}', AppColors.textPrimary),
+                _chip('Demand', '${formatIndianNumber(_totalDemand)}', AppColors.textPrimary),
                 SizedBox(width: 8.w),
-                _chip('Paid', '₹${_totalPaid.toStringAsFixed(0)}', Colors.green.shade700),
+                _chip('Paid', '${formatIndianNumber(_totalPaid)}', Colors.green.shade700),
                 SizedBox(width: 8.w),
-                _chip('Pending', '₹${_totalPending.toStringAsFixed(0)}', AppColors.error),
+                _chip('Pending', '${formatIndianNumber(_totalPending)}', AppColors.error),
                 SizedBox(width: 12.w),
                 SizedBox(
                   height: AppBtn.height(context),
@@ -847,7 +848,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             header: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-        // ── Column header ──
+        // â”€â”€ Column header â”€â”€
         Container(
           color: AppColors.tableHeadBg,
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -945,7 +946,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 100.w,
                             child: Text(
-                              debit > 0 ? '₹${debit.toStringAsFixed(0)}' : '-',
+                              debit > 0 ? '${formatIndianNumber(debit)}' : '-',
                               textAlign: TextAlign.right,
                               style: TextStyle(
                                   fontSize: 13.sp,
@@ -956,7 +957,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           SizedBox(
                             width: 100.w,
                             child: Text(
-                              credit > 0 ? '₹${credit.toStringAsFixed(0)}' : '-',
+                              credit > 0 ? '${formatIndianNumber(credit)}' : '-',
                               textAlign: TextAlign.right,
                               style: TextStyle(
                                   fontSize: 13.sp,
@@ -968,7 +969,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                             width: 80.w,
                             child: Text(
                               ((r['fine'] as num?)?.toDouble() ?? 0) > 0
-                                  ? '₹${((r['fine'] as num).toDouble()).toStringAsFixed(0)}'
+                                  ? '${formatIndianNumber((r['fine'] as num).toDouble())}'
                                   : '-',
                               textAlign: TextAlign.right,
                               style: TextStyle(
@@ -987,12 +988,12 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
             ),
         ),
 
-        // ── Footer ──
+        // â”€â”€ Footer â”€â”€
         Container(
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
           child: Column(
             children: [
-              // Total row — same dark bg as header
+              // Total row â€” same dark bg as header
               Container(
                 color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
@@ -1009,14 +1010,14 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     SizedBox(width: 110.w),
                     SizedBox(
                       width: 100.w,
-                      child: Text('₹${totalDebit.toStringAsFixed(0)}',
+                      child: Text('${formatIndianNumber(totalDebit)}',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary)),
                     ),
                     SizedBox(
                       width: 100.w,
-                      child: Text('₹${totalCredit.toStringAsFixed(0)}',
+                      child: Text('${formatIndianNumber(totalCredit)}',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary)),
@@ -1024,7 +1025,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                     SizedBox(
                       width: 80.w,
                       child: Text(
-                          totalFine > 0 ? '₹${totalFine.toStringAsFixed(0)}' : '-',
+                          totalFine > 0 ? '${formatIndianNumber(totalFine)}' : '-',
                           textAlign: TextAlign.right,
                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary)),
@@ -1032,7 +1033,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   ],
                 ),
               ),
-              // Closing Balance row — slightly lighter dark
+              // Closing Balance row â€” slightly lighter dark
               Container(
                 color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
@@ -1061,8 +1062,8 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                           ),
                           child: Text(
                             closingBalance <= 0
-                                ? '₹${closingBalance.abs().toStringAsFixed(0)}  Fine'
-                                : '₹${closingBalance.toStringAsFixed(0)}  Due',
+                                ? '${formatIndianNumber(closingBalance.abs())}  Fine'
+                                : '${formatIndianNumber(closingBalance)}  Due',
                             style: TextStyle(
                                 fontSize: 14.sp,
                                 fontWeight: FontWeight.w700,
@@ -1368,6 +1369,6 @@ class _TH extends StatelessWidget {
   const _TH(this.text, {this.align = TextAlign.left});
   @override
   Widget build(BuildContext context) =>
-      Text(text, textAlign: align, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3));
+      Text(text, textAlign: align, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3));
 }
 

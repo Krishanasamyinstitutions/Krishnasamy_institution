@@ -8,6 +8,7 @@ import '../../widgets/app_icon.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
 import '../../utils/friendly_error.dart';
+import '../../utils/formatters.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -36,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tabs (pill style — same pattern as Master Data / Reports)
+        // Tabs (pill style â€” same pattern as Master Data / Reports)
         ListenableBuilder(
           listenable: _tabController,
           builder: (context, _) {
@@ -64,7 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             );
           },
         ),
-        // Content — inner cards bring their own border, so no outer frame needed.
+        // Content â€” inner cards bring their own border, so no outer frame needed.
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -359,10 +360,10 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('DESIGNATION NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('REPORTS TO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 80.w, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('DESIGNATION NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('REPORTS TO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -663,10 +664,10 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        SizedBox(width: 80.w, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 40.w, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('ROLE NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('INS CODE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        SizedBox(width: 80.w, child: Text('ACTIONS', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -914,7 +915,7 @@ class _PaymentSequenceTabState extends State<_PaymentSequenceTab> with Automatic
                     child: DataTable(
                 dividerThickness: 1,
                 headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
-                headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary, letterSpacing: 0.3),
+                headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.sp, color: AppColors.textPrimary, letterSpacing: 0.3),
                 dataTextStyle: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                 columnSpacing: 24,
                 horizontalMargin: 20,
@@ -1403,15 +1404,15 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                 'TYPE', 'VALUE', 'ACTIONS',
                               ];
                               final hStyle = TextStyle(
-                                  fontSize: 13.sp,
+                                  fontSize: 12.sp,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.textPrimary,
                                   letterSpacing: 0.3);
                               // Per-column alignment so the header text and
                               // the data underneath stay visually aligned.
-                              // FROM/TO/VALUE → centerRight (numbers).
-                              // ACTIONS → centerRight (icons sit at far right
-                              // matching the header). Everything else → left.
+                              // FROM/TO/VALUE â†’ centerRight (numbers).
+                              // ACTIONS â†’ centerRight (icons sit at far right
+                              // matching the header). Everything else â†’ left.
                               Alignment alignOf(int i) {
                                 if (i == 2 || i == 3 || i == 5 || i == 6) {
                                   return Alignment.centerRight;
@@ -1516,7 +1517,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                                     r['to_days'] !=
                                                             null
                                                         ? '${r['to_days']}'
-                                                        : '∞',
+                                                        : 'âˆž',
                                                     style: TextStyle(
                                                         fontSize:
                                                             13.sp,
@@ -1540,7 +1541,7 @@ class _FineRulesTabState extends State<_FineRulesTab> with AutomaticKeepAliveCli
                                                 5,
                                                 Text(
                                                     isFixed
-                                                        ? '₹${fineValue.toStringAsFixed(0)}'
+                                                        ? '${formatIndianNumber(fineValue)}'
                                                         : '${fineValue.toStringAsFixed(1)}%',
                                                     style: TextStyle(
                                                         fontSize:

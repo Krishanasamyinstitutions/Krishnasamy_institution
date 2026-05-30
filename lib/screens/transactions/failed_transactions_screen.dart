@@ -14,6 +14,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../models/payment_model.dart';
+import '../../utils/formatters.dart';
 import '../../models/student_model.dart';
 import '../../widgets/receipt_widget.dart';
 import '../../utils/receipt_pdf.dart';
@@ -66,7 +67,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         return _filterMethods.contains(m);
       }).toList();
     }
-    // Search filter — name, roll no, class.
+    // Search filter â€” name, roll no, class.
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((t) {
         final name = _getStudentName(t).toLowerCase();
@@ -241,7 +242,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     try {
       final details = await SupabaseService.getFeeDetailsByPayId(t.payId);
       if (details.isNotEmpty) {
-        // Group by term — show month name from duedate for TUITION/VAN fees
+        // Group by term â€” show month name from duedate for TUITION/VAN fees
         const monthFeeTypes = ['TUITION FEES', 'TUITION FEE', 'VAN FEES', 'VAN FEE'];
         final termMap = <String, List<ReceiptFeeItem>>{};
         for (final d in details) {
@@ -606,7 +607,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                                       for (final fee in data.feeDetails[i].fees)
                                         pw.Padding(
                                           padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                                          child: pw.Text('\u20B9${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
+                                          child: pw.Text('${formatAmount(fee.amount)}', style: sMediumDark, textAlign: pw.TextAlign.right),
                                         ),
                                     ],
                                   ),
@@ -630,7 +631,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                                   ),
                                   pw.SizedBox(
                                     width: 119,
-                                    child: pw.Text('\u20B9${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
+                                    child: pw.Text('${formatAmount(data.total)}', style: pw.TextStyle(font: fontSemiBold, fontSize: 10, color: PdfColors.white), textAlign: pw.TextAlign.right),
                                   ),
                                 ],
                               ),
@@ -640,7 +641,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       ),
                     ],
                   ),
-                  // Status stamp overlay – between Term and Fee Type columns
+                  // Status stamp overlay â€“ between Term and Fee Type columns
                   if (data.status == 'paid' || data.status == 'failed')
                     pw.Positioned(
                       left: 120, top: 40,
@@ -796,9 +797,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                       SizedBox(width: 8.w),
                       Text(
                         'Transactions',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                       ),
                       const Spacer(),
                       // In drill-down mode these move to the back-button card.
@@ -820,13 +819,13 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
-  /// Search + date/method filter + refresh — shared by the table-card
+  /// Search + date/method filter + refresh â€” shared by the table-card
   /// header (main view) and the drill-down header card.
   List<Widget> _toolbarActions() {
     return [
       AppSearchField(
         controller: _searchController,
-        hintText: 'Search by name, roll no or class…',
+        hintText: 'Search by name, roll no or classâ€¦',
         onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
         width: 320,
         suffixIcon: _searchQuery.isNotEmpty
@@ -881,8 +880,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     ];
   }
 
-  /// Drill-down header — Back button + breadcrumb inside a white card,
-  /// matching the Fee Collection › Total Collection drill-down design.
+  /// Drill-down header â€” Back button + breadcrumb inside a white card,
+  /// matching the Fee Collection â€º Total Collection drill-down design.
   Widget _buildDrilldownHeader() {
     final compact = MediaQuery.of(context).size.width <= 1366;
     final hPad = compact ? 10.0 : 14.0;
@@ -962,21 +961,21 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     if (!hasDate) {
       datePart = 'All Dates';
     } else if (_filterFromDate != null && _filterToDate != null) {
-      datePart = '${_fmtDate(_filterFromDate!)} – ${_fmtDate(_filterToDate!)}';
+      datePart = '${_fmtDate(_filterFromDate!)} â€“ ${_fmtDate(_filterToDate!)}';
     } else if (_filterFromDate != null) {
       datePart = 'From ${_fmtDate(_filterFromDate!)}';
     } else {
       datePart = 'Until ${_fmtDate(_filterToDate!)}';
     }
     if (hasMethod) {
-      return '$datePart · ${_filterMethods.length} method${_filterMethods.length == 1 ? '' : 's'}';
+      return '$datePart Â· ${_filterMethods.length} method${_filterMethods.length == 1 ? '' : 's'}';
     }
     return datePart;
   }
 
   Future<void> _openDateRangeDialog() async {
     // Build the chip set from the modes actually present in the loaded
-    // transactions — keeps the filter list tight to what the user can act on.
+    // transactions â€” keeps the filter list tight to what the user can act on.
     final availableMethods = <String>{};
     for (final t in _allTransactions) {
       final m = (t.paymethod ?? '').toLowerCase().trim();
@@ -1146,7 +1145,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                   sectionLabel('CUSTOM RANGE'),
                   Row(children: [
                     Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('â€”')),
                     Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
                   ]),
                   if (methodList.isNotEmpty) ...[
@@ -1221,7 +1220,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         Expanded(
           child: _buildSummaryCard(
             'Total Paid',
-            '\u20B9 ${paidTotal.toStringAsFixed(2)}',
+            '${formatIndianNumber(paidTotal)}',
             '${filteredPaid.length} transactions',
             Colors.green,
             'tick-circle',
@@ -1232,7 +1231,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
         Expanded(
           child: _buildSummaryCard(
             'Total Failed',
-            '\u20B9 ${failedTotal.toStringAsFixed(2)}',
+            '${formatIndianNumber(failedTotal)}',
             '${filteredFailed.length} transactions',
             Colors.red,
             'info-circle',
@@ -1325,8 +1324,8 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
     );
   }
 
-  // ── Sticky-header table ──
-  // Reference column was dropped — the same details surface via the receipt
+  // â”€â”€ Sticky-header table â”€â”€
+  // Reference column was dropped â€” the same details surface via the receipt
   // download. Payment Method renamed to "Mode" for brevity.
   static const _txColWidths = <double>[60, 110, 100, 130, 180, 120, 120, 100, 90, 120];
   static const _txHeaders = <String>[
@@ -1347,7 +1346,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
 
   Widget _buildStickyTable(List<PaymentModel> transactions, {bool? fixedIsPaid}) {
     final cellStyle = TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600);
-    final headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: AppColors.textPrimary, letterSpacing: 0.3);
+    final headerStyle = TextStyle(fontWeight: FontWeight.w700, fontSize: 12.sp, color: AppColors.textPrimary, letterSpacing: 0.3);
 
     final baseTotal = _txColWidths.fold<double>(0, (a, b) => a + b) + 32;
     final ctrlKey = fixedIsPaid == null ? 'all' : (fixedIsPaid ? 'paid' : 'failed');
@@ -1407,12 +1406,12 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                 children: [
                   SizedBox(width: widths[0], child: Text('${i + 1}', style: cellStyle)),
                   SizedBox(width: widths[1], child: Text(dateStr, style: cellStyle)),
-                  SizedBox(width: widths[2], child: Text(t.paynumber ?? '—', style: cellStyle)),
+                  SizedBox(width: widths[2], child: Text(t.paynumber ?? 'â€”', style: cellStyle)),
                   SizedBox(width: widths[3], child: Text(stu?.stuadmno ?? '-', style: cellStyle, overflow: TextOverflow.ellipsis)),
                   SizedBox(width: widths[4], child: Text(stuName, style: cellStyle, overflow: TextOverflow.ellipsis)),
                   SizedBox(width: widths[5], child: Text(stu?.stuclass ?? '-', style: cellStyle)),
                   SizedBox(width: widths[6], child: Text(t.paymethod ?? '-', style: cellStyle)),
-                  SizedBox(width: widths[7], child: Text(t.transtotalamount.toStringAsFixed(2), style: cellStyle)),
+                  SizedBox(width: widths[7], child: Text(formatIndianNumber(t.transtotalamount), style: cellStyle)),
                   SizedBox(
                     width: widths[8],
                     child: Align(
@@ -1430,7 +1429,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
             );
           }
 
-          // Body list — framework scrollbar suppressed; the pinned bar on the
+          // Body list â€” framework scrollbar suppressed; the pinned bar on the
           // right drives it instead.
           final body = ScrollConfiguration(
             behavior: ScrollConfiguration.of(ctx).copyWith(scrollbars: false),
@@ -1466,7 +1465,7 @@ class _FailedTransactionsScreenState extends State<FailedTransactionsScreen>
                         ),
                       ),
                     ),
-                    // Vertical scrollbar pinned to the viewport — top spacer
+                    // Vertical scrollbar pinned to the viewport â€” top spacer
                     // carries the header colour so the band reads as a
                     // continuous full-width strip with the bar only below it.
                     Column(

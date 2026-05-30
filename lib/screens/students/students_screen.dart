@@ -91,7 +91,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   String? _selectedCourseFilter; // tracks which course the selected class belongs to
-  // Single-open accordion state for the course list — opening one course
+  // Single-open accordion state for the course list â€” opening one course
   // auto-collapses any previously open course.
   String? _expandedCourse;
   final Map<String, ExpansibleController> _courseExpansionCtrls = {};
@@ -116,11 +116,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
   String? _importErrorMsg;
 
   // Class + course masters cached at file-pick time so _validateImportRow can
-  // reject rows whose class/course doesn't exist or whose class→course
+  // reject rows whose class/course doesn't exist or whose classâ†’course
   // mapping disagrees with the master.
   Set<String> _importClassNames = {};         // normalized claname
   Set<String> _importCourseNames = {};        // normalized courname
-  Map<String, String?> _importClassToCourse = {}; // normalized claname → normalized course name (from class.cour_id)
+  Map<String, String?> _importClassToCourse = {}; // normalized claname â†’ normalized course name (from class.cour_id)
 
   static const _importGridKeys = [
     'stuadmno', 'stuname', 'stugender', 'studob', 'stuadmdate', 'courname', 'stuclass',
@@ -274,7 +274,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
 
-    // Stage 1: parallel — includes class counts so list shows immediately with correct counts
+    // Stage 1: parallel â€” includes class counts so list shows immediately with correct counts
     final results = await Future.wait<dynamic>([
       SupabaseService.getYears(insId),
       SupabaseService.getConcessions(insId),
@@ -308,7 +308,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         if (r['courname'] != null && r['ordid'] != null)
           r['courname'].toString().trim(): (r['ordid'] as num).toInt(),
     };
-    // Dedupe rawClasses while preserving first-seen order — the class table
+    // Dedupe rawClasses while preserving first-seen order â€” the class table
     // sometimes has multiple rows with the same claname (different cour_id),
     // which would otherwise crash DropdownButton with duplicate values.
     final seen = <String>{};
@@ -335,10 +335,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedYrId = years.first['yr_id'].toString();
         _selectedYrLabel = years.first['yrlabel'];
       }
-      // Don't auto-select — show all students by default
+      // Don't auto-select â€” show all students by default
     });
 
-    // Stage 2: background — load all students for search/export
+    // Stage 2: background â€” load all students for search/export
     final students = await SupabaseService.getStudents(insId);
     if (!mounted) return;
     setState(() => _students = students);
@@ -359,7 +359,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   String? _normalizeBloodGroup(String? raw) {
     if (raw == null) return null;
-    // Map DB variants like "B+VE", "B-VE", "O+VE" → canonical dropdown values
+    // Map DB variants like "B+VE", "B-VE", "O+VE" â†’ canonical dropdown values
     const map = {
       'A+VE': 'A+', 'A-VE': 'A-',
       'B+VE': 'B+', 'B-VE': 'B-',
@@ -450,7 +450,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _admDate = s.stuadmdate;
       _dob = s.studob;
       _photoUrl = s.stuphoto;
-      _isFormEnabled = false; // view mode — buttons disabled
+      _isFormEnabled = false; // view mode â€” buttons disabled
     });
   }
 
@@ -629,7 +629,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   // Per-institution bucket name. Each institution gets its own bucket
-  // (student-photos-kcet, student-photos-kcsam, …) so quotas / deletion
+  // (student-photos-kcet, student-photos-kcsam, â€¦) so quotas / deletion
   // are isolated per school.
   String _photoBucket(String inscode) => 'student-photos-${inscode.toLowerCase()}';
 
@@ -676,7 +676,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   /// mismatches on the next pass.
   Future<void> _bulkImportPhotos() async {
     // Pick a FOLDER (Windows desktop). The app then enumerates every image
-    // file inside and uploads them — much faster than Ctrl+A in the file
+    // file inside and uploads them â€” much faster than Ctrl+A in the file
     // picker when a school has hundreds of photos.
     final folderPath = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Select folder of photos named by Roll No (e.g. 6522.jpg)',
@@ -722,7 +722,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final inscode = auth.inscode ?? 'ins';
     if (insId == null) return;
 
-    // Build a Roll No → stu_id lookup from the already-loaded students list.
+    // Build a Roll No â†’ stu_id lookup from the already-loaded students list.
     // Case-insensitive match so "6522.jpg" and "6522.JPG" both work.
     final rollToStuId = <String, int>{
       for (final s in _students) s.stuadmno.toLowerCase(): s.stuId,
@@ -808,19 +808,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 14.sp)),
                   if (unmatched.isNotEmpty) ...[
                     SizedBox(height: 8.h),
-                    Text('Unmatched (${unmatched.length}) — no student with this Roll No:',
+                    Text('Unmatched (${unmatched.length}) â€” no student with this Roll No:',
                         style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 13.sp)),
                     for (final n in unmatched.take(20))
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('• $n', style: TextStyle(fontSize: 12.sp))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¢ $n', style: TextStyle(fontSize: 12.sp))),
                     if (unmatched.length > 20)
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('… and ${unmatched.length - 20} more', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¦ and ${unmatched.length - 20} more', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic))),
                   ],
                   if (failed.isNotEmpty) ...[
                     SizedBox(height: 8.h),
                     Text('Failed (${failed.length}):',
                         style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 13.sp)),
                     for (final n in failed.take(10))
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('• $n', style: TextStyle(fontSize: 12.sp))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¢ $n', style: TextStyle(fontSize: 12.sp))),
                   ],
                 ],
               ),
@@ -841,7 +841,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             s.stuadmno.toLowerCase().contains(q) ||
             s.stuclass.toLowerCase().contains(q),
           ).toList();
-    // Sort by course ordid → class ordid → name so the main list mirrors the
+    // Sort by course ordid â†’ class ordid â†’ name so the main list mirrors the
     // sidebar grouping (which is also driven by the same master ordids).
     int courseOrd(StudentModel s) =>
         _courseOrdMap[(s.courname ?? '').trim()] ?? 1 << 30;
@@ -910,7 +910,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Left Panel Builders ─────────────────────────────────────────────────────
+  // â”€â”€â”€ Left Panel Builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Group classes by course with correct counts
   Map<String, Map<String, int>> _getCoursewiseClassCounts() {
@@ -1196,7 +1196,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : Icon(Icons.photo_library, size: iconSize),
         label: Text(_isImportingPhotos
-            ? 'Uploading ${_photoUploadDone}/$_photoUploadTotal…'
+            ? 'Uploading ${_photoUploadDone}/$_photoUploadTotalâ€¦'
             : 'Import Photos'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -1291,14 +1291,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                     color: AppColors.tableHeadBg,
                     child: Row(
                       children: [
-                        Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 2, child: Text('MOBILE NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                        Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('CLASS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 2, child: Text('MOBILE NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                        Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                       ],
                     ),
                   ),
@@ -1372,7 +1372,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Ledger-style class header: icon + class name (colored) + count
-          // pill + search field. No back/breadcrumb/export — class switching
+          // pill + search field. No back/breadcrumb/export â€” class switching
           // happens via the sidebar.
           Container(
             padding: EdgeInsets.fromLTRB(12.w, 10.h, 16.w, 10.h),
@@ -1422,14 +1422,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 color: AppColors.tableHeadBg,
                 child: Row(
                   children: [
-                    Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 2, child: Text('MOBILE', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
-                    Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 1, child: Text('S NO.', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('ROLL NO', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 3, child: Text('STUDENT NAME', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('COURSE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('BATCH', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 1, child: Text('GENDER', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 2, child: Text('MOBILE', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
+                    Expanded(flex: 1, child: Text('ACTION', textAlign: TextAlign.right, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3))),
                   ],
                 ),
               ),
@@ -1473,7 +1473,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Build â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
   Widget build(BuildContext context) {
@@ -1545,7 +1545,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // LEFT — Student List
+                // LEFT â€” Student List
                 SizedBox(
                   width: 260.w,
             child: Container(
@@ -1566,7 +1566,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             AppIcon('people', color: AppColors.accent, size: 20),
                             SizedBox(width: 8.w),
                             Expanded(
-                              child: Text('Students', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                              child: Text('Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                             ),
                             Container(
                               padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -1574,7 +1574,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                                 color: AppColors.accent.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10.r),
                               ),
-                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.accent)),
+                              child: Text('${_students.isNotEmpty ? _students.length : _classCounts.values.fold(0, (s, c) => s + c)}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                             ),
                           ],
                         ),
@@ -1594,7 +1594,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
           SizedBox(width: 16.w),
 
-          // RIGHT — Student Details or Class Table
+          // RIGHT â€” Student Details or Class Table
           Expanded(
             child: _selectedStudent == null
                 ? Container(
@@ -1789,7 +1789,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Left panel: Student fields ───────────────────────────────────────────────
+  // â”€â”€â”€ Left panel: Student fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildStudentFields() {
     return Column(
@@ -1954,7 +1954,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
           )),
           _fieldFull(label: 'Concession', child: Builder(builder: (_) {
-            // Dedupe by con_id — duplicate master rows would otherwise crash
+            // Dedupe by con_id â€” duplicate master rows would otherwise crash
             // DropdownButton with "2 or more items with the same value".
             final seen = <String>{};
             final items = <DropdownMenuItem<String>>[];
@@ -2056,7 +2056,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Right panel: Parent fields ───────────────────────────────────────────────
+  // â”€â”€â”€ Right panel: Parent fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildParentFields() {
     final controllers = _selectedParentTab == 'Father'
@@ -2112,7 +2112,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  // ─── Right panel: Payment fields ──────────────────────────────────────────────
+  // â”€â”€â”€ Right panel: Payment fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildPaymentFields() {
     return IgnorePointer(
@@ -2135,7 +2135,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     ));
   }
 
-  // ─── Excel Import ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Excel Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Known student fields for column mapping
   static const _importFields = <String, String>{
@@ -2175,7 +2175,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   /// Auto-map header text to field key (case-insensitive)
   static String _autoMapHeader(String header) {
     // Strip the trailing "*" used to flag mandatory columns in our templates
-    // ("Roll No *" → "roll no") so re-uploaded templates still auto-map.
+    // ("Roll No *" â†’ "roll no") so re-uploaded templates still auto-map.
     final h = header.replaceAll('*', '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     const map = {
       'adm no': 'stuadmno', 'admission number': 'stuadmno', 'admno': 'stuadmno', 'admission no': 'stuadmno', 'roll no': 'stuadmno', 'rollno': 'stuadmno', 'roll number': 'stuadmno',
@@ -2253,7 +2253,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return 'O';
   }
 
-  // ─── Import Logic ───────────────────────────────────────────────────────
+  // â”€â”€â”€ Import Logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   void _resetImport() {
     setState(() {
@@ -2597,12 +2597,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static String? _validEmail(String? v) {
     final e = _nullIfEmpty(v);
     if (e == null) return null;
-    // Basic email check — must contain @ and .
+    // Basic email check â€” must contain @ and .
     final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     return regex.hasMatch(e) ? e : null;
   }
 
-  /// Per-field validation. Returns a map of fieldKey → reason for every cell
+  /// Per-field validation. Returns a map of fieldKey â†’ reason for every cell
   /// that's invalid. Empty map means the row passes.
   Map<String, String> _validateImportRow(int rowIdx) {
     final row = _importRows[rowIdx];
@@ -2614,7 +2614,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
     }
     // Class + course must exist in the master and (if both supplied) agree
-    // with the class-course mapping. Skip if masters haven't loaded yet —
+    // with the class-course mapping. Skip if masters haven't loaded yet â€”
     // server enforces too.
     String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
     final classRaw = (_importCellByKey(row, 'stuclass') ?? '').trim();
@@ -2652,7 +2652,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final parts = <String>[];
     if (missing.isNotEmpty) parts.add('Missing: ${missing.join(', ')}');
     parts.addAll(detail);
-    return parts.join(' • ');
+    return parts.join(' â€¢ ');
   }
 
   static String _friendlyError(String msg) {
@@ -2703,7 +2703,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${rowErrors.length} row(s) have errors — highlighted in red'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('${rowErrors.length} row(s) have errors â€” highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -2794,11 +2794,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
       String claNameCanon = classRaw;
       final classAsInt = int.tryParse(classRaw);
       if (classAsInt != null && claNameById.containsKey(classAsInt)) {
-        // Excel had a valid cla_id → resolve to canonical name
+        // Excel had a valid cla_id â†’ resolve to canonical name
         claId = classAsInt;
         claNameCanon = claNameById[claId]!;
       } else {
-        // Excel had a name (or a number that isn't in the master) → name lookup
+        // Excel had a name (or a number that isn't in the master) â†’ name lookup
         final byName = claIdByName[_normKey(classRaw)];
         if (byName != null) {
           claId = byName;
@@ -2920,7 +2920,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     _loadDropdowns();
   }
 
-  // ─── Import UI ──────────────────────────────────────────────────────────
+  // â”€â”€â”€ Import UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildStudentImportSection() {
     if (_importStep == 2) return _buildImportProgressStep();
@@ -3322,7 +3322,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         maxLines: 1,
         softWrap: false,
         overflow: TextOverflow.visible,
-        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w),
+        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3.w),
       ),
     );
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
@@ -3344,7 +3344,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return width != null ? SizedBox(width: width, child: child) : Expanded(flex: flex, child: child);
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   /// Card panel with a labelled header
   Widget _panel({required String title, required String icon, required Widget child}) {
@@ -3439,4 +3439,4 @@ class _StudentsScreenState extends State<StudentsScreen> {
   );
 }
 
-// _ExcelImportDialog removed — import is now inline grid in _StudentsScreenState
+// _ExcelImportDialog removed â€” import is now inline grid in _StudentsScreenState
