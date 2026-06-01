@@ -160,7 +160,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  'CSV is ${(size / 1024 / 1024).toStringAsFixed(1)} MB â€” limit is 5 MB. Please trim the file.'),
+                  'CSV is ${(size / 1024 / 1024).toStringAsFixed(1)} MB - limit is 5 MB. Please trim the file.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -175,7 +175,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       String csvString = _decodeBankBytes(bytes);
       csvString = csvString.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
-      // Auto-detect delimiter by scanning the first few lines â€” comma,
+      // Auto-detect delimiter by scanning the first few lines - comma,
       // semicolon, or tab. Some co-op and European bank exports use ';'
       // or '\t' as the field separator.
       final delimiter = _detectDelimiter(csvString);
@@ -205,11 +205,11 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
       final headers = allRows[headerRowIdx].map((h) => h.toString().toLowerCase().trim()).toList();
       final rows = allRows.sublist(headerRowIdx);
 
-      // Generic header sniffer â€” works across HDFC, ICICI, SBI, Axis, Yes,
+      // Generic header sniffer - works across HDFC, ICICI, SBI, Axis, Yes,
       // Federal, IOB and most CSV/Excel statements. Picks the FIRST column
       // whose header matches the bank's varied conventions.
 
-      // DATE â€” Transaction Date / Txn Date / Tran Date / Trans Date /
+      // DATE - Transaction Date / Txn Date / Tran Date / Trans Date /
       // Posting Date / Posted Date / Date. Prefer the transaction-style
       // variants so a bank that has both "Transaction Date" and "Value Date"
       // doesn't accidentally pick Value Date.
@@ -222,7 +222,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         dateIdx = headers.indexWhere((h) => h.contains('date') && !h.contains('value'));
       }
 
-      // REFERENCE / UTR / RRN / Cheque-no â€” exclude bare "transaction" which
+      // REFERENCE / UTR / RRN / Cheque-no - exclude bare "transaction" which
       // would collide with "Transaction Date".
       final refIdx = headers.indexWhere((h) =>
           h.contains('utr') || h.contains('rrn') ||
@@ -256,7 +256,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
               h.endsWith(' amount') || h.endsWith(' amt') ||
               h.startsWith('amount ') || h.startsWith('amt '));
 
-      // Single-column-amount banks ship a separate Dr/Cr flag â€” skip rows
+      // Single-column-amount banks ship a separate Dr/Cr flag - skip rows
       // marked as debit. Match the common header spellings.
       final drCrIdx = headers.indexWhere((h) =>
           h == 'dr/cr' || h == 'cr/dr' || h == 'type' ||
@@ -270,7 +270,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         final row = rows[i];
         if (row.length < 2) continue;
 
-        // If a separate withdrawal column is populated, skip â€” it's a debit.
+        // If a separate withdrawal column is populated, skip - it's a debit.
         if (withdrawalIdx >= 0 && withdrawalIdx < row.length) {
           final w = _parseAmount(row[withdrawalIdx].toString());
           if (w > 0) continue;
@@ -384,7 +384,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                 usedPayIds.addAll(chequePayIds);
                 break;
               }
-              // Single-receipt fallback â€” when several payments share the
+              // Single-receipt fallback - when several payments share the
               // same cheque number but the bank only cleared one of them,
               // match just the receipt whose amount equals the bank line.
               if (isAmountMatch) {
@@ -568,15 +568,15 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
         );
       }
     } catch (e) {
-      // Log the raw exception so it shows up in the Flutter run console â€”
+      // Log the raw exception so it shows up in the Flutter run console -
       // friendlyError() collapses unknown errors into "Something went wrong"
       // which makes diagnosis impossible. Both go to the user/log.
       debugPrint('Reconcile from bank statement failed: $e');
       failureMessage = friendlyError(e);
-      // Append a short tail of the raw message for the snackbar â€” keeps the
+      // Append a short tail of the raw message for the snackbar - keeps the
       // friendly summary but surfaces the actual cause to the user.
       final raw = e.toString();
-      final tail = raw.length > 120 ? raw.substring(0, 120) + 'â€¦' : raw;
+      final tail = raw.length > 120 ? raw.substring(0, 120) + '…' : raw;
       failureMessage = '$failureMessage\n($tail)';
     }
 
@@ -1129,7 +1129,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                       ),
                       child: Row(
                         children: [
-                          Text('${pageStart + 1}â€“$pageEnd of ${filteredReconciled.length}',
+                          Text('${pageStart + 1}–$pageEnd of ${filteredReconciled.length}',
                               style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                           const Spacer(),
                           IconButton(

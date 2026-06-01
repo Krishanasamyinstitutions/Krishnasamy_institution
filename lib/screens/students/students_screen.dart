@@ -91,7 +91,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   StudentModel? _selectedStudent;
   String? _selectedClassFilter; // null = show class list, non-null = show students of that class
   String? _selectedCourseFilter; // tracks which course the selected class belongs to
-  // Single-open accordion state for the course list â€” opening one course
+  // Single-open accordion state for the course list - opening one course
   // auto-collapses any previously open course.
   String? _expandedCourse;
   final Map<String, ExpansibleController> _courseExpansionCtrls = {};
@@ -274,7 +274,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final auth = context.read<AuthProvider>();
     final insId = auth.insId ?? 1;
 
-    // Stage 1: parallel â€” includes class counts so list shows immediately with correct counts
+    // Stage 1: parallel - includes class counts so list shows immediately with correct counts
     final results = await Future.wait<dynamic>([
       SupabaseService.getYears(insId),
       SupabaseService.getConcessions(insId),
@@ -308,7 +308,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         if (r['courname'] != null && r['ordid'] != null)
           r['courname'].toString().trim(): (r['ordid'] as num).toInt(),
     };
-    // Dedupe rawClasses while preserving first-seen order â€” the class table
+    // Dedupe rawClasses while preserving first-seen order - the class table
     // sometimes has multiple rows with the same claname (different cour_id),
     // which would otherwise crash DropdownButton with duplicate values.
     final seen = <String>{};
@@ -335,10 +335,10 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _selectedYrId = years.first['yr_id'].toString();
         _selectedYrLabel = years.first['yrlabel'];
       }
-      // Don't auto-select â€” show all students by default
+      // Don't auto-select - show all students by default
     });
 
-    // Stage 2: background â€” load all students for search/export
+    // Stage 2: background - load all students for search/export
     final students = await SupabaseService.getStudents(insId);
     if (!mounted) return;
     setState(() => _students = students);
@@ -450,7 +450,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       _admDate = s.stuadmdate;
       _dob = s.studob;
       _photoUrl = s.stuphoto;
-      _isFormEnabled = false; // view mode â€” buttons disabled
+      _isFormEnabled = false; // view mode - buttons disabled
     });
   }
 
@@ -629,7 +629,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   }
 
   // Per-institution bucket name. Each institution gets its own bucket
-  // (student-photos-kcet, student-photos-kcsam, â€¦) so quotas / deletion
+  // (student-photos-kcet, student-photos-kcsam, ...) so quotas / deletion
   // are isolated per school.
   String _photoBucket(String inscode) => 'student-photos-${inscode.toLowerCase()}';
 
@@ -676,7 +676,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   /// mismatches on the next pass.
   Future<void> _bulkImportPhotos() async {
     // Pick a FOLDER (Windows desktop). The app then enumerates every image
-    // file inside and uploads them â€” much faster than Ctrl+A in the file
+    // file inside and uploads them - much faster than Ctrl+A in the file
     // picker when a school has hundreds of photos.
     final folderPath = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Select folder of photos named by Roll No (e.g. 6522.jpg)',
@@ -808,19 +808,19 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w700, fontSize: 14.sp)),
                   if (unmatched.isNotEmpty) ...[
                     SizedBox(height: 8.h),
-                    Text('Unmatched (${unmatched.length}) â€” no student with this Roll No:',
+                    Text('Unmatched (${unmatched.length}) - no student with this Roll No:',
                         style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 13.sp)),
                     for (final n in unmatched.take(20))
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¢ $n', style: TextStyle(fontSize: 12.sp))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('* $n', style: TextStyle(fontSize: 12.sp))),
                     if (unmatched.length > 20)
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¦ and ${unmatched.length - 20} more', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('... and ${unmatched.length - 20} more', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic))),
                   ],
                   if (failed.isNotEmpty) ...[
                     SizedBox(height: 8.h),
                     Text('Failed (${failed.length}):',
                         style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 13.sp)),
                     for (final n in failed.take(10))
-                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('â€¢ $n', style: TextStyle(fontSize: 12.sp))),
+                      Padding(padding: EdgeInsets.only(left: 8.w, top: 2.h), child: Text('* $n', style: TextStyle(fontSize: 12.sp))),
                   ],
                 ],
               ),
@@ -1196,7 +1196,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : Icon(Icons.photo_library, size: iconSize),
         label: Text(_isImportingPhotos
-            ? 'Uploading ${_photoUploadDone}/$_photoUploadTotalâ€¦'
+            ? 'Uploading ${_photoUploadDone}/$_photoUploadTotal…'
             : 'Import Photos'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -1372,7 +1372,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Ledger-style class header: icon + class name (colored) + count
-          // pill + search field. No back/breadcrumb/export â€” class switching
+          // pill + search field. No back/breadcrumb/export - class switching
           // happens via the sidebar.
           Container(
             padding: EdgeInsets.fromLTRB(12.w, 10.h, 16.w, 10.h),
@@ -1545,7 +1545,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // LEFT â€” Student List
+                // LEFT - Student List
                 SizedBox(
                   width: 260.w,
             child: Container(
@@ -1594,7 +1594,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
           SizedBox(width: 16.w),
 
-          // RIGHT â€” Student Details or Class Table
+          // RIGHT - Student Details or Class Table
           Expanded(
             child: _selectedStudent == null
                 ? Container(
@@ -1954,7 +1954,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
           )),
           _fieldFull(label: 'Concession', child: Builder(builder: (_) {
-            // Dedupe by con_id â€” duplicate master rows would otherwise crash
+            // Dedupe by con_id - duplicate master rows would otherwise crash
             // DropdownButton with "2 or more items with the same value".
             final seen = <String>{};
             final items = <DropdownMenuItem<String>>[];
@@ -2597,7 +2597,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
   static String? _validEmail(String? v) {
     final e = _nullIfEmpty(v);
     if (e == null) return null;
-    // Basic email check â€” must contain @ and .
+    // Basic email check - must contain @ and .
     final regex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     return regex.hasMatch(e) ? e : null;
   }
@@ -2614,7 +2614,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       }
     }
     // Class + course must exist in the master and (if both supplied) agree
-    // with the class-course mapping. Skip if masters haven't loaded yet â€”
+    // with the class-course mapping. Skip if masters haven't loaded yet -
     // server enforces too.
     String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
     final classRaw = (_importCellByKey(row, 'stuclass') ?? '').trim();
@@ -2652,7 +2652,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final parts = <String>[];
     if (missing.isNotEmpty) parts.add('Missing: ${missing.join(', ')}');
     parts.addAll(detail);
-    return parts.join(' â€¢ ');
+    return parts.join(' • ');
   }
 
   static String _friendlyError(String msg) {
@@ -2703,7 +2703,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${rowErrors.length} row(s) have errors â€” highlighted in red'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('${rowErrors.length} row(s) have errors - highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -3439,4 +3439,4 @@ class _StudentsScreenState extends State<StudentsScreen> {
   );
 }
 
-// _ExcelImportDialog removed â€” import is now inline grid in _StudentsScreenState
+// _ExcelImportDialog removed - import is now inline grid in _StudentsScreenState

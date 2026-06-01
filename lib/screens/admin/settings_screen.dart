@@ -37,7 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tabs (pill style â€” same pattern as Master Data / Reports)
+        // Tabs (pill style - same pattern as Master Data / Reports)
         ListenableBuilder(
           listenable: _tabController,
           builder: (context, _) {
@@ -65,7 +65,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
             );
           },
         ),
-        // Content â€” inner cards bring their own border, so no outer frame needed.
+        // Content - inner cards bring their own border, so no outer frame needed.
         Expanded(
           child: TabBarView(
             controller: _tabController,

@@ -251,7 +251,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   }
 
   void _clearForm() {
-    // Reset first so onUserInteraction fields drop their "touched" flag â€”
+    // Reset first so onUserInteraction fields drop their "touched" flag -
     // otherwise autovalidation re-flags the now-empty fields as "Required".
     _formKey.currentState?.reset();
     _nameController.clear();
@@ -541,7 +541,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             ),
             SizedBox(height: 24.h),
 
-            // Buttons â€” full-width pair (Clear + Create User) sharing the
+            // Buttons - full-width pair (Clear + Create User) sharing the
             // form row 50/50.
             Row(
               children: [

@@ -495,7 +495,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     if (ft != null && _feeTypes.isNotEmpty) {
       final ftLower = ft.toLowerCase();
       if (!_feeTypes.any((f) => f.toLowerCase() == ftLower)) {
-        errors['demfeetype'] = 'Fee Type "$ft" not found â€” import it first';
+        errors['demfeetype'] = 'Fee Type "$ft" not found - import it first';
       }
     }
     String norm(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -540,7 +540,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     final parts = <String>[];
     if (missing.isNotEmpty) parts.add('Missing: ${missing.join(', ')}');
     parts.addAll(detail);
-    return parts.join(' â€¢ ');
+    return parts.join(' • ');
   }
 
   String? _cellByKey(List<dynamic> row, String fieldKey) {
@@ -670,7 +670,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
         final admNoRaw = _cellByKey(row, 'stuadmno')?.trim() ?? '';
         // Try direct, lowercase, and leading-zero-stripped variants
-        // before giving up â€” same normalisations applied to the map.
+        // before giving up - same normalisations applied to the map.
         int? stuId = stuMap[admNoRaw];
         if (stuId == null && admNoRaw.isNotEmpty) {
           stuId = stuMap[admNoRaw.toLowerCase()];
@@ -801,7 +801,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       child: Column(
         children: [
           // Card header with title, buttons, breadcrumb, and search.
-          // Hidden entirely while import is active â€” the import panel has
+          // Hidden entirely while import is active - the import panel has
           // its own Back button to return.
           if (!_showImport) Container(
             padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
@@ -814,7 +814,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 ],
                 if (!_showImport) ...[
                   if (_drilldownClass != null || _drilldownStudent != null) ...[
-                    // Back button â€” solid accent pill
+                    // Back button - solid accent pill
                     InkWell(
                       onTap: () => setState(() {
                         if (_drilldownStudent != null) {
@@ -1824,7 +1824,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                 ),
                 ),
               ),
-              // Total â€” pinned footer.
+              // Total - pinned footer.
               Container(height: 1, color: AppColors.border),
               Container(
                 color: AppColors.tableHeadBg,
@@ -2395,7 +2395,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${rowErrors.length} row(s) have errors â€” highlighted in red'), backgroundColor: AppColors.error),
+        SnackBar(content: Text('${rowErrors.length} row(s) have errors - highlighted in red'), backgroundColor: AppColors.error),
       );
     }
   }

@@ -106,7 +106,7 @@ class _MasterImportScreenState extends State<MasterImportScreen> with SingleTick
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Tabs (pill style, same as Reports) â€” hidden when driven by sidebar sub-menu
+        // Tabs (pill style, same as Reports) - hidden when driven by sidebar sub-menu
         if (widget.showInternalTabs)
           ListenableBuilder(
             listenable: _tabCtrl,
@@ -381,7 +381,7 @@ Map<int, Set<int>> _deriveCellErrors(Map<int, String> rowErrs, List<String> head
   for (final entry in rowErrs.entries) {
     final msg = entry.value;
     final cells = <int>{};
-    final missing = RegExp(r'Missing:\s*([^â€¢]+)').firstMatch(msg);
+    final missing = RegExp(r'Missing:\s*([^*]+)').firstMatch(msg);
     if (missing != null) {
       for (final raw in missing.group(1)!.split(',')) {
         final idx = headerIndexFor(raw.trim());
@@ -764,7 +764,7 @@ class _CourseTabState extends State<_CourseTab> with AutomaticKeepAliveClientMix
     setState(() => _isLoadingExisting = true);
     try {
       final rows = await SupabaseService.fromSchema('course').select('*').eq('ins_id', insId);
-      // Sort client-side by ordid (NULLS last), then courname â€” mirrors the
+      // Sort client-side by ordid (NULLS last), then courname - mirrors the
       // master-defined order used by the Students sidebar and drilldowns.
       final sorted = List<Map<String, dynamic>>.from(rows.cast<Map<String, dynamic>>())
         ..sort((a, b) {
@@ -908,7 +908,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
   static const _headers = ['Class ID *', 'Class Name *', 'Active Status', 'Course ID', 'Succeeding Class', 'Order'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
-  // Existing course IDs for this institution â€” _validate uses these to flag
+  // Existing course IDs for this institution - _validate uses these to flag
   // rows whose Course ID isn't backed by a real course (otherwise the FK
   // insert fails silently and rows are skipped).
   Set<int> _courIds = {};
@@ -947,7 +947,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
           .whereType<int>()
           .toSet();
       // Sort by course.ordid â†’ class.ordid (NULLs to the end). Existing
-      // rows read in master-defined order â€” same as the Students sidebar.
+      // rows read in master-defined order - same as the Students sidebar.
       final enriched = rows.map((r) {
         final courIdKey = '${r['cour_id'] ?? ''}';
         return {
@@ -1029,7 +1029,7 @@ class _ClassTabState extends State<_ClassTab> with AutomaticKeepAliveClientMixin
       if (courRaw.isNotEmpty && _courIds.isNotEmpty) {
         final cid = int.tryParse(courRaw);
         if (cid != null && !_courIds.contains(cid)) {
-          rowErrs[i] = 'Course ID "$courRaw" not found â€” import the course first';
+          rowErrs[i] = 'Course ID "$courRaw" not found - import the course first';
         }
       }
     }
@@ -1191,7 +1191,7 @@ class _FeeGroupTabState extends State<_FeeGroupTab> with AutomaticKeepAliveClien
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors - highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1273,7 +1273,7 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
   static const _headers = ['Fee ID *', 'Fee Name *', 'Short Name *', 'Fee Group *', 'Year *', 'Fine Applicable *'];
   List<List<dynamic>> _existingRows = [];
   bool _isLoadingExisting = false;
-  // Lowercased fee-group names for the current institution â€” used by _validate
+  // Lowercased fee-group names for the current institution - used by _validate
   // to flag rows whose Fee Group doesn't exist (otherwise the server import
   // silently skips them).
   Set<String> _fgNames = {};
@@ -1366,12 +1366,12 @@ class _FeeTypeTabState extends State<_FeeTypeTab> with AutomaticKeepAliveClientM
       // server-side join in process_master_import drops the row silently.
       final fg = (_rows[i].length > 3 ? _rows[i][3]?.toString().trim() ?? '' : '').toLowerCase();
       if (fg.isNotEmpty && _fgNames.isNotEmpty && !_fgNames.contains(fg)) {
-        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found â€” import it first';
+        rowErrs[i] = 'Fee Group "${_rows[i][3]}" not found - import it first';
       }
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors - highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1526,7 +1526,7 @@ class _ConcessionTabState extends State<_ConcessionTab> with AutomaticKeepAliveC
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors - highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1727,7 +1727,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
     }
     setState(() { _rowErrors = rowErrs; _cellErrors = _deriveCellErrors(rowErrs, _headers); _isValidated = rowErrs.isEmpty; });
     if (rowErrs.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors â€” highlighted in red'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${rowErrs.length} row(s) have errors - highlighted in red'), backgroundColor: Colors.red));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Validation passed! Click Save to import.'), backgroundColor: Colors.green));
     }
@@ -1753,7 +1753,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
         while (mapped.length < 6) mapped.add('');
         // Admission Type passes through as a name (e.g. "MANAGEMENT QUOTA");
         // the SQL staging-promote looks up admissiontype.adm_id by admname.
-        // Prepend a placeholder col1 (row number) â€” real cf_id is assigned
+        // Prepend a placeholder col1 (row number) - real cf_id is assigned
         // server-side by the set_cf_id trigger.
         return [(i + 1).toString(), ...mapped];
       }).toList();
@@ -1802,7 +1802,7 @@ class _ClassFeeDemandTabState extends State<_ClassFeeDemandTab> with AutomaticKe
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// ADMISSION TYPE / QUOTA â€” simple lookup tables
+// ADMISSION TYPE / QUOTA - simple lookup tables
 // (ids are user-supplied; no auto-trigger)
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 

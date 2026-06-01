@@ -66,7 +66,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   String _insPhone = '';
   String _insEmail = '';
 
-  // PowerCollege tab state â€” independent date range so it doesn't override
+  // PowerCollege tab state - independent date range so it doesn't override
   // the Daily Collection range when the user navigates between tabs.
   DateTime? _pcFrom;
   DateTime? _pcTo;
@@ -137,7 +137,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     if (!hasDate) {
       datePart = 'All Dates';
     } else if (_dailyFrom != null && _dailyTo != null) {
-      datePart = '${_dailyFmt(_dailyFrom)} â€“ ${_dailyFmt(_dailyTo)}';
+      datePart = '${_dailyFmt(_dailyFrom)} - ${_dailyFmt(_dailyTo)}';
     } else if (_dailyFrom != null) {
       datePart = 'From ${_dailyFmt(_dailyFrom)}';
     } else {
@@ -280,7 +280,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   sectionLabel('CUSTOM RANGE'),
                   Row(children: [
                     Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('â€”')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('-')),
                     Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
                   ]),
                 ],
@@ -483,7 +483,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   sectionLabel('CUSTOM RANGE'),
                   Row(children: [
                     Expanded(child: datePickerBox(hint: 'From', value: from, onChanged: (d) => setStateDialog(() => from = d))),
-                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('â€”')),
+                    const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('-')),
                     Expanded(child: datePickerBox(hint: 'To', value: to, onChanged: (d) => setStateDialog(() => to = d))),
                   ]),
                   const SizedBox(height: 16),
@@ -493,7 +493,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     modeChip('Cash', 'cash'),
                     modeChip('Bank', 'bank'),
                   ]),
-                  // USER (accountant) filter â€” only relevant for the Cash
+                  // USER (accountant) filter - only relevant for the Cash
                   // mode, since cash is the only method the accountant
                   // physically handles. Bank/online payments reconcile via
                   // the payment gateway, not per-user, so the filter would
@@ -688,7 +688,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             .select('usename')
             .eq('ins_id', insId)
             // Case-insensitive "contains" so "Accountant", "Sr. Accountant",
-            // "Junior Accountant" all qualify â€” schools label roles
+            // "Junior Accountant" all qualify - schools label roles
             // inconsistently and we don't want the filter to silently drop
             // everyone because of capitalisation.
             .ilike('desname', '%accountant%')
@@ -1134,7 +1134,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
             icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
             isDense: true,
-            // Popup styling â€” rounded, white, soft elevation, no Material 3 tint.
+            // Popup styling - rounded, white, soft elevation, no Material 3 tint.
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(12),
             elevation: 6,
@@ -1195,7 +1195,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             Builder(builder: (_) {
               final prefixes = _dailyPrefixes();
               // Stale _selectedPrefix can survive a date change that drops
-              // its prefix from the list â€” guard against the assertion in
+              // its prefix from the list - guard against the assertion in
               // DropdownButton requiring exactly one matching item.
               final safeValue = (_selectedPrefix != null && prefixes.contains(_selectedPrefix))
                   ? _selectedPrefix
@@ -1242,7 +1242,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     );
   }
 
-  // Solid-color action button â€” matches Master Data's Browse / Format / Sample style.
+  // Solid-color action button - matches Master Data's Browse / Format / Sample style.
   Widget _miniExportBtn({
     required VoidCallback onPressed,
     required IconData icon,
@@ -1300,7 +1300,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 SizedBox(width: 8.w),
                 Text('Consolidated Status', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 SizedBox(width: 8.w),
-                Text('â€” ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                 const Spacer(),
                 _miniExportBtn(
                   onPressed: () => _exportConsolidatedExcel(rows, byClass),
@@ -1322,7 +1322,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             columnWidths: const [90, 110, 90, 110, 200, 100, 90, 110, 100, 120, 100, 110],
             headers: const ['COURSE', 'CLASS', 'STRENGTH', 'SEMESTER', 'CATEGORY', 'STUD COUNT', 'TYPE', 'DUE', 'CONCESS', 'NET DEMAND', 'PAID', 'BALANCE'],
             rows: [
-              for (final r in rows.skip(_consolidatedPage * _tablePageSize).take(_tablePageSize))
+              for (final r in rows)
                 [
                   r['course']?.toString() ?? '',
                   r['class']?.toString() ?? '',
@@ -1350,14 +1350,6 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             centerCols: const {2, 5},
           ),
         ),
-            _pagerBar(
-              total: rows.length,
-              page: _consolidatedPage,
-              onPrev: _consolidatedPage > 0 ? () => setState(() => _consolidatedPage--) : null,
-              onNext: (_consolidatedPage + 1) * _tablePageSize < rows.length
-                  ? () => setState(() => _consolidatedPage++)
-                  : null,
-            ),
           ],
     );
   }
@@ -1521,8 +1513,6 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   bool _pendingMetaLoaded = false;
   static const int _tablePageSize = 50;
-  int _pendingPage = 0;
-  int _consolidatedPage = 0;
   int _dailyPage = 0;
   List<Map<String, dynamic>> _pendingRowsCache = [];
   List<Map<String, dynamic>> _consolidatedRowsCache = [];
@@ -1542,7 +1532,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       });
       final results = await Future.wait([pendingFut, consoFut]);
       // RPC returns JSON (RETURNS json). Supabase may decode it as a List,
-      // or hand back a JSON-encoded String â€” handle both.
+      // or hand back a JSON-encoded String - handle both.
       List _asList(dynamic v) {
         if (v is List) return v;
         if (v is String && v.isNotEmpty) {
@@ -1635,7 +1625,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 SizedBox(width: 8.w),
                 Text('Pending Payment', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 SizedBox(width: 8.w),
-                Text('â€” ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                 const Spacer(),
                 _miniExportBtn(
                   onPressed: () => _exportPendingPaymentExcel(rows, byClass, grandPending, grandConcess),
@@ -1657,7 +1647,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 columnWidths: const [90, 90, 100, 140, 90, 170, 110, 100, 90, 110],
                 headers: const ['COURSE', 'CLASS', 'SEMESTER', 'ADMN TYPE', 'REG. NO', 'NAME', 'PENDING AMT', 'CON. AMT', 'QUOTA', 'MOBILE NO'],
                 rows: [
-                  for (final r in rows.skip(_pendingPage * _tablePageSize).take(_tablePageSize))
+                  for (final r in rows)
                     [
                       r['course']?.toString() ?? '',
                       r['class']?.toString() ?? '',
@@ -1679,14 +1669,6 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 ],
                 numericCols: const {6, 7},
               ),
-            ),
-            _pagerBar(
-              total: rows.length,
-              page: _pendingPage,
-              onPrev: _pendingPage > 0 ? () => setState(() => _pendingPage--) : null,
-              onNext: (_pendingPage + 1) * _tablePageSize < rows.length
-                  ? () => setState(() => _pendingPage++)
-                  : null,
             ),
           ],
     );
@@ -1722,7 +1704,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
       child: Row(
         children: [
-          Text('$startâ€“$end of $total', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
+          Text('$start–$end of $total', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
           const Spacer(),
           IconButton(onPressed: onPrev, icon: const Icon(Icons.chevron_left_rounded), tooltip: 'Previous'),
           Text('Page ${page + 1} of $pages', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
@@ -2065,7 +2047,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 Text(_insName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
                 if (_insAddress.isNotEmpty) Text(_insAddress, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary)),
                 SizedBox(height: 6.h),
-                Text('STUDENT LEDGER â€” ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+                Text('STUDENT LEDGER — ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700)),
                 SizedBox(height: 8.h),
                 Row(children: [
                   Expanded(child: Text('Name: ${_ledgerStudent!['stuname'] ?? ''}', style: TextStyle(fontSize: 13.sp))),
@@ -2099,7 +2081,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     final fineDisplay = isReconciled ? fine : 0.0;
                     final bal = reconBal;
                     final pay = d['pay_id'] != null ? _ledgerPayments[d['pay_id']] : null;
-                    // Show DOC.NO / DOC.DATE only after reconciliation â€”
+                    // Show DOC.NO / DOC.DATE only after reconciliation -
                     // unreconciled payments don't surface here yet.
                     final docNo = isReconciled ? (pay?['paynumber']?.toString() ?? '') : '';
                     final docDate = isReconciled ? (pay?['paydate']?.toString() ?? '') : '';
@@ -2877,7 +2859,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       classGroups.putIfAbsent(key, () => []).add(row);
     }
 
-    // Fixed column widths â€” the pivot is wide (one column per term) and
+    // Fixed column widths - the pivot is wide (one column per term) and
     // scrolls horizontally, so the header can't use flex.
     final colWidths = <double>[
       54, 92, 112, 190,
@@ -3028,7 +3010,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       scrollDirection: Axis.horizontal,
       child: SizedBox(
         width: tableWidth,
-        // bounded: a fixed-height host (Collection Statement) â€” sticky
+        // bounded: a fixed-height host (Collection Statement) - sticky
         // header + internally scrolling body. Otherwise the table is
         // content-sized and the page scrolls (course/class section views).
         child: bounded
@@ -3555,7 +3537,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
   }
 
-  /// PowerCollege export â€” one row per (payment, fee demand) for every
+  /// PowerCollege export - one row per (payment, fee demand) for every
   /// reconciled payment in the selected date range. Joins payment +
   /// paymentdetails + feedemand + students + bank server-side via the
   /// get_powercollege_export RPC. Only paystatus='C' AND recon_status='R'
@@ -3713,7 +3695,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     }
   }
 
-  /// PowerCollege tab â€” date range pickers, Excel export button, and a
+  /// PowerCollege tab - date range pickers, Excel export button, and a
   /// preview table of every reconciled per-line-item row that the export
   /// would emit. Same shape as Daily Collection so users can see what
   /// they'll get before downloading.
@@ -3746,7 +3728,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: AppColors.textPrimary),
                   label: Text(
                     _pcFrom != null && _pcTo != null
-                        ? '${_formatDate(_pcFrom!)} â€“ ${_formatDate(_pcTo!)}'
+                        ? '${_formatDate(_pcFrom!)} – ${_formatDate(_pcTo!)}'
                         : 'Pick range',
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
@@ -3760,7 +3742,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               _miniExportBtn(
                 onPressed: (_pcRows.isEmpty || _pcExporting) ? () {} : _exportPowerCollege,
                 icon: Icons.download_rounded,
-                label: _pcExporting ? 'Exportingâ€¦' : 'Excel',
+                label: _pcExporting ? 'Exporting…' : 'Excel',
                 color: const Color(0xFF10B981),
               ),
             ],
@@ -3769,7 +3751,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         Expanded(
           child: _pcRows.isEmpty
               ? _emptyState(_pcLoading
-                  ? 'Loading reconciled paymentsâ€¦'
+                  ? 'Loading reconciled payments…'
                   : 'No payments in this range')
               : Container(
                   clipBehavior: Clip.antiAlias,
@@ -3892,7 +3874,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           pageFormat: PdfPageFormat.a4.landscape,
           margin: const pw.EdgeInsets.all(24),
           header: (_) {
-            // "Collected by" line â€” shows who the report covers.
+            // "Collected by" line - shows who the report covers.
             //   * specific user filter active â†’ that user's name
             //   * no filter + 1 accountant visible in rows â†’ their name
             //   * no filter + multiple â†’ "All accountants" so the report
@@ -3977,7 +3959,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
 
 /// Stateful wrapper so the horizontal ScrollController survives across
 /// rebuilds. Before this, applying a filter created a new ScrollController
-/// every build â€” the scrollbar thumb would freeze in place because the
+/// every build - the scrollbar thumb would freeze in place because the
 /// AnimatedBuilder was listening to an orphaned controller that was never
 /// attached to a live ScrollView.
 class _StickyTable extends StatefulWidget {
@@ -4145,7 +4127,7 @@ class _StickyTableState extends State<_StickyTable> {
                         ),
                       ),
                     ),
-                    // Vertical scrollbar pinned to the viewport â€” top/bottom
+                    // Vertical scrollbar pinned to the viewport - top/bottom
                     // spacers carry the header/footer colour so each band
                     // reads as a continuous full-width strip with the bar
                     // only between them.
@@ -4305,7 +4287,7 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
                             ),
                           ),
                           Expanded(
-                            // Framework scrollbar suppressed â€” the pinned bar
+                            // Framework scrollbar suppressed - the pinned bar
                             // on the right (outside the horizontal scroll)
                             // drives the vertical scroll instead.
                             child: ScrollConfiguration(
@@ -4352,7 +4334,7 @@ class _PowerCollegeTableState extends State<_PowerCollegeTable> {
                     ),
                   ),
                 ),
-                // Pinned vertical scrollbar â€” sits outside the horizontal
+                // Pinned vertical scrollbar - sits outside the horizontal
                 // scroll so it stays in the viewport. The top spacer carries
                 // the header colour so the band reads as one continuous strip.
                 Column(

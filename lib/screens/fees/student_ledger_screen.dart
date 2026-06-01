@@ -36,7 +36,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
   final Map<String, List<StudentModel>> _cachedClassStudents = {};
   bool _loadingStudents = false;
 
-  // Single-open accordion state for the course list â€” opening one course
+  // Single-open accordion state for the course list - opening one course
   // auto-collapses any previously open course.
   String? _expandedCourse;
   final Map<String, ExpansibleController> _courseExpansionCtrls = {};
@@ -87,7 +87,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
     try {
       final results = await Future.wait<dynamic>([
         SupabaseService.getStudents(insId),
-        // class + course masters with ordid for sidebar ordering â€” same
+        // class + course masters with ordid for sidebar ordering - same
         // source the Students screen sidebar uses.
         SupabaseService.fromSchema('class').select('claname, ordid').eq('ins_id', insId).eq('activestatus', 1),
         SupabaseService.fromSchema('course').select('courname, ordid').eq('ins_id', insId).eq('activestatus', 1),
@@ -269,7 +269,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
         'type': 'demand',
       });
 
-      // Payment row (credit) â€” only show for reconciled rows so RECEIVED
+      // Payment row (credit) - only show for reconciled rows so RECEIVED
       // entries match the Paid card. Unreconciled rows surface as a Demand
       // with Pending balance only.
       final amt = (d['feeamount'] as num?)?.toDouble() ?? 0.0;
@@ -773,7 +773,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(s.stuname, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Roll: ${s.stuadmno}  â€¢  ${s.courname ?? ''} ${s.stuclass}  â€¢  Father: $fatherName',
+                    Text('Roll: ${s.stuadmno}  *  ${s.courname ?? ''} ${s.stuclass}  *  Father: $fatherName',
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
                 ),
@@ -993,7 +993,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
           child: Column(
             children: [
-              // Total row â€” same dark bg as header
+              // Total row - same dark bg as header
               Container(
                 color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
@@ -1033,7 +1033,7 @@ class _StudentLedgerScreenState extends State<StudentLedgerScreen> {
                   ],
                 ),
               ),
-              // Closing Balance row â€” slightly lighter dark
+              // Closing Balance row - slightly lighter dark
               Container(
                 color: AppColors.tableHeadBg,
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
