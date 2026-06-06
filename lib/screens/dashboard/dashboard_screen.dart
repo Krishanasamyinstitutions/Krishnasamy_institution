@@ -18,10 +18,15 @@ import '../notices/notices_screen.dart';
 import '../notifications/notification_screen.dart';
 import '../fees/fee_demand_screen.dart';
 import '../fees/fee_demand_approval_screen.dart';
-import '../admin/master_import_screen.dart';
-import '../admin/settings_screen.dart';
+import '../admin/master_data_screen.dart';
 import '../fees/bank_reconciliation_screen.dart';
 import '../fees/reports_screen.dart';
+import '../fees/fee_master_screen.dart';
+import '../fees/fee_concession_screen.dart';
+import '../admission/admission_screen.dart';
+import '../admission/fast_admission_screen.dart';
+import '../admission/class_allocation_screen.dart';
+import '../admission/admission_master_screen.dart';
 
 
 
@@ -56,21 +61,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   static const List<_NavItem> _allNavItems = [
     _NavItem('element-3', 'Dashboard', section: 'MAIN MENU'),
-    _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true, subItems: [
-      _NavSubItem('user-tick', 'Admission Type'),
-      _NavSubItem('ticket', 'Quota'),
-      _NavSubItem('teacher', 'Course'),
-      _NavSubItem('book-1', 'Class'),
-      _NavSubItem('category-2', 'Fee Group'),
-      _NavSubItem('receipt-1', 'Fee Type'),
-      _NavSubItem('receipt-discount', 'Concession'),
-      _NavSubItem('note-2', 'Class Fee Demand'),
-    ]),
-    _NavItem('setting-2', 'Sequence Creation', section: 'ADMIN', adminOnly: true),
+    _NavItem('document-upload', 'Master Data', section: 'ADMIN', adminOnly: true),
     _NavItem('bank', 'Bank Accounts', section: 'ADMIN', adminOnly: true),
     _NavItem('security-user', 'User Creation', section: 'ADMIN', adminOnly: true),
+    _NavItem('category', 'Admission Master', section: 'ADMISSION', adminOnly: true),
+    _NavItem('profile-add', 'Admission', section: 'ADMISSION', adminOnly: true),
+    _NavItem('flash', 'Fast Admission', section: 'ADMISSION', adminOnly: true),
+    _NavItem('task-square', 'Class Allocation', section: 'ADMISSION', adminOnly: true),
     _NavItem('people', 'Student', section: 'STUDENTS', adminOnly: true),
     _NavItem('book-1', 'Student Ledger', section: 'STUDENTS'),
+    _NavItem('receipt-discount', 'Fee Master', section: 'FEES', accountantOnly: true),
+    _NavItem('discount-shape', 'Fee Concession', section: 'FEES', accountantOnly: true),
     _NavItem('receipt-edit', 'Fee Demand', section: 'FEES'),
     _NavItem('tick-square', 'Fee Demand Approval', section: 'FEES', adminOnly: true),
     _NavItem('bank', 'Bank Reconciliation', section: 'FEES', adminOnly: true),
@@ -739,7 +740,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSubMenu(BuildContext context, int parentIndex, _NavItem item) {
-    const selectedFg = AppColors.primary;
+    // Selected sub-item mirrors a selected main nav item (Admission Master):
+    // a filled navy pill with white icon/text.
+    const selectedFg = AppColors.textOnPrimary;
     const unselectedFg = AppColors.textSecondary;
     final isParentSelected = _selectedNavIndex == parentIndex;
 
@@ -764,49 +767,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   borderRadius: BorderRadius.circular(8.r),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8.r),
+                      color: selected ? AppColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        children: [
-                          // Left accent rail on selected
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 160),
-                            width: 3.w,
-                            margin: EdgeInsets.symmetric(vertical: 6.h),
-                            decoration: BoxDecoration(
-                              color: selected ? selectedFg : Colors.transparent,
-                              borderRadius: BorderRadius.circular(2.r),
+                    child: Row(
+                      children: [
+                        AppIcon(
+                          sub.icon,
+                          size: 15.sp,
+                          color: selected ? selectedFg : unselectedFg,
+                          style: selected ? AppIconStyle.bold : AppIconStyle.linear,
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Text(
+                            sub.label,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12.5.sp,
+                              color: selected ? selectedFg : unselectedFg,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                             ),
                           ),
-                          SizedBox(width: 10.w),
-                          AppIcon(
-                            sub.icon,
-                            size: 15.sp,
-                            color: selected ? selectedFg : unselectedFg,
-                            style: selected ? AppIconStyle.bold : AppIconStyle.linear,
-                          ),
-                          SizedBox(width: 10.w),
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8.h),
-                              child: Text(
-                                sub.label,
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12.5.sp,
-                                  color: selected ? selectedFg : unselectedFg,
-                                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1092,7 +1079,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// Screens that manage their own scroll and need full bounded height
   bool _isFullHeightScreen() {
     final label = _navItems[_selectedNavIndex].label;
-    return label == 'Dashboard' || label == 'Student' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Sequence Creation' || label == 'Bank Reconciliation' || label == 'Bank Accounts' || label == 'Reports';
+    return label == 'Dashboard' || label == 'Student' || label == 'Fee Demand' || label == 'Fee Collection' || label == 'Student Ledger' || label == 'Fee Demand Approval' || label == 'Transactions' || label == 'User Creation' || label == 'Notices' || label == 'Notifications' || label == 'Master Data' || label == 'Bank Reconciliation' || label == 'Bank Accounts' || label == 'Reports' || label == 'Admission' || label == 'Fast Admission' || label == 'Class Allocation' || label == 'Admission Master' || label == 'Fee Master' || label == 'Fee Concession';
   }
 
   Widget _buildDashboardContent(BuildContext context, bool isDesktop) {
@@ -1132,13 +1119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return NotificationScreen(onReadChanged: _loadUnreadNotifCount);
     }
     if (selectedMenu == 'Master Data') {
-      return MasterImportScreen(
-        initialTabIndex: _selectedSubIndex,
-        showInternalTabs: false,
-      );
-    }
-    if (selectedMenu == 'Sequence Creation') {
-      return const SettingsScreen();
+      return const MasterDataScreen();
     }
     if (selectedMenu == 'Bank Accounts') {
       return const BankDetailsScreen();
@@ -1148,6 +1129,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (selectedMenu == 'Reports') {
       return const ReportsScreen();
+    }
+    if (selectedMenu == 'Admission') {
+      return const AdmissionScreen();
+    }
+    if (selectedMenu == 'Fast Admission') {
+      return const FastAdmissionScreen();
+    }
+    if (selectedMenu == 'Class Allocation') {
+      return const ClassAllocationScreen();
+    }
+    if (selectedMenu == 'Admission Master') {
+      return const AdmissionMasterScreen();
+    }
+    if (selectedMenu == 'Fee Master') {
+      return const FeeMasterScreen();
+    }
+    if (selectedMenu == 'Fee Concession') {
+      return const FeeConcessionScreen();
     }
     // Dashboard shows Fee Collection screen
     return const FeeCollectionScreen();

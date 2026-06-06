@@ -850,20 +850,20 @@ class SupabaseService {
   }
 
   /// Terminate (deactivate) an institution user
-  static Future<bool> terminateInstitutionUser(int useId, {required String terminatedBy, required String terminatedReason}) async {
+  static Future<bool> terminateInstitutionUser(int useId, {required int insId, required String terminatedBy, required String terminatedReason}) async {
     try {
-      debugPrint('Terminating user with use_id: $useId');
-      final now = DateTime.now().toIso8601String();
-      await client.from('institutionusers')
-          .update({
-            'activestatus': 9,
-            'terminatedby': terminatedBy,
-            'terminateddate': now,
-            'terminatedreason': terminatedReason,
-          })
-          .eq('use_id', useId);
-      debugPrint('Terminate user success');
-      return true;
+      debugPrint('Terminating user with use_id: $useId (ins_id: $insId)');
+      // SECURITY DEFINER RPC — bypasses RLS on public.institutionusers (a direct
+      // UPDATE was blocked by row-level security). Returns rows updated.
+      final res = await client.rpc('terminate_institution_user', params: {
+        'p_use_id': useId,
+        'p_ins_id': insId,
+        'p_terminatedby': terminatedBy,
+        'p_terminatedreason': terminatedReason,
+      });
+      final count = res is int ? res : int.tryParse(res?.toString() ?? '0') ?? 0;
+      debugPrint('Terminate user rows updated: $count');
+      return count > 0;
     } catch (e, st) {
       debugPrint('Error terminating institution user: $e');
       debugPrint('Stack trace: $st');

@@ -37,9 +37,10 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
   // so it stays reachable without scrolling the table horizontally.
   final _vScrollController = ScrollController();
 
-  // Pagination
+  // Pagination — _pageSize is derived from the viewport height (rows that fit)
+  // so the table fills the available space rather than leaving a gap.
   int _currentPage = 1;
-  static const int _pageSize = 10;
+  int _pageSize = 10;
 
   // Predefined class order
   static const _classOrder = [
@@ -538,6 +539,20 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
           const contentW = 1200.0;
           final effectiveW = contentW > viewportW ? contentW : viewportW;
           const scrollbarH = 18.0;
+          // Fill the available height with rows: derive rows-per-page from how
+          // many checkbox-driven rows (~49px) fit below the header, so the page
+          // shows enough rows to use the space instead of leaving a gap.
+          const headerH = 44.0, rowH = 49.0;
+          final fit = (((tableH - headerH - scrollbarH) / rowH).floor()).clamp(1, 100);
+          if (fit != _pageSize) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _pageSize = fit;
+                if (_currentPage > _totalPages) _currentPage = _totalPages;
+              });
+            });
+          }
           return Stack(
             children: [
               // ── Table (header + rows) ──────────────────────────────────
@@ -565,8 +580,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                               _headerCell('Roll No', 3),
                               _headerCell('Student Name', 5),
                               _headerCell('Class', 3),
-                              _headerCell('Course', 2, center: true),
-                              _headerCell('Year', 3, center: true),
                               _headerCell('Semester', 3, center: true),
                               _headerCell('Fee Type', 3),
                               _headerCell('Fee Amount', 3, right: true),
@@ -796,8 +809,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
     // stuname comes from students join; fallback to inline field
     final name = (d['stuname'] ?? d['studentname'] ?? '').toString();
     final cls = d['stuclass']?.toString() ?? '-';
-    // tempfeedemand stores year as demfeeyear (text label)
-    final year = (d['demfeeyear'] ?? d['acayear'] ?? d['academicyear'] ?? d['year'] ?? '-').toString();
     // tempfeedemand: demfeeterm
     final term = (d['demfeeterm'] ?? d['feeterm'] ?? d['feetermname'] ?? d['termname'] ?? '-').toString();
     // tempfeedemand: demfeetype
@@ -826,7 +837,7 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 : index.isOdd
                     ? AppColors.surface
                     : Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
         child: Row(
             children: [
               SizedBox(
@@ -860,21 +871,6 @@ class _FeeDemandApprovalScreenState extends State<FeeDemandApprovalScreen> {
                 child: Text(cls,
                     style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                     textAlign: TextAlign.left,
-                    overflow: TextOverflow.ellipsis),
-              ),
-              // Course
-              Expanded(
-                flex: 2,
-                child: Text(d['courname']?.toString() ?? '-',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                    textAlign: TextAlign.center),
-              ),
-              // Year
-              Expanded(
-                flex: 3,
-                child: Text(year,
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                    textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis),
               ),
               // Fee Term
