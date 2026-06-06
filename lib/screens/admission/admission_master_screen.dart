@@ -44,8 +44,8 @@ class AdmissionMasterScreen extends StatelessWidget {
                 tabs: const [
                   Tab(text: 'Admission Type'),
                   Tab(text: 'Quota'),
-                  Tab(text: 'Community'),
                   Tab(text: 'Concession'),
+                  Tab(text: 'Community'),
                   Tab(text: 'Reg No'),
                 ],
               ),
@@ -55,8 +55,8 @@ class AdmissionMasterScreen extends StatelessWidget {
                   children: [
                     MasterCrudPanel(table: 'admissiontype', idCol: 'adm_id', nameCol: 'admname', title: 'Admission Type', importTabIndex: 0),
                     MasterCrudPanel(table: 'quota', idCol: 'quo_id', nameCol: 'quoname', title: 'Quota', importTabIndex: 1),
-                    MasterCrudPanel(table: 'community', idCol: 'com_id', nameCol: 'comname', title: 'Community'),
                     MasterCrudPanel(table: 'concessioncategory', idCol: 'con_id', nameCol: 'condesc', title: 'Concession', importTabIndex: 6, includeCreatedBy: false),
+                    MasterCrudPanel(table: 'community', idCol: 'com_id', nameCol: 'comname', title: 'Community'),
                     _RegNoPanel(),
                   ],
                 ),
