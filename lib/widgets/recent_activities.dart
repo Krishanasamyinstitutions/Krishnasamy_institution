@@ -6,6 +6,7 @@ import '../services/supabase_service.dart';
 import '../models/payment_model.dart';
 
 import './app_icon.dart';
+import '../utils/formatters.dart';
 class RecentActivitiesWidget extends StatefulWidget {
   const RecentActivitiesWidget({super.key});
 
@@ -163,7 +164,7 @@ class _RecentActivitiesWidgetState extends State<RecentActivitiesWidget> {
                                     ),
                                     TextSpan(
                                       text:
-                                          ' — ₹${payment.amount.toStringAsFixed(2)} (${payment.statusText})',
+                                          ' — ${formatIndianNumber(payment.amount)} (${payment.statusText})',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
