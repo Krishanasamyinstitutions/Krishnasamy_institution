@@ -13,6 +13,7 @@ import 'package:webview_windows/webview_windows.dart'
 import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
+import '../../utils/formatters.dart';
 import '../../utils/receipt_pdf.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import '../../services/supabase_service.dart';
