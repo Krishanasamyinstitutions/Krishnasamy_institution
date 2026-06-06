@@ -17,6 +17,7 @@ import '../../utils/receipt_pdf.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/receipt_widget.dart';
+import 'student_fee_definition_dialog.dart';
 
 import '../../widgets/app_icon.dart';
 const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
@@ -994,8 +995,41 @@ class _StudentFeeCollectionScreenState
         Container(width: 1, height: 36.h, color: AppColors.border),
         SizedBox(width: 16.w),
         Expanded(child: _detailRow('teacher', 'Class', className)),
+        SizedBox(width: 12.w),
+        OutlinedButton.icon(
+          onPressed: _openFeeDefinition,
+          icon: const Icon(Icons.fact_check_outlined, size: 16),
+          label: const Text('Fee Definition'),
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+        ),
       ],
     );
+  }
+
+  /// Open the per-student fee definition (opt the student in/out of each fee).
+  Future<void> _openFeeDefinition() async {
+    final s = _student;
+    if (s == null) return;
+    final insId = context.read<AuthProvider>().insId;
+    if (insId == null) return;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => StudentFeeDefinitionDialog(
+        insId: insId,
+        stuAdmno: s['stuadmno']?.toString() ?? '',
+        stuName: s['stuname']?.toString() ?? '',
+        admName: s['admname']?.toString() ?? '',
+      ),
+    );
+    if (saved == true) {
+      // Reload demands so newly-opted fees appear. _search() resolves by the
+      // search field, which after the previous search holds the student NAME
+      // (a fuzzy name match could land on a different student). Restore the
+      // exact roll no first so _search's exact stuadmno lookup re-resolves
+      // THIS student.
+      _admNoController.text = s['stuadmno']?.toString() ?? '';
+      _search();
+    }
   }
 
   // ── Term Filter ──

@@ -251,8 +251,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
   }
 
   void _clearForm() {
-    // Reset first so onUserInteraction fields drop their "touched" flag —
-    // otherwise autovalidation re-flags the now-empty fields as "Required".
+    // Reset the form's validation state first, otherwise the just-cleared
+    // (now empty) fields re-trigger their 'Required' errors via
+    // autovalidateMode.onUserInteraction right after a successful create.
     _formKey.currentState?.reset();
     _nameController.clear();
     _emailController.clear();
@@ -963,7 +964,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     setState(() => _isLoading = true);
     final auth = context.read<AuthProvider>();
     final terminatedBy = auth.userName ?? '';
-    final success = await SupabaseService.terminateInstitutionUser(u.useId, terminatedBy: terminatedBy, terminatedReason: reason);
+    final success = await SupabaseService.terminateInstitutionUser(u.useId, insId: auth.insId ?? 0, terminatedBy: terminatedBy, terminatedReason: reason);
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
