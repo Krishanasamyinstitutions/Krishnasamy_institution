@@ -7,6 +7,9 @@ import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
+import '../../widgets/focusable_tap.dart';
+import '../../widgets/pill_tab.dart';
 import '../admin/master_import_screen.dart';
 import '../admin/settings_screen.dart' show PaymentSequenceTab, FineRulesTab;
 
@@ -15,73 +18,98 @@ import '../admin/settings_screen.dart' show PaymentSequenceTab, FineRulesTab;
 /// Rules. Each tab is a left "Add" form + right table. Payment Sequence and
 /// Fine Rules were previously in a standalone "Sequence Creation" sidebar
 /// entry; they live here now so all fee configuration is in one place.
-class FeeMasterScreen extends StatelessWidget {
+/// Fee Master — pill-tab page shell per fee-master-design.md § 1.
+class FeeMasterScreen extends StatefulWidget {
   const FeeMasterScreen({super.key});
 
   @override
+  State<FeeMasterScreen> createState() => _FeeMasterScreenState();
+}
+
+class _FeeMasterScreenState extends State<FeeMasterScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  static const _tabLabels = [
+    'Fee Group', 'Fee Type', 'Term', 'Class Fee Demand', 'Payment Sequence', 'Fine Rules',
+  ];
+  static const _tabIcons = [
+    'receipt-discount', 'tag', 'calendar-1', 'category', 'sort', 'warning-2',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabLabels.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 6,
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Container(
-          decoration: AppCard.decoration(),
-          child: Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 6.h),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    const AppIcon('receipt-discount', size: 20, color: AppColors.primary),
-                    SizedBox(width: 10.w),
-                    Text('Fee Master',
-                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    for (var i = 0; i < _tabLabels.length; i++) ...[
+                      PillTab(
+                        icon: _tabIcons[i],
+                        label: _tabLabels[i],
+                        selected: selected == i,
+                        onTap: () => _tabController.animateTo(i),
+                      ),
+                      if (i < _tabLabels.length - 1)
+                        SizedBox(width: PillTab.gap(context)),
+                    ],
                   ],
                 ),
               ),
-              TabBar(
-                isScrollable: true,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.accent,
-                labelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
-                tabs: const [
-                  Tab(text: 'Fee Group'),
-                  Tab(text: 'Fee Type'),
-                  Tab(text: 'Semester'),
-                  Tab(text: 'Class Fee Demand'),
-                  Tab(text: 'Payment Sequence'),
-                  Tab(text: 'Fine Rules'),
-                ],
-              ),
-              Divider(height: 1.h, color: AppColors.border),
-              const Expanded(
-                child: TabBarView(
-                  children: [
-                    _FeeGroupPanel(),
-                    _FeeTypePanel(),
-                    _SemesterPanel(),
-                    _ClassFeeDemandPanel(),
-                    PaymentSequenceTab(),
-                    FineRulesTab(),
-                  ],
-                ),
-              ),
+            );
+          },
+        ),
+        SizedBox(height: 6.h),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              _FeeGroupPanel(),
+              _FeeTypePanel(),
+              _SemesterPanel(),
+              _ClassFeeDemandPanel(),
+              PaymentSequenceTab(),
+              FineRulesTab(),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
 // ── shared bits ───────────────────────────────────────────────────────────
-InputDecoration _dec(String label) => InputDecoration(
-      labelText: label,
-      isDense: true,
-      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-    );
+InputDecoration _dec(String label, {bool filled = false}) {
+  final idle = filled ? AppColors.accent : AppColors.border;
+  return InputDecoration(
+    labelText: label,
+    isDense: true,
+    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: idle, width: 1.5)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: idle, width: 1.5)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+  );
+}
 
 void _snack(BuildContext ctx, String msg, Color color) {
   ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
@@ -103,54 +131,144 @@ Future<int> _nextId(String table, String idCol) async {
   return n + 1;
 }
 
-Widget _tableShell({required List<Widget> headerCells, required Widget body}) {
+TextStyle _h() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3);
+TextStyle _c() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
+
+// ── design helpers (mirrors master_data_screen / admission-master-design.md) ──
+
+Widget _lbl(String text) =>
+    Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black));
+
+// [filled] = the field has a value. Filled fields get an amber (accent)
+// border; empty fields stay grey; the focused border is always amber.
+InputDecoration _filledFieldDec(BuildContext context, String hint, {bool filled = false}) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  final textSize = compact ? 11.0 : 14.0;
+  final hPad = compact ? 8.0 : 14.0;
+  final vPad = compact ? 5.0 : 14.0;
+  final radius = compact ? 5.0 : 8.0;
+  final idle = filled ? AppColors.accent : AppColors.border;
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+    contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+    filled: true,
+    fillColor: Colors.white,
+  );
+}
+
+TextStyle _fieldTextStyle(BuildContext context) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  return TextStyle(fontWeight: FontWeight.w500, fontSize: compact ? 11 : 14, color: const Color(0xFF555555));
+}
+
+/// Outer Add card — white, 10r, full border, 20w padding. Header uses the
+/// shared [CardTitleBlock] with optional subtitle.
+Widget _addCard({required String icon, required String title, String? subtitle, required Widget child}) {
   return Container(
+    padding: EdgeInsets.all(20.w),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12.r),
-      border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+      borderRadius: BorderRadius.circular(10.r),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CardTitleBlock(icon: icon, title: title, subtitle: subtitle),
+        SizedBox(height: 20.h),
+        child,
+      ],
+    ),
+  );
+}
+
+/// Outer List card — title row with icon-tile block + count badge + optional
+/// action; inner bordered table card inside.
+Widget _listCard({
+  required String icon,
+  required String title,
+  String? subtitle,
+  required int count,
+  required String countLabel,
+  required List<Widget> headerCells,
+  required Widget body,
+  Widget? action,
+}) {
+  return Container(
+    padding: EdgeInsets.all(16.w),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10.r),
+      border: Border.all(color: AppColors.border),
     ),
     child: Column(
       children: [
-        Container(
-          color: AppColors.tableHeadBg,
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-          child: Row(children: headerCells),
+        Padding(
+          padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 10.h),
+          child: Row(children: [
+            CardTitleBlock(icon: icon, title: title, subtitle: subtitle),
+            SizedBox(width: 10.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text('$count $countLabel',
+                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            ),
+            const Spacer(),
+            if (action != null) action,
+          ]),
         ),
-        Expanded(child: body),
+        Expanded(
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  color: AppColors.tableHeadBg,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  child: Row(children: headerCells),
+                ),
+                Expanded(child: body),
+              ],
+            ),
+          ),
+        ),
       ],
     ),
   );
 }
 
-TextStyle _h() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-TextStyle _c() => TextStyle(fontSize: 12.sp, color: AppColors.textSecondary);
-
-Future<bool> _confirmDelete(BuildContext ctx, String what) async {
-  final ok = await showDialog<bool>(
-    context: ctx,
-    builder: (c) => AlertDialog(
-      title: Text('Delete $what'),
-      content: Text('Remove this $what?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete', style: TextStyle(color: AppColors.error))),
-      ],
-    ),
-  );
-  return ok == true;
-}
-
-/// Top-right "Import CSV/Excel" button that opens the bulk importer
-/// ([MasterImportScreen]) full-screen at [tabIndex], then runs [onReturn]
-/// (the panel's _load) so imported rows appear on return. Tab indices match
-/// MasterImportScreen: Fee Group = 4, Fee Type = 5, Class Fee Demand = 7.
-Widget _importBar(BuildContext context,
-    {required String title, required int tabIndex, required bool saving, required Future<void> Function() onReturn}) {
-  return Align(
-    alignment: Alignment.centerRight,
+/// Compact-or-expanded amber Import CSV/Excel button — sits in the
+/// `action` slot of `_listCard`. Opens [MasterImportScreen] at [tabIndex],
+/// then runs [onReturn].
+Widget _importButton(BuildContext context, {
+  required String title,
+  required int tabIndex,
+  required bool disabled,
+  required Future<void> Function() onReturn,
+}) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  final btnHeight = compact ? 30.0 : 40.0;
+  final iconSize = compact ? 12.0 : 16.0;
+  final hPad = compact ? 10.0 : 18.0;
+  final radius = compact ? 6.0 : 10.0;
+  final textSize = compact ? 11.0 : 13.0;
+  return SizedBox(
+    height: btnHeight,
     child: ElevatedButton.icon(
-      onPressed: saving
+      onPressed: disabled
           ? null
           : () async {
               await Navigator.of(context).push<void>(
@@ -178,17 +296,33 @@ Widget _importBar(BuildContext context,
               );
               await onReturn();
             },
-      icon: const AppIcon('document-upload', size: 16, color: Colors.white),
+      icon: AppIcon('document-upload', size: iconSize, color: Colors.white),
       label: const Text('Import CSV/Excel'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+        elevation: 0,
+        padding: EdgeInsets.symmetric(horizontal: hPad),
+        textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       ),
     ),
   );
+}
+
+Future<bool> _confirmDelete(BuildContext ctx, String what) async {
+  final ok = await showDialog<bool>(
+    context: ctx,
+    builder: (c) => AlertDialog(
+      title: Text('Delete $what'),
+      content: Text('Remove this $what?'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete', style: TextStyle(color: AppColors.error))),
+      ],
+    ),
+  );
+  return ok == true;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -299,93 +433,89 @@ class _FeeGroupPanelState extends State<_FeeGroupPanel> with AutomaticKeepAliveC
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _importBar(context, title: 'Fee Group', tabIndex: 4, saving: _saving, onReturn: _load),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 320.w,
-            child: Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_editId != null ? 'Edit Fee Group' : 'Add Fee Group', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 12.h),
-                  TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Group Name *'), onSubmitted: (_) => _add()),
-                  SizedBox(height: 14.h),
-                  Row(children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _saving ? null : _add,
-                        icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
-                        label: Text(_editId != null ? 'Update' : 'Add'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-                      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 320.w,
+          child: _addCard(
+            icon: 'receipt-discount',
+            title: _editId != null ? 'Edit Fee Group' : 'Add Fee Group',
+            subtitle: 'group fees by category',
+            child: FocusTraversalGroup(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _lbl('Group Name *'),
+                SizedBox(height: 6.h),
+                TextField(
+                  controller: _name,
+                  style: _fieldTextStyle(context).copyWith(color: _name.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+                  decoration: _filledFieldDec(context, 'Enter group name', filled: _name.text.trim().isNotEmpty),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _add(),
+                ),
+                SizedBox(height: 18.h),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _add,
+                      icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
+                      label: Text(_editId != null ? 'Update' : 'Add'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
                     ),
-                    if (_editId != null) ...[
-                      SizedBox(width: 8.w),
-                      OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
-                    ],
-                  ]),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: _tableShell(
-              headerCells: [
-                SizedBox(width: 50.w, child: Text('S.No', style: _h())),
-                Expanded(child: Text('GROUP NAME', style: _h())),
-                SizedBox(width: 110.w, child: Text('YEAR', style: _h())),
-                SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+                  ),
+                  if (_editId != null) ...[
+                    SizedBox(width: 8.w),
+                    OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
+                  ],
+                ]),
               ],
-              body: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _rows.isEmpty
-                      ? Center(child: Text('No fee groups', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                      : ListView.separated(
-                          itemCount: _rows.length,
-                          separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                          itemBuilder: (_, i) {
-                            final r = _rows[i];
-                            final id = r['fg_id'] is int ? r['fg_id'] as int : int.tryParse(r['fg_id'].toString()) ?? 0;
-                            return Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                              child: Row(children: [
-                                SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
-                                Expanded(child: Text(r['fgdesc']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                SizedBox(width: 110.w, child: Text(r['yrlabel']?.toString() ?? '', style: _c())),
-                                SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
-                                  SizedBox(width: 8.w),
-                                  InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
-                                ])),
-                              ]),
-                            );
-                          },
-                        ),
-            ),
+            )),
           ),
-        ],
-            ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _listCard(
+            icon: 'receipt-discount',
+            title: 'Fee Groups',
+            subtitle: 'all fee groups in this institution',
+            count: _rows.length,
+            countLabel: 'groups',
+            action: _importButton(context, title: 'Fee Group', tabIndex: 4, disabled: _saving, onReturn: _load),
+            headerCells: [
+              SizedBox(width: 50.w, child: Text('S NO.', style: _h())),
+              Expanded(child: Text('GROUP NAME', style: _h())),
+              SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+            ],
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _rows.isEmpty
+                    ? Center(child: Text('No fee groups', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        itemCount: _rows.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                        itemBuilder: (_, i) {
+                          final r = _rows[i];
+                          final id = r['fg_id'] is int ? r['fg_id'] as int : int.tryParse(r['fg_id'].toString()) ?? 0;
+                          return Container(
+                            color: i.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                            child: Row(children: [
+                              SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
+                              Expanded(child: Text(r['fgdesc']?.toString() ?? '', style: _c())),
+                              SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
+                                SizedBox(width: 8.w),
+                                InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
+                              ])),
+                            ]),
+                          );
+                        },
+                      ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -403,7 +533,7 @@ class _FeeTypePanelState extends State<_FeeTypePanel> with AutomaticKeepAliveCli
   final _name = TextEditingController();
   final _short = TextEditingController();
   String? _fgId;
-  String _fine = 'No';
+  String? _fine;
   List<Map<String, dynamic>> _feeGroups = [];
   List<Map<String, dynamic>> _rows = [];
   Map<int, String> _fgName = {};
@@ -441,7 +571,7 @@ class _FeeTypePanelState extends State<_FeeTypePanel> with AutomaticKeepAliveCli
       _editId = null;
       _name.clear();
       _short.clear();
-      _fine = 'No';
+      _fine = null;
     });
   }
 
@@ -461,7 +591,8 @@ class _FeeTypePanelState extends State<_FeeTypePanel> with AutomaticKeepAliveCli
         _feeGroups = fgList;
         _fgName = {for (final g in fgList) g['fg_id'] as int: g['fgdesc']?.toString() ?? ''};
         _rows = List<Map<String, dynamic>>.from(types);
-        _fgId ??= fgList.isNotEmpty ? fgList.first['fg_id'].toString() : null;
+        // Start with no fee group selected so the 'Select fee group'
+        // placeholder shows (edit mode sets _fgId explicitly).
         _loading = false;
       });
     } catch (e) {
@@ -522,118 +653,132 @@ class _FeeTypePanelState extends State<_FeeTypePanel> with AutomaticKeepAliveCli
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _importBar(context, title: 'Fee Type', tabIndex: 5, saving: _saving, onReturn: _load),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 320.w,
-            child: Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_editId != null ? 'Edit Fee Type' : 'Add Fee Type', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 12.h),
-                  TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Fee Name *')),
-                  SizedBox(height: 10.h),
-                  TextField(controller: _short, style: TextStyle(fontSize: 13.sp), decoration: _dec('Short Name')),
-                  SizedBox(height: 10.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: _fgId,
-                    isExpanded: true,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    decoration: _dec('Fee Group *'),
-                    items: _feeGroups.map((g) => DropdownMenuItem(value: g['fg_id'].toString(), child: Text(g['fgdesc']?.toString() ?? '', overflow: TextOverflow.ellipsis))).toList(),
-                    onChanged: (v) => setState(() => _fgId = v),
-                  ),
-                  SizedBox(height: 10.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: _fine,
-                    isExpanded: true,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    decoration: _dec('Fine Applicable'),
-                    items: const [DropdownMenuItem(value: 'No', child: Text('No')), DropdownMenuItem(value: 'Yes', child: Text('Yes'))],
-                    onChanged: (v) => setState(() => _fine = v ?? 'No'),
-                  ),
-                  SizedBox(height: 14.h),
-                  Row(children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _saving ? null : _add,
-                        icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
-                        label: Text(_editId != null ? 'Update' : 'Add'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-                      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 320.w,
+          child: _addCard(
+            icon: 'tag',
+            title: _editId != null ? 'Edit Fee Type' : 'Add Fee Type',
+            subtitle: 'individual fees inside a group',
+            child: FocusTraversalGroup(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _lbl('Fee Name *'),
+                SizedBox(height: 6.h),
+                TextField(controller: _name, style: _fieldTextStyle(context).copyWith(color: _name.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec(context, 'Enter fee name', filled: _name.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                SizedBox(height: 16.h),
+                _lbl('Short Name'),
+                SizedBox(height: 6.h),
+                TextField(controller: _short, style: _fieldTextStyle(context).copyWith(color: _short.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec(context, 'Enter short name', filled: _short.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                SizedBox(height: 16.h),
+                _lbl('Fee Group *'),
+                SizedBox(height: 6.h),
+                DropdownButtonFormField<String>(
+                  initialValue: _fgId,
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 6,
+                  style: _fieldTextStyle(context),
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  decoration: _filledFieldDec(context, 'Select fee group', filled: _fgId != null),
+                  items: _feeGroups.map((g) => DropdownMenuItem(value: g['fg_id'].toString(), child: Text(g['fgdesc']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))).toList(),
+                  selectedItemBuilder: (context) => _feeGroups.map((g) => Align(alignment: Alignment.centerLeft, child: Text(g['fgdesc']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                  onChanged: (v) => setState(() => _fgId = v),
+                ),
+                SizedBox(height: 16.h),
+                _lbl('Fine Applicable'),
+                SizedBox(height: 6.h),
+                DropdownButtonFormField<String>(
+                  initialValue: _fine,
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 6,
+                  style: _fieldTextStyle(context),
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  decoration: _filledFieldDec(context, 'Select option', filled: _fine != null),
+                  items: [
+                    DropdownMenuItem(value: 'No', child: Text('No', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    DropdownMenuItem(value: 'Yes', child: Text('Yes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                  ],
+                  selectedItemBuilder: (context) => [
+                    Align(alignment: Alignment.centerLeft, child: Text('No', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                    Align(alignment: Alignment.centerLeft, child: Text('Yes', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                  ],
+                  onChanged: (v) => setState(() => _fine = v),
+                ),
+                SizedBox(height: 18.h),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _add,
+                      icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
+                      label: Text(_editId != null ? 'Update' : 'Add'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
                     ),
-                    if (_editId != null) ...[
-                      SizedBox(width: 8.w),
-                      OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
-                    ],
-                  ]),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: _tableShell(
-              headerCells: [
-                SizedBox(width: 50.w, child: Text('S.No', style: _h())),
-                Expanded(flex: 3, child: Text('FEE NAME', style: _h())),
-                SizedBox(width: 80.w, child: Text('SHORT', style: _h())),
-                Expanded(flex: 2, child: Text('FEE GROUP', style: _h())),
-                SizedBox(width: 60.w, child: Text('FINE', style: _h())),
-                SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+                  ),
+                  if (_editId != null) ...[
+                    SizedBox(width: 8.w),
+                    OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
+                  ],
+                ]),
               ],
-              body: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _rows.isEmpty
-                      ? Center(child: Text('No fee types', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                      : ListView.separated(
-                          itemCount: _rows.length,
-                          separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                          itemBuilder: (_, i) {
-                            final r = _rows[i];
-                            final id = r['fee_id'] is int ? r['fee_id'] as int : int.tryParse(r['fee_id'].toString()) ?? 0;
-                            final fine = '${r['feefineapplicable'] ?? 0}' == '1' ? 'Yes' : 'No';
-                            return Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                              child: Row(children: [
-                                SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
-                                Expanded(flex: 3, child: Text(r['feedesc']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                SizedBox(width: 80.w, child: Text(r['feeshort']?.toString() ?? '', style: _c())),
-                                Expanded(flex: 2, child: Text(_fgName[r['fg_id']] ?? '', style: _c())),
-                                SizedBox(width: 60.w, child: Text(fine, style: _c())),
-                                SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
-                                  SizedBox(width: 8.w),
-                                  InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
-                                ])),
-                              ]),
-                            );
-                          },
-                        ),
-            ),
+            )),
           ),
-        ],
-            ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _listCard(
+            icon: 'tag',
+            title: 'Fee Types',
+            subtitle: 'all fee types in this institution',
+            count: _rows.length,
+            countLabel: 'types',
+            action: _importButton(context, title: 'Fee Type', tabIndex: 5, disabled: _saving, onReturn: _load),
+            headerCells: [
+              SizedBox(width: 50.w, child: Text('S NO.', style: _h())),
+              Expanded(flex: 3, child: Text('FEE NAME', style: _h())),
+              SizedBox(width: 80.w, child: Text('SHORT', style: _h())),
+              Expanded(flex: 2, child: Text('FEE GROUP', style: _h())),
+              SizedBox(width: 60.w, child: Text('FINE', style: _h())),
+              SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+            ],
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _rows.isEmpty
+                    ? Center(child: Text('No fee types', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        itemCount: _rows.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                        itemBuilder: (_, i) {
+                          final r = _rows[i];
+                          final id = r['fee_id'] is int ? r['fee_id'] as int : int.tryParse(r['fee_id'].toString()) ?? 0;
+                          final fine = '${r['feefineapplicable'] ?? 0}' == '1' ? 'Yes' : 'No';
+                          return Container(
+                            color: i.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                            child: Row(children: [
+                              SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
+                              Expanded(flex: 3, child: Text(r['feedesc']?.toString() ?? '', style: _c())),
+                              SizedBox(width: 80.w, child: Text(r['feeshort']?.toString() ?? '', style: _c())),
+                              Expanded(flex: 2, child: Text(_fgName[r['fg_id']] ?? '', style: _c())),
+                              SizedBox(width: 60.w, child: Text(fine, style: _c())),
+                              SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
+                                SizedBox(width: 8.w),
+                                InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
+                              ])),
+                            ]),
+                          );
+                        },
+                      ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -650,7 +795,7 @@ class _SemesterPanel extends StatefulWidget {
 class _SemesterPanelState extends State<_SemesterPanel> with AutomaticKeepAliveClientMixin {
   final _name = TextEditingController();
   final _short = TextEditingController();
-  String _type = 'S'; // S = Semester, M = Monthly, Y = Yearly
+  String? _type; // S = Semester, M = Monthly, Y = Yearly (null = not chosen)
   List<Map<String, dynamic>> _rows = [];
   int? _editId; // non-null while editing an existing row
   bool _loading = true, _saving = false;
@@ -706,13 +851,14 @@ class _SemesterPanelState extends State<_SemesterPanel> with AutomaticKeepAliveC
       _editId = null;
       _name.clear();
       _short.clear();
-      _type = 'S';
+      _type = null;
     });
   }
 
   Future<void> _add() async {
     final name = _name.text.trim();
     if (name.isEmpty) return _snack(context, 'Enter a semester name.', AppColors.warning);
+    if (_type == null) return _snack(context, 'Select a type.', AppColors.warning);
     if (_rows.any((r) => (r['semname']?.toString().trim().toLowerCase() ?? '') == name.toLowerCase() &&
         (r['sem_id']?.toString() ?? '') != (_editId?.toString() ?? ''))) {
       return _snack(context, '"$name" already exists.', AppColors.warning);
@@ -740,7 +886,7 @@ class _SemesterPanelState extends State<_SemesterPanel> with AutomaticKeepAliveC
       }
       _name.clear();
       _short.clear();
-      _type = 'S';
+      _type = null;
       _editId = null;
       await _load();
     } catch (e) {
@@ -763,98 +909,107 @@ class _SemesterPanelState extends State<_SemesterPanel> with AutomaticKeepAliveC
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 320.w,
-            child: Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_editId != null ? 'Edit Semester' : 'Add Semester', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                  SizedBox(height: 12.h),
-                  TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Semester Name *'), onSubmitted: (_) => _add()),
-                  SizedBox(height: 10.h),
-                  TextField(controller: _short, style: TextStyle(fontSize: 13.sp), decoration: _dec('Short Name')),
-                  SizedBox(height: 10.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: _type,
-                    isExpanded: true,
-                    style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                    decoration: _dec('Type *'),
-                    items: _typeLabels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                    onChanged: (v) => setState(() => _type = v ?? 'S'),
-                  ),
-                  SizedBox(height: 14.h),
-                  Row(children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _saving ? null : _add,
-                        icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
-                        label: Text(_editId != null ? 'Update' : 'Add'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-                      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 320.w,
+          child: _addCard(
+            icon: 'calendar-1',
+            title: _editId != null ? 'Edit Semester' : 'Add Semester',
+            subtitle: 'collection cycles for the academic year',
+            child: FocusTraversalGroup(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _lbl('Semester Name *'),
+                SizedBox(height: 6.h),
+                TextField(controller: _name, style: _fieldTextStyle(context).copyWith(color: _name.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec(context, 'Enter semester name', filled: _name.text.trim().isNotEmpty), onChanged: (_) => setState(() {}), onSubmitted: (_) => _add()),
+                SizedBox(height: 16.h),
+                _lbl('Short Name'),
+                SizedBox(height: 6.h),
+                TextField(controller: _short, style: _fieldTextStyle(context).copyWith(color: _short.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec(context, 'Enter short name', filled: _short.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                SizedBox(height: 16.h),
+                _lbl('Type *'),
+                SizedBox(height: 6.h),
+                DropdownButtonFormField<String>(
+                  initialValue: _type,
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 6,
+                  style: _fieldTextStyle(context),
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  decoration: _filledFieldDec(context, 'Select type', filled: _type != null),
+                  items: _typeLabels.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)))).toList(),
+                  selectedItemBuilder: (context) => _typeLabels.entries.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e.value, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                  onChanged: (v) => setState(() => _type = v),
+                ),
+                SizedBox(height: 18.h),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _add,
+                      icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
+                      label: Text(_editId != null ? 'Update' : 'Add'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
                     ),
-                    if (_editId != null) ...[
-                      SizedBox(width: 8.w),
-                      OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
-                    ],
-                  ]),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: _tableShell(
-              headerCells: [
-                SizedBox(width: 50.w, child: Text('S.No', style: _h())),
-                Expanded(flex: 2, child: Text('SEMESTER NAME', style: _h())),
-                SizedBox(width: 90.w, child: Text('SHORT', style: _h())),
-                SizedBox(width: 100.w, child: Text('TYPE', style: _h())),
-                SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+                  ),
+                  if (_editId != null) ...[
+                    SizedBox(width: 8.w),
+                    OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
+                  ],
+                ]),
               ],
-              body: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _rows.isEmpty
-                      ? Center(child: Text('No semesters', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                      : ListView.separated(
-                          itemCount: _rows.length,
-                          separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                          itemBuilder: (_, i) {
-                            final r = _rows[i];
-                            final id = r['sem_id'] is int ? r['sem_id'] as int : int.tryParse(r['sem_id'].toString()) ?? 0;
-                            final type = _typeLabels[r['semtype']?.toString().trim()] ?? 'Semester';
-                            return Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                              child: Row(children: [
-                                SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
-                                Expanded(flex: 2, child: Text(r['semname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                SizedBox(width: 90.w, child: Text(r['semshort']?.toString() ?? '', style: _c())),
-                                SizedBox(width: 100.w, child: Text(type, style: _c())),
-                                SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
-                                  SizedBox(width: 8.w),
-                                  InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
-                                ])),
-                              ]),
-                            );
-                          },
-                        ),
-            ),
+            )),
           ),
-        ],
-      ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _listCard(
+            icon: 'calendar-1',
+            title: 'Semesters',
+            subtitle: 'all collection cycles in this institution',
+            count: _rows.length,
+            countLabel: 'terms',
+            headerCells: [
+              SizedBox(width: 50.w, child: Text('S NO.', style: _h())),
+              Expanded(flex: 2, child: Text('SEMESTER NAME', style: _h())),
+              SizedBox(width: 90.w, child: Text('SHORT', style: _h())),
+              SizedBox(width: 100.w, child: Text('TYPE', style: _h())),
+              SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+            ],
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _rows.isEmpty
+                    ? Center(child: Text('No semesters', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        itemCount: _rows.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                        itemBuilder: (_, i) {
+                          final r = _rows[i];
+                          final id = r['sem_id'] is int ? r['sem_id'] as int : int.tryParse(r['sem_id'].toString()) ?? 0;
+                          final type = _typeLabels[r['semtype']?.toString().trim()] ?? 'Semester';
+                          return Container(
+                            color: i.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                            child: Row(children: [
+                              SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
+                              Expanded(flex: 2, child: Text(r['semname']?.toString() ?? '', style: _c())),
+                              SizedBox(width: 90.w, child: Text(r['semshort']?.toString() ?? '', style: _c())),
+                              SizedBox(width: 100.w, child: Text(type, style: _c())),
+                              SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
+                                SizedBox(width: 8.w),
+                                InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
+                              ])),
+                            ]),
+                          );
+                        },
+                      ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -936,7 +1091,7 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
         _admTypes = List<Map<String, dynamic>>.from((results[3] as List).cast<Map<String, dynamic>>());
         _semesters = (results[4] as List).map((e) => e['semname']?.toString().trim() ?? '').where((s) => s.isNotEmpty).toSet().toList()..sort();
         _admName = {for (final a in _admTypes) a['adm_id'].toString(): a['admname']?.toString() ?? ''};
-        _cls ??= _classNames.isNotEmpty ? _classNames.first : null;
+        // Start with no class selected so the 'Select Class' placeholder shows.
         if (_cls != null) _reloadGrid();
         _loading = false;
       });
@@ -1316,25 +1471,13 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
   Widget build(BuildContext context) {
     super.build(context);
     if (_loading) return const Center(child: CircularProgressIndicator());
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _importBar(context, title: 'Class Fee Demand', tabIndex: 7, saving: _saving, onReturn: _load),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: _creation()),
-                SizedBox(width: 16.w),
-                Expanded(flex: 2, child: _existing()),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 3, child: _creation()),
+        SizedBox(width: 16.w),
+        Expanded(flex: 2, child: _existing()),
+      ],
     );
   }
 
@@ -1359,56 +1502,122 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
   }
 
   Widget _creation() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return Container(
+      // Outer white card wrapping the whole creation panel (mode buttons,
+      // filter row, fee table, total/save) so it visually mirrors the
+      // Saved Demands card on the right.
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        // Single top row — filters on the left, mode buttons on the right.
+        // Each filter is an Expanded slot, mode buttons get fixed widths so
+        // everything fits side-by-side without wrapping.
         Padding(
           padding: EdgeInsets.only(bottom: 10.h),
-          child: Row(children: [
-            _modeButton('New', Icons.add, !_editMode, () => setState(() {
-              _editMode = false;
-              _reloadGrid();
-            })),
-            SizedBox(width: 10.w),
-            _modeButton('Edit', Icons.edit, _editMode, () => setState(() {
-              _editMode = true;
-              _reloadGrid();
-            })),
-            SizedBox(width: 10.w),
-            OutlinedButton.icon(
-              onPressed: _saving ? null : _copyFee,
-              icon: const Icon(Icons.copy_all, size: 15),
-              label: const Text('Copy Fee'),
-            ),
-            SizedBox(width: 12.w),
-            Text(_editMode ? 'Editing saved demand for this selection' : 'Creating a new demand',
-                style: TextStyle(fontSize: 11.sp, color: AppColors.textLight)),
-          ]),
+          child: FocusTraversalGroup(child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: DropdownButtonFormField<String>(
+                initialValue: _cls,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                elevation: 6,
+                style: _fieldTextStyle(context),
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                decoration: _filledFieldDec(context, 'Select Class', filled: _cls != null),
+                hint: Text('Select Class',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: MediaQuery.of(context).size.width <= 1366 ? 11 : 14)),
+                items: _classNames.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))).toList(),
+                // Polished filled state: the chosen value reads bold + accent,
+                // clearly distinct from the muted placeholder.
+                selectedItemBuilder: (context) => _classNames.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                onChanged: (v) => setState(() { _cls = v; _reloadGrid(); }),
+              )),
+              SizedBox(width: 8.w),
+              Expanded(child: DropdownButtonFormField<String>(
+                initialValue: _sem,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                elevation: 6,
+                style: _fieldTextStyle(context),
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                decoration: _filledFieldDec(context, 'Select Term', filled: _sem != null),
+                hint: Text('Select Term',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: MediaQuery.of(context).size.width <= 1366 ? 11 : 14)),
+                items: _semesters.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))).toList(),
+                selectedItemBuilder: (context) => _semesters.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                onChanged: (v) => setState(() { _sem = v; _reloadGrid(); }),
+              )),
+              SizedBox(width: 8.w),
+              Expanded(child: DropdownButtonFormField<String>(
+                initialValue: _admId,
+                isExpanded: true,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                elevation: 6,
+                style: _fieldTextStyle(context),
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                decoration: _filledFieldDec(context, 'Admission Type', filled: _admId != null),
+                hint: Text('Admission Type',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: MediaQuery.of(context).size.width <= 1366 ? 11 : 14)),
+                items: _admTypes.map((a) => DropdownMenuItem(value: a['adm_id'].toString(), child: Text(a['admname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))).toList(),
+                selectedItemBuilder: (context) => _admTypes.map((a) => Align(alignment: Alignment.centerLeft, child: Text(a['admname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                onChanged: (v) => setState(() { _admId = v; _reloadGrid(); }),
+              )),
+              SizedBox(width: 8.w),
+              Expanded(child: FocusableTap(
+                onTap: () async {
+                  final now = DateTime.now();
+                  final p = await showDatePicker(context: context, initialDate: _due ?? now, firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 5));
+                  if (p != null) setState(() => _due = p);
+                },
+                child: InputDecorator(
+                  // InputDecorator doesn't render hintText when a child widget is
+                  // present, so we render the placeholder text inline ourselves.
+                  decoration: _filledFieldDec(context, '', filled: _due != null),
+                  child: Text(
+                    _due == null ? 'Select Date' : _fmt(_due!),
+                    style: _due == null
+                        ? TextStyle(fontSize: 13.sp, color: AppColors.textPrimary.withValues(alpha: 0.6))
+                        : _fieldTextStyle(context).copyWith(color: AppColors.accent),
+                  ),
+                ),
+              )),
+              SizedBox(width: 10.w),
+              // Action buttons are mouse-only — kept out of Tab so the key
+              // moves only through the input fields (dropdowns + amounts).
+              ExcludeFocus(child: _modeButton('New', Icons.add, !_editMode, () => setState(() {
+                _editMode = false;
+                _reloadGrid();
+              }))),
+              SizedBox(width: 8.w),
+              ExcludeFocus(child: _modeButton('Edit', Icons.edit, _editMode, () => setState(() {
+                _editMode = true;
+                _reloadGrid();
+              }))),
+              SizedBox(width: 8.w),
+              ExcludeFocus(
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _copyFee,
+                  icon: const Icon(Icons.copy_all, size: 15),
+                  label: const Text('Copy Fee'),
+                ),
+              ),
+            ],
+          )),
         ),
-        Container(
-          padding: EdgeInsets.all(12.w),
-          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.border.withValues(alpha: 0.6))),
-          child: Wrap(spacing: 12.w, runSpacing: 10.h, children: [
-            SizedBox(width: 190.w, child: DropdownButtonFormField<String>(initialValue: _cls, isExpanded: true, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), decoration: _dec('Class *'), items: _classNames.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) => setState(() {
-              _cls = v;
-              _reloadGrid();
-            }))),
-            SizedBox(width: 170.w, child: DropdownButtonFormField<String>(initialValue: _sem, isExpanded: true, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), decoration: _dec('Semester *'), items: _semesters.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(), onChanged: (v) => setState(() {
-              _sem = v;
-              _reloadGrid();
-            }))),
-            SizedBox(width: 190.w, child: DropdownButtonFormField<String>(initialValue: _admId, isExpanded: true, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), decoration: _dec('Admn Type'), items: [const DropdownMenuItem<String>(value: null, child: Text('All')), ..._admTypes.map((a) => DropdownMenuItem(value: a['adm_id'].toString(), child: Text(a['admname']?.toString() ?? '', overflow: TextOverflow.ellipsis)))], onChanged: (v) => setState(() {
-              _admId = v;
-              _reloadGrid();
-            }))),
-            SizedBox(width: 180.w, child: InkWell(onTap: () async {
-              final now = DateTime.now();
-              final p = await showDatePicker(context: context, initialDate: _due ?? now, firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 5));
-              if (p != null) setState(() => _due = p);
-            }, child: InputDecorator(decoration: _dec('Pay On or Before *'), child: Text(_due == null ? 'Select' : _fmt(_due!), style: TextStyle(fontSize: 13.sp, color: _due == null ? AppColors.textLight : AppColors.textPrimary))))),
-          ]),
-        ),
-        SizedBox(height: 12.h),
+        SizedBox(height: 4.h),
         Expanded(
           child: Container(
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.border.withValues(alpha: 0.6))),
@@ -1419,16 +1628,16 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
                 SizedBox(width: 70.w, child: Text('ALL', textAlign: TextAlign.center, style: _h())),
                 SizedBox(width: 44.w, child: Text('', style: _h())),
               ])),
-              Expanded(child: ListView.separated(itemCount: _lines.length, separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.4)), itemBuilder: (_, i) {
+              Expanded(child: FocusTraversalGroup(child: ListView.separated(itemCount: _lines.length, separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.4)), itemBuilder: (_, i) {
                 final l = _lines[i];
-                return Padding(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h), child: Row(children: [
-                  Expanded(flex: 3, child: Padding(padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 10.h), child: Text(l.feeType ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)))),
+                return Container(color: i.isEven ? Colors.white : AppColors.surface, padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h), child: Row(children: [
+                  Expanded(flex: 3, child: Padding(padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 10.h), child: Text(l.feeType ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)))),
                   SizedBox(width: 8.w),
-                  SizedBox(width: 132.w, child: TextField(controller: l.amount, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))], style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary), decoration: _dec(''), onChanged: (_) => setState(() {}))),
-                  SizedBox(width: 70.w, child: Center(child: Tooltip(message: l.locked ? 'Apply-to-all fee is locked once created' : 'Apply this fee to all students in the class', child: Checkbox(value: l.applyAll, visualDensity: VisualDensity.compact, onChanged: l.locked ? null : (v) => setState(() => l.applyAll = v ?? false))))),
+                  SizedBox(width: 132.w, child: TextField(controller: l.amount, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))], style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: l.amount.text.trim().isNotEmpty ? AppColors.accent : AppColors.textPrimary), decoration: _dec('', filled: l.amount.text.trim().isNotEmpty), onChanged: (_) => setState(() {}))),
+                  SizedBox(width: 70.w, child: Center(child: Tooltip(message: l.locked ? 'Apply-to-all fee is locked once created' : 'Apply this fee to all students in the class', child: ExcludeFocus(child: Checkbox(value: l.applyAll, activeColor: AppColors.accent, visualDensity: VisualDensity.compact, onChanged: l.locked ? null : (v) => setState(() => l.applyAll = v ?? false)))))),
                   SizedBox(width: 44.w),
                 ]));
-              })),
+              }))),
               Divider(height: 1.h, color: AppColors.border),
               Padding(padding: EdgeInsets.all(12.w), child: Row(children: [
                 Text('Tick ALL to demand a fee for every student', style: TextStyle(fontSize: 11.sp, color: AppColors.textLight)),
@@ -1436,18 +1645,25 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
                 Text('Total  ', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                 Text(_total.toStringAsFixed(2), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
                 SizedBox(width: 16.w),
-                ElevatedButton.icon(onPressed: _saving ? null : _save, icon: _saving ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save, size: 16), label: const Text('Save'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white)),
+                ElevatedButton.icon(onPressed: _saving ? null : _save, icon: _saving ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save, size: 16), label: const Text('Save'), style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white)),
               ])),
             ]),
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _existing() {
     final filtered = _cls == null ? _rows : _rows.where((r) => (r['cfclass']?.toString() ?? '') == _cls).toList();
-    return _tableShell(
+    return _listCard(
+      icon: 'category',
+      title: 'Saved Demands',
+      subtitle: 'class-wise fee demands for the academic year',
+      count: filtered.length,
+      countLabel: 'items',
+      action: _importButton(context, title: 'Class Fee Demand', tabIndex: 7, disabled: _saving, onReturn: _load),
       headerCells: [
         SizedBox(width: 70.w, child: Text('TERM', style: _h())),
         Expanded(flex: 2, child: Text('FEE TYPE', style: _h())),
@@ -1457,17 +1673,25 @@ class _ClassFeeDemandPanelState extends State<_ClassFeeDemandPanel> with Automat
       ],
       body: filtered.isEmpty
           ? Center(child: Text('No fee demands', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-          : ListView.separated(itemCount: filtered.length, separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)), itemBuilder: (_, i) {
-              final r = filtered[i];
-              final id = r['cf_id'] is int ? r['cf_id'] as int : int.tryParse(r['cf_id'].toString()) ?? 0;
-              return Padding(padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h), child: Row(children: [
-                SizedBox(width: 70.w, child: Text(r['cfterm']?.toString() ?? '', style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary))),
-                Expanded(flex: 2, child: Text(r['cffeetype']?.toString() ?? '', style: _c())),
-                SizedBox(width: 70.w, child: Text(r['cfamount']?.toString() ?? '', style: _c())),
-                Expanded(child: Text(_admName['${r['admissiontype'] ?? ''}'] ?? 'All', style: _c())),
-                SizedBox(width: 44.w, child: Center(child: InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 15, color: AppColors.error))))),
-              ]));
-            }),
+          : ListView.separated(
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+              itemBuilder: (_, i) {
+                final r = filtered[i];
+                final id = r['cf_id'] is int ? r['cf_id'] as int : int.tryParse(r['cf_id'].toString()) ?? 0;
+                return Container(
+                  color: i.isEven ? Colors.white : AppColors.surface,
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  child: Row(children: [
+                    SizedBox(width: 70.w, child: Text(r['cfterm']?.toString() ?? '', style: _c())),
+                    Expanded(flex: 2, child: Text(r['cffeetype']?.toString() ?? '', style: _c())),
+                    SizedBox(width: 70.w, child: Text(r['cfamount']?.toString() ?? '', style: _c())),
+                    Expanded(child: Text(_admName['${r['admissiontype'] ?? ''}'] ?? 'All', style: _c())),
+                    SizedBox(width: 44.w, child: Center(child: InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 15, color: AppColors.error))))),
+                  ]),
+                );
+              },
+            ),
     );
   }
 }

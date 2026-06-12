@@ -6,71 +6,121 @@ import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
+import '../../widgets/pill_tab.dart';
 import 'master_import_screen.dart';
 
 /// Master Data — Course and Class masters in the Fee-Master CRUD style:
 /// a left Add/Edit form + right table, with a top-right "Import CSV/Excel"
 /// button that opens the bulk importer. A single sidebar entry with internal
 /// Course / Class tabs (same layout as Admission Master).
-class MasterDataScreen extends StatelessWidget {
+///
+/// Page shell follows the project's pill-tab convention (admission-master-
+/// design.md § 1): a plain `Column` — no outer `Padding`, no
+/// `AppCard.decoration()`. The PillTab row sits on the Dashboard surface
+/// and the TabBarView fills the rest.
+class MasterDataScreen extends StatefulWidget {
   const MasterDataScreen({super.key});
 
   @override
+  State<MasterDataScreen> createState() => _MasterDataScreenState();
+}
+
+class _MasterDataScreenState extends State<MasterDataScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  static const _tabLabels = ['Course', 'Class'];
+  static const _tabIcons = ['teacher', 'book-1'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabLabels.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Container(
-          decoration: AppCard.decoration(),
-          child: Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 6.h),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    const AppIcon('document-upload', size: 20, color: AppColors.primary),
-                    SizedBox(width: 10.w),
-                    Text('Master Data',
-                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    for (var i = 0; i < _tabLabels.length; i++) ...[
+                      PillTab(
+                        icon: _tabIcons[i],
+                        label: _tabLabels[i],
+                        selected: selected == i,
+                        onTap: () => _tabController.animateTo(i),
+                      ),
+                      if (i < _tabLabels.length - 1)
+                        SizedBox(width: PillTab.gap(context)),
+                    ],
                   ],
                 ),
               ),
-              TabBar(
-                isScrollable: true,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.accent,
-                labelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
-                tabs: const [
-                  Tab(text: 'Course'),
-                  Tab(text: 'Class'),
-                ],
-              ),
-              Divider(height: 1.h, color: AppColors.border),
-              const Expanded(
-                child: TabBarView(
-                  children: [
-                    _CourseMasterPanel(),
-                    _ClassMasterPanel(),
-                  ],
-                ),
-              ),
+            );
+          },
+        ),
+        SizedBox(height: 6.h),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              _CourseMasterPanel(),
+              _ClassMasterPanel(),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-// ── shared bits (mirrors fee_master_screen) ────────────────────────────────
-InputDecoration _dec(String label) => InputDecoration(
-      labelText: label,
-      isDense: true,
-      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-    );
+// ── shared helpers (mirrors fee-master / admission-master design contract) ──
+
+/// Bold-black label rendered above each input (admission-master-design.md § 5).
+Widget _lbl(String text) =>
+    Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black));
+
+/// Compact-or-expanded responsive input decoration with placeholder hint.
+/// Matches `_filledFieldDec` from admission-master-design.md § 5.
+InputDecoration _filledFieldDec(BuildContext context, String hint, {bool filled = false}) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  final textSize = compact ? 11.0 : 14.0;
+  final hPad = compact ? 8.0 : 14.0;
+  final vPad = compact ? 5.0 : 14.0;
+  final radius = compact ? 5.0 : 8.0;
+  final idle = filled ? AppColors.accent : AppColors.border;
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+    contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+    filled: true,
+    fillColor: Colors.white,
+  );
+}
+
+TextStyle _fieldTextStyle(BuildContext context, {bool filled = false}) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  return TextStyle(fontWeight: filled ? FontWeight.w600 : FontWeight.w500, fontSize: compact ? 11 : 14, color: filled ? AppColors.accent : const Color(0xFF555555));
+}
 
 void _snack(BuildContext ctx, String msg, Color color) {
   ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
@@ -98,28 +148,94 @@ int _nextOrder(List<Map<String, dynamic>> rows) {
   return mx + 1;
 }
 
-Widget _tableShell({required List<Widget> headerCells, required Widget body}) {
+/// Outer "Add" / "Edit" card — white, 10r radius, full border, 20.w padding.
+/// Uses the shared [CardTitleBlock] with optional subtitle.
+Widget _addCard({required String icon, required String title, String? subtitle, required Widget child}) {
   return Container(
+    padding: EdgeInsets.all(20.w),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12.r),
-      border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+      borderRadius: BorderRadius.circular(10.r),
+      border: Border.all(color: AppColors.border),
     ),
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          color: AppColors.tableHeadBg,
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-          child: Row(children: headerCells),
-        ),
-        Expanded(child: body),
+        CardTitleBlock(icon: icon, title: title, subtitle: subtitle),
+        SizedBox(height: 20.h),
+        child,
       ],
     ),
   );
 }
 
-TextStyle _h() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-TextStyle _c() => TextStyle(fontSize: 12.sp, color: AppColors.textSecondary);
+/// Outer "List" card — white, 10r radius, full border, 16.w padding. Title bar
+/// holds an icon-tile block + count badge + spacer + optional action.
+/// The inner bordered table card sits inside.
+Widget _listCard({
+  required String icon,
+  required String title,
+  String? subtitle,
+  required int count,
+  required String countLabel,
+  required List<Widget> headerCells,
+  required Widget body,
+  Widget? action,
+}) {
+  return Container(
+    padding: EdgeInsets.all(16.w),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10.r),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 10.h),
+          child: Row(children: [
+            CardTitleBlock(icon: icon, title: title, subtitle: subtitle),
+            SizedBox(width: 10.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text('$count $countLabel',
+                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+            ),
+            const Spacer(),
+            if (action != null) action,
+          ]),
+        ),
+        Expanded(
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  color: AppColors.tableHeadBg,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  child: Row(children: headerCells),
+                ),
+                Expanded(child: body),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+TextStyle _h() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3);
+TextStyle _c() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
 
 Future<bool> _confirmDelete(BuildContext ctx, String what) async {
   final ok = await showDialog<bool>(
@@ -136,16 +252,25 @@ Future<bool> _confirmDelete(BuildContext ctx, String what) async {
   return ok == true;
 }
 
-/// Top-right "Import CSV/Excel" button that opens the bulk importer
-/// ([MasterImportScreen]) full-screen at [tabIndex], then runs [onReturn]
-/// (the panel's _load) so imported rows appear on return. Tab indices match
-/// MasterImportScreen: Course = 2, Class = 3.
-Widget _importBar(BuildContext context,
-    {required String title, required int tabIndex, required bool saving, required Future<void> Function() onReturn}) {
-  return Align(
-    alignment: Alignment.centerRight,
+/// Compact-or-expanded amber Import CSV/Excel button used in the list-card
+/// title bar (sits in the `action` slot of `_listCard`). Opens
+/// [MasterImportScreen] full-screen at [tabIndex], then runs [onReturn].
+Widget _importButton(BuildContext context, {
+  required String title,
+  required int tabIndex,
+  required bool disabled,
+  required Future<void> Function() onReturn,
+}) {
+  final compact = MediaQuery.of(context).size.width <= 1366;
+  final btnHeight = compact ? 30.0 : 40.0;
+  final iconSize = compact ? 12.0 : 16.0;
+  final hPad = compact ? 10.0 : 18.0;
+  final radius = compact ? 6.0 : 10.0;
+  final textSize = compact ? 11.0 : 13.0;
+  return SizedBox(
+    height: btnHeight,
     child: ElevatedButton.icon(
-      onPressed: saving
+      onPressed: disabled
           ? null
           : () async {
               await Navigator.of(context).push<void>(
@@ -173,14 +298,15 @@ Widget _importBar(BuildContext context,
               );
               await onReturn();
             },
-      icon: const AppIcon('document-upload', size: 16, color: Colors.white),
+      icon: AppIcon('document-upload', size: iconSize, color: Colors.white),
       label: const Text('Import CSV/Excel'),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-        textStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+        elevation: 0,
+        padding: EdgeInsets.symmetric(horizontal: hPad),
+        textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
       ),
     ),
   );
@@ -301,91 +427,91 @@ class _CourseMasterPanelState extends State<_CourseMasterPanel> with AutomaticKe
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _importBar(context, title: 'Course', tabIndex: 2, saving: _saving, onReturn: _load),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 320.w,
+          child: _addCard(
+            icon: 'teacher',
+            title: _editId != null ? 'Edit Course' : 'Add Course',
+            subtitle: 'top-level academic course / programme',
+            child: FocusTraversalGroup(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 320.w,
-                  child: Container(
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_editId != null ? 'Edit Course' : 'Add Course', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 12.h),
-                        TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Course Name *'), onSubmitted: (_) => _add()),
-                        SizedBox(height: 14.h),
-                        Row(children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _saving ? null : _add,
-                              icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
-                              label: Text(_editId != null ? 'Update' : 'Add'),
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-                            ),
-                          ),
-                          if (_editId != null) ...[
-                            SizedBox(width: 8.w),
-                            OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
-                          ],
-                        ]),
-                      ],
+                _lbl('Course Name *'),
+                SizedBox(height: 6.h),
+                TextField(
+                  controller: _name,
+                  style: _fieldTextStyle(context, filled: _name.text.trim().isNotEmpty),
+                  decoration: _filledFieldDec(context, 'Enter course name', filled: _name.text.trim().isNotEmpty),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _add(),
+                ),
+                SizedBox(height: 18.h),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _add,
+                      icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
+                      label: Text(_editId != null ? 'Update' : 'Add'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
                     ),
                   ),
-                ),
-                SizedBox(width: 16.w),
-                Expanded(
-                  child: _tableShell(
-                    headerCells: [
-                      SizedBox(width: 50.w, child: Text('S.No', style: _h())),
-                      Expanded(child: Text('COURSE NAME', style: _h())),
-                      SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
-                    ],
-                    body: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _rows.isEmpty
-                            ? Center(child: Text('No courses', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                            : ListView.separated(
-                                itemCount: _rows.length,
-                                separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                                itemBuilder: (_, i) {
-                                  final r = _rows[i];
-                                  final id = r['cour_id'] is int ? r['cour_id'] as int : int.tryParse(r['cour_id'].toString()) ?? 0;
-                                  return Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                                    child: Row(children: [
-                                      SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
-                                      Expanded(child: Text(r['courname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                      SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                        InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
-                                        SizedBox(width: 8.w),
-                                        InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
-                                      ])),
-                                    ]),
-                                  );
-                                },
-                              ),
-                  ),
-                ),
+                  if (_editId != null) ...[
+                    SizedBox(width: 8.w),
+                    OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
+                  ],
+                ]),
               ],
             ),
+            ),
           ),
-        ],
-      ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _listCard(
+            icon: 'teacher',
+            title: 'Courses',
+            subtitle: 'all courses in this institution',
+            count: _rows.length,
+            countLabel: 'courses',
+            action: _importButton(context, title: 'Course', tabIndex: 2, disabled: _saving, onReturn: _load),
+            headerCells: [
+              SizedBox(width: 50.w, child: Text('S NO.', style: _h())),
+              Expanded(child: Text('COURSE', style: _h())),
+              SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+            ],
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _rows.isEmpty
+                    ? Center(child: Text('No courses', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        itemCount: _rows.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                        itemBuilder: (_, i) {
+                          final r = _rows[i];
+                          final id = r['cour_id'] is int ? r['cour_id'] as int : int.tryParse(r['cour_id'].toString()) ?? 0;
+                          return Container(
+                            color: i.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                            child: Row(children: [
+                              SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
+                              Expanded(child: Text(r['courname']?.toString() ?? '', style: _c())),
+                              SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
+                                SizedBox(width: 8.w),
+                                InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
+                              ])),
+                            ]),
+                          );
+                        },
+                      ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -538,134 +664,150 @@ class _ClassMasterPanelState extends State<_ClassMasterPanel> with AutomaticKeep
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _importBar(context, title: 'Class', tabIndex: 3, saving: _saving, onReturn: _load),
-          SizedBox(height: 12.h),
-          Expanded(
-            child: Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 320.w,
+          child: _addCard(
+            icon: 'book-1',
+            title: _editId != null ? 'Edit Class' : 'Add Class',
+            subtitle: 'class / standard inside a course',
+            child: FocusTraversalGroup(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 320.w,
-                  child: Container(
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_editId != null ? 'Edit Class' : 'Add Class', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 12.h),
-                        TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Class Name *'), onSubmitted: (_) => _add()),
-                        SizedBox(height: 10.h),
-                        DropdownButtonFormField<String>(
-                          initialValue: _courId,
-                          isExpanded: true,
-                          style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                          decoration: _dec('Course'),
-                          items: [
-                            const DropdownMenuItem<String>(value: null, child: Text('None')),
-                            ..._courses.map((c) => DropdownMenuItem(value: c['cour_id'].toString(), child: Text(c['courname']?.toString() ?? '', overflow: TextOverflow.ellipsis))),
-                          ],
-                          // Changing the course resets the succeeding class — it
-                          // must belong to the same course.
-                          onChanged: (v) => setState(() {
-                            _courId = v;
-                            _succId = null;
-                          }),
-                        ),
-                        SizedBox(height: 10.h),
-                        Builder(builder: (_) {
-                          // Succeeding class is scoped to the selected course
-                          // (no course selected → no options to choose from).
-                          final succClasses = _rows.where((r) =>
-                              r['cla_id']?.toString() != _editId?.toString() &&
-                              _courId != null &&
-                              r['cour_id']?.toString() == _courId).toList();
-                          final succValue =
-                              succClasses.any((r) => r['cla_id'].toString() == _succId) ? _succId : null;
-                          return DropdownButtonFormField<String>(
-                            initialValue: succValue,
-                            isExpanded: true,
-                            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-                            decoration: _dec('Succeeding Class'),
-                            items: [
-                              const DropdownMenuItem<String>(value: null, child: Text('None')),
-                              ...succClasses.map((r) => DropdownMenuItem(value: r['cla_id'].toString(), child: Text(r['claname']?.toString() ?? '', overflow: TextOverflow.ellipsis))),
-                            ],
-                            onChanged: (v) => setState(() => _succId = v),
-                          );
-                        }),
-                        SizedBox(height: 14.h),
-                        Row(children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _saving ? null : _add,
-                              icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
-                              label: Text(_editId != null ? 'Update' : 'Add'),
-                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
-                            ),
-                          ),
-                          if (_editId != null) ...[
-                            SizedBox(width: 8.w),
-                            OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
-                          ],
-                        ]),
-                      ],
-                    ),
-                  ),
+                _lbl('Class Name *'),
+                SizedBox(height: 6.h),
+                TextField(
+                  controller: _name,
+                  style: _fieldTextStyle(context, filled: _name.text.trim().isNotEmpty),
+                  decoration: _filledFieldDec(context, 'Enter class name', filled: _name.text.trim().isNotEmpty),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _add(),
                 ),
-                SizedBox(width: 16.w),
-                Expanded(
-                  child: _tableShell(
-                    headerCells: [
-                      SizedBox(width: 50.w, child: Text('S.No', style: _h())),
-                      Expanded(flex: 2, child: Text('CLASS NAME', style: _h())),
-                      Expanded(flex: 2, child: Text('COURSE', style: _h())),
-                      Expanded(flex: 2, child: Text('SUCCEEDING', style: _h())),
-                      SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+                SizedBox(height: 16.h),
+                _lbl('Course'),
+                SizedBox(height: 6.h),
+                DropdownButtonFormField<String>(
+                  initialValue: _courId,
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 6,
+                  style: _fieldTextStyle(context, filled: _courId != null),
+                  decoration: _filledFieldDec(context, 'Select course', filled: _courId != null),
+                  items: [
+                    ..._courses.map((c) => DropdownMenuItem(value: c['cour_id'].toString(), child: Text(c['courname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))),
+                  ],
+                  selectedItemBuilder: (context) => [
+                    ..._courses.map((c) => Align(alignment: Alignment.centerLeft, child: Text(c['courname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
+                  ],
+                  // Changing the course resets the succeeding class — it
+                  // must belong to the same course.
+                  onChanged: (v) => setState(() {
+                    _courId = v;
+                    _succId = null;
+                  }),
+                ),
+                SizedBox(height: 16.h),
+                _lbl('Succeeding Class'),
+                SizedBox(height: 6.h),
+                Builder(builder: (_) {
+                  // Succeeding class is scoped to the selected course
+                  // (no course selected → no options to choose from).
+                  final succClasses = _rows.where((r) =>
+                      r['cla_id']?.toString() != _editId?.toString() &&
+                      _courId != null &&
+                      r['cour_id']?.toString() == _courId).toList();
+                  final succValue =
+                      succClasses.any((r) => r['cla_id'].toString() == _succId) ? _succId : null;
+                  return DropdownButtonFormField<String>(
+                    initialValue: succValue,
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                    isExpanded: true,
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: 6,
+                    style: _fieldTextStyle(context, filled: succValue != null),
+                    decoration: _filledFieldDec(context, 'Select succeeding class', filled: succValue != null),
+                    items: [
+                      ...succClasses.map((r) => DropdownMenuItem(value: r['cla_id'].toString(), child: Text(r['claname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))),
                     ],
-                    body: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _rows.isEmpty
-                            ? Center(child: Text('No classes', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                            : ListView.separated(
-                                itemCount: _rows.length,
-                                separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                                itemBuilder: (_, i) {
-                                  final r = _rows[i];
-                                  final id = r['cla_id'] is int ? r['cla_id'] as int : int.tryParse(r['cla_id'].toString()) ?? 0;
-                                  return Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-                                    child: Row(children: [
-                                      SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
-                                      Expanded(flex: 2, child: Text(r['claname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                      Expanded(flex: 2, child: Text(_courName['${r['cour_id'] ?? ''}'] ?? '', style: _c())),
-                                      Expanded(flex: 2, child: Text(_claName['${r['succeedingclass'] ?? ''}'] ?? '', style: _c())),
-                                      SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                        InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
-                                        SizedBox(width: 8.w),
-                                        InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
-                                      ])),
-                                    ]),
-                                  );
-                                },
-                              ),
+                    selectedItemBuilder: (context) => [
+                      ...succClasses.map((r) => Align(alignment: Alignment.centerLeft, child: Text(r['claname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
+                    ],
+                    onChanged: (v) => setState(() => _succId = v),
+                  );
+                }),
+                SizedBox(height: 18.h),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _saving ? null : _add,
+                      icon: Icon(_editId != null ? Icons.save : Icons.add, size: 16),
+                      label: Text(_editId != null ? 'Update' : 'Add'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+                    ),
                   ),
-                ),
+                  if (_editId != null) ...[
+                    SizedBox(width: 8.w),
+                    OutlinedButton(onPressed: _saving ? null : _cancelEdit, child: const Text('Cancel')),
+                  ],
+                ]),
               ],
             ),
+            ),
           ),
-        ],
-      ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _listCard(
+            icon: 'book-1',
+            title: 'Classes',
+            subtitle: 'all classes in this institution',
+            count: _rows.length,
+            countLabel: 'classes',
+            action: _importButton(context, title: 'Class', tabIndex: 3, disabled: _saving, onReturn: _load),
+            headerCells: [
+              SizedBox(width: 50.w, child: Text('S NO.', style: _h())),
+              Expanded(flex: 2, child: Text('CLASS', style: _h())),
+              Expanded(flex: 2, child: Text('COURSE', style: _h())),
+              Expanded(flex: 2, child: Text('SUCCEEDING', style: _h())),
+              SizedBox(width: 90.w, child: Text('ACTION', textAlign: TextAlign.center, style: _h())),
+            ],
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _rows.isEmpty
+                    ? Center(child: Text('No classes', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                    : ListView.separated(
+                        itemCount: _rows.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                        itemBuilder: (_, i) {
+                          final r = _rows[i];
+                          final id = r['cla_id'] is int ? r['cla_id'] as int : int.tryParse(r['cla_id'].toString()) ?? 0;
+                          return Container(
+                            color: i.isEven ? Colors.white : AppColors.surface,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                            child: Row(children: [
+                              SizedBox(width: 50.w, child: Text('${i + 1}', style: _c())),
+                              Expanded(flex: 2, child: Text(r['claname']?.toString() ?? '', style: _c())),
+                              Expanded(flex: 2, child: Text(_courName['${r['cour_id'] ?? ''}'] ?? '', style: _c())),
+                              Expanded(flex: 2, child: Text(_claName['${r['succeedingclass'] ?? ''}'] ?? '', style: _c())),
+                              SizedBox(width: 90.w, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                InkWell(onTap: () => _edit(r), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('edit-2', size: 16, color: AppColors.primary))),
+                                SizedBox(width: 8.w),
+                                InkWell(onTap: () => _delete(id), child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error))),
+                              ])),
+                            ]),
+                          );
+                        },
+                      ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -281,14 +281,37 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
       );
 
   /// Shared input decoration in the login screen's style — rounded fill,
-  /// hint text, and a tinted prefix icon.
-  InputDecoration _inputDecoration(String hint, String iconName) =>
+  /// hint text, and a tinted prefix icon. Grey border idle, navy (primary)
+  /// border on focus. The [filled] param is retained but no longer affects
+  /// the border.
+  InputDecoration _inputDecoration(String hint, String iconName,
+          {bool filled = false}) =>
       InputDecoration(
         hintText: hint,
+        hintStyle: TextStyle(
+            color: AppColors.textPrimary.withValues(alpha: 0.6)),
         prefixIcon:
             AppIcon.linear(iconName, size: 20, color: AppColors.textLight),
         prefixIconConstraints:
             const BoxConstraints(minWidth: 52, minHeight: 0),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      );
+
+  /// Text style for a field's value — standard dark colour at normal weight.
+  TextStyle _valueStyle(bool filled) => const TextStyle(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w400,
       );
 
   @override
@@ -448,21 +471,21 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
                   controller: _codeController,
                   autofocus: true,
                   textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) => setState(() {}),
                   style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 18.sp,
-                      letterSpacing: 2),
+                      letterSpacing: 2,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w400),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
                     LengthLimitingTextInputFormatter(19),
                   ],
-                  decoration: InputDecoration(
-                    hintText: 'XXXX-XXXX-XXXX-XXXX',
-                    prefixIcon: AppIcon.linear('key',
-                        size: 20, color: AppColors.textLight),
-                    prefixIconConstraints:
-                        const BoxConstraints(minWidth: 52, minHeight: 0),
-                  ),
+                  decoration: _inputDecoration(
+                          'XXXX-XXXX-XXXX-XXXX', 'key',
+                          filled: _codeController.text.trim().isNotEmpty)
+                      .copyWith(hintStyle: const TextStyle(fontFamily: 'monospace')),
                   onSubmitted: (_) => _activate(),
                 ),
               ],
@@ -559,26 +582,25 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
               fontSize: 14,
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w500),
-          decoration: InputDecoration(
-            hintText: 'Select your institution or trust',
-            hintStyle:
-                const TextStyle(fontSize: 14, color: AppColors.textLight),
-            prefixIcon: AppIcon.linear('teacher',
-                size: 20, color: AppColors.textLight),
-            prefixIconConstraints:
-                const BoxConstraints(minWidth: 52, minHeight: 0),
+          decoration: _inputDecoration(
+            'Select your institution or trust',
+            'teacher',
+            filled: _selectedInsId != null,
           ),
+          icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           items: [
             DropdownMenuItem<int>(
               value: _kTrustSentinel,
-              child:
-                  Text('★ $_trustName', overflow: TextOverflow.ellipsis),
+              child: Text('★ $_trustName',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textPrimary)),
             ),
             ..._institutions.map<DropdownMenuItem<int>>(
               (i) => DropdownMenuItem<int>(
                 value: i['ins_id'] as int,
                 child: Text(i['insname']?.toString() ?? '—',
-                    overflow: TextOverflow.ellipsis),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textPrimary)),
               ),
             ),
           ],
@@ -593,8 +615,10 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
         _fieldLabel('Username *'),
         TextField(
           controller: _usernameController,
-          decoration:
-              _inputDecoration('Your login username / email', 'user'),
+          onChanged: (_) => setState(() {}),
+          style: _valueStyle(_usernameController.text.trim().isNotEmpty),
+          decoration: _inputDecoration('Your login username / email', 'user',
+              filled: _usernameController.text.trim().isNotEmpty),
         ),
       ],
     );
@@ -606,11 +630,14 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
         TextField(
           controller: _mobileController,
           keyboardType: TextInputType.phone,
+          onChanged: (_) => setState(() {}),
+          style: _valueStyle(_mobileController.text.trim().isNotEmpty),
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(10),
           ],
-          decoration: _inputDecoration('10-digit mobile number', 'call'),
+          decoration: _inputDecoration('10-digit mobile number', 'call',
+              filled: _mobileController.text.trim().isNotEmpty),
         ),
       ],
     );
@@ -622,7 +649,10 @@ class _DeviceActivationScreenState extends State<DeviceActivationScreen>
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          decoration: _inputDecoration('name@example.com', 'sms'),
+          onChanged: (_) => setState(() {}),
+          style: _valueStyle(_emailController.text.trim().isNotEmpty),
+          decoration: _inputDecoration('name@example.com', 'sms',
+              filled: _emailController.text.trim().isNotEmpty),
         ),
       ],
     );

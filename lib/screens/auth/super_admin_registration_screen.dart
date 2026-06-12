@@ -217,12 +217,15 @@ class _SuperAdminRegistrationScreenState
                   ),
                   SizedBox(height: 24.h),
                   _field(_trustNameController, 'Trust Name *',
-                      Icons.account_balance_outlined),
+                      Icons.account_balance_outlined,
+                      hint: 'Enter trust name'),
                   SizedBox(height: 12.h),
-                  _field(_nameController, 'Username *', Icons.person_outline),
+                  _field(_nameController, 'Username *', Icons.person_outline,
+                      hint: 'Enter username'),
                   SizedBox(height: 12.h),
                   _field(_emailController, 'Email *', Icons.mail_outline,
-                      keyboard: TextInputType.emailAddress),
+                      keyboard: TextInputType.emailAddress,
+                      hint: 'name@example.com'),
                   SizedBox(height: 12.h),
                   // Mobile + Send OTP
                   Row(
@@ -232,17 +235,17 @@ class _SuperAdminRegistrationScreenState
                         child: TextField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
+                          onChanged: (_) => setState(() {}),
+                          style: _valueStyle(
+                              _phoneController.text.trim().isNotEmpty),
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(10),
                           ],
-                          decoration: InputDecoration(
-                            labelText: 'Mobile *',
-                            prefixIcon: const Icon(Icons.phone_outlined),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r)),
-                            isDense: true,
-                          ),
+                          decoration: _inputDec('Mobile *',
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              hint: '10-digit mobile number',
+                              filled: _phoneController.text.trim().isNotEmpty),
                         ),
                       ),
                       SizedBox(width: 8.w),
@@ -283,49 +286,49 @@ class _SuperAdminRegistrationScreenState
                     TextField(
                       controller: _otpController,
                       keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(6),
                       ],
-                      style: TextStyle(fontSize: 16.sp, letterSpacing: 4),
-                      decoration: InputDecoration(
-                        labelText: 'Enter 6-digit OTP *',
-                        prefixIcon: const Icon(Icons.sms_outlined),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.r)),
-                        isDense: true,
-                      ),
+                      style: TextStyle(
+                          fontSize: 16.sp,
+                          letterSpacing: 4,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w400),
+                      decoration: _inputDec('Enter 6-digit OTP *',
+                          prefixIcon: const Icon(Icons.sms_outlined),
+                          hint: '6-digit OTP',
+                          filled: _otpController.text.trim().isNotEmpty),
                     ),
                   ],
                   SizedBox(height: 12.h),
                   TextField(
                     controller: _passwordController,
                     obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Password *',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r)),
-                      isDense: true,
-                    ),
+                    onChanged: (_) => setState(() {}),
+                    style: _valueStyle(_passwordController.text.isNotEmpty),
+                    decoration: _inputDec('Password *',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        hint: 'Enter password',
+                        filled: _passwordController.text.isNotEmpty,
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscure
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          onPressed: () => setState(() => _obscure = !_obscure),
+                        )),
                   ),
                   SizedBox(height: 12.h),
                   TextField(
                     controller: _confirmController,
                     obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password *',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r)),
-                      isDense: true,
-                    ),
+                    onChanged: (_) => setState(() {}),
+                    style: _valueStyle(_confirmController.text.isNotEmpty),
+                    decoration: _inputDec('Confirm Password *',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        hint: 'Re-enter password',
+                        filled: _confirmController.text.isNotEmpty),
                     onSubmitted: (_) => _register(),
                   ),
                   if (_error != null) ...[
@@ -387,15 +390,46 @@ class _SuperAdminRegistrationScreenState
   }
 
   Widget _field(TextEditingController c, String label, IconData icon,
-      {TextInputType? keyboard}) {
+      {TextInputType? keyboard, String? hint}) {
+    final filled = c.text.trim().isNotEmpty;
     return TextField(
       controller: c,
       keyboardType: keyboard,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-        isDense: true,
+      onChanged: (_) => setState(() {}),
+      style: _valueStyle(filled),
+      decoration: _inputDec(label, prefixIcon: Icon(icon), hint: hint, filled: filled),
+    );
+  }
+
+  /// Text style for a field's value — standard dark colour at normal weight.
+  TextStyle _valueStyle(bool filled) => const TextStyle(
+        color: AppColors.textPrimary,
+        fontWeight: FontWeight.w400,
+      );
+
+  /// Standard decoration: grey border idle, navy (primary) border on focus.
+  /// Width 1.5. Shows an in-field placeholder. The [filled] param is retained
+  /// but no longer affects the border.
+  InputDecoration _inputDec(String label,
+      {Widget? prefixIcon, Widget? suffixIcon, String? hint, bool filled = false}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6)),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      isDense: true,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8.r),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8.r),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8.r),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
   }

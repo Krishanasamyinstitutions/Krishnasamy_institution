@@ -25,12 +25,12 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
   List<Map<String, dynamic>> _classList = [];  // {claname, cour_id}
 
   String? _selectedCourse;
-  String _orderBy = 'Reg. No';
+  String _orderBy = 'Admission No';
   final Map<int, String?> _rowClass = {}; // adm_id -> chosen class
   bool _loading = true;
   bool _saving = false;
 
-  static const _orderOptions = ['Reg. No', 'Student Name', 'Sex + Student Name'];
+  static const _orderOptions = ['Admission No', 'Student Name', 'Sex + Student Name'];
 
   @override
   void initState() {
@@ -100,7 +100,7 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
         case 'Sex + Student Name':
           final s = a.stugender.compareTo(b.stugender);
           return s != 0 ? s : a.stuname.toLowerCase().compareTo(b.stuname.toLowerCase());
-        default: // Reg. No
+        default: // Admission No
           return a.admno.compareTo(b.admno);
       }
     });
@@ -131,8 +131,10 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
               DropdownButtonFormField<String>(
                 initialValue: picked,
                 isExpanded: true,
+                icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                 decoration: const InputDecoration(labelText: 'Class'),
-                items: options.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                items: options.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)))).toList(),
+                selectedItemBuilder: (context) => options.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)))).toList(),
                 onChanged: (v) => setLocal(() => picked = v),
               ),
             ],
@@ -215,43 +217,108 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
   }
 
   // ── build ─────────────────────────────────────────────────────────
+  // Page shell per admission-design.md § 1: edge-to-edge outer card (no
+  // Padding(16.w) wrapper). Outer card is white / 16 logical-px radius /
+  // AppColors.border.
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Container(
-        decoration: AppCard.decoration(),
-        child: Column(
-          children: [
-            _header(),
-            Divider(height: 1.h, color: AppColors.border),
-            _controls(),
-            Divider(height: 1.h, color: AppColors.border),
-            _tableHeader(),
-            Expanded(child: _body()),
-            Divider(height: 1.h, color: AppColors.border),
-            _actionBar(),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Container(
+            // Outer white card.
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Padding(
+              // Padding around all inner content so it doesn't touch the
+              // outer card edge.
+              padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 12.h),
+              child: Column(
+                children: [
+                  _topBar(),
+                  SizedBox(height: 8.h),
+                  // Inner bordered table card — header band + body rows.
+                  Expanded(
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        children: [
+                          _tableHeader(),
+                          Expanded(child: _body()),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  _actionBar(),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _header() {
+  /// Single top bar: icon + "Section Allocation" + subtitle on the left,
+  /// pushed-right Standard dropdown + Order By dropdown + navy Auto Fill +
+  /// amber "X pending" chip.
+  Widget _topBar() {
+    // Horizontal padding only — vertical breathing comes from the outer
+    // Padding wrapper in build().
     return Padding(
-      padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 14.h),
+      padding: EdgeInsets.symmetric(vertical: 8.h),
       child: Row(
         children: [
           const AppIcon('book-1', size: 20, color: AppColors.primary),
           SizedBox(width: 10.w),
-          Text('Class Allocation',
+          Text('Section Allocation',
               style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           SizedBox(width: 10.w),
           Text('Admitted — pending allocation',
               style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           const Spacer(),
+          SizedBox(width: 200.w, child: _courseDropdown()),
+          SizedBox(width: 10.w),
+          SizedBox(width: 170.w, child: _orderDropdown()),
+          SizedBox(width: 10.w),
+          // Sized to match the Import CSV/Excel button used elsewhere in the
+          // project (compact / expanded responsive).
+          Builder(builder: (context) {
+            final compact = MediaQuery.of(context).size.width <= 1366;
+            final btnHeight = compact ? 30.0 : 40.0;
+            final iconSize = compact ? 12.0 : 16.0;
+            final hPad = compact ? 10.0 : 18.0;
+            final radius = compact ? 6.0 : 10.0;
+            final textSize = compact ? 11.0 : 13.0;
+            return SizedBox(
+              height: btnHeight,
+              child: ElevatedButton.icon(
+                onPressed: _selectedCourse == null ? null : _autoFill,
+                icon: Icon(Icons.auto_fix_high, size: iconSize, color: Colors.white),
+                label: const Text('Auto Fill'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+                ),
+              ),
+            );
+          }),
+          SizedBox(width: 10.w),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12.r),
@@ -264,39 +331,22 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
     );
   }
 
-  Widget _controls() {
-    return Padding(
-      padding: EdgeInsets.all(14.w),
-      child: Row(
-        children: [
-          _miniLabel('Course'),
-          SizedBox(width: 8.w),
-          SizedBox(width: 240.w, child: _courseDropdown()),
-          SizedBox(width: 20.w),
-          _miniLabel('Order By'),
-          SizedBox(width: 8.w),
-          SizedBox(width: 200.w, child: _orderDropdown()),
-          const Spacer(),
-          OutlinedButton.icon(
-            onPressed: _selectedCourse == null ? null : _autoFill,
-            icon: const Icon(Icons.auto_fix_high, size: 16),
-            label: const Text('Auto Fill'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _miniLabel(String t) => Text(t,
-      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary));
-
   Widget _courseDropdown() {
     return DropdownButtonFormField<String>(
       initialValue: _selectedCourse,
       isExpanded: true,
-      decoration: _dec(),
-      hint: Text('Select course', style: TextStyle(fontSize: 13.sp, color: AppColors.textLight)),
-      items: _courseNames.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 6,
+      icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+      decoration: _dec(filled: _selectedCourse != null),
+      hint: Text('Select Standard', style: TextStyle(fontSize: 13.sp, color: AppColors.textLight)),
+      items: _courseNames.map((e) => DropdownMenuItem(
+            value: e,
+            child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+          )).toList(),
+      selectedItemBuilder: (context) => _courseNames.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
       onChanged: (v) => setState(() {
         _selectedCourse = v;
         _rowClass.clear();
@@ -308,24 +358,37 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
     return DropdownButtonFormField<String>(
       initialValue: _orderBy,
       isExpanded: true,
-      decoration: _dec(),
-      items: _orderOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-      onChanged: (v) => setState(() => _orderBy = v ?? 'Reg. No'),
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 6,
+      icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+      style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+      decoration: _dec(filled: true, hint: 'Order by'),
+      items: _orderOptions.map((e) => DropdownMenuItem(
+            value: e,
+            child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          )).toList(),
+      selectedItemBuilder: (context) => _orderOptions.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+      onChanged: (v) => setState(() => _orderBy = v ?? 'Admission No'),
     );
   }
 
   Widget _tableHeader() {
-    TextStyle s() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    TextStyle s() => TextStyle(
+        fontSize: 12.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.3);
     return Container(
       color: AppColors.tableHeadBg,
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       child: Row(
         children: [
-          SizedBox(width: 140.w, child: Text('Reg. No', style: s())),
-          Expanded(flex: 3, child: Text('Student Name', style: s())),
-          SizedBox(width: 80.w, child: Text('Sex', style: s())),
-          Expanded(flex: 2, child: Text('Course', style: s())),
-          SizedBox(width: 220.w, child: Text('Class', style: s())),
+          SizedBox(width: 140.w, child: Text('REG. NO', style: s())),
+          Expanded(flex: 3, child: Text('STUDENT NAME', style: s())),
+          SizedBox(width: 80.w, child: Text('SEX', style: s())),
+          Expanded(flex: 2, child: Text('COURSE', style: s())),
+          SizedBox(width: 220.w, child: Text('CLASS', style: s())),
         ],
       ),
     );
@@ -335,7 +398,7 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_selectedCourse == null) {
       return Center(
-        child: Text('Select a course to list admitted students',
+        child: Text('Select a standard to list admitted students',
             style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
       );
     }
@@ -347,31 +410,39 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
       );
     }
     final options = _classNamesFor(_selectedCourse);
-    return ListView.separated(
-      itemCount: rows.length,
-      separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border),
-      itemBuilder: (_, i) => _row(rows[i], options),
+    return FocusTraversalGroup(
+      child: ListView.builder(
+        itemCount: rows.length,
+        itemBuilder: (_, i) => _row(rows[i], i, options),
+      ),
     );
   }
 
-  Widget _row(AdmissionModel a, List<String> options) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+  Widget _row(AdmissionModel a, int index, List<String> options) {
+    final cell = TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
+    return Container(
+      color: index.isEven ? Colors.white : AppColors.surface,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
       child: Row(
         children: [
-          SizedBox(width: 140.w, child: Text(a.admno, style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary))),
-          Expanded(flex: 3, child: Text(a.stuname, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-          SizedBox(width: 80.w, child: Text(a.genderLabel, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
-          Expanded(flex: 2, child: Text(a.courname ?? '—', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary))),
+          SizedBox(width: 140.w, child: Text(a.admno, style: cell)),
+          Expanded(flex: 3, child: Text(a.stuname, style: cell)),
+          SizedBox(width: 80.w, child: Text(a.genderLabel, style: cell)),
+          Expanded(flex: 2, child: Text(a.courname ?? '—', style: cell)),
           SizedBox(
             width: 220.w,
             child: DropdownButtonFormField<String>(
               initialValue: options.contains(_rowClass[a.admId]) ? _rowClass[a.admId] : null,
               isExpanded: true,
               isDense: true,
-              decoration: _dec(),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              elevation: 6,
+              icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+              decoration: _cellDec(filled: options.contains(_rowClass[a.admId])),
               hint: Text('Select class', style: TextStyle(fontSize: 12.sp, color: AppColors.textLight)),
-              items: options.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+              items: options.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis))).toList(),
+              selectedItemBuilder: (context) => options.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               onChanged: (v) => setState(() => _rowClass[a.admId] = v),
             ),
           ),
@@ -383,7 +454,7 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
   Widget _actionBar() {
     final count = _rows.where((a) => (_rowClass[a.admId] ?? '').isNotEmpty).length;
     return Padding(
-      padding: EdgeInsets.all(14.w),
+      padding: EdgeInsets.symmetric(vertical: 6.h),
       child: Row(
         children: [
           if (count > 0)
@@ -396,21 +467,59 @@ class _ClassAllocationScreenState extends State<ClassAllocationScreen> {
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.save, size: 16),
             label: Text(_saving ? 'Allocating…' : 'Save Allocation'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  InputDecoration _dec() => InputDecoration(
+  // Compact-or-expanded responsive decoration per admission-design.md § 4:
+  // isDense off, 14.h vertical padding at expanded sizes, 5/8 radius, focused
+  // border in accent. Used by the top-bar dropdowns.
+  InputDecoration _dec({bool filled = false, String? hint}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final vPad = compact ? 8.0 : 14.0;
+    final radius = compact ? 6.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+    );
+  }
+
+  // Compact decoration for inline row dropdowns — keeps body rows tight.
+  InputDecoration _cellDec({bool filled = false, String? hint}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
         isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+        hintText: hint,
+        hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 12.sp),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6.r),
+            borderSide: BorderSide(color: idle, width: 1.5)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.r),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderRadius: BorderRadius.circular(6.r),
+            borderSide: BorderSide(color: idle, width: 1.5)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6.r),
+            borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       );
+  }
 }

@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
@@ -1252,9 +1253,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 0),
           child: Row(
             children: [
-              AppIcon('people', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('All Students', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700)),
+              const CardTitleBlock(icon: 'people', title: 'All Students', subtitle: 'browse and search the student directory'),
               SizedBox(width: 8.w),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -1792,7 +1791,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
   // â”€â”€â”€ Left panel: Student fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildStudentFields() {
-    return Column(
+    return FocusTraversalGroup(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _row3(
@@ -1801,9 +1801,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(12),
             elevation: 6,
-            decoration: _dec('Select year'),
+            decoration: _dec('Select year', filled: _selectedYrId != null),
+            icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
             style: _inputStyle,
             items: _years.map((y) => DropdownMenuItem(value: y['yr_id'].toString(), child: Text(y['yrlabel']))).toList(),
+            selectedItemBuilder: (context) => _years.map((y) => Align(alignment: Alignment.centerLeft, child: Text(y['yrlabel'], overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
             onChanged: (v) => setState(() {
               _selectedYrId = v;
               _selectedYrLabel = v != null
@@ -1814,14 +1816,16 @@ class _StudentsScreenState extends State<StudentsScreen> {
           )),
           _fieldFull(label: 'Roll Number *', child: TextFormField(
             controller: _admNoController,
-            decoration: _dec('Enter roll no'),
-            style: _inputStyle,
+            decoration: _dec('Enter roll no', filled: _admNoController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _admNoController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           )),
           _fieldFull(label: 'Student Name *', child: TextFormField(
             controller: _nameController,
-            decoration: _dec('Enter full name'),
-            style: _inputStyle,
+            decoration: _dec('Enter full name', filled: _nameController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _nameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           )),
         ),
@@ -1841,7 +1845,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 if (d != null) setState(() => _admDate = d);
               },
               child: InputDecorator(
-                decoration: _dec('Select admission date').copyWith(
+                decoration: _dec('Select admission date', filled: _admDate != null).copyWith(
                   suffixIcon: Padding(
                     padding: EdgeInsets.only(right: 10.w),
                     child: AppIcon('calendar-1', size: 14, color: AppColors.textSecondary),
@@ -1852,7 +1856,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       ? '${_admDate!.day.toString().padLeft(2, '0')}/${_admDate!.month.toString().padLeft(2, '0')}/${_admDate!.year}'
                       : 'Select admission date',
                   style: TextStyle(
-                    color: _admDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                    color: _admDate != null ? AppColors.accent : AppColors.textSecondary.withValues(alpha: 0.6),
                     fontSize: 13.sp,
                     fontWeight: _admDate != null ? FontWeight.w700 : FontWeight.normal,
                   ),
@@ -1865,9 +1869,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(12),
             elevation: 6,
-            decoration: _dec('Select gender'),
+            decoration: _dec('Select gender', filled: _selectedGender != null),
+            icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
             style: _inputStyle,
             items: _genders.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+            selectedItemBuilder: (context) => _genders.map((g) => Align(alignment: Alignment.centerLeft, child: Text(g, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
             onChanged: (v) => setState(() => _selectedGender = v),
             validator: (v) => v == null ? 'Required' : null,
           )),
@@ -1882,13 +1888,13 @@ class _StudentsScreenState extends State<StudentsScreen> {
               if (d != null) setState(() => _dob = d);
             },
             child: InputDecorator(
-              decoration: _dec('Select DOB'),
+              decoration: _dec('Select DOB', filled: _dob != null),
               child: Text(
                 _dob != null
                     ? '${_dob!.day.toString().padLeft(2, '0')}/${_dob!.month.toString().padLeft(2, '0')}/${_dob!.year}'
                     : 'DD/MM/YYYY',
                 style: TextStyle(
-                  color: _dob != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6),
+                  color: _dob != null ? AppColors.accent : AppColors.textSecondary.withValues(alpha: 0.6),
                   fontSize: 13.sp,
                   fontWeight: _dob != null ? FontWeight.w700 : FontWeight.normal,
                 ),
@@ -1901,21 +1907,23 @@ class _StudentsScreenState extends State<StudentsScreen> {
         _row3(
           _fieldFull(label: 'Mobile Number', child: TextFormField(
             controller: _mobileController,
-            decoration: _dec('Enter mobile'),
-            style: _inputStyle,
+            decoration: _dec('Enter mobile', filled: _mobileController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _mobileController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.phone,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           )),
           _fieldFull(label: 'Email', child: TextFormField(
             controller: _emailController,
-            decoration: _dec('Enter email'),
-            style: _inputStyle,
+            decoration: _dec('Enter email', filled: _emailController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _emailController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.emailAddress,
           )),
           _fieldFull(label: 'Course', child: TextFormField(
             initialValue: _selectedStudent?.courname ?? '',
-            decoration: _dec('Course'),
-            style: _inputStyle,
+            decoration: _dec('Course', filled: (_selectedStudent?.courname ?? '').trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: (_selectedStudent?.courname ?? '').trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
             enabled: false,
           )),
         ),
@@ -1935,9 +1943,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _dec('Select class'),
+              decoration: _dec('Select class', filled: _selectedClass != null),
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               style: _inputStyle,
               items: classOptions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              selectedItemBuilder: (context) => classOptions.map((c) => Align(alignment: Alignment.centerLeft, child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               onChanged: (v) => setState(() => _selectedClass = v),
               validator: (v) => v == null ? 'Required' : null,
             );
@@ -1948,9 +1958,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(12),
             elevation: 6,
-            decoration: _dec('Select'),
+            decoration: _dec('Select', filled: _selectedBloodGroup != null),
+            icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
             style: _inputStyle,
             items: _bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+            selectedItemBuilder: (context) => _bloodGroups.map((g) => Align(alignment: Alignment.centerLeft, child: Text(g, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
             onChanged: (v) => setState(() => _selectedBloodGroup = v),
           )),
           _fieldFull(label: 'Concession', child: Builder(builder: (_) {
@@ -1970,9 +1982,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _dec('Select concession'),
+              decoration: _dec('Select concession', filled: value != null),
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               style: _inputStyle,
               items: items,
+              selectedItemBuilder: (context) => items.map((e) => Align(alignment: Alignment.centerLeft, child: Text((e.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               onChanged: (v) => setState(() => _selectedConId = v),
             );
           })),
@@ -1995,9 +2009,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _dec('Select admission type'),
+              decoration: _dec('Select admission type', filled: value != null),
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               style: _inputStyle,
               items: items,
+              selectedItemBuilder: (context) => items.map((e) => Align(alignment: Alignment.centerLeft, child: Text((e.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               onChanged: (v) => setState(() => _selectedAdmName = v),
             );
           })),
@@ -2016,43 +2032,49 @@ class _StudentsScreenState extends State<StudentsScreen> {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _dec('Select quota'),
+              decoration: _dec('Select quota', filled: value != null),
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               style: _inputStyle,
               items: items,
+              selectedItemBuilder: (context) => items.map((e) => Align(alignment: Alignment.centerLeft, child: Text((e.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               onChanged: (v) => setState(() => _selectedQuoName = v),
             );
           })),
           _fieldFull(label: 'Batch', child: TextFormField(
             controller: _batchController,
-            decoration: _dec('e.g. 2024-2028'),
-            style: _inputStyle,
+            decoration: _dec('e.g. 2024-2028', filled: _batchController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _batchController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
           )),
         ),
         SizedBox(height: 14.h),
 
         _fieldFull(label: 'Address *', child: TextFormField(
           controller: _addressController,
-          decoration: _dec('Enter address'),
-          style: _inputStyle,
+          decoration: _dec('Enter address', filled: _addressController.text.trim().isNotEmpty),
+          style: _inputStyle.copyWith(color: _addressController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+          onChanged: (_) => setState(() {}),
           maxLines: 2,
           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
         )),
         SizedBox(height: 14.h),
 
         _row4(
-          _fieldFull(label: 'City', child: TextFormField(controller: _cityController, decoration: _dec('Enter city'), style: _inputStyle)),
-          _fieldFull(label: 'State', child: TextFormField(controller: _stateController, decoration: _dec('Enter state'), style: _inputStyle)),
-          _fieldFull(label: 'Country', child: TextFormField(controller: _countryController, decoration: _dec('Enter country'), style: _inputStyle)),
+          _fieldFull(label: 'City', child: TextFormField(controller: _cityController, decoration: _dec('Enter city', filled: _cityController.text.trim().isNotEmpty), style: _inputStyle.copyWith(color: _cityController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), onChanged: (_) => setState(() {}))),
+          _fieldFull(label: 'State', child: TextFormField(controller: _stateController, decoration: _dec('Enter state', filled: _stateController.text.trim().isNotEmpty), style: _inputStyle.copyWith(color: _stateController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), onChanged: (_) => setState(() {}))),
+          _fieldFull(label: 'Country', child: TextFormField(controller: _countryController, decoration: _dec('Enter country', filled: _countryController.text.trim().isNotEmpty), style: _inputStyle.copyWith(color: _countryController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), onChanged: (_) => setState(() {}))),
           _fieldFull(label: 'Pin Code *', child: TextFormField(
             controller: _pinController,
-            decoration: _dec('Enter pin'),
-            style: _inputStyle,
+            decoration: _dec('Enter pin', filled: _pinController.text.trim().isNotEmpty),
+            style: _inputStyle.copyWith(color: _pinController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
           )),
         ),
       ],
+    ),
     );
   }
 
@@ -2066,7 +2088,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
             : (_guardianNameController, _guardianMobileController, _guardianOccController);
     final prefix = _selectedParentTab;
 
-    return Column(
+    return FocusTraversalGroup(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Wrap(
@@ -2091,47 +2114,55 @@ class _StudentsScreenState extends State<StudentsScreen> {
           child: _row3(
             _fieldFull(label: '$prefix Name', child: TextFormField(
               controller: controllers.$1,
-              decoration: _dec('Enter $prefix name'),
-              style: _inputStyle,
+              decoration: _dec('Enter $prefix name', filled: controllers.$1.text.trim().isNotEmpty),
+              style: _inputStyle.copyWith(color: controllers.$1.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+              onChanged: (_) => setState(() {}),
             )),
             _fieldFull(label: '$prefix Mobile', child: TextFormField(
               controller: controllers.$2,
-              decoration: _dec('Enter mobile'),
-              style: _inputStyle,
+              decoration: _dec('Enter mobile', filled: controllers.$2.text.trim().isNotEmpty),
+              style: _inputStyle.copyWith(color: controllers.$2.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+              onChanged: (_) => setState(() {}),
               keyboardType: TextInputType.phone,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             )),
             _fieldFull(label: '$prefix Occupation', child: TextFormField(
               controller: controllers.$3,
-              decoration: _dec('Enter occupation'),
-              style: _inputStyle,
+              decoration: _dec('Enter occupation', filled: controllers.$3.text.trim().isNotEmpty),
+              style: _inputStyle.copyWith(color: controllers.$3.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+              onChanged: (_) => setState(() {}),
             )),
           ),
         ),
       ],
+    ),
     );
   }
 
   // â”€â”€â”€ Right panel: Payment fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildPaymentFields() {
-    return IgnorePointer(
+    return FocusTraversalGroup(
+      child: IgnorePointer(
       ignoring: !_isFormEnabled,
       child: _row2(
       _fieldFull(label: 'Name *', child: TextFormField(
         controller: _payNameController,
-        decoration: _dec('Enter name'),
-        style: _inputStyle,
+        decoration: _dec('Enter name', filled: _payNameController.text.trim().isNotEmpty),
+        style: _inputStyle.copyWith(color: _payNameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+        onChanged: (_) => setState(() {}),
         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       )),
       _fieldFull(label: 'Mobile Number *', child: TextFormField(
         controller: _payMobileController,
-        decoration: _dec('Enter mobile'),
-        style: _inputStyle,
+        decoration: _dec('Enter mobile', filled: _payMobileController.text.trim().isNotEmpty),
+        style: _inputStyle.copyWith(color: _payMobileController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+        onChanged: (_) => setState(() {}),
         keyboardType: TextInputType.phone,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       )),
+    ),
     ));
   }
 
@@ -3427,16 +3458,21 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  InputDecoration _dec(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
-    contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent)),
-    filled: true,
-    fillColor: Colors.white,
-  );
+  // [filled] = the field has a value. Filled fields get an amber (accent)
+  // border; empty fields stay grey; the focused border is always amber.
+  InputDecoration _dec(String hint, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13.sp),
+      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
 }
 
 // _ExcelImportDialog removed - import is now inline grid in _StudentsScreenState

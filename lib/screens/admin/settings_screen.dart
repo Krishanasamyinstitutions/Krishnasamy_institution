@@ -217,11 +217,14 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
     return match.isNotEmpty ? (match.first['desname']?.toString() ?? '-') : '-';
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(fontSize: 13.sp),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
     );
   }
@@ -246,7 +249,8 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
               ),
               child: Form(
                 key: _formKey,
-                child: Column(
+                child: FocusTraversalGroup(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -263,22 +267,29 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                     SizedBox(height: 20.h),
                     TextFormField(
                       controller: _nameController,
-                      decoration: _inputDecoration('Designation Name'),
+                      style: TextStyle(color: _nameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _nameController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDecoration('Designation Name', filled: _nameController.text.trim().isNotEmpty),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     SizedBox(height: 16.h),
                     DropdownButtonFormField<int?>(
                       value: _selectedReportTo,
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      decoration: _inputDecoration('Reports To'),
+                      decoration: _inputDecoration('Reports To', filled: _selectedReportTo != null),
                       items: [
                         DropdownMenuItem<int?>(value: null, child: Text('None', style: TextStyle(fontSize: 13.sp))),
                         ..._designations.map((d) => DropdownMenuItem<int?>(
                               value: d['des_id'] as int,
                               child: Text(d['desname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp)),
                             )),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Align(alignment: Alignment.centerLeft, child: Text('None', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                        ..._designations.map((d) => Align(alignment: Alignment.centerLeft, child: Text(d['desname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
                       ],
                       onChanged: (v) => setState(() => _selectedReportTo = v),
                     ),
@@ -308,6 +319,7 @@ class _StaffDesignationTabState extends State<_StaffDesignationTab> with Automat
                       ],
                     ),
                   ],
+                ),
                 ),
               ),
             ),
@@ -537,11 +549,14 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
     _editingUrId = null;
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(fontSize: 13.sp),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
     );
   }
@@ -566,7 +581,8 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
               ),
               child: Form(
                 key: _formKey,
-                child: Column(
+                child: FocusTraversalGroup(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -583,7 +599,9 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                     SizedBox(height: 20.h),
                     TextFormField(
                       controller: _nameController,
-                      decoration: _inputDecoration('Role Name'),
+                      style: TextStyle(color: _nameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _nameController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDecoration('Role Name', filled: _nameController.text.trim().isNotEmpty),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     SizedBox(height: 24.h),
@@ -612,6 +630,7 @@ class _CustomRolesTabState extends State<_CustomRolesTab> with AutomaticKeepAliv
                       ],
                     ),
                   ],
+                ),
                 ),
               ),
             ),
@@ -878,14 +897,16 @@ class PaymentSequenceTabState extends State<PaymentSequenceTab> with AutomaticKe
                       controller: _widthController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: '4',
                         contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.border)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _widthController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _widthController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                         isDense: true,
                       ),
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: _widthController.text.trim().isNotEmpty ? AppColors.accent : null),
                     ),
                   ),
                   SizedBox(width: 6.w),
@@ -903,7 +924,7 @@ class PaymentSequenceTabState extends State<PaymentSequenceTab> with AutomaticKe
               )
             else
               Padding(
-                padding: EdgeInsets.all(16.w),
+                padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.w),
                 child: Container(
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
@@ -912,7 +933,8 @@ class PaymentSequenceTabState extends State<PaymentSequenceTab> with AutomaticKe
                   ),
                   child: SizedBox(
                     width: double.infinity,
-                    child: DataTable(
+                    child: FocusTraversalGroup(
+                      child: DataTable(
                 dividerThickness: 1,
                 headingRowColor: WidgetStateProperty.all(AppColors.tableHeadBg),
                 headingTextStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.sp, color: AppColors.textPrimary, letterSpacing: 0.3),
@@ -959,19 +981,23 @@ class PaymentSequenceTabState extends State<PaymentSequenceTab> with AutomaticKe
                             : SizedBox(
                                 width: 100.w,
                                 height: 32.h,
-                                child: TextFormField(
+                                child: Builder(builder: (context) {
+                                  final prefixFilled = (_editedPrefixes[fgId] ?? autoPrefix).trim().isNotEmpty;
+                                  return TextFormField(
                                   initialValue: autoPrefix,
                                   textCapitalization: TextCapitalization.characters,
                                   decoration: InputDecoration(
                                     hintText: 'Prefix',
                                     contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: AppColors.border)),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: AppColors.border)),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: prefixFilled ? AppColors.accent : AppColors.border, width: 1.5)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: prefixFilled ? AppColors.accent : AppColors.border, width: 1.5)),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                                     isDense: true,
                                   ),
-                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                                  onChanged: (v) => _editedPrefixes[fgId] = v.trim().toUpperCase(),
-                                ),
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: prefixFilled ? AppColors.accent : AppColors.textPrimary),
+                                  onChanged: (v) => setState(() => _editedPrefixes[fgId] = v.trim().toUpperCase()),
+                                  );
+                                }),
                               ),
                       ),
                       DataCell(Text(preview, style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600))),
@@ -996,6 +1022,7 @@ class PaymentSequenceTabState extends State<PaymentSequenceTab> with AutomaticKe
                     ],
                   );
                 }),
+                    ),
                     ),
                   ),
                 ),
@@ -1030,8 +1057,8 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
   final _fromDaysCtrl = TextEditingController();
   final _toDaysCtrl = TextEditingController();
   final _fineValueCtrl = TextEditingController();
-  String _fineType = 'FIXED';
-  String _feeType = '';
+  String? _fineType; // null = no fine type chosen yet (shows placeholder)
+  String? _feeType; // null = no fee type chosen yet (shows placeholder)
   List<String> _feeTypes = [];
   int? _editingId;
 
@@ -1087,8 +1114,10 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
       if (mounted) {
         setState(() {
           _feeTypes = types;
-          if (types.isNotEmpty && (_feeType == 'ALL' || !types.contains(_feeType))) {
-            _feeType = types.first;
+          // Start with no fee type selected so the 'Select fee type'
+          // placeholder shows (edit mode sets _feeType explicitly).
+          if (_feeType != null && !types.contains(_feeType)) {
+            _feeType = null;
           }
         });
       }
@@ -1102,8 +1131,8 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
     _fromDaysCtrl.clear();
     _toDaysCtrl.clear();
     _fineValueCtrl.clear();
-    _fineType = 'FIXED';
-    _feeType = _feeTypes.isNotEmpty ? _feeTypes.first : '';
+    _fineType = null;
+    _feeType = null;
     _editingId = null;
   }
 
@@ -1118,7 +1147,7 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
       final ruleFeeType = rule['feetype']?.toString() ?? '';
       _feeType = (ruleFeeType.isNotEmpty && _feeTypes.contains(ruleFeeType))
           ? ruleFeeType
-          : (_feeTypes.isNotEmpty ? _feeTypes.first : '');
+          : null;
     });
   }
 
@@ -1135,6 +1164,18 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
     if (ruleName.isEmpty || fromDays == null || fineValue == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill Rule Name, From Days, and Fine Value'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (_feeType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select fee type'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (_fineType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select fine type'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -1202,7 +1243,8 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Column(
+              child: FocusTraversalGroup(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -1218,29 +1260,29 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                   SizedBox(height: 6.h),
                   TextField(
                     controller: _ruleNameCtrl,
-                    style: _fieldTextStyle(),
+                    style: _fieldTextStyle(filled: _ruleNameCtrl.text.trim().isNotEmpty),
                     onChanged: (v) {
                       final overflow = v.trim().length > 50;
                       final next = overflow ? 'Rule name must be less than 50 characters' : null;
-                      if (_ruleNameError != next) {
-                        setState(() => _ruleNameError = next);
-                      }
+                      setState(() => _ruleNameError = next);
                     },
-                    decoration: _fieldDecoration(hint: 'e.g., 1 Week Overdue').copyWith(errorText: _ruleNameError, errorMaxLines: 3),
+                    decoration: _fieldDecoration(hint: 'e.g., 1 Week Overdue', filled: _ruleNameCtrl.text.trim().isNotEmpty).copyWith(errorText: _ruleNameError, errorMaxLines: 3),
                   ),
                   SizedBox(height: 14.h),
                   _fieldLabel('Fee Type'),
                   SizedBox(height: 6.h),
                   DropdownButtonFormField<String>(
                     value: _feeType,
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                     isExpanded: true,
                     dropdownColor: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     elevation: 6,
-                    style: _fieldTextStyle(),
-                    decoration: _fieldDecoration(),
+                    style: _fieldTextStyle(filled: _feeType != null),
+                    decoration: _fieldDecoration(hint: 'Select fee type', filled: _feeType != null),
                     items: _feeTypes.map((f) => DropdownMenuItem(value: f, child: Text(f, style: _fieldTextStyle()))).toList(),
-                    onChanged: (v) => setState(() => _feeType = v ?? 'ALL'),
+                    selectedItemBuilder: (context) => _feeTypes.map((f) => Align(alignment: Alignment.centerLeft, child: Text(f, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                    onChanged: (v) => setState(() => _feeType = v),
                   ),
                   SizedBox(height: 14.h),
                   Row(
@@ -1255,8 +1297,9 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                             TextField(
                               controller: _fromDaysCtrl,
                               keyboardType: TextInputType.number,
-                              style: _fieldTextStyle(),
-                              decoration: _fieldDecoration(hint: '1'),
+                              style: _fieldTextStyle(filled: _fromDaysCtrl.text.trim().isNotEmpty),
+                              onChanged: (_) => setState(() {}),
+                              decoration: _fieldDecoration(hint: '1', filled: _fromDaysCtrl.text.trim().isNotEmpty),
                             ),
                           ],
                         ),
@@ -1271,8 +1314,9 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                             TextField(
                               controller: _toDaysCtrl,
                               keyboardType: TextInputType.number,
-                              style: _fieldTextStyle(),
-                              decoration: _fieldDecoration(hint: '7'),
+                              style: _fieldTextStyle(filled: _toDaysCtrl.text.trim().isNotEmpty),
+                              onChanged: (_) => setState(() {}),
+                              decoration: _fieldDecoration(hint: '7', filled: _toDaysCtrl.text.trim().isNotEmpty),
                             ),
                           ],
                         ),
@@ -1284,17 +1328,22 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                   SizedBox(height: 6.h),
                   DropdownButtonFormField<String>(
                     value: _fineType,
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                     isExpanded: true,
                     dropdownColor: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     elevation: 6,
-                    style: _fieldTextStyle(),
-                    decoration: _fieldDecoration(),
+                    style: _fieldTextStyle(filled: _fineType != null),
+                    decoration: _fieldDecoration(hint: 'Select fine type', filled: _fineType != null),
                     items: const [
                       DropdownMenuItem(value: 'FIXED', child: Text('Fixed Amount (Rs.)')),
                       DropdownMenuItem(value: 'PERCENT', child: Text('Percentage (%)')),
                     ],
-                    onChanged: (v) => setState(() => _fineType = v ?? 'FIXED'),
+                    selectedItemBuilder: (context) => [
+                      Align(alignment: Alignment.centerLeft, child: Text('Fixed Amount (Rs.)', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                      Align(alignment: Alignment.centerLeft, child: Text('Percentage (%)', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                    ],
+                    onChanged: (v) => setState(() => _fineType = v),
                   ),
                   SizedBox(height: 14.h),
                   _fieldLabel(_fineType == 'FIXED' ? 'Fine Amount (Rs.)' : 'Fine Percentage (%)', required: true),
@@ -1302,8 +1351,9 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                   TextField(
                     controller: _fineValueCtrl,
                     keyboardType: TextInputType.number,
-                    style: _fieldTextStyle(),
-                    decoration: _fieldDecoration(hint: _fineType == 'FIXED' ? '50' : '2'),
+                    style: _fieldTextStyle(filled: _fineValueCtrl.text.trim().isNotEmpty),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _fieldDecoration(hint: _fineType == 'FIXED' ? '50' : '2', filled: _fineValueCtrl.text.trim().isNotEmpty),
                   ),
                   SizedBox(height: 22.h),
                   Row(
@@ -1340,6 +1390,7 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
                     ],
                   ),
                 ],
+              ),
               ),
             ),
           ),
@@ -1613,28 +1664,29 @@ class FineRulesTabState extends State<FineRulesTab> with AutomaticKeepAliveClien
     );
   }
 
-  TextStyle _fieldTextStyle() {
+  TextStyle _fieldTextStyle({bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     return TextStyle(
-      fontWeight: FontWeight.w500,
+      fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
       fontSize: compact ? 11 : 14,
-      color: const Color(0xFF555555),
+      color: filled ? AppColors.accent : const Color(0xFF555555),
     );
   }
 
-  InputDecoration _fieldDecoration({String? hint}) {
+  InputDecoration _fieldDecoration({String? hint, bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     final textSize = compact ? 11.0 : 14.0;
     final hPad = compact ? 8.0 : 14.0;
     final vPad = compact ? 5.0 : 14.0;
     final radius = compact ? 5.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
       contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       filled: true,
       fillColor: Colors.white,
     );

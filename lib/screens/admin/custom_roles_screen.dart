@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 class CustomRolesScreen extends StatefulWidget {
   const CustomRolesScreen({super.key});
 
@@ -129,11 +130,14 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
     _editingUrId = null;
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(fontSize: 13.sp),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
     );
   }
@@ -157,7 +161,8 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
               ),
               child: Form(
                 key: _formKey,
-                child: Column(
+                child: FocusTraversalGroup(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -174,7 +179,9 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     SizedBox(height: 20.h),
                     TextFormField(
                       controller: _nameController,
-                      decoration: _inputDecoration('Role Name'),
+                      style: TextStyle(color: _nameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _nameController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDecoration('Role Name', filled: _nameController.text.trim().isNotEmpty),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     SizedBox(height: 24.h),
@@ -204,6 +211,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     ),
                   ],
                 ),
+                ),
               ),
             ),
           ),
@@ -228,9 +236,7 @@ class _CustomRolesScreenState extends State<CustomRolesScreen> {
                     ),
                     child: Row(
                       children: [
-                        AppIcon('security-user', size: 18, color: AppColors.accent),
-                        SizedBox(width: 8.w),
-                        Text('Custom Roles', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        const CardTitleBlock(icon: 'security-user', title: 'Custom Roles', subtitle: 'all custom roles in this institution'),
                         const Spacer(),
                         Text('${_roles.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         SizedBox(width: 12.w),

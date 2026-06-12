@@ -8,7 +8,9 @@ import '../../services/supabase_service.dart';
 import '../../services/admission_service.dart';
 import '../../models/admission_model.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/app_search_field.dart';
+import '../../widgets/focusable_tap.dart';
 
 /// Admission module — master/detail.
 /// New admissions are captured into the PUBLIC `admission` table. An admin
@@ -57,8 +59,8 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   String? _gender;
   String? _bloodGroup;
   DateTime? _dob;
-  DateTime _admDate = DateTime.now();
-  String? _source = 'WALK-IN';
+  DateTime? _admDate;
+  String? _source;
   String? _selectedYrId;
   String? _selectedYrLabel;
   String? _selectedCourse;
@@ -70,7 +72,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   String? _hostel;        // 'Yes' | 'No'
   String? _selectedCommunity;
   String? _selectedRegSeqId; // chosen register-number sequence (rns_id)
-  String _regMode = 'Manual'; // 'Manual' | 'Auto'
+  String? _regMode; // null = not chosen | 'Manual' | 'Auto'
 
   static const _regModes = ['Manual', 'Auto'];
 
@@ -92,6 +94,16 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   String _statusFilter = 'ALL';
   bool _loading = true;
   bool _saving = false;
+
+  // ── wizard step state ────────────────────────────────────────────────
+  // 4-step wizard per admission-design.md § 5:
+  //   0  document-text  Admission   → Admission
+  //   1  user           Applicant   → Applicant
+  //   2  book-1         Academic    → Applied For, Additional Details, Previous School
+  //   3  people         Family      → Parent / Guardian, Remarks
+  int _currentStep = 0;
+  static const _wizardLabels = ['Admission', 'Applicant', 'Academic', 'Family'];
+  static const _wizardIcons = ['document-text', 'user', 'book-1', 'people'];
 
   static const _genders = ['Male', 'Female', 'Other'];
   static const _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -152,10 +164,6 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
             .map((e) => e['comname']?.toString().trim() ?? '')
             .where((s) => s.isNotEmpty).toSet().toList()..sort();
         _regSeqs = List<Map<String, dynamic>>.from(results[8] as List);
-        if (_years.isNotEmpty && _selectedYrId == null) {
-          _selectedYrId = _years.first['yr_id'].toString();
-          _selectedYrLabel = _years.first['yrlabel']?.toString();
-        }
         _loading = false;
       });
     } catch (e) {
@@ -226,11 +234,11 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   void _newAdmission() {
     setState(() {
       _selected = null;
-      _admDate = DateTime.now();
+      _admDate = null;
       _dob = null;
       _gender = null;
       _bloodGroup = null;
-      _source = 'WALK-IN';
+      _source = null;
       _selectedCourse = null;
       _selectedClass = null;
       _selectedAdmName = null;
@@ -240,11 +248,9 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
       _hostel = null;
       _selectedCommunity = null;
       _selectedRegSeqId = null;
-      _regMode = 'Manual';
-      if (_years.isNotEmpty) {
-        _selectedYrId = _years.first['yr_id'].toString();
-        _selectedYrLabel = _years.first['yrlabel']?.toString();
-      }
+      _regMode = null;
+      _selectedYrId = null;
+      _selectedYrLabel = null;
       _admnoController.clear();
       for (final c in [
         _nameController, _mobileController, _emailController, _aadharController,
@@ -270,7 +276,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
       _dob = a.studob;
       _gender = a.genderLabel;
       _bloodGroup = _bloodGroups.contains(a.stubloodgrp) ? a.stubloodgrp : null;
-      _source = _sources.contains(a.admsource) ? a.admsource : 'WALK-IN';
+      _source = _sources.contains(a.admsource) ? a.admsource : null;
       _selectedYrId = a.yrId != 0 ? a.yrId.toString() : _selectedYrId;
       _selectedYrLabel = a.yrlabel.isNotEmpty ? a.yrlabel : _selectedYrLabel;
       _selectedCourse = _courseNames.contains(a.courname) ? a.courname : null;
@@ -355,7 +361,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
       'yr_id': int.tryParse(_selectedYrId ?? '0') ?? 0,
       'yrlabel': _selectedYrLabel ?? '',
       'admno': _admnoController.text.trim(),
-      'admdate': _admDate.toIso8601String().split('T').first,
+      'admdate': _admDate?.toIso8601String().split('T').first,
       'admsource': _source,
       'stuname': _nameController.text.trim(),
       'stugender': _genderCode(_gender) ?? 'M',
@@ -406,6 +412,22 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   }
 
   bool _validate() {
+    if (_regMode == null) {
+      _snack('Select Reg No Mode', AppColors.error);
+      return false;
+    }
+    if (_admDate == null) {
+      _snack('Select Admission Date', AppColors.error);
+      return false;
+    }
+    if (_selectedYrId == null) {
+      _snack('Select Academic Year', AppColors.error);
+      return false;
+    }
+    if (_source == null) {
+      _snack('Select Source', AppColors.error);
+      return false;
+    }
     if (_admnoController.text.trim().isEmpty ||
         _nameController.text.trim().isEmpty ||
         _gender == null ||
@@ -493,18 +515,18 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   }
 
   // ── build ─────────────────────────────────────────────────────────
+  // Page shell per admission-design.md § 1: edge-to-edge 2-pane layout (the
+  // list and detail cards each carry their own white card, so no outer card
+  // wraps the whole screen).
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(width: 340.w, child: _buildList()),
-          SizedBox(width: 16.w),
-          Expanded(child: _buildDetail()),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(width: 340.w, child: _buildList()),
+        SizedBox(width: 16.w),
+        Expanded(child: _buildDetail()),
+      ],
     );
   }
 
@@ -520,10 +542,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
             padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 8.h),
             child: Row(
               children: [
-                const AppIcon('profile-add', size: 18, color: AppColors.primary),
-                SizedBox(width: 8.w),
-                Text('Admissions',
-                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                const CardTitleBlock(icon: 'profile-add', title: 'Admissions', subtitle: 'all admission records in this institution'),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
@@ -555,7 +574,6 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
           ),
           SizedBox(height: 8.h),
           _statusChips(counts),
-          Divider(height: 1.h, color: AppColors.border),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -567,7 +585,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
                     : ListView.builder(
                         padding: EdgeInsets.symmetric(vertical: 4.h),
                         itemCount: filtered.length,
-                        itemBuilder: (_, i) => _listTile(filtered[i]),
+                        itemBuilder: (_, i) => _listTile(filtered[i], i),
                       ),
           ),
         ],
@@ -643,11 +661,13 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
     );
   }
 
-  Widget _listTile(AdmissionModel a) {
+  Widget _listTile(AdmissionModel a, int i) {
     final selected = _selected?.admId == a.admId;
     final color = _statusColor(a.admstatus);
     return Material(
-      color: selected ? AppColors.accent.withValues(alpha: 0.1) : Colors.transparent,
+      color: selected
+          ? AppColors.accent.withValues(alpha: 0.1)
+          : (i.isEven ? Colors.white : AppColors.surface),
       child: InkWell(
         onTap: () => _populate(a),
         child: Container(
@@ -717,6 +737,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
         children: [
           _detailHeader(),
           Divider(height: 1.h, color: AppColors.border),
+          _stepperHeader(),
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(18.w),
@@ -724,127 +745,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (_readonly) _allocatedBanner(),
-                  _section('Admission', [
-                    _row([
-                      _dropdown('Reg No Mode', _regMode, _regModes, (v) => setState(() {
-                            _regMode = v ?? 'Manual';
-                            if (_regMode == 'Manual') {
-                              _selectedRegSeqId = null;
-                            }
-                          })),
-                      _regSeqField(),
-                      _text('Register No *', _admnoController, enabled: _regMode == 'Manual'),
-                    ]),
-                    _row([
-                      _dateField('Admission Date', _admDate, (d) => setState(() => _admDate = d)),
-                      _yearDropdown(),
-                      _dropdown('Source', _source, _sources, (v) => setState(() => _source = v)),
-                    ]),
-                  ]),
-                  _section('Applicant', [
-                    _row([
-                      _text('Full Name *', _nameController),
-                      _dropdown('Gender *', _gender, _genders, (v) => setState(() => _gender = v)),
-                      _dateField('Date of Birth *', _dob, (d) => setState(() => _dob = d)),
-                    ]),
-                    _row([
-                      _text('Mobile', _mobileController, keyboard: TextInputType.phone),
-                      _text('Email', _emailController, keyboard: TextInputType.emailAddress),
-                      _dropdown('Blood Group', _bloodGroup, _bloodGroups, (v) => setState(() => _bloodGroup = v)),
-                    ]),
-                    _row([
-                      _text('Aadhar No', _aadharController),
-                      const Spacer(),
-                      const Spacer(),
-                    ]),
-                    _row([
-                      _text('Address', _addressController),
-                      _text('City', _cityController),
-                      _text('State', _stateController),
-                    ]),
-                    _row([
-                      _text('Pin Code', _pinController),
-                      const Spacer(),
-                      const Spacer(),
-                    ]),
-                  ]),
-                  _section('Applied For', [
-                    _row([
-                      _dropdown('Course', _selectedCourse, _courseNames, (v) => setState(() {
-                            _selectedCourse = v;
-                            // drop a class that no longer belongs to the chosen course
-                            if (_selectedClass != null && !_classNamesFor(v).contains(_selectedClass)) {
-                              _selectedClass = null;
-                            }
-                          })),
-                      _dropdown('Preferred Class', _selectedClass, _classNamesFor(_selectedCourse),
-                          (v) => setState(() => _selectedClass = v)),
-                      _text('Batch', _batchController),
-                    ]),
-                    _row([
-                      _dropdownMap('Admission Type', _selectedAdmName, _admissionTypes, 'admname', 'admname',
-                          (v) => setState(() => _selectedAdmName = v)),
-                      _dropdownMap('Quota', _selectedQuoName, _quotas, 'quoname', 'quoname',
-                          (v) => setState(() => _selectedQuoName = v)),
-                      _dropdownMap('Concession', _selectedConId, _concessions, 'con_id', 'condesc',
-                          (v) => setState(() => _selectedConId = v)),
-                    ]),
-                  ]),
-                  _section('Additional Details', [
-                    _row([
-                      _dropdown('Community', _selectedCommunity, _communities,
-                          (v) => setState(() => _selectedCommunity = v)),
-                      _text('Caste', _casteController),
-                      _text('Religion', _religionController),
-                    ]),
-                    _row([
-                      _text('Nationality', _nationalityController),
-                      _dropdown('Transport', _transportMode, _transportOptions,
-                          (v) => setState(() => _transportMode = v)),
-                      _dropdown('Hostel', _hostel, _hostelOptions,
-                          (v) => setState(() => _hostel = v)),
-                    ]),
-                  ]),
-                  _section('Previous School', [
-                    _row([
-                      _text('School / College', _prevSchoolController),
-                      _text('Class / Course', _prevClassController),
-                      _text('Marks %', _prevPercentController, keyboard: TextInputType.number),
-                    ]),
-                  ]),
-                  _section('Parent / Guardian', [
-                    _row([
-                      _text('Father Name', _fatherNameController),
-                      _text('Father Mobile', _fatherMobileController, keyboard: TextInputType.phone),
-                      _text('Father Occupation', _fatherOccController),
-                    ]),
-                    _row([
-                      _text('Mother Name', _motherNameController),
-                      _text('Mother Mobile', _motherMobileController, keyboard: TextInputType.phone),
-                      _text('Mother Occupation', _motherOccController),
-                    ]),
-                    _row([
-                      _text('Guardian Name', _guardianNameController),
-                      _text('Guardian Mobile', _guardianMobileController, keyboard: TextInputType.phone),
-                      _text('Guardian Occupation', _guardianOccController),
-                    ]),
-                    Padding(
-                      padding: EdgeInsets.only(top: 4.h),
-                      child: Row(children: [
-                        Icon(Icons.info_outline, size: 14.sp, color: AppColors.textLight),
-                        SizedBox(width: 6.w),
-                        Expanded(
-                          child: Text(
-                            'Pay In Charge is set automatically from Father → Mother → Guardian (the first with both Name and Mobile).',
-                            style: TextStyle(fontSize: 11.sp, color: AppColors.textLight),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ]),
-                  _section('Remarks', [
-                    _text('Notes', _remarksController, maxLines: 2),
-                  ]),
+                  ..._stepSections(_currentStep),
                 ],
               ),
             ),
@@ -852,6 +753,214 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
           Divider(height: 1.h, color: AppColors.border),
           _actionBar(),
         ],
+      ),
+    );
+  }
+
+  /// Sections rendered for the given wizard step.
+  List<Widget> _stepSections(int step) {
+    switch (step) {
+      case 0:
+        return [
+          _section('Admission', [
+            _row([
+              _dropdown('Reg No Mode', _regMode, _regModes, (v) => setState(() {
+                    _regMode = v;
+                    // Leaving Auto clears any chosen sequence; null (not chosen)
+                    // and Manual both mean no auto-sequence is active.
+                    if (_regMode != 'Auto') {
+                      _selectedRegSeqId = null;
+                    }
+                  }), hint: 'Select mode'),
+              _regSeqField(),
+              _text('Register No *', _admnoController, enabled: _regMode == 'Manual'),
+            ]),
+            _row([
+              _dateField('Admission Date', _admDate, (d) => setState(() => _admDate = d), hint: 'Select date'),
+              _yearDropdown(),
+              _dropdown('Source', _source, _sources, (v) => setState(() => _source = v)),
+            ]),
+          ]),
+        ];
+      case 1:
+        return [
+          _section('Applicant', [
+            _row([
+              _text('Full Name *', _nameController),
+              _dropdown('Gender *', _gender, _genders, (v) => setState(() => _gender = v)),
+              _dateField('Date of Birth *', _dob, (d) => setState(() => _dob = d)),
+            ]),
+            _row([
+              _text('Mobile', _mobileController, keyboard: TextInputType.phone),
+              _text('Email', _emailController, keyboard: TextInputType.emailAddress),
+              _dropdown('Blood Group', _bloodGroup, _bloodGroups, (v) => setState(() => _bloodGroup = v)),
+            ]),
+            _row([
+              _text('Aadhar No', _aadharController),
+              const Spacer(),
+              const Spacer(),
+            ]),
+            _row([
+              _text('Address', _addressController),
+              _text('City', _cityController),
+              _text('State', _stateController),
+            ]),
+            _row([
+              _text('Pin Code', _pinController),
+              const Spacer(),
+              const Spacer(),
+            ]),
+          ]),
+        ];
+      case 2:
+        return [
+          _section('Applied For', [
+            _row([
+              _dropdown('Course', _selectedCourse, _courseNames, (v) => setState(() {
+                    _selectedCourse = v;
+                    // drop a class that no longer belongs to the chosen course
+                    if (_selectedClass != null && !_classNamesFor(v).contains(_selectedClass)) {
+                      _selectedClass = null;
+                    }
+                  })),
+              _dropdown('Preferred Class', _selectedClass, _classNamesFor(_selectedCourse),
+                  (v) => setState(() => _selectedClass = v), hint: 'Select class'),
+              _text('Batch', _batchController),
+            ]),
+            _row([
+              _dropdownMap('Admission Type', _selectedAdmName, _admissionTypes, 'admname', 'admname',
+                  (v) => setState(() => _selectedAdmName = v)),
+              _dropdownMap('Quota', _selectedQuoName, _quotas, 'quoname', 'quoname',
+                  (v) => setState(() => _selectedQuoName = v)),
+              _dropdownMap('Concession', _selectedConId, _concessions, 'con_id', 'condesc',
+                  (v) => setState(() => _selectedConId = v)),
+            ]),
+          ]),
+          _section('Additional Details', [
+            _row([
+              _dropdown('Community', _selectedCommunity, _communities,
+                  (v) => setState(() => _selectedCommunity = v)),
+              _text('Caste', _casteController),
+              _text('Religion', _religionController),
+            ]),
+            _row([
+              _text('Nationality', _nationalityController),
+              _dropdown('Transport', _transportMode, _transportOptions,
+                  (v) => setState(() => _transportMode = v)),
+              _dropdown('Hostel', _hostel, _hostelOptions,
+                  (v) => setState(() => _hostel = v)),
+            ]),
+          ]),
+          _section('Previous School', [
+            _row([
+              _text('School / College', _prevSchoolController),
+              _text('Class / Course', _prevClassController),
+              _text('Marks %', _prevPercentController, keyboard: TextInputType.number),
+            ]),
+          ]),
+        ];
+      case 3:
+      default:
+        return [
+          _section('Parent / Guardian', [
+            _row([
+              _text('Father Name', _fatherNameController),
+              _text('Father Mobile', _fatherMobileController, keyboard: TextInputType.phone),
+              _text('Father Occupation', _fatherOccController),
+            ]),
+            _row([
+              _text('Mother Name', _motherNameController),
+              _text('Mother Mobile', _motherMobileController, keyboard: TextInputType.phone),
+              _text('Mother Occupation', _motherOccController),
+            ]),
+            _row([
+              _text('Guardian Name', _guardianNameController),
+              _text('Guardian Mobile', _guardianMobileController, keyboard: TextInputType.phone),
+              _text('Guardian Occupation', _guardianOccController),
+            ]),
+            Padding(
+              padding: EdgeInsets.only(top: 4.h),
+              child: Row(children: [
+                Icon(Icons.info_outline, size: 14.sp, color: AppColors.textLight),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    'Pay In Charge is set automatically from Father → Mother → Guardian (the first with both Name and Mobile).',
+                    style: TextStyle(fontSize: 11.sp, color: AppColors.textLight),
+                  ),
+                ),
+              ]),
+            ),
+          ]),
+          _section('Remarks', [
+            _text('Notes', _remarksController, maxLines: 2),
+          ]),
+        ];
+    }
+  }
+
+  /// Top-of-detail stepper header: row of circles (36w) + label + connector
+  /// bars between them. Tap any circle to jump.
+  Widget _stepperHeader() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 14.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: List.generate(_wizardLabels.length * 2 - 1, (i) {
+          if (i.isEven) {
+            return _stepCell(i ~/ 2);
+          }
+          return Expanded(child: _stepConnector(i ~/ 2));
+        }),
+      ),
+    );
+  }
+
+  Widget _stepCell(int index) {
+    final isDone = index < _currentStep;
+    final isActive = index == _currentStep;
+    final color = isDone
+        ? AppColors.success
+        : isActive
+            ? AppColors.primary
+            : AppColors.textSecondary.withValues(alpha: 0.4);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _currentStep = index),
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 36.w,
+            height: 36.w,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Center(
+              child: AppIcon(_wizardIcons[index], size: 18, color: Colors.white),
+            ),
+          ),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          _wizardLabels[index],
+          style: TextStyle(
+            fontSize: 12.sp,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Horizontal connector bar between step circles. Padded down so it lines
+  /// up with the circle center rather than the column's vertical centre.
+  Widget _stepConnector(int afterIndex) {
+    final filled = afterIndex < _currentStep;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 18.h),
+      child: Container(
+        height: 2,
+        color: filled ? AppColors.success : AppColors.border,
       ),
     );
   }
@@ -911,6 +1020,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   Widget _actionBar() {
     final a = _selected;
     final allocated = a?.isAllocated ?? false;
+    final isLastStep = _currentStep == _wizardLabels.length - 1;
     return Padding(
       padding: EdgeInsets.all(14.w),
       child: Row(
@@ -926,15 +1036,40 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 12.w),
               ),
             ),
+          if (_currentStep > 0) ...[
+            SizedBox(width: a != null && !allocated ? 8.w : 0),
+            OutlinedButton.icon(
+              onPressed: _saving ? null : () => setState(() => _currentStep -= 1),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Back'),
+            ),
+          ],
           const Spacer(),
           if (!allocated)
-            ElevatedButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save, size: 16),
-              label: Text(a == null ? 'Save Admission' : 'Update'),
-            ),
+            if (isLastStep)
+              // Final step — Save Admission (amber per spec § 8).
+              ElevatedButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.save, size: 16),
+                label: Text(a == null ? 'Save Admission' : 'Update'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                ),
+              )
+            else
+              // Steps 0-2 — Next (amber per spec § 8).
+              ElevatedButton.icon(
+                onPressed: _saving ? null : () => setState(() => _currentStep += 1),
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text('Next'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                ),
+              ),
           if (allocated)
             Text('Allocated — record locked (allocate in the Class Allocation module)',
                 style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic, color: AppColors.textSecondary)),
@@ -944,27 +1079,57 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   }
 
   // ── form widget helpers ───────────────────────────────────────────
+  /// Section card per admission-design.md § 5:
+  ///   - Outer Container: white, 10r radius, AppColors.border border,
+  ///     bottom margin 14h.
+  ///   - Header band: AppColors.accent @ 0.06 background, bottom border,
+  ///     padding 16.w / 12.h. Section icon + 15.sp w700 title.
+  ///   - Body: Padding(16.w / 14.h / 16.w / 16.h) wrapping the form rows.
   Widget _section(String title, List<Widget> children) {
+    const sectionIcons = {
+      'Admission':          'document-text',
+      'Applicant':          'user',
+      'Applied For':        'book-1',
+      'Additional Details': 'info-circle',
+      'Previous School':    'teacher',
+      'Parent / Guardian':  'people',
+      'Remarks':            'note',
+    };
+    final icon = sectionIcons[title] ?? 'category';
     return Container(
       width: double.infinity,
       margin: EdgeInsets.only(bottom: 14.h),
-      padding: EdgeInsets.all(14.w),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title.toUpperCase(),
-              style: TextStyle(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: AppColors.accentDark)),
-          SizedBox(height: 10.h),
-          ...children,
+          // Accent-tinted header band with icon + title.
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.06),
+              border: const Border(
+                bottom: BorderSide(color: AppColors.border),
+              ),
+            ),
+            child: CardTitleBlock(icon: icon, title: title),
+          ),
+          // Body — wraps the form rows.
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 16.h),
+            child: FocusTraversalGroup(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: children,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -987,25 +1152,38 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
     );
   }
 
+  // Per admission-design.md § 4: bold black label above each field.
   Widget _label(String text) => Padding(
-        padding: EdgeInsets.only(bottom: 5.h, left: 2.w),
+        padding: EdgeInsets.only(bottom: 6.h, left: 2.w),
         child: Text(text,
-            style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black)),
       );
 
-  InputDecoration _dec() => InputDecoration(
-        isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+  // Per admission-design.md § 4: isDense OFF, 14 vertical padding, focused
+  // border in accent.
+  InputDecoration _dec({bool filled = false, String? hint}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
+        contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
         filled: true,
         fillColor: _readonly ? AppColors.surface : Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+        hintText: hint,
+        hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.r),
+            borderSide: BorderSide(color: idle, width: 1.5)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8.r),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderSide: BorderSide(color: idle, width: 1.5)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8.r),
+            borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       );
+  }
 
   Widget _text(String label, TextEditingController c,
       {bool enabled = true, TextInputType? keyboard, int maxLines = 1}) {
+    final filled = c.text.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1015,14 +1193,15 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
           enabled: enabled && !_readonly,
           keyboardType: keyboard,
           maxLines: maxLines,
-          style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          decoration: _dec(),
+          onChanged: (_) => setState(() {}),
+          style: TextStyle(fontSize: 13.sp, color: filled ? AppColors.accent : AppColors.textPrimary, fontWeight: filled ? FontWeight.w600 : null),
+          decoration: _dec(filled: filled),
         ),
       ],
     );
   }
 
-  Widget _dropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _dropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged, {String? hint}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1030,10 +1209,17 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
         DropdownButtonFormField<String>(
           initialValue: items.contains(value) ? value : null,
           isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 6,
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          decoration: _dec(),
+          decoration: _dec(filled: items.contains(value), hint: hint ?? 'Select ${label.replaceAll(' *', '').trim().toLowerCase()}'),
           items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis)))
+              .map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis)))
+              .toList(),
+          selectedItemBuilder: (context) => items
+              .map((e) => Align(alignment: Alignment.centerLeft, child: Text(e, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))))
               .toList(),
           onChanged: _readonly ? null : onChanged,
         ),
@@ -1042,7 +1228,7 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
   }
 
   Widget _dropdownMap(String label, String? value, List<Map<String, dynamic>> items,
-      String valueKey, String labelKey, ValueChanged<String?> onChanged) {
+      String valueKey, String labelKey, ValueChanged<String?> onChanged, {String? hint}) {
     final values = items.map((e) => e[valueKey].toString()).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1051,13 +1237,20 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
         DropdownButtonFormField<String>(
           initialValue: values.contains(value) ? value : null,
           isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 6,
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          decoration: _dec(),
+          decoration: _dec(filled: values.contains(value), hint: hint ?? 'Select ${label.replaceAll(' *', '').trim().toLowerCase()}'),
           items: items
               .map((e) => DropdownMenuItem(
                     value: e[valueKey].toString(),
-                    child: Text(e[labelKey]?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                    child: Text(e[labelKey]?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
                   ))
+              .toList(),
+          selectedItemBuilder: (context) => items
+              .map((e) => Align(alignment: Alignment.centerLeft, child: Text(e[labelKey]?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))))
               .toList(),
           onChanged: _readonly ? null : onChanged,
         ),
@@ -1076,14 +1269,21 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
         DropdownButtonFormField<String>(
           initialValue: values.contains(_selectedRegSeqId) ? _selectedRegSeqId : null,
           isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 6,
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          decoration: _dec(),
-          hint: Text('Auto Reg No', style: TextStyle(fontSize: 13.sp, color: AppColors.textLight)),
+          decoration: _dec(filled: values.contains(_selectedRegSeqId)),
+          hint: Text('Select register sequence', style: TextStyle(fontSize: 13.sp, color: AppColors.textLight)),
           items: _regSeqs
               .map((s) => DropdownMenuItem(
                     value: s['rns_id'].toString(),
-                    child: Text(s['rnsname']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                    child: Text(s['rnsname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
                   ))
+              .toList(),
+          selectedItemBuilder: (context) => _regSeqs
+              .map((s) => Align(alignment: Alignment.centerLeft, child: Text(s['rnsname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))))
               .toList(),
           onChanged: (_readonly || _regMode != 'Auto')
               ? null
@@ -1108,13 +1308,20 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
         DropdownButtonFormField<String>(
           initialValue: _selectedYrId,
           isExpanded: true,
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          elevation: 6,
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          decoration: _dec(),
+          decoration: _dec(filled: _selectedYrId != null, hint: 'Select year'),
           items: _years
               .map((y) => DropdownMenuItem(
                     value: y['yr_id'].toString(),
-                    child: Text(y['yrlabel']?.toString() ?? '', overflow: TextOverflow.ellipsis),
+                    child: Text(y['yrlabel']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
                   ))
+              .toList(),
+          selectedItemBuilder: (context) => _years
+              .map((y) => Align(alignment: Alignment.centerLeft, child: Text(y['yrlabel']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))))
               .toList(),
           onChanged: _readonly
               ? null
@@ -1130,12 +1337,13 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
     );
   }
 
-  Widget _dateField(String label, DateTime? value, ValueChanged<DateTime> onPick) {
+  Widget _dateField(String label, DateTime? value, ValueChanged<DateTime> onPick, {String? hint}) {
+    final placeholder = hint ?? 'Select ${label.replaceAll(' *', '').trim().toLowerCase()}';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _label(label),
-        InkWell(
+        FocusableTap(
           onTap: _readonly
               ? null
               : () async {
@@ -1149,15 +1357,16 @@ class _AdmissionScreenState extends State<AdmissionScreen> {
                   if (picked != null) onPick(picked);
                 },
           child: InputDecorator(
-            decoration: _dec(),
+            decoration: _dec(filled: value != null),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    value == null ? 'Select' : _fmtDate(value),
+                    value == null ? placeholder : _fmtDate(value),
                     style: TextStyle(
                         fontSize: 13.sp,
-                        color: value == null ? AppColors.textLight : AppColors.textPrimary),
+                        color: value == null ? AppColors.textLight : AppColors.accent,
+                        fontWeight: value == null ? null : FontWeight.w600),
                   ),
                 ),
                 const AppIcon.linear('calendar', size: 14, color: AppColors.textSecondary),

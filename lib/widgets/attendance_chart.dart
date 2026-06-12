@@ -55,7 +55,7 @@ class AttendanceChartWidget extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(width: 4),
-                    const AppIcon.linear('Chevron Down', size: 18),
+                    const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                   ],
                 ),
               ),
