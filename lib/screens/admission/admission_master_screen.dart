@@ -6,65 +6,99 @@ import '../../utils/auth_provider.dart';
 import '../../utils/friendly_error.dart';
 import '../../services/admission_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/master_crud_panel.dart';
+import '../../widgets/pill_tab.dart';
 
 /// Admission Master — manage the admission lookups (Admission Type, Quota,
 /// Community) used by the admission form. Each tab is a simple add/list/delete
 /// over its per-schema master table.
-class AdmissionMasterScreen extends StatelessWidget {
+///
+/// Page shell follows admission-master-design.md § 1:
+///   - Plain `Column` — no outer `Padding`, no `AppCard.decoration()`. The
+///     Dashboard shell provides the page-level breathing room.
+///   - `PillTab` row at the top (vertical: 8 padding), 6.h gap, then the
+///     `TabBarView` fills the rest of the screen.
+///
+/// Tab order: the spec describes Community / Admission No / Concession.
+/// The two extra tabs (Admission Type, Quota) preserve existing CRUD
+/// functionality and follow section 7 ("When adding a new tab").
+class AdmissionMasterScreen extends StatefulWidget {
   const AdmissionMasterScreen({super.key});
 
   @override
+  State<AdmissionMasterScreen> createState() => _AdmissionMasterScreenState();
+}
+
+class _AdmissionMasterScreenState extends State<AdmissionMasterScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // Order matches the spec's primary trio first, then the project-specific
+  // extras (Admission Type / Quota).
+  static const _tabLabels = [
+    'Community', 'Admission No', 'Concession', 'Admission Type', 'Quota',
+  ];
+  static const _tabIcons = [
+    'people', 'tag', 'discount-shape', 'user-tick', 'ticket',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabLabels.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 5,
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Container(
-          decoration: AppCard.decoration(),
-          child: Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 6.h),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListenableBuilder(
+          listenable: _tabController,
+          builder: (context, _) {
+            final selected = _tabController.index;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    const AppIcon('category', size: 20, color: AppColors.primary),
-                    SizedBox(width: 10.w),
-                    Text('Admission Master',
-                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    for (var i = 0; i < _tabLabels.length; i++) ...[
+                      PillTab(
+                        icon: _tabIcons[i],
+                        label: _tabLabels[i],
+                        selected: selected == i,
+                        onTap: () => _tabController.animateTo(i),
+                      ),
+                      if (i < _tabLabels.length - 1)
+                        SizedBox(width: PillTab.gap(context)),
+                    ],
                   ],
                 ),
               ),
-              TabBar(
-                isScrollable: true,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.accent,
-                labelStyle: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700),
-                tabs: const [
-                  Tab(text: 'Admission Type'),
-                  Tab(text: 'Quota'),
-                  Tab(text: 'Concession'),
-                  Tab(text: 'Community'),
-                  Tab(text: 'Reg No'),
-                ],
-              ),
-              Divider(height: 1.h, color: AppColors.border),
-              const Expanded(
-                child: TabBarView(
-                  children: [
-                    MasterCrudPanel(table: 'admissiontype', idCol: 'adm_id', nameCol: 'admname', title: 'Admission Type', importTabIndex: 0),
-                    MasterCrudPanel(table: 'quota', idCol: 'quo_id', nameCol: 'quoname', title: 'Quota', importTabIndex: 1),
-                    MasterCrudPanel(table: 'concessioncategory', idCol: 'con_id', nameCol: 'condesc', title: 'Concession', importTabIndex: 6, includeCreatedBy: false),
-                    MasterCrudPanel(table: 'community', idCol: 'com_id', nameCol: 'comname', title: 'Community'),
-                    _RegNoPanel(),
-                  ],
-                ),
-              ),
+            );
+          },
+        ),
+        SizedBox(height: 6.h),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              MasterCrudPanel(table: 'community', idCol: 'com_id', nameCol: 'comname', title: 'Community', icon: 'people', countLabel: 'communities'),
+              _RegNoPanel(),
+              MasterCrudPanel(table: 'concessioncategory', idCol: 'con_id', nameCol: 'condesc', title: 'Concession', icon: 'discount-shape', countLabel: 'concessions', importTabIndex: 6, includeCreatedBy: false),
+              MasterCrudPanel(table: 'admissiontype', idCol: 'adm_id', nameCol: 'admname', title: 'Admission Type', icon: 'user-tick', countLabel: 'types', importTabIndex: 0),
+              MasterCrudPanel(table: 'quota', idCol: 'quo_id', nameCol: 'quoname', title: 'Quota', icon: 'ticket', countLabel: 'quotas', importTabIndex: 1),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -80,11 +114,11 @@ class _RegNoPanel extends StatefulWidget {
 class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientMixin {
   final _name = TextEditingController();
   final _affix = TextEditingController();
-  final _start = TextEditingController(text: '1');
+  final _start = TextEditingController();
   final _end = TextEditingController();
-  final _width = TextEditingController(text: '4');
+  final _width = TextEditingController();
   final _division = TextEditingController();
-  String _mode = 'Prefix';
+  String? _mode; // null = not chosen (shows 'Select mode' placeholder)
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
   bool _saving = false;
@@ -122,6 +156,10 @@ class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientM
       _snack('Enter a name.', AppColors.warning);
       return;
     }
+    if (_mode == null) {
+      _snack('Select mode', AppColors.warning);
+      return;
+    }
     final auth = context.read<AuthProvider>();
     setState(() => _saving = true);
     try {
@@ -131,9 +169,9 @@ class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientM
         'rnsname': name,
         'rnsmode': _mode == 'Prefix' ? 'P' : 'S',
         'rnsaffix': _affix.text.trim().isEmpty ? null : _affix.text.trim(),
-        'rnsstart': int.tryParse(_start.text.trim()),
+        'rnsstart': _start.text.trim().isEmpty ? 1 : int.tryParse(_start.text.trim()),
         'rnsend': _end.text.trim().isEmpty ? null : int.tryParse(_end.text.trim()),
-        'rnswidth': int.tryParse(_width.text.trim()),
+        'rnswidth': _width.text.trim().isEmpty ? 4 : int.tryParse(_width.text.trim()),
         'rnscurrent': 0,
         'division': _division.text.trim().isEmpty ? null : _division.text.trim(),
         'ins_id': auth.insId,
@@ -143,10 +181,10 @@ class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientM
       for (final c in [_name, _affix, _division]) {
         c.clear();
       }
-      _start.text = '1';
-      _width.text = '4';
+      _start.clear();
+      _width.clear();
       _end.clear();
-      setState(() => _mode = 'Prefix');
+      setState(() => _mode = null);
       _snack('Register sequence added.', AppColors.success);
       await _load();
     } catch (e) {
@@ -184,70 +222,154 @@ class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientM
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: c));
   }
 
-  InputDecoration _dec(String label) => InputDecoration(
-        labelText: label,
-        isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
-      );
+  // ── design helpers (mirrors master_data_screen / master_crud_panel) ──
+
+  Widget _lbl(String text) =>
+      Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.black));
+
+  InputDecoration _filledFieldDec(String hint, {bool filled = false}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final textSize = compact ? 11.0 : 14.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+      filled: true,
+      fillColor: Colors.white,
+    );
+  }
+
+  TextStyle _fieldTextStyle() {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    return TextStyle(fontWeight: FontWeight.w500, fontSize: compact ? 11 : 14, color: const Color(0xFF555555));
+  }
+
+
+  TextStyle _hStyle() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: 0.3);
+  TextStyle _cStyle() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary);
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 340.w, child: _form()),
-          SizedBox(width: 16.w),
-          Expanded(child: _list()),
-        ],
-      ),
+    // Edge-to-edge (no outer Padding) — parent pill-tab page shell handles
+    // breathing room.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(width: 320.w, child: _form()),
+        SizedBox(width: 16.w),
+        Expanded(child: _list()),
+      ],
     );
   }
 
+  /// Add card per admission-master-design.md § 3: white Container, 20.w
+  /// padding, 10.r radius, full AppColors.border. Title: tag icon + 15.sp w700
+  /// "Admission Number Sequencing". Every field is `Column(_lbl + 6h + field)`.
   Widget _form() {
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Column(
+      child: FocusTraversalGroup(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Register Number Sequencing',
-              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-          SizedBox(height: 12.h),
-          TextField(controller: _name, style: TextStyle(fontSize: 13.sp), decoration: _dec('Name *')),
-          SizedBox(height: 10.h),
+          const CardTitleBlock(icon: 'tag', title: 'Admission Number Sequencing', subtitle: 'set up the sequence for new admission numbers'),
+          SizedBox(height: 20.h),
+          _lbl('Name *'),
+          SizedBox(height: 6.h),
+          TextField(
+            controller: _name,
+            style: _fieldTextStyle().copyWith(color: _name.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            decoration: _filledFieldDec('Enter name', filled: _name.text.trim().isNotEmpty),
+            onChanged: (_) => setState(() {}),
+          ),
+          SizedBox(height: 16.h),
+          _lbl('Mode'),
+          SizedBox(height: 6.h),
           DropdownButtonFormField<String>(
             initialValue: _mode,
-            decoration: _dec('Mode'),
-            items: const [
-              DropdownMenuItem(value: 'Prefix', child: Text('Prefix')),
-              DropdownMenuItem(value: 'Suffix', child: Text('Suffix')),
+            isExpanded: true,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            elevation: 6,
+            icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+            style: _fieldTextStyle(),
+            decoration: _filledFieldDec('Select mode', filled: _mode != null),
+            items: [
+              DropdownMenuItem(value: 'Prefix', child: Text('Prefix', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+              DropdownMenuItem(value: 'Suffix', child: Text('Suffix', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
             ],
-            onChanged: (v) => setState(() => _mode = v ?? 'Prefix'),
+            selectedItemBuilder: (context) => [
+              Align(alignment: Alignment.centerLeft, child: Text('Prefix', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+              Align(alignment: Alignment.centerLeft, child: Text('Suffix', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+            ],
+            onChanged: (v) => setState(() => _mode = v),
           ),
-          SizedBox(height: 10.h),
-          TextField(controller: _affix, style: TextStyle(fontSize: 13.sp), decoration: _dec('Prefix / Suffix value')),
-          SizedBox(height: 10.h),
+          SizedBox(height: 16.h),
+          _lbl('Prefix / Suffix value'),
+          SizedBox(height: 6.h),
+          TextField(
+            controller: _affix,
+            style: _fieldTextStyle().copyWith(color: _affix.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            decoration: _filledFieldDec('e.g. ADM/', filled: _affix.text.trim().isNotEmpty),
+            onChanged: (_) => setState(() {}),
+          ),
+          SizedBox(height: 16.h),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: TextField(controller: _start, keyboardType: TextInputType.number, style: TextStyle(fontSize: 13.sp), decoration: _dec('Start No'))),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _lbl('Start No'),
+                  SizedBox(height: 6.h),
+                  TextField(controller: _start, keyboardType: TextInputType.number, style: _fieldTextStyle().copyWith(color: _start.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec('1', filled: _start.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                ],
+              )),
               SizedBox(width: 8.w),
-              Expanded(child: TextField(controller: _end, keyboardType: TextInputType.number, style: TextStyle(fontSize: 13.sp), decoration: _dec('End No'))),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _lbl('End No'),
+                  SizedBox(height: 6.h),
+                  TextField(controller: _end, keyboardType: TextInputType.number, style: _fieldTextStyle().copyWith(color: _end.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec('-', filled: _end.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                ],
+              )),
               SizedBox(width: 8.w),
-              Expanded(child: TextField(controller: _width, keyboardType: TextInputType.number, style: TextStyle(fontSize: 13.sp), decoration: _dec('Width'))),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _lbl('Width'),
+                  SizedBox(height: 6.h),
+                  TextField(controller: _width, keyboardType: TextInputType.number, style: _fieldTextStyle().copyWith(color: _width.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600), decoration: _filledFieldDec('4', filled: _width.text.trim().isNotEmpty), onChanged: (_) => setState(() {})),
+                ],
+              )),
             ],
           ),
-          SizedBox(height: 10.h),
-          TextField(controller: _division, style: TextStyle(fontSize: 13.sp), maxLines: 2, decoration: _dec('Division')),
-          SizedBox(height: 14.h),
+          SizedBox(height: 16.h),
+          _lbl('Division'),
+          SizedBox(height: 6.h),
+          TextField(
+            controller: _division,
+            style: _fieldTextStyle().copyWith(color: _division.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+            maxLines: 2,
+            decoration: _filledFieldDec('Division description', filled: _division.text.trim().isNotEmpty),
+            onChanged: (_) => setState(() {}),
+          ),
+          SizedBox(height: 18.h),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -261,73 +383,107 @@ class _RegNoPanelState extends State<_RegNoPanel> with AutomaticKeepAliveClientM
           ),
         ],
       ),
+      ),
     );
   }
 
+  /// List card per admission-master-design.md § 3: outer white card (10r,
+  /// 16.w padding, full border) with title bar (tag icon + "Register Sequences"
+  /// + count badge), then inner bordered table (8r, antiAlias).
   Widget _list() {
-    TextStyle h() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
     return Container(
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         children: [
-          Container(
-            color: AppColors.tableHeadBg,
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-            child: Row(
-              children: [
-                Expanded(flex: 3, child: Text('NAME', style: h())),
-                SizedBox(width: 64.w, child: Text('PRE/SUF', style: h())),
-                SizedBox(width: 64.w, child: Text('AFFIX', style: h())),
-                SizedBox(width: 56.w, child: Text('START', style: h())),
-                SizedBox(width: 56.w, child: Text('END', style: h())),
-                SizedBox(width: 36.w, child: Text('W', style: h())),
-                SizedBox(width: 44.w, child: Text('', style: h())),
-              ],
-            ),
+          Padding(
+            padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 10.h),
+            child: Row(children: [
+              const CardTitleBlock(icon: 'tag', title: 'Register Sequences', subtitle: 'all admission number sequences in this institution'),
+              SizedBox(width: 10.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text('${_rows.length} sequences',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+              ),
+              const Spacer(),
+            ]),
           ),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _rows.isEmpty
-                    ? Center(child: Text('No register sequences', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
-                    : ListView.separated(
-                        itemCount: _rows.length,
-                        separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
-                        itemBuilder: (_, i) {
-                          final r = _rows[i];
-                          final id = r['rns_id'] is int ? r['rns_id'] as int : int.tryParse(r['rns_id'].toString()) ?? 0;
-                          final name = r['rnsname']?.toString() ?? '';
-                          final mode = (r['rnsmode']?.toString() ?? 'P') == 'P' ? 'Prefix' : 'Suffix';
-                          TextStyle c() => TextStyle(fontSize: 12.sp, color: AppColors.textSecondary);
-                          return Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 9.h),
-                            child: Row(
-                              children: [
-                                Expanded(flex: 3, child: Text(name, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary))),
-                                SizedBox(width: 64.w, child: Text(mode, style: c())),
-                                SizedBox(width: 64.w, child: Text(r['rnsaffix']?.toString() ?? '-', style: c())),
-                                SizedBox(width: 56.w, child: Text(r['rnsstart']?.toString() ?? '-', style: c())),
-                                SizedBox(width: 56.w, child: Text(r['rnsend']?.toString() ?? '-', style: c())),
-                                SizedBox(width: 36.w, child: Text(r['rnswidth']?.toString() ?? '-', style: c())),
-                                SizedBox(
-                                  width: 44.w,
-                                  child: Center(
-                                    child: InkWell(
-                                      onTap: () => _delete(id, name),
-                                      borderRadius: BorderRadius.circular(6.r),
-                                      child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error)),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    color: AppColors.tableHeadBg,
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: Text('NAME', style: _hStyle())),
+                        SizedBox(width: 64.w, child: Text('PRE/SUF', style: _hStyle())),
+                        SizedBox(width: 64.w, child: Text('AFFIX', style: _hStyle())),
+                        SizedBox(width: 56.w, child: Text('START', style: _hStyle())),
+                        SizedBox(width: 56.w, child: Text('END', style: _hStyle())),
+                        SizedBox(width: 36.w, child: Text('W', style: _hStyle())),
+                        SizedBox(width: 44.w, child: const SizedBox.shrink()),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _rows.isEmpty
+                            ? Center(child: Text('No register sequences', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)))
+                            : ListView.separated(
+                                itemCount: _rows.length,
+                                separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+                                itemBuilder: (_, i) {
+                                  final r = _rows[i];
+                                  final id = r['rns_id'] is int ? r['rns_id'] as int : int.tryParse(r['rns_id'].toString()) ?? 0;
+                                  final name = r['rnsname']?.toString() ?? '';
+                                  final mode = (r['rnsmode']?.toString() ?? 'P') == 'P' ? 'Prefix' : 'Suffix';
+                                  return Container(
+                                    color: i.isEven ? Colors.white : AppColors.surface,
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 9.h),
+                                    child: Row(
+                                      children: [
+                                        Expanded(flex: 3, child: Text(name, style: _cStyle())),
+                                        SizedBox(width: 64.w, child: Text(mode, style: _cStyle())),
+                                        SizedBox(width: 64.w, child: Text(r['rnsaffix']?.toString() ?? '-', style: _cStyle())),
+                                        SizedBox(width: 56.w, child: Text(r['rnsstart']?.toString() ?? '-', style: _cStyle())),
+                                        SizedBox(width: 56.w, child: Text(r['rnsend']?.toString() ?? '-', style: _cStyle())),
+                                        SizedBox(width: 36.w, child: Text(r['rnswidth']?.toString() ?? '-', style: _cStyle())),
+                                        SizedBox(
+                                          width: 44.w,
+                                          child: Center(
+                                            child: InkWell(
+                                              onTap: () => _delete(id, name),
+                                              borderRadius: BorderRadius.circular(6.r),
+                                              child: Padding(padding: EdgeInsets.all(4.w), child: const AppIcon('trash', size: 16, color: AppColors.error)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

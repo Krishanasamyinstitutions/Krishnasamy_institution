@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
+import '../../widgets/focusable_tap.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import 'package:excel/excel.dart' as xl;
@@ -988,26 +990,20 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
           : Form(
               key: _formKey,
               child: SingleChildScrollView(
-                child: Column(
+                child: FocusTraversalGroup(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        AppIcon('receipt-2', size: 18, color: AppColors.accent),
-                        SizedBox(width: 8.w),
-                        Text('Add Fee Demand', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
+                    const CardTitleBlock(icon: 'receipt-2', title: 'Add Fee Demand', subtitle: 'create a new fee demand for a student'),
                     SizedBox(height: 20.h),
 
                     // Admission No
                     _buildLabel('Roll No *'),
                     TextFormField(
                       controller: _admNoController,
-                      decoration: _inputDecoration('Enter admission number'),
-                      style: TextStyle(fontSize: 13.sp),
+                      decoration: _inputDecoration('Enter admission number', filled: _admNoController.text.trim().isNotEmpty),
+                      style: TextStyle(fontSize: 13.sp, color: _admNoController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _admNoController.text.trim().isNotEmpty ? FontWeight.w600 : null),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                      onChanged: (v) => _lookupStudentClass(v.trim()),
+                      onChanged: (v) { setState(() {}); _lookupStudentClass(v.trim()); },
                     ),
                     SizedBox(height: 16.h),
 
@@ -1026,8 +1022,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         dropdownColor: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         elevation: 6,
-                        decoration: _inputDecoration('Select class'),
+                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                        decoration: _inputDecoration('Select class', filled: value != null),
                         items: items,
+                        selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text((m.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
                         onChanged: (v) => setState(() => _selectedClass = v),
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                       );
@@ -1049,8 +1047,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         dropdownColor: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         elevation: 6,
-                        decoration: _inputDecoration('Select fee type'),
+                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                        decoration: _inputDecoration('Select fee type', filled: value != null),
                         items: items,
+                        selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text((m.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
                         onChanged: (v) => setState(() => _selectedFeeType = v),
                         validator: (v) => v == null ? 'Required' : null,
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
@@ -1080,8 +1080,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                                   dropdownColor: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                   elevation: 6,
-                                  decoration: _inputDecoration('Select year'),
+                                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                                  decoration: _inputDecoration('Select year', filled: value != null),
                                   items: items,
+                                  selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text((m.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
                                   onChanged: (v) => setState(() => _selectedFeeYear = v),
                                   style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                                 );
@@ -1097,8 +1099,9 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                               _buildLabel('Semester'),
                               TextFormField(
                                 controller: _feeTermController,
-                                decoration: _inputDecoration('Enter term'),
-                                style: TextStyle(fontSize: 13.sp),
+                                decoration: _inputDecoration('Enter term', filled: _feeTermController.text.trim().isNotEmpty),
+                                style: TextStyle(fontSize: 13.sp, color: _feeTermController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _feeTermController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                                onChanged: (_) => setState(() {}),
                               ),
                             ],
                           ),
@@ -1123,8 +1126,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                         dropdownColor: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         elevation: 6,
-                        decoration: _inputDecoration('Select concession'),
+                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                        decoration: _inputDecoration('Select concession', filled: value != null),
                         items: items,
+                        selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text((m.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
                         onChanged: (v) => setState(() => _selectedConcession = v),
                         style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
                       );
@@ -1141,10 +1146,11 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                               _buildLabel('Fee Amount *'),
                               TextFormField(
                                 controller: _feeAmountController,
-                                decoration: _inputDecoration('Enter amount'),
+                                decoration: _inputDecoration('Enter amount', filled: _feeAmountController.text.trim().isNotEmpty),
                                 keyboardType: TextInputType.number,
-                                style: TextStyle(fontSize: 13.sp),
+                                style: TextStyle(fontSize: 13.sp, color: _feeAmountController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _feeAmountController.text.trim().isNotEmpty ? FontWeight.w600 : null),
                                 validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                onChanged: (_) => setState(() {}),
                               ),
                             ],
                           ),
@@ -1157,9 +1163,10 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                               _buildLabel('Concession Amount'),
                               TextFormField(
                                 controller: _conAmountController,
-                                decoration: _inputDecoration('Enter amount'),
+                                decoration: _inputDecoration('Enter amount', filled: _conAmountController.text.trim().isNotEmpty),
                                 keyboardType: TextInputType.number,
-                                style: TextStyle(fontSize: 13.sp),
+                                style: TextStyle(fontSize: 13.sp, color: _conAmountController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _conAmountController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                                onChanged: (_) => setState(() {}),
                               ),
                             ],
                           ),
@@ -1170,18 +1177,18 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
 
                     // Due Date
                     _buildLabel('Due Date'),
-                    InkWell(
+                    FocusableTap(
                       onTap: _pickDueDate,
                       borderRadius: BorderRadius.circular(10.r),
                       child: InputDecorator(
-                        decoration: _inputDecoration('').copyWith(
+                        decoration: _inputDecoration('', filled: _dueDate != null).copyWith(
                           suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary),
                         ),
                         child: Text(
                           _dueDate != null
                               ? '${_dueDate!.day.toString().padLeft(2, '0')}/${_dueDate!.month.toString().padLeft(2, '0')}/${_dueDate!.year}'
                               : 'Select date',
-                          style: TextStyle(fontSize: 13.sp, color: _dueDate != null ? AppColors.textPrimary : Colors.grey.shade400),
+                          style: TextStyle(fontSize: 13.sp, color: _dueDate != null ? AppColors.accent : Colors.grey.shade400, fontWeight: _dueDate != null ? FontWeight.w600 : null),
                         ),
                       ),
                     ),
@@ -1233,7 +1240,7 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
                       );
                     }),
                   ],
-                ),
+                )),
               ),
             ),
     );
@@ -1249,18 +1256,19 @@ class _FeeDemandScreenState extends State<FeeDemandScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(String hint, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey.shade400),
       contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10.r),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10.r),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10.r),

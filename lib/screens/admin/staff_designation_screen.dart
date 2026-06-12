@@ -6,6 +6,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 class StaffDesignationScreen extends StatefulWidget {
   const StaffDesignationScreen({super.key});
 
@@ -123,11 +124,14 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
     return match.isNotEmpty ? (match.first['desname']?.toString() ?? '-') : '-';
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration _inputDecoration(String label, {bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(fontSize: 13.sp),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
     );
   }
@@ -151,7 +155,8 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
               ),
               child: Form(
                 key: _formKey,
-                child: Column(
+                child: FocusTraversalGroup(
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -168,22 +173,29 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                     SizedBox(height: 20.h),
                     TextFormField(
                       controller: _nameController,
-                      decoration: _inputDecoration('Designation Name'),
+                      style: TextStyle(color: _nameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: _nameController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDecoration('Designation Name', filled: _nameController.text.trim().isNotEmpty),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                     SizedBox(height: 16.h),
                     DropdownButtonFormField<int?>(
                       value: _selectedReportTo,
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      decoration: _inputDecoration('Reports To'),
+                      decoration: _inputDecoration('Reports To', filled: _selectedReportTo != null),
                       items: [
                         DropdownMenuItem<int?>(value: null, child: Text('None', style: TextStyle(fontSize: 13.sp))),
                         ..._designations.map((d) => DropdownMenuItem<int?>(
                               value: d['des_id'] as int,
                               child: Text(d['desname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp)),
                             )),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Align(alignment: Alignment.centerLeft, child: Text('None', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                        ..._designations.map((d) => Align(alignment: Alignment.centerLeft, child: Text(d['desname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
                       ],
                       onChanged: (v) => setState(() => _selectedReportTo = v),
                     ),
@@ -206,6 +218,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                       ],
                     ),
                   ],
+                ),
                 ),
               ),
             ),
@@ -231,9 +244,7 @@ class _StaffDesignationScreenState extends State<StaffDesignationScreen> {
                     ),
                     child: Row(
                       children: [
-                        AppIcon('personalcard', size: 18, color: AppColors.accent),
-                        SizedBox(width: 8.w),
-                        Text('Designations', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        const CardTitleBlock(icon: 'personalcard', title: 'Designations', subtitle: 'all staff designations in this institution'),
                         const Spacer(),
                         Text('${_designations.length} records', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                         SizedBox(width: 12.w),

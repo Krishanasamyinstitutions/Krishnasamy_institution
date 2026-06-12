@@ -1224,18 +1224,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     TextInputAction? textInputAction,
     void Function(String)? onFieldSubmitted,
   }) {
+    final filled = controller.text.trim().isNotEmpty;
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       onFieldSubmitted: onFieldSubmitted,
+      onChanged: (_) => setState(() {}),
       style: const TextStyle(
         fontSize: 14,
         color: _PinkPalette.textBody,
         fontWeight: FontWeight.w500,
       ),
-      decoration: _filledDec(hint, icon, suffixIcon),
+      decoration: _filledDec(hint, icon, suffixIcon, filled: filled),
       validator: validator,
     );
   }
@@ -1248,27 +1250,44 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     required void Function(T?) onChanged,
     String? Function(T?)? validator,
   }) {
+    final filled = value != null;
     return DropdownButtonFormField<T>(
       value: value,
       isExpanded: true,
       dropdownColor: Colors.white,
       borderRadius: BorderRadius.circular(12),
       elevation: 6,
+      // Open-menu items render in textPrimary; the closed/selected value is
+      // recolored amber + semibold via selectedItemBuilder below.
       style: const TextStyle(
         fontSize: 14,
         color: _PinkPalette.textBody,
         fontWeight: FontWeight.w500,
       ),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          size: 22, color: _PinkPalette.textMuted),
-      decoration: _filledDec(hint, icon, null),
+      icon: const Icon(Icons.arrow_drop_down, color: _PinkPalette.textMuted),
+      decoration: _filledDec(hint, icon, null, filled: filled),
       items: items,
+      selectedItemBuilder: (context) => items
+          .map((item) => DefaultTextStyle(
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: _PinkPalette.textBody,
+                  fontWeight: FontWeight.w500,
+                ),
+                child: Align(
+                    alignment: Alignment.centerLeft, child: item.child),
+              ))
+          .toList(),
       onChanged: onChanged,
       validator: validator,
     );
   }
 
-  InputDecoration _filledDec(String hint, IconData icon, Widget? suffixIcon) {
+  // Standard decoration: grey border idle, navy (primary) border on focus.
+  // The [filled] param is retained but no longer affects the border.
+  InputDecoration _filledDec(String hint, IconData icon, Widget? suffixIcon,
+      {bool filled = false}) {
+    const idle = _PinkPalette.fieldBorder;
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(
@@ -1283,15 +1302,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _PinkPalette.fieldBorder),
+        borderSide: const BorderSide(color: idle, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _PinkPalette.fieldBorder),
+        borderSide: const BorderSide(color: idle, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _PinkPalette.accent, width: 1.5),
+        borderSide: const BorderSide(color: _PinkPalette.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

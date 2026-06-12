@@ -112,6 +112,37 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Standard decoration: grey border idle, navy (primary) border on focus.
+  // Keeps any prefix/suffix icon supplied by the caller. The [filled] param
+  // is retained but no longer affects the border.
+  InputDecoration _dec(String hint, {bool filled = false, Widget? prefixIcon, Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6)),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      prefixIconConstraints: const BoxConstraints(minWidth: 52, minHeight: 0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+  }
+
+  // Normal value text — standard dark colour at the normal weight.
+  TextStyle _fieldStyle(bool filled) => const TextStyle(
+        fontWeight: FontWeight.w400,
+        color: AppColors.textPrimary,
+      );
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -445,8 +476,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                     dropdownColor: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     elevation: 6,
-                                    decoration: InputDecoration(
-                                      hintText: 'Select your institution',
+                                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                                    decoration: _dec(
+                                      'Select your institution',
+                                      filled: _selectedInsId != null,
                                       prefixIcon: selectedLogo.isNotEmpty
                                           ? Padding(
                                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -460,7 +493,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                               ),
                                             )
                                           : AppIcon.linear('teacher', size: 20, color: AppColors.textLight),
-                                      prefixIconConstraints: const BoxConstraints(minWidth: 52, minHeight: 0),
                                     ),
                                     selectedItemBuilder: (context) => _institutions.map((ins) {
                                       return Align(
@@ -553,11 +585,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                     dropdownColor: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     elevation: 6,
-                                    decoration: InputDecoration(
-                                      hintText: 'Select academic year',
-                                      prefixIcon: AppIcon.linear('calendar', size: 20, color: AppColors.textLight),
-                                      prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
+                                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                                    decoration: _dec(
+                                      'Select academic year',
+                                      filled: _selectedYear != null,
+                                      prefixIcon: const AppIcon.linear('calendar', size: 20, color: AppColors.textLight),
                                     ),
+                                    selectedItemBuilder: (context) => _availableYears.map((y) {
+                                      final label = y['yrlabel']?.toString() ?? '';
+                                      return Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          label,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.textPrimary),
+                                        ),
+                                      );
+                                    }).toList(),
                                     items: _availableYears.map((y) {
                                       final label = y['yrlabel']?.toString() ?? '';
                                       return DropdownMenuItem<String>(value: label, child: Text(label, overflow: TextOverflow.ellipsis));
@@ -587,13 +631,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _emailController,
                           keyboardType: _isSuperAdmin ? TextInputType.text : TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            hintText: _isSuperAdmin ? 'Enter username' : 'admin@edudesk.com',
+                          style: _fieldStyle(_emailController.text.trim().isNotEmpty),
+                          onChanged: (_) => setState(() {}),
+                          decoration: _dec(
+                            _isSuperAdmin ? 'Enter username' : 'admin@edudesk.com',
+                            filled: _emailController.text.trim().isNotEmpty,
                             prefixIcon: AppIcon(
                                 _isSuperAdmin ? 'user' : 'sms',
                                 size: 20, color: AppColors.textLight),
-                            prefixIconConstraints: BoxConstraints(
-                                minWidth: 52, minHeight: 0),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -628,12 +673,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            hintText: '********',
+                          style: _fieldStyle(_passwordController.text.isNotEmpty),
+                          onChanged: (_) => setState(() {}),
+                          decoration: _dec(
+                            '********',
+                            filled: _passwordController.text.isNotEmpty,
                             prefixIcon: AppIcon.linear('lock',
                                 size: 20, color: AppColors.textLight),
-                            prefixIconConstraints: BoxConstraints(
-                                minWidth: 52, minHeight: 0),
                             suffixIcon: IconButton(
                               icon: AppIcon(
                                 _obscurePassword

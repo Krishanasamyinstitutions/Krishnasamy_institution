@@ -1,5 +1,6 @@
 import 'dart:io';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/app_search_field.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
@@ -1022,13 +1023,13 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(radius),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: _collectionMethodFilter != null ? AppColors.accent : AppColors.border, width: 1.5),
                     ),
                     child: DropdownButton<String?>(
                       value: _collectionMethodFilter,
                       hint: Text('All Modes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       isDense: true,
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -1038,6 +1039,12 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                         DropdownMenuItem<String?>(value: null, child: Text('All Modes')),
                         DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
                         DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
+                      ],
+                      // Filled: chosen mode reads amber + w600 in the closed state.
+                      selectedItemBuilder: (context) => [
+                        Text('All Modes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        Text('Cash', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                        Text('Bank', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent)),
                       ],
                       onChanged: (v) => setState(() => _collectionMethodFilter = v),
                     ),
@@ -1087,9 +1094,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                 child: Row(
                   children: [
-                    AppIcon('wallet-money', size: 18, color: AppColors.accent),
-                    SizedBox(width: 8.w),
-                    Text('Method-wise Summary', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                    const CardTitleBlock(icon: 'wallet-money', title: 'Method-wise Summary', subtitle: 'collections grouped by payment method'),
                     const Spacer(),
                     Text('${methodKeys.length} methods', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
                   ],
@@ -1715,6 +1720,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               final hPad = compact ? 10.0 : 14.0;
               final radius = compact ? 6.0 : 10.0;
               final textSize = compact ? 11.0 : 13.0;
+              final ftFilled = feeTypes.contains(_pendingFeeTypeFilter);
               return SizedBox(
                 height: AppBtn.height(context),
                 child: Container(
@@ -1722,7 +1728,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: ftFilled ? AppColors.accent : AppColors.border, width: 1.5),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
@@ -1733,10 +1739,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
                         ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        ...feeTypes.map((t) => Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                       ],
                       onChanged: (v) => setState(() => _pendingFeeTypeFilter = v),
                     ),
@@ -1751,6 +1761,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               final hPad = compact ? 10.0 : 14.0;
               final radius = compact ? 6.0 : 10.0;
               final textSize = compact ? 11.0 : 13.0;
+              final clsFilled = classes.contains(_pendingClassFilter);
               return SizedBox(
                 height: AppBtn.height(context),
                 child: Container(
@@ -1758,7 +1769,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: clsFilled ? AppColors.accent : AppColors.border, width: 1.5),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
@@ -1769,10 +1780,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
                         ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        ...classes.map((c) => Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                       ],
                       onChanged: (v) => setState(() => _pendingClassFilter = v),
                     ),
@@ -2499,6 +2514,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               final hPad = compact ? 10.0 : 14.0;
               final radius = compact ? 6.0 : 10.0;
               final textSize = compact ? 11.0 : 13.0;
+              final ftFilled = feeTypes.contains(_pendingFeeTypeFilter);
               return SizedBox(
                 height: AppBtn.height(context),
                 child: Container(
@@ -2506,7 +2522,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: ftFilled ? AppColors.accent : AppColors.border, width: 1.5),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
@@ -2517,10 +2533,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Fee Types')),
                         ...feeTypes.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t))),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        ...feeTypes.map((t) => Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                       ],
                       onChanged: (v) => setState(() { _pendingFeeTypeFilter = v; _pendingPage = 0; }),
                     ),
@@ -2535,6 +2555,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
               final hPad = compact ? 10.0 : 14.0;
               final radius = compact ? 6.0 : 10.0;
               final textSize = compact ? 11.0 : 13.0;
+              final clsFilled = classes.contains(_pendingClassFilter);
               return SizedBox(
                 height: AppBtn.height(context),
                 child: Container(
@@ -2542,7 +2563,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(radius),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: clsFilled ? AppColors.accent : AppColors.border, width: 1.5),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
@@ -2553,10 +2574,14 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
                       style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       items: [
                         const DropdownMenuItem<String?>(value: null, child: Text('All Classes')),
                         ...classes.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Text('All Classes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                        ...classes.map((c) => Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                       ],
                       onChanged: (v) => setState(() { _pendingClassFilter = v; _pendingPage = 0; }),
                     ),
@@ -3274,7 +3299,7 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                       child: Container(
                         padding: EdgeInsets.symmetric(horizontal: hPad),
                         decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: _dateDrilldownMethodFilter != null ? AppColors.accent : AppColors.border, width: 1.5),
                           borderRadius: BorderRadius.circular(radius),
                         ),
                         child: DropdownButton<String?>(
@@ -3292,6 +3317,11 @@ class _FeeCollectionTabState extends State<_FeeCollectionTab> with AutomaticKeep
                             DropdownMenuItem<String?>(value: null, child: Text('All Modes')),
                             DropdownMenuItem<String?>(value: 'Cash', child: Text('Cash')),
                             DropdownMenuItem<String?>(value: 'Bank', child: Text('Bank')),
+                          ],
+                          selectedItemBuilder: (context) => [
+                            Text('All Modes', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            Text('Cash', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                            Text('Bank', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent)),
                           ],
                           onChanged: (v) => setState(() { _dateDrilldownMethodFilter = v; _dateDrilldownPage = 0; }),
                         ),
@@ -4990,9 +5020,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                     padding: EdgeInsets.fromLTRB(16, 14, 16, 8.h),
                     child: Row(
                       children: [
-                        AppIcon('book-1', size: 18, color: AppColors.accent),
-                        SizedBox(width: 8.w),
-                        Text('Class-Wise Fee Details', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        const CardTitleBlock(icon: 'book-1', title: 'Class-Wise Fee Details', subtitle: 'fee demands grouped by class'),
                         SizedBox(width: 8.w),
                         Text('(${_classGroups.length} classes)', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                         const Spacer(),
@@ -5009,6 +5037,11 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                           final hPad = compact ? 10.0 : 14.0;
                           final radius = compact ? 6.0 : 10.0;
                           final textSize = compact ? 11.0 : 13.0;
+                          final allFeeTypesSet = <String>{};
+                          for (final g in _classGroups) {
+                            allFeeTypesSet.addAll(g.feeTypes);
+                          }
+                          final sortedFeeTypes = allFeeTypesSet.toList()..sort();
                           return SizedBox(
                             height: AppBtn.height(context),
                             child: Container(
@@ -5016,7 +5049,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(radius),
-                              border: Border.all(color: AppColors.border),
+                              border: Border.all(color: _classFilterFeeType != null ? AppColors.accent : AppColors.border, width: 1.5),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
@@ -5027,17 +5060,14 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                                 borderRadius: BorderRadius.circular(12),
                                 elevation: 6,
                                 style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                                icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+                                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                                 items: [
                                   DropdownMenuItem<String>(value: null, child: Text('All Fee Types', style: TextStyle(fontSize: textSize))),
-                                  ...() {
-                                    final allFeeTypes = <String>{};
-                                    for (final g in _classGroups) {
-                                      allFeeTypes.addAll(g.feeTypes);
-                                    }
-                                    final sorted = allFeeTypes.toList()..sort();
-                                    return sorted.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: TextStyle(fontSize: textSize))));
-                                  }(),
+                                  ...sortedFeeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft, style: TextStyle(fontSize: textSize)))),
+                                ],
+                                selectedItemBuilder: (context) => [
+                                  Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  ...sortedFeeTypes.map((ft) => Text(ft, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                                 ],
                                 onChanged: (v) => setState(() => _classFilterFeeType = v),
                               ),
@@ -5734,7 +5764,7 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                         child: Container(
                           padding: EdgeInsets.symmetric(horizontal: 14.w),
                           decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: _studentStatusFilter != null ? AppColors.accent : AppColors.border, width: 1.5),
                             borderRadius: BorderRadius.circular(10.r),
                           ),
                           child: DropdownButton<String?>(
@@ -5749,6 +5779,12 @@ class _ClassWiseDemandTabState extends State<_ClassWiseDemandTab> with Automatic
                               DropdownMenuItem(value: 'Paid', child: Text('Paid', style: TextStyle(fontSize: 13.sp))),
                               DropdownMenuItem(value: 'Partial', child: Text('Partial', style: TextStyle(fontSize: 13.sp))),
                               DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid', style: TextStyle(fontSize: 13.sp))),
+                            ],
+                            selectedItemBuilder: (context) => [
+                              Text('All Status', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              Text('Paid', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                              Text('Partial', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                              Text('Unpaid', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)),
                             ],
                             onChanged: (v) => setState(() {
                               _studentStatusFilter = v;
@@ -6733,9 +6769,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                     padding: EdgeInsets.fromLTRB(16, 12, 16, 8.h),
                     child: Row(
                       children: [
-                        AppIcon('grid-1', size: 18, color: AppColors.accent),
-                        SizedBox(width: 8.w),
-                        Text('Date-wise Paid Collection Register', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600)),
+                        const CardTitleBlock(icon: 'grid-1', title: 'Date-wise Paid Collection Register', subtitle: 'all paid receipts grouped by collection date'),
                         SizedBox(width: 12.w),
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -6764,7 +6798,7 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                               child: Container(
                                 padding: EdgeInsets.symmetric(horizontal: hPad),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: AppColors.border),
+                                  border: Border.all(color: _filterFeeType != null ? AppColors.accent : AppColors.border, width: 1.5),
                                   borderRadius: BorderRadius.circular(radius),
                                 ),
                                 child: DropdownButton<String?>(
@@ -6777,6 +6811,10 @@ class _DateWiseTabState extends State<_DateWiseTab> with AutomaticKeepAliveClien
                                   items: [
                                     const DropdownMenuItem<String>(value: null, child: Text('All Fee Types')),
                                     ..._feeTypes.map((ft) => DropdownMenuItem<String>(value: ft, child: Text(ft))),
+                                  ],
+                                  selectedItemBuilder: (context) => [
+                                    Text('All Fee Types', style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                    ..._feeTypes.map((ft) => Text(ft, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.accent))),
                                   ],
                                   onChanged: (v) => setState(() => _filterFeeType = v),
                                 ),

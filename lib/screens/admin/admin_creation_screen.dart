@@ -8,6 +8,7 @@ import '../../services/supabase_service.dart';
 import '../../models/institution_user_model.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 class AdminCreationScreen extends StatefulWidget {
   const AdminCreationScreen({super.key});
 
@@ -111,16 +112,17 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               TextField(
                 controller: controller,
                 autofocus: true,
+                style: TextStyle(color: controller.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: controller.text.trim().isNotEmpty ? FontWeight.w600 : null),
                 onChanged: (v) {
                   final overflow = v.trim().length > 50;
                   final next = overflow ? 'Designation must be less than 50 characters' : null;
-                  if (nameError != next) {
-                    setDialogState(() => nameError = next);
-                  }
+                  setDialogState(() => nameError = next);
                 },
                 decoration: InputDecoration(
                   hintText: 'Enter designation name',
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(borderSide: BorderSide(color: controller.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: controller.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.accent, width: 1.5)),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
                   errorText: nameError,
                 ),
@@ -130,11 +132,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
               SizedBox(height: 6.h),
               DropdownButtonFormField<int?>(
                 value: reportsTo,
+                icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                 dropdownColor: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 elevation: 6,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderSide: BorderSide(color: reportsTo != null ? AppColors.accent : AppColors.border, width: 1.5)),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: reportsTo != null ? AppColors.accent : AppColors.border, width: 1.5)),
+                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.accent, width: 1.5)),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
                 ),
                 items: [
@@ -143,6 +148,10 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                         value: d['des_id'] as int?,
                         child: Text(d['desname'] as String),
                       )),
+                ],
+                selectedItemBuilder: (context) => [
+                  Align(alignment: Alignment.centerLeft, child: Text('None', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                  ..._designationsList.map((d) => Align(alignment: Alignment.centerLeft, child: Text(d['desname'] as String, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
                 ],
                 onChanged: (v) => setDialogState(() => reportsTo = v),
               ),
@@ -327,7 +336,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       ),
       child: Form(
         key: _formKey,
-        child: Column(
+        child: FocusTraversalGroup(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -351,12 +361,13 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedDesignation,
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               isExpanded: true,
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _inputDecoration(context, 'Select designation'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Select designation', filled: _selectedDesignation != null),
+              style: _inputTextStyle(context, filled: _selectedDesignation != null),
               items: [
                 ..._designationsList.map((d) => DropdownMenuItem(
                       value: d['desname'] as String,
@@ -372,6 +383,10 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                     ],
                   ),
                 ),
+              ],
+              selectedItemBuilder: (context) => [
+                ..._designationsList.map((d) => Align(alignment: Alignment.centerLeft, child: Text(d['desname'] as String, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
+                Align(alignment: Alignment.centerLeft, child: Text('Add New Designation', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
               ],
               onChanged: (v) {
                 if (v == '__add_new__') {
@@ -400,18 +415,23 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<int>(
               value: _selectedReportTo,
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               isExpanded: true,
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _inputDecoration(context, 'Select reporting person'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Select reporting person', filled: _selectedReportTo != null),
+              style: _inputTextStyle(context, filled: _selectedReportTo != null),
               items: [
                 const DropdownMenuItem(value: 0, child: Text('None')),
                 ..._users.map((u) => DropdownMenuItem(
                       value: u.useId,
                       child: Text('${u.usename} (${u.desname})'),
                     )),
+              ],
+              selectedItemBuilder: (context) => [
+                Align(alignment: Alignment.centerLeft, child: Text('None', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                ..._users.map((u) => Align(alignment: Alignment.centerLeft, child: Text('${u.usename} (${u.desname})', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
               ],
               onChanged: (v) => setState(() => _selectedReportTo = v),
             ),
@@ -426,17 +446,22 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             DropdownButtonFormField<String>(
               value: _selectedRole,
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               isExpanded: true,
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
-              decoration: _inputDecoration(context, 'Select role'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Select role', filled: _selectedRole != null),
+              style: _inputTextStyle(context, filled: _selectedRole != null),
               items: _rolesList
                   .where((r) => (r['urname'] as String) != 'Admin')
                   .map((r) => DropdownMenuItem(
                       value: r['urname'] as String,
                       child: Text(r['urname'] as String)))
+                  .toList(),
+              selectedItemBuilder: (context) => _rolesList
+                  .where((r) => (r['urname'] as String) != 'Admin')
+                  .map((r) => Align(alignment: Alignment.centerLeft, child: Text(r['urname'] as String, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))))
                   .toList(),
               onChanged: (v) => setState(() => _selectedRole = v),
               validator: (v) => v == null ? 'Required' : null,
@@ -452,8 +477,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _nameController,
-              decoration: _inputDecoration(context, 'Enter user name'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Enter user name', filled: _nameController.text.trim().isNotEmpty),
+              style: _inputTextStyle(context, filled: _nameController.text.trim().isNotEmpty),
+              onChanged: (_) => setState(() {}),
               autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (v) {
                 final s = v?.trim() ?? '';
@@ -473,8 +499,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _emailController,
-              decoration: _inputDecoration(context, 'Enter email'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Enter email', filled: _emailController.text.trim().isNotEmpty),
+              style: _inputTextStyle(context, filled: _emailController.text.trim().isNotEmpty),
+              onChanged: (_) => setState(() {}),
               keyboardType: TextInputType.emailAddress,
               validator: (v) {
                 final s = v?.trim() ?? '';
@@ -495,8 +522,9 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _phoneController,
-              decoration: _inputDecoration(context, 'Enter phone number'),
-              style: _inputTextStyle(context),
+              decoration: _inputDecoration(context, 'Enter phone number', filled: _phoneController.text.trim().isNotEmpty),
+              style: _inputTextStyle(context, filled: _phoneController.text.trim().isNotEmpty),
+              onChanged: (_) => setState(() {}),
               keyboardType: TextInputType.phone,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
@@ -520,7 +548,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             SizedBox(height: 6.h),
             TextFormField(
               controller: _passwordController,
-              decoration: _inputDecoration(context, 'Enter password').copyWith(
+              decoration: _inputDecoration(context, 'Enter password', filled: _passwordController.text.trim().isNotEmpty).copyWith(
                 suffixIcon: IconButton(
                   tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                   icon: AppIcon(
@@ -531,7 +559,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
-              style: _inputTextStyle(context),
+              style: _inputTextStyle(context, filled: _passwordController.text.trim().isNotEmpty),
+              onChanged: (_) => setState(() {}),
               obscureText: _obscurePassword,
               validator: (v) {
                 final s = v ?? '';
@@ -585,25 +614,27 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
-  TextStyle _inputTextStyle(BuildContext context) {
+  TextStyle _inputTextStyle(BuildContext context, {bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     return TextStyle(
-      fontWeight: FontWeight.w500,
+      fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
       fontSize: compact ? 11 : 14,
-      color: const Color(0xFF555555),
+      color: filled ? AppColors.accent : const Color(0xFF555555),
     );
   }
 
-  InputDecoration _inputDecoration(BuildContext context, String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint, {bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     final textSize = compact ? 11.0 : 14.0;
     final hPad = compact ? 8.0 : 14.0;
     final vPad = compact ? 5.0 : 14.0;
     final radius = compact ? 5.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
 
     return InputDecoration(
       hintText: hint,
@@ -611,15 +642,15 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
       contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.accent),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
       ),
       filled: true,
       fillColor: Colors.white,
@@ -645,9 +676,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
             child: Row(
               children: [
-                AppIcon('people', size: 18, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Existing Users', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                const CardTitleBlock(icon: 'people', title: 'Existing Users', subtitle: 'all user accounts in this institution'),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -910,7 +939,8 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
     final reasonController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
         title: const Text('Terminate User', style: TextStyle(fontWeight: FontWeight.w700)),
         content: Column(
@@ -922,10 +952,14 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             TextField(
               controller: reasonController,
               maxLines: 3,
+              style: TextStyle(color: reasonController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: reasonController.text.trim().isNotEmpty ? FontWeight.w600 : null),
+              onChanged: (_) => setDialogState(() {}),
               decoration: InputDecoration(
                 labelText: 'Reason for termination *',
                 hintText: 'Enter reason...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: reasonController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: reasonController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
               ),
             ),
           ],
@@ -956,6 +990,7 @@ class _AdminCreationScreenState extends State<AdminCreationScreen> {
             child: const Text('Terminate'),
           ),
         ],
+      ),
       ),
     );
   }

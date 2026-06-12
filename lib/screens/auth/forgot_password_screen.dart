@@ -153,6 +153,38 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
+  // Standard decoration: grey border idle, navy (primary) border on focus.
+  // Keeps any prefix/suffix icon supplied by the caller. The [filled] param
+  // is retained but no longer affects the border.
+  InputDecoration _dec(String hint, {bool filled = false, Widget? prefixIcon, Widget? suffixIcon, String? counterText}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6)),
+      counterText: counterText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      prefixIconConstraints: const BoxConstraints(minWidth: 52, minHeight: 0),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+    );
+  }
+
+  // Normal value text — standard dark colour at the normal weight.
+  TextStyle _fieldStyle(bool filled) => const TextStyle(
+        fontWeight: FontWeight.w400,
+        color: AppColors.textPrimary,
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -267,10 +299,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       TextFormField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
-        decoration: InputDecoration(
-          hintText: 'you@school.edu',
+        style: _fieldStyle(_emailController.text.trim().isNotEmpty),
+        onChanged: (_) => setState(() {}),
+        decoration: _dec(
+          'you@school.edu',
+          filled: _emailController.text.trim().isNotEmpty,
           prefixIcon: const AppIcon.linear('sms', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
       SizedBox(height: 24),
@@ -296,11 +330,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         keyboardType: TextInputType.number,
         maxLength: 6,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(
-          hintText: '6-digit OTP',
+        style: _fieldStyle(_otpController.text.trim().isNotEmpty),
+        onChanged: (_) => setState(() {}),
+        decoration: _dec(
+          '6-digit OTP',
+          filled: _otpController.text.trim().isNotEmpty,
           counterText: '',
           prefixIcon: const AppIcon.linear('shield-tick', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
       SizedBox(height: 8),
@@ -332,10 +368,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       TextFormField(
         controller: _newPasswordController,
         obscureText: _obscurePassword,
-        decoration: InputDecoration(
-          hintText: 'At least 6 characters',
+        style: _fieldStyle(_newPasswordController.text.isNotEmpty),
+        onChanged: (_) => setState(() {}),
+        decoration: _dec(
+          'At least 6 characters',
+          filled: _newPasswordController.text.isNotEmpty,
           prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
           suffixIcon: IconButton(
             icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -348,10 +386,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       TextFormField(
         controller: _confirmPasswordController,
         obscureText: _obscurePassword,
-        decoration: InputDecoration(
-          hintText: 'Re-enter password',
+        style: _fieldStyle(_confirmPasswordController.text.isNotEmpty),
+        onChanged: (_) => setState(() {}),
+        decoration: _dec(
+          'Re-enter password',
+          filled: _confirmPasswordController.text.isNotEmpty,
           prefixIcon: const AppIcon.linear('lock', size: 20, color: AppColors.textLight),
-          prefixIconConstraints: BoxConstraints(minWidth: 52, minHeight: 0),
         ),
       ),
       SizedBox(height: 24),

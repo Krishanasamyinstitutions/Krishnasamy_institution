@@ -7,6 +7,7 @@ import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
+import '../../widgets/focusable_tap.dart';
 import '../../utils/friendly_error.dart';
 class NoticesScreen extends StatefulWidget {
   const NoticesScreen({super.key});
@@ -526,8 +527,8 @@ class _CreateNoticeForm extends StatefulWidget {
 class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
-  String _priority = 'Normal';
-  String _category = 'General';
+  String? _priority;
+  String? _category;
   DateTime? _fromDate;
   DateTime? _toDate;
   String _targetType = 'All Students';
@@ -612,12 +613,13 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
 
   Widget _buildCourseFilterDropdown() {
     final courses = _courseClassMap.keys.toList()..sort();
+    final filled = _selectedCourse != null;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: filled ? AppColors.accent : AppColors.border, width: 1.5),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String?>(
@@ -628,7 +630,11 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           borderRadius: BorderRadius.circular(12),
           elevation: 6,
           style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
-          icon: const AppIcon.linear('Chevron Down', size: 18),
+          icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+          selectedItemBuilder: (context) => [
+            Align(alignment: Alignment.centerLeft, child: Text('All Courses', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: filled ? AppColors.accent : AppColors.textPrimary))),
+            ...courses.map((c) => Align(alignment: Alignment.centerLeft, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
+          ],
           items: [
             const DropdownMenuItem<String?>(value: null, child: Text('All Courses')),
             ...courses.map((c) => DropdownMenuItem<String?>(value: c, child: Text(c))),
@@ -840,8 +846,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
         'ins_id': insId,
         'noticetitle': title,
         'noticedesc': desc,
-        'noticepriority': _priority,
-        'noticecategory': _category,
+        'noticepriority': _priority ?? 'Normal',
+        'noticecategory': _category ?? 'General',
         'noticetarget': targetLabel,
         'createdby': userName,
         'createdat': DateTime.now().toIso8601String(),
@@ -1007,24 +1013,30 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                 borderRadius: BorderRadius.circular(10.r),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Column(
+              child: FocusTraversalGroup(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
                   Text('Notice Title', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8.h),
-                  TextField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter notice title...',
-                      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    style: TextStyle(fontSize: 14.sp),
-                  ),
+                  Builder(builder: (context) {
+                    final filled = _titleController.text.trim().isNotEmpty;
+                    final idle = filled ? AppColors.accent : AppColors.border;
+                    return TextField(
+                      controller: _titleController,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Enter notice title...',
+                        hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: TextStyle(fontSize: 14.sp, color: filled ? AppColors.accent : null, fontWeight: filled ? FontWeight.w600 : null),
+                    );
+                  }),
                   SizedBox(height: 20.h),
 
                   // Target Audience
@@ -1035,7 +1047,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                       final isSelected = _targetType == t;
                       return Padding(
                         padding: const EdgeInsets.only(right: 10),
-                        child: GestureDetector(
+                        child: FocusableTap(
+                          borderRadius: BorderRadius.circular(8.r),
                           onTap: () {
                             setState(() {
                               _targetType = t;
@@ -1107,12 +1120,12 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               Text('Select Classes', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                               const Spacer(),
                               if (_selectedClasses.isNotEmpty)
-                                GestureDetector(
+                                FocusableTap(
                                   onTap: () => setState(() => _selectedClasses.clear()),
                                   child: Text('Clear all', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
                                 ),
                               SizedBox(width: 12.w),
-                              GestureDetector(
+                              FocusableTap(
                                 onTap: () => setState(() => _selectedClasses = List.from(_classesInScope)),
                                 child: Text('Select all', style: TextStyle(fontSize: 13.sp, color: AppColors.accent, fontWeight: FontWeight.w500)),
                               ),
@@ -1126,7 +1139,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                   runSpacing: 8,
                                   children: _classesInScope.map((cls) {
                                     final isSelected = _selectedClasses.contains(cls);
-                                    return GestureDetector(
+                                    return FocusableTap(
+                                      borderRadius: BorderRadius.circular(8.r),
                                       onTap: () {
                                         setState(() {
                                           if (isSelected) {
@@ -1196,7 +1210,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                 Text('Filter by Class', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                                 const Spacer(),
                                 if (_selectedClasses.isNotEmpty)
-                                  GestureDetector(
+                                  FocusableTap(
                                     onTap: () => setState(() => _selectedClasses.clear()),
                                     child: Text('Clear', style: TextStyle(fontSize: 13.sp, color: AppColors.error, fontWeight: FontWeight.w500)),
                                   ),
@@ -1208,7 +1222,8 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                               runSpacing: 8,
                               children: _classesInScope.map((cls) {
                                 final isSelected = _selectedClasses.contains(cls);
-                                return GestureDetector(
+                                return FocusableTap(
+                                  borderRadius: BorderRadius.circular(8.r),
                                   onTap: () => setState(() {
                                     if (isSelected) {
                                       _selectedClasses.remove(cls);
@@ -1243,7 +1258,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(8.r),
-                                      border: Border.all(color: AppColors.border),
+                                      border: Border.all(color: _pendingFeeTerms.isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5),
                                     ),
                                     child: Row(
                                       children: [
@@ -1254,10 +1269,10 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                                 : _pendingFeeTerms.length == 1
                                                     ? _pendingFeeTerms.first
                                                     : '${_pendingFeeTerms.length} terms',
-                                            style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                                            style: TextStyle(fontSize: 13.sp, color: _pendingFeeTerms.isNotEmpty ? AppColors.accent : AppColors.textPrimary, fontWeight: _pendingFeeTerms.isNotEmpty ? FontWeight.w600 : FontWeight.w500),
                                           ),
                                         ),
-                                        const AppIcon.linear('Chevron Down', size: 18),
+                                        const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                                       ],
                                     ),
                                   ),
@@ -1271,27 +1286,32 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   // Description
                   Text('Description', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
                   SizedBox(height: 8.h),
-                  TextField(
-                    controller: _descController,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      hintText: 'Enter notice description...',
-                      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    style: TextStyle(fontSize: 14.sp),
-                  ),
+                  Builder(builder: (context) {
+                    final filled = _descController.text.trim().isNotEmpty;
+                    final idle = filled ? AppColors.accent : AppColors.border;
+                    return TextField(
+                      controller: _descController,
+                      maxLines: 5,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Enter notice description...',
+                        hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.5), fontSize: 13),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: BorderSide(color: idle, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: TextStyle(fontSize: 14.sp, color: filled ? AppColors.accent : null, fontWeight: filled ? FontWeight.w600 : null),
+                    );
+                  }),
                   SizedBox(height: 20.h),
 
                   // Priority & Category row
                   Row(
                     children: [
-                      Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v!))),
+                      Expanded(child: _buildDropdown('Priority', _priority, _priorities, (v) => setState(() => _priority = v))),
                       SizedBox(width: 16.w),
-                      Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v!))),
+                      Expanded(child: _buildDropdown('Category', _category, _categories, (v) => setState(() => _category = v))),
                     ],
                   ),
                   SizedBox(height: 20.h),
@@ -1313,12 +1333,12 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   Row(
                     children: [
                       Expanded(
-                        child: GestureDetector(
+                        child: FocusableTap(
                           onTap: () => _pickDate(true),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: _fromDate != null ? AppColors.accent : AppColors.border),
+                              border: Border.all(color: _fromDate != null ? AppColors.accent : AppColors.border, width: 1.5),
                               borderRadius: BorderRadius.circular(10.r),
                               color: AppColors.surface,
                             ),
@@ -1330,7 +1350,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                   _fromDate != null
                                       ? '${_fromDate!.day.toString().padLeft(2,'0')}/${_fromDate!.month.toString().padLeft(2,'0')}/${_fromDate!.year}'
                                       : 'From Date',
-                                  style: TextStyle(fontSize: 13.sp, color: _fromDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: _fromDate != null ? FontWeight.w600 : FontWeight.normal, color: _fromDate != null ? AppColors.accent : AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -1342,24 +1362,24 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                         child: Text('—', style: TextStyle(color: AppColors.textSecondary)),
                       ),
                       Expanded(
-                        child: GestureDetector(
+                        child: FocusableTap(
                           onTap: () => _pickDate(false),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
-                              border: Border.all(color: _toDate != null ? AppColors.error : AppColors.border),
+                              border: Border.all(color: _toDate != null ? AppColors.accent : AppColors.border, width: 1.5),
                               borderRadius: BorderRadius.circular(10.r),
                               color: AppColors.surface,
                             ),
                             child: Row(
                               children: [
-                                AppIcon('calendar-remove', size: 15, color: _toDate != null ? AppColors.error : AppColors.textSecondary),
+                                AppIcon('calendar-remove', size: 15, color: _toDate != null ? AppColors.accent : AppColors.textSecondary),
                                 SizedBox(width: 8.w),
                                 Text(
                                   _toDate != null
                                       ? '${_toDate!.day.toString().padLeft(2,'0')}/${_toDate!.month.toString().padLeft(2,'0')}/${_toDate!.year}'
                                       : 'To Date (Auto-expire)',
-                                  style: TextStyle(fontSize: 13.sp, color: _toDate != null ? AppColors.textPrimary : AppColors.textSecondary),
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: _toDate != null ? FontWeight.w600 : FontWeight.normal, color: _toDate != null ? AppColors.accent : AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -1404,7 +1424,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                 color: _priorityColorForPreview.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6.r),
                               ),
-                              child: Text(_priority, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColorForPreview)),
+                              child: Text(_priority ?? 'Normal', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _priorityColorForPreview)),
                             ),
                             SizedBox(width: 8.w),
                             Container(
@@ -1413,7 +1433,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                                 color: AppColors.surface,
                                 borderRadius: BorderRadius.circular(6.r),
                               ),
-                              child: Text(_category, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                              child: Text(_category ?? 'General', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                             ),
                             SizedBox(width: 8.w),
                             AppIcon('people', size: 12, color: AppColors.textSecondary.withValues(alpha: 0.6)),
@@ -1449,6 +1469,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                   ),
                 ],
               ),
+              ),
             ),
           ),
         ),
@@ -1457,7 +1478,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
   }
 
   Color get _priorityColorForPreview {
-    switch (_priority.toLowerCase()) {
+    switch ((_priority ?? 'Normal').toLowerCase()) {
       case 'high':
       case 'urgent':
         return AppColors.error;
@@ -1478,7 +1499,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
       children: [
         Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)),
         SizedBox(height: 8.h),
-        GestureDetector(
+        FocusableTap(
           onTap: () async {
             final picked = await showDatePicker(
               context: context,
@@ -1493,7 +1514,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10.r),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: selectedDate != null ? AppColors.accent : AppColors.border, width: 1.5),
             ),
             child: Row(
               children: [
@@ -1502,11 +1523,12 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
                     selectedDate != null ? _formatDateDisplay(selectedDate) : 'Select date...',
                     style: TextStyle(
                       fontSize: 13.sp,
-                      color: selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.5),
+                      fontWeight: selectedDate != null ? FontWeight.w600 : FontWeight.normal,
+                      color: selectedDate != null ? AppColors.accent : AppColors.textSecondary.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
-                AppIcon('calendar-1', size: 16, color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                AppIcon('calendar-1', size: 16, color: selectedDate != null ? AppColors.accent : AppColors.textSecondary.withValues(alpha: 0.6)),
               ],
             ),
           ),
@@ -1515,7 +1537,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
     );
   }
 
-  Widget _buildDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1525,7 +1547,7 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: value != null ? AppColors.accent : AppColors.border, width: 1.5),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -1534,7 +1556,10 @@ class _CreateNoticeFormState extends State<_CreateNoticeForm> {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               elevation: 6,
+              hint: Text('Select ${label.toLowerCase()}', style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary.withValues(alpha: 0.6))),
+              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
               style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+              selectedItemBuilder: (context) => items.map((i) => Align(alignment: Alignment.centerLeft, child: Text(i, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
               items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
               onChanged: onChanged,
             ),
