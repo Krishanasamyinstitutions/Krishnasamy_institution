@@ -728,9 +728,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      decoration: _inputDec('Select institution type'),
+                      decoration: _inputDec('Select institution type', filled: _institutionType != null),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
-                      items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+                      items: _institutionTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))).toList(),
+                      selectedItemBuilder: (context) => _institutionTypes.map((t) => Align(alignment: Alignment.centerLeft, child: Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))).toList(),
                       onChanged: (v) => setState(() => _institutionType = v),
                     ),
                   ),
@@ -739,9 +741,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Institution Name *'),
                   TextFormField(
                     controller: _institutionNameController,
-                    decoration: _inputDec('Enter institution name').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter institution name', filled: _institutionNameController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_institutionNameController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (_) => setState(() {}),
                     validator: (v) => _vRequiredMax(v, 80, 'Institution name'),
                   ),
                 ]),
@@ -814,9 +817,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Short Name *'),
                   TextFormField(
                     controller: _institutionShortNameController,
-                    decoration: _inputDec('e.g. KCET').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('e.g. KCET', filled: _institutionShortNameController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_institutionShortNameController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (_) => setState(() {}),
                     validator: (v) => _vRequiredMax(v, 30, 'Short name'),
                   ),
                 ]),
@@ -824,10 +828,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Institution Code *'),
                   TextFormField(
                     controller: _institutionCodeController,
-                    decoration: _inputDec('Enter code').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter code', filled: _institutionCodeController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_institutionCodeController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                    onChanged: (_) => setState(() {}),
                     validator: (v) => _vRequiredMax(v, 10, 'Code'),
                   ),
                 ]),
@@ -840,7 +845,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   InkWell(
                     onTap: _pickInstitutionStartDate,
                     child: InputDecorator(
-                      decoration: _inputDec('Select date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
+                      decoration: _inputDec('Select date', filled: _institutionStartDate != null).copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                       child: Text(
                         _institutionStartDate != null ? _formatDate(_institutionStartDate!) : 'Select date',
                         style: TextStyle(color: _institutionStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _institutionStartDate != null ? FontWeight.w600 : FontWeight.normal),
@@ -852,9 +857,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Authorized Username'),
                   TextFormField(
                     controller: _authorizedUsernameController,
-                    decoration: _inputDec('Enter authorized username').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter authorized username', filled: _authorizedUsernameController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_authorizedUsernameController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (_) => setState(() {}),
                     validator: (v) => _vOptionalMax(v, 50, 'Authorized username'),
                   ),
                 ]),
@@ -862,9 +868,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Designation'),
                   TextFormField(
                     controller: _designationController,
-                    decoration: _inputDec('Enter designation').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter designation', filled: _designationController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_designationController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (_) => setState(() {}),
                     validator: (v) => _vOptionalMax(v, 30, 'Designation'),
                   ),
                 ]),
@@ -876,11 +883,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Mobile Number'),
                   TextFormField(
                     controller: _mobileNumberController,
-                    decoration: _inputDec('Enter mobile number').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter mobile number', filled: _mobileNumberController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_mobileNumberController.text.trim().isNotEmpty),
                     keyboardType: TextInputType.phone,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                    onChanged: (_) => setState(() {}),
                     validator: _vMobile10,
                   ),
                 ]),
@@ -893,9 +901,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      decoration: _inputDec('Select'),
+                      decoration: _inputDec('Select', filled: true),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       style: _fieldStyle(),
-                      items: const [DropdownMenuItem(value: 'Yes', child: Text('Yes')), DropdownMenuItem(value: 'No', child: Text('No'))],
+                      items: const [DropdownMenuItem(value: 'Yes', child: Text('Yes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary))), DropdownMenuItem(value: 'No', child: Text('No', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))],
+                      selectedItemBuilder: (context) => const [Align(alignment: Alignment.centerLeft, child: Text('Yes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary))), Align(alignment: Alignment.centerLeft, child: Text('No', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))],
                       onChanged: (v) { if (v != null) setState(() => _institutionRecognized = v); },
                     ),
                   ),
@@ -904,10 +914,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Email *'),
                   TextFormField(
                     controller: _emailController,
-                    decoration: _inputDec('Enter email address').copyWith(errorMaxLines: 2),
-                    style: _fieldStyle(),
+                    decoration: _inputDec('Enter email address', filled: _emailController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                    style: _fieldStyleFilled(_emailController.text.trim().isNotEmpty),
                     keyboardType: TextInputType.emailAddress,
                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                    onChanged: (_) => setState(() {}),
                     validator: _vEmail,
                   ),
                 ]),
@@ -919,24 +930,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _fieldLabel('Activation Code *'),
                   TextFormField(
                     controller: _activationCodeController,
-                    decoration: _inputDec('Enter activation code').copyWith(
+                    decoration: _inputDec('Enter activation code', filled: _activationCodeController.text.trim().isNotEmpty).copyWith(
                       errorMaxLines: 2,
                       suffixIcon: _codeValidated == true
                           ? const Icon(Icons.check_circle, color: Colors.green, size: 18)
                           : (_codeValidated == false ? const Icon(Icons.cancel, color: Colors.red, size: 18) : null),
                     ),
-                    style: _fieldStyle(),
+                    style: _fieldStyleFilled(_activationCodeController.text.trim().isNotEmpty),
                     autovalidateMode: AutovalidateMode.onUserInteraction,
                     onChanged: (v) {
                       // Any edit after a successful verify invalidates the
                       // gate so the cashier can't tamper with a verified
                       // code and slip past.
                       if (_codeValidated != null && v.trim() != _validatedCodeSnapshot) {
-                        setState(() {
-                          _codeValidated = null;
-                          _codeValidationMsg = null;
-                        });
+                        _codeValidated = null;
+                        _codeValidationMsg = null;
                       }
+                      // Recolor the field live (amber when it has a value).
+                      setState(() {});
                     },
                     validator: (v) {
                       final s = v?.trim() ?? '';
@@ -1056,9 +1067,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _fieldLabel('Institution Affiliation'),
                       TextFormField(
                         controller: _affiliationController,
-                        decoration: _inputDec('Enter affiliation').copyWith(errorMaxLines: 2),
-                        style: _fieldStyle(),
+                        decoration: _inputDec('Enter affiliation', filled: _affiliationController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                        style: _fieldStyleFilled(_affiliationController.text.trim().isNotEmpty),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
+                        onChanged: (_) => setState(() {}),
                         validator: (v) => _vOptionalMax(v, 70, 'Affiliation'),
                       ),
                     ]),
@@ -1066,9 +1078,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _fieldLabel('Affiliation Number'),
                       TextFormField(
                         controller: _affiliationNumberController,
-                        decoration: _inputDec('Enter affiliation number').copyWith(errorMaxLines: 2),
-                        style: _fieldStyle(),
+                        decoration: _inputDec('Enter affiliation number', filled: _affiliationNumberController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                        style: _fieldStyleFilled(_affiliationNumberController.text.trim().isNotEmpty),
                         autovalidateMode: AutovalidateMode.onUserInteraction,
+                        onChanged: (_) => setState(() {}),
                         validator: (v) => _vOptionalMax(v, 25, 'Affiliation number'),
                       ),
                     ]),
@@ -1077,7 +1090,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       InkWell(
                         onTap: _pickAffiliationStartYear,
                         child: InputDecorator(
-                          decoration: _inputDec('Select year').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
+                          decoration: _inputDec('Select year', filled: _affiliationStartYear != null).copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                           child: Text(
                             _affiliationStartYear != null ? '${_affiliationStartYear!.year}' : 'Select year',
                             style: TextStyle(color: _affiliationStartYear != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _affiliationStartYear != null ? FontWeight.w600 : FontWeight.normal),
@@ -1133,9 +1146,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Address Line 1 *'),
                     TextFormField(
                       controller: _address1Controller,
-                      decoration: _inputDec('Enter address line 1').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter address line 1', filled: _address1Controller.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_address1Controller.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vRequiredMax(v, 60, 'Address'),
                     ),
                   ]),
@@ -1143,9 +1157,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Address Line 2'),
                     TextFormField(
                       controller: _address2Controller,
-                      decoration: _inputDec('Enter address line 2').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter address line 2', filled: _address2Controller.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_address2Controller.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vOptionalMax(v, 60, 'Address'),
                     ),
                   ]),
@@ -1153,9 +1168,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Address Line 3'),
                     TextFormField(
                       controller: _address3Controller,
-                      decoration: _inputDec('Enter address line 3').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter address line 3', filled: _address3Controller.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_address3Controller.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vOptionalMax(v, 60, 'Address'),
                     ),
                   ]),
@@ -1166,11 +1182,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Pin Code *'),
                     TextFormField(
                       controller: _pinCodeController,
-                      decoration: _inputDec('Enter pin code').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter pin code', filled: _pinCodeController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_pinCodeController.text.trim().isNotEmpty),
                       keyboardType: TextInputType.number,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                      onChanged: (_) => setState(() {}),
                       validator: _vPincode,
                     ),
                   ]),
@@ -1178,9 +1195,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('City'),
                     TextFormField(
                       controller: _cityController,
-                      decoration: _inputDec('Enter city').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter city', filled: _cityController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_cityController.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vOptionalMax(v, 50, 'City'),
                     ),
                   ]),
@@ -1188,9 +1206,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('State'),
                     TextFormField(
                       controller: _stateController,
-                      decoration: _inputDec('Enter state').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter state', filled: _stateController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_stateController.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vOptionalMax(v, 35, 'State'),
                     ),
                   ]),
@@ -1198,9 +1217,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Country'),
                     TextFormField(
                       controller: _countryController,
-                      decoration: _inputDec('Enter country').copyWith(errorMaxLines: 2),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter country', filled: _countryController.text.trim().isNotEmpty).copyWith(errorMaxLines: 2),
+                      style: _fieldStyleFilled(_countryController.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vOptionalMax(v, 35, 'Country'),
                     ),
                   ]),
@@ -1252,8 +1272,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Year Label *'),
                     TextFormField(
                       controller: _yearLabelController,
-                      decoration: _inputDec('e.g. 2025-2026'),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('e.g. 2025-2026', filled: _yearLabelController.text.trim().isNotEmpty),
+                      style: _fieldStyleFilled(_yearLabelController.text.trim().isNotEmpty),
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                     ),
                   ]),
@@ -1265,10 +1286,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (picked != null) setState(() => _yearStartDate = picked);
                       },
                       child: InputDecorator(
-                        decoration: _inputDec('Select start date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
+                        decoration: _inputDec('Select start date', filled: _yearStartDate != null).copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearStartDate != null ? _formatDate(_yearStartDate!) : 'Select start date',
-                          style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+                          style: TextStyle(color: _yearStartDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _yearStartDate != null ? FontWeight.w600 : FontWeight.normal),
                         ),
                       ),
                     ),
@@ -1281,10 +1302,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (picked != null) setState(() => _yearEndDate = picked);
                       },
                       child: InputDecorator(
-                        decoration: _inputDec('Select end date').copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
+                        decoration: _inputDec('Select end date', filled: _yearEndDate != null).copyWith(suffixIcon: AppIcon('calendar-1', size: 18, color: AppColors.textSecondary)),
                         child: Text(
                           _yearEndDate != null ? _formatDate(_yearEndDate!) : 'Select end date',
-                          style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+                          style: TextStyle(color: _yearEndDate != null ? AppColors.textPrimary : AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13, fontWeight: _yearEndDate != null ? FontWeight.w600 : FontWeight.normal),
                         ),
                       ),
                     ),
@@ -1348,12 +1369,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Admin Name *'),
                     TextFormField(
                       controller: _adminNameController,
-                      decoration: _inputDec('Enter admin name').copyWith(
+                      decoration: _inputDec('Enter admin name', filled: _adminNameController.text.trim().isNotEmpty).copyWith(
                         prefixIcon: AppIcon('user', size: 14, color: AppColors.textSecondary),
                         errorMaxLines: 2,
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyleFilled(_adminNameController.text.trim().isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: (v) => _vRequiredMax(v, 50, 'Admin name'),
                     ),
                   ]),
@@ -1366,11 +1388,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         dropdownColor: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         elevation: 6,
-                        decoration: _inputDec('Select designation').copyWith(
+                        decoration: _inputDec('Select designation', filled: true).copyWith(
                           prefixIcon: AppIcon('personalcard', size: 14, color: AppColors.textSecondary),
                         ),
+                        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                         style: _fieldStyle(),
-                        items: _designationOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        items: _designationOptions.map((d) => DropdownMenuItem(value: d, child: Text(d, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))).toList(),
+                        selectedItemBuilder: (context) => _designationOptions.map((d) => Align(alignment: Alignment.centerLeft, child: Text(d, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)))).toList(),
                         onChanged: (v) => setState(() => _adminDesignation = v ?? 'Principal'),
                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                       ),
@@ -1384,13 +1408,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Admin Email *'),
                     TextFormField(
                       controller: _adminEmailController,
-                      decoration: _inputDec('Enter email').copyWith(
+                      decoration: _inputDec('Enter email', filled: _adminEmailController.text.trim().isNotEmpty).copyWith(
                         prefixIcon: AppIcon('sms', size: 12, color: AppColors.textSecondary),
                         errorMaxLines: 2,
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyleFilled(_adminEmailController.text.trim().isNotEmpty),
                       keyboardType: TextInputType.emailAddress,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      onChanged: (_) => setState(() {}),
                       validator: _vEmail,
                     ),
                   ]),
@@ -1398,14 +1423,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     _fieldLabel('Admin Phone *'),
                     TextFormField(
                       controller: _adminPhoneController,
-                      decoration: _inputDec('Enter phone').copyWith(
+                      decoration: _inputDec('Enter phone', filled: _adminPhoneController.text.trim().isNotEmpty).copyWith(
                         prefixIcon: AppIcon('call', size: 12, color: AppColors.textSecondary),
                         errorMaxLines: 2,
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyleFilled(_adminPhoneController.text.trim().isNotEmpty),
                       keyboardType: TextInputType.phone,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                      onChanged: (_) => setState(() {}),
                       validator: _vMobile10,
                     ),
                   ]),
@@ -1418,7 +1444,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
-                      decoration: _inputDec('Enter password').copyWith(
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDec('Enter password', filled: _passwordController.text.isNotEmpty).copyWith(
                         prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
                         // Compact tap target — IconButton's default 48×48 hit
                         // area gets clipped inside the smaller field height,
@@ -1437,7 +1464,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyleFilled(_passwordController.text.isNotEmpty),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: _vPassword,
                     ),
@@ -1447,7 +1474,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirm,
-                      decoration: _inputDec('Re-enter password').copyWith(
+                      onChanged: (_) => setState(() {}),
+                      decoration: _inputDec('Re-enter password', filled: _confirmPasswordController.text.isNotEmpty).copyWith(
                         prefixIcon: AppIcon('lock', size: 18, color: AppColors.textSecondary),
                         suffixIcon: InkWell(
                           onTap: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -1463,7 +1491,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyleFilled(_confirmPasswordController.text.isNotEmpty),
                       validator: (v) {
                         if (v != _passwordController.text) return 'Passwords do not match';
                         return null;
@@ -1531,6 +1559,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   TextStyle _fieldStyle() => TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary);
 
+  // Normal value style — standard dark colour. The [filled] flag is retained
+  // for call-site compatibility but no longer changes the colour.
+  TextStyle _fieldStyleFilled(bool filled) => TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+        color: AppColors.textPrimary,
+      );
+
   static const Color _kFieldFill = Color(0xFFF3F4F6);
 
   // ── Validators (mapped to public.institution column types) ───
@@ -1571,20 +1607,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  InputDecoration _inputDec(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13, fontWeight: FontWeight.w500),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-    errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error)),
-    focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
-    filled: true,
-    fillColor: Colors.white,
-    isDense: false,
-    constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
-    suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 16, maxHeight: 16),
-    prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 16, maxHeight: 16),
-  );
+  // Standard decoration: grey border idle, navy (primary) border on focus.
+  // The [filled] param is retained but no longer affects the border.
+  InputDecoration _inputDec(String hint, {bool filled = false}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13, fontWeight: FontWeight.w500),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
+      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
+      filled: true,
+      fillColor: Colors.white,
+      isDense: false,
+      constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
+      suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 16, maxHeight: 16),
+      prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 16, maxHeight: 16),
+    );
+  }
 }

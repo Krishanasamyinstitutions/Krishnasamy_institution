@@ -861,7 +861,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> wit
                       dropdownColor: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
-                      icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                      icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                       style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
                       items: _bankOptions
                           .map((b) => DropdownMenuItem(value: b, child: Text(b)))

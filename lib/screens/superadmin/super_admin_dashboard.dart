@@ -17,6 +17,7 @@ import '../../utils/formatters.dart';
 import '../auth/register_screen.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../utils/friendly_error.dart';
@@ -187,7 +188,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         child: DropdownButton<String>(
           value: _selectedYear,
           isDense: true,
-          icon: const AppIcon('arrow-down-1', size: 14, color: AppColors.textSecondary),
+          icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -606,15 +607,20 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   alignment: Alignment.centerLeft,
                   minWidth: _sidebarCollapsed ? 78 : 240,
                   maxWidth: _sidebarCollapsed ? 78 : 240,
-                  child: _buildSidebar(context, _sidebarCollapsed),
+                  // Keep the sidebar out of keyboard Tab traversal so tabbing
+                  // through a form doesn't jump into the nav menu between rows.
+                  child: ExcludeFocus(child: _buildSidebar(context, _sidebarCollapsed)),
                 ),
               ),
             ),
           Expanded(
             child: Column(
               children: [
-                _buildTopBar(context, isDesktop),
-                Expanded(child: _buildContent(context)),
+                // Top bar kept out of Tab traversal (mouse-operated chrome).
+                ExcludeFocus(child: _buildTopBar(context, isDesktop)),
+                // FocusTraversalGroup keeps a page's form fields tabbing as one
+                // contiguous unit, independent of the surrounding chrome.
+                Expanded(child: FocusTraversalGroup(child: _buildContent(context))),
               ],
             ),
           ),
@@ -814,6 +820,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          // Mouse-only: never take keyboard focus so Tab in a form never
+          // lands on a nav item.
+          canRequestFocus: false,
           onTap: () {
             final prevIndex = _selectedNavIndex;
             setState(() {
@@ -1289,10 +1298,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                       padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
                       child: Row(
                         children: [
-                          AppIcon('buildings-2', size: 18, color: AppColors.accent),
-                          SizedBox(width: 8.w),
-                          Text('Institutions Overview',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          const CardTitleBlock(icon: 'buildings-2', title: 'Institutions Overview', subtitle: 'summary across every institution'),
                           const Spacer(),
                           Text('${_institutionSummaries.length} institutes',
                               style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
@@ -2411,10 +2417,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      AppIcon('buildings-2', size: 18, color: AppColors.accent),
-                      const SizedBox(width: 8),
-                      const Text('All Institutions',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const CardTitleBlock(icon: 'buildings-2', title: 'All Institutions', subtitle: 'manage every institution on the platform'),
                       const SizedBox(width: 10),
                       Text('${_institutions.length} institutes',
                           style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
@@ -4356,14 +4359,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
     return null;
   }
 
-  InputDecoration _inputDec(String hint, {Widget? suffix}) => InputDecoration(
+  // [filled] = the field has a value. Filled fields get an amber (accent)
+  // border; empty fields stay grey; the focused border is always amber.
+  InputDecoration _inputDec(String hint, {Widget? suffix, bool filled = false}) => InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.55), fontSize: 13, fontWeight: FontWeight.w500),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: filled ? AppColors.accent : AppColors.border, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: filled ? AppColors.accent : AppColors.border, width: 1.5)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
         focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
         filled: true,
         fillColor: Colors.white,
@@ -4395,7 +4400,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
               key: _formKey,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(isMobile ? 16 : 20, 20, isMobile ? 16 : 20, 20),
-                child: Column(
+                child: FocusTraversalGroup(
+                  child: Column(
                   children: [
                     Row(
                       children: [
@@ -4430,8 +4436,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                   controller: _usernameCtrl,
                   readOnly: true,
                   canRequestFocus: false,
-                  decoration: _inputDec('Enter username'),
-                  style: _fieldStyle(),
+                  decoration: _inputDec('Enter username', filled: _usernameCtrl.text.trim().isNotEmpty),
+                  style: _fieldStyle().copyWith(color: _usernameCtrl.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
                 ),
                 const SizedBox(height: 14),
@@ -4440,8 +4446,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                   controller: _emailCtrl,
                   readOnly: true,
                   canRequestFocus: false,
-                  decoration: _inputDec('Enter email'),
-                  style: _fieldStyle(),
+                  decoration: _inputDec('Enter email', filled: _emailCtrl.text.trim().isNotEmpty),
+                  style: _fieldStyle().copyWith(color: _emailCtrl.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   validator: _validateEmail,
@@ -4454,8 +4460,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                       controller: _usernameCtrl,
                       readOnly: true,
                       canRequestFocus: false,
-                      decoration: _inputDec('Enter username'),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter username', filled: _usernameCtrl.text.trim().isNotEmpty),
+                      style: _fieldStyle().copyWith(color: _usernameCtrl.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Username required' : null,
                     ),
                   ])),
@@ -4466,8 +4472,8 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                       controller: _emailCtrl,
                       readOnly: true,
                       canRequestFocus: false,
-                      decoration: _inputDec('Enter email'),
-                      style: _fieldStyle(),
+                      decoration: _inputDec('Enter email', filled: _emailCtrl.text.trim().isNotEmpty),
+                      style: _fieldStyle().copyWith(color: _emailCtrl.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
                       validator: _validateEmail,
@@ -4480,8 +4486,9 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 controller: _phoneCtrl,
                 readOnly: true,
                 canRequestFocus: false,
-                decoration: _inputDec('Enter 10-digit mobile number'),
-                style: _fieldStyle(),
+                decoration: _inputDec('Enter 10-digit mobile number', filled: _phoneCtrl.text.trim().isNotEmpty),
+                style: _fieldStyle().copyWith(color: _phoneCtrl.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+                onChanged: (_) => setState(() {}),
                 keyboardType: TextInputType.phone,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
@@ -4531,14 +4538,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
               TextFormField(
                 controller: _currentPwdCtrl,
                 obscureText: !_showCurrent,
+                onChanged: (_) => setState(() {}),
                 decoration: _inputDec(
                   'Enter current password',
+                  filled: _currentPwdCtrl.text.isNotEmpty,
                   suffix: IconButton(
                     icon: AppIcon(_showCurrent ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
                     onPressed: () => setState(() => _showCurrent = !_showCurrent),
                   ),
                 ),
-                style: _fieldStyle(),
+                style: _fieldStyle().copyWith(color: _currentPwdCtrl.text.isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                 validator: (v) => (v == null || v.isEmpty) ? 'Required to confirm changes' : null,
               ),
               const SizedBox(height: 14),
@@ -4547,14 +4556,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 TextFormField(
                   controller: _newPwdCtrl,
                   obscureText: !_showNew,
+                  onChanged: (_) => setState(() {}),
                   decoration: _inputDec(
                     'Leave blank to keep current',
+                    filled: _newPwdCtrl.text.isNotEmpty,
                     suffix: IconButton(
                       icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
                       onPressed: () => setState(() => _showNew = !_showNew),
                     ),
                   ),
-                  style: _fieldStyle(),
+                  style: _fieldStyle().copyWith(color: _newPwdCtrl.text.isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                   validator: (v) {
                     if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
                     return null;
@@ -4565,14 +4576,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                 TextFormField(
                   controller: _confirmPwdCtrl,
                   obscureText: !_showConfirm,
+                  onChanged: (_) => setState(() {}),
                   decoration: _inputDec(
                     'Re-enter new password',
+                    filled: _confirmPwdCtrl.text.isNotEmpty,
                     suffix: IconButton(
                       icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
                       onPressed: () => setState(() => _showConfirm = !_showConfirm),
                     ),
                   ),
-                  style: _fieldStyle(),
+                  style: _fieldStyle().copyWith(color: _confirmPwdCtrl.text.isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                   validator: (v) {
                     if (_newPwdCtrl.text.isEmpty) return null;
                     if (v != _newPwdCtrl.text) return 'Passwords do not match';
@@ -4586,14 +4599,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     TextFormField(
                       controller: _newPwdCtrl,
                       obscureText: !_showNew,
+                      onChanged: (_) => setState(() {}),
                       decoration: _inputDec(
                         'Leave blank to keep current',
+                        filled: _newPwdCtrl.text.isNotEmpty,
                         suffix: IconButton(
                           icon: AppIcon(_showNew ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
                           onPressed: () => setState(() => _showNew = !_showNew),
                         ),
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyle().copyWith(color: _newPwdCtrl.text.isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                       validator: (v) {
                         if (v != null && v.isNotEmpty && v.length < 6) return 'Min 6 characters';
                         return null;
@@ -4606,14 +4621,16 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
                     TextFormField(
                       controller: _confirmPwdCtrl,
                       obscureText: !_showConfirm,
+                      onChanged: (_) => setState(() {}),
                       decoration: _inputDec(
                         'Re-enter new password',
+                        filled: _confirmPwdCtrl.text.isNotEmpty,
                         suffix: IconButton(
                           icon: AppIcon(_showConfirm ? 'eye-slash' : 'eye', size: 12, color: AppColors.textSecondary),
                           onPressed: () => setState(() => _showConfirm = !_showConfirm),
                         ),
                       ),
-                      style: _fieldStyle(),
+                      style: _fieldStyle().copyWith(color: _confirmPwdCtrl.text.isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                       validator: (v) {
                         if (_newPwdCtrl.text.isEmpty) return null;
                         if (v != _newPwdCtrl.text) return 'Passwords do not match';
@@ -4645,6 +4662,7 @@ class _SuperAdminSettingsState extends State<_SuperAdminSettings> {
               ),
             ],
                   ),
+                ),
                 ),
               ),
             ),
@@ -4845,10 +4863,7 @@ class _AggregateDrilldownPage extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                       child: Row(
                         children: [
-                          AppIcon('buildings-2', size: 18, color: AppColors.accent),
-                          const SizedBox(width: 8),
-                          const Text('Institution Breakdown',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                          const CardTitleBlock(icon: 'buildings-2', title: 'Institution Breakdown', subtitle: 'fee performance per institution'),
                           const Spacer(),
                           Text('${filtered.length} institutes',
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),

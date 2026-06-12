@@ -7,6 +7,7 @@ import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 
 /// Bank account master for the active institution. Each row represents a
 /// beneficiary account a fee group can route to (school's main account,
@@ -274,7 +275,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       ),
       child: Form(
         key: _formKey,
-        child: Column(
+        child: FocusTraversalGroup(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -385,6 +387,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -411,8 +414,9 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           autovalidateMode: AutovalidateMode.onUserInteraction,
-          decoration: _inputDecoration(context, hint ?? '').copyWith(errorMaxLines: 3),
-          style: _inputTextStyle(context),
+          onChanged: (_) => setState(() {}),
+          decoration: _inputDecoration(context, hint ?? '', filled: controller.text.trim().isNotEmpty).copyWith(errorMaxLines: 3),
+          style: _inputTextStyle(context, filled: controller.text.trim().isNotEmpty),
           validator: validator ?? (required ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null : null),
         ),
       ],
@@ -490,10 +494,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
             child: Row(
               children: [
-                const AppIcon('category-2', size: 18, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Fee Group Assignments',
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const CardTitleBlock(icon: 'category-2', title: 'Fee Group Assignments', subtitle: 'map fee groups to their collection bank'),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -571,12 +572,13 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                             flex: 4,
                             child: DropdownButtonFormField<int?>(
                               value: currentBanId,
+                              icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                               isExpanded: true,
                               dropdownColor: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               elevation: 6,
-                              decoration: _inputDecoration(context, '- No account -'),
-                              style: _inputTextStyle(context),
+                              decoration: _inputDecoration(context, '- No account -', filled: currentBanId != null),
+                              style: _inputTextStyle(context, filled: currentBanId != null),
                               hint: Text('- No account -', style: _inputTextStyle(context)),
                               items: [
                                 DropdownMenuItem<int?>(
@@ -592,6 +594,11 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
+                              ],
+                              selectedItemBuilder: (context) => [
+                                Align(alignment: Alignment.centerLeft, child: Text('- No account -', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                                for (final b in _banks)
+                                  Align(alignment: Alignment.centerLeft, child: Text('${b['banname']} • ${b['banaccno']}', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
                               ],
                               onChanged: fgId == null ? null : (v) => _assignBank(fgId, v),
                             ),
@@ -622,10 +629,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
             padding: EdgeInsets.only(left: 4.w, right: 4.w, bottom: 8.h),
             child: Row(
               children: [
-                AppIcon('bank', size: 18, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Bank Accounts',
-                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                const CardTitleBlock(icon: 'bank', title: 'Bank Accounts', subtitle: 'all bank accounts in this institution'),
                 const Spacer(),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
@@ -918,39 +922,40 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(BuildContext context, String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint, {bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     final textSize = compact ? 11.0 : 14.0;
     final hPad = compact ? 8.0 : 14.0;
     final vPad = compact ? 5.0 : 14.0;
     final radius = compact ? 5.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
       contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.accent),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
       ),
       filled: true,
       fillColor: Colors.white,
     );
   }
 
-  TextStyle _inputTextStyle(BuildContext context) {
+  TextStyle _inputTextStyle(BuildContext context, {bool filled = false}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
     return TextStyle(
-      fontWeight: FontWeight.w500,
+      fontWeight: filled ? FontWeight.w600 : FontWeight.w500,
       fontSize: compact ? 11 : 14,
-      color: const Color(0xFF555555),
+      color: filled ? AppColors.accent : const Color(0xFF555555),
     );
   }
 }

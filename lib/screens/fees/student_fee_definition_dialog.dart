@@ -187,10 +187,15 @@ class _StudentFeeDefinitionDialogState extends State<StudentFeeDefinitionDialog>
                       : Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // semester list
-                            SizedBox(width: 170.w, child: _semList()),
+                            // semester (TERMS) list — kept out of Tab traversal
+                            // so tabbing through the amount fields doesn't jump
+                            // into this internal menu. Still mouse-clickable.
+                            ExcludeFocusTraversal(
+                              child: SizedBox(width: 170.w, child: _semList()),
+                            ),
                             const VerticalDivider(width: 1, color: AppColors.border),
-                            Expanded(child: _table()),
+                            // Amount fields tab as one contiguous reading-order group.
+                            Expanded(child: FocusTraversalGroup(child: _table())),
                           ],
                         ),
             ),
@@ -252,13 +257,15 @@ class _StudentFeeDefinitionDialogState extends State<StudentFeeDefinitionDialog>
             separatorBuilder: (_, __) => Divider(height: 1.h, color: AppColors.border.withValues(alpha: 0.5)),
             itemBuilder: (_, i) {
               final r = rows[i];
-              return Padding(
+              return FocusTraversalGroup(child: Container(
+                color: i.isEven ? Colors.white : AppColors.surface,
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 2.h),
                 child: Row(children: [
                   SizedBox(
                     width: 56.w,
                     child: Checkbox(
                       value: r.opted,
+                      activeColor: AppColors.accent,
                       visualDensity: VisualDensity.compact,
                       onChanged: (v) => setState(() => r.opted = v ?? false),
                     ),
@@ -273,11 +280,13 @@ class _StudentFeeDefinitionDialogState extends State<StudentFeeDefinitionDialog>
                       textAlign: TextAlign.right,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                      style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
+                      style: TextStyle(fontSize: 12.sp, color: r.amountCtrl.text.trim().isNotEmpty ? AppColors.accent : AppColors.textPrimary),
                       decoration: InputDecoration(
                         isDense: true,
                         contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: r.amountCtrl.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: r.amountCtrl.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                       ),
                       onChanged: (v) => setState(() {
                         // Typing a positive amount auto-opts the student into
@@ -290,7 +299,7 @@ class _StudentFeeDefinitionDialogState extends State<StudentFeeDefinitionDialog>
                   SizedBox(width: 80.w, child: Text(r.balance.toStringAsFixed(2), textAlign: TextAlign.right, style: c())),
                   SizedBox(width: 80.w, child: Text(r.concession.toStringAsFixed(2), textAlign: TextAlign.right, style: c())),
                 ]),
-              );
+              ));
             },
           ),
         ),

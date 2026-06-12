@@ -21,7 +21,9 @@ import '../../widgets/receipt_widget.dart';
 import 'student_fee_definition_dialog.dart';
 
 import '../../widgets/app_icon.dart';
-const _classOrder = ['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+import '../../widgets/card_title_block.dart';
+import '../../widgets/focusable_tap.dart';
+const _classOrder =['PKG', 'LKG', 'UKG', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 
 int _classIndex(String c) {
   final idx = _classOrder.indexOf(c.toUpperCase());
@@ -64,6 +66,7 @@ class _StudentFeeCollectionScreenState
   final _bankNameController = TextEditingController();
   DateTime? _chequeDate;
   List<Map<String, dynamic>> _studentSuggestions = [];
+  final LayerLink _admSearchLink = LayerLink();
   List<String> _courseList = [];
   String? _selectedCourse;
   List<String> _classList = [];
@@ -753,39 +756,82 @@ class _StudentFeeCollectionScreenState
             ),
           ],
         ),
-        // Floating suggestions popup over the body (doesn't push content down)
+        // Floating suggestions popup anchored under the search field — matches
+        // the Fee Concession concession-popup style: UPPERCASE name + adm no +
+        // class on a single line, first row tinted, hover in accent.
         if (_studentSuggestions.isNotEmpty || _classSuggestions.isNotEmpty)
           Positioned(
-            left: 260,
-            width: 500,
-            top: 115,
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(12),
-              shadowColor: Colors.black.withValues(alpha: 0.15),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 520),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _studentSuggestions.isNotEmpty
-                      ? _studentSuggestions.length
-                      : _classSuggestions.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) {
+            width: _compactCtx ? 260.w : 340.w,
+            child: CompositedTransformFollower(
+              link: _admSearchLink,
+              showWhenUnlinked: false,
+              offset: Offset(0, _compactCtx ? 38 : 50),
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(12.r),
+                color: Colors.white,
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: 480.h),
+                  child: Builder(builder: (_) {
                     final source = _studentSuggestions.isNotEmpty ? _studentSuggestions : _classSuggestions;
-                    final s = source[i];
-                    return ListTile(
-                      dense: true,
-                      title: Text(s['stuname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      subtitle: Text('Roll: ${s['stuadmno']} • ${s['courname'] ?? ''} ${s['stuclass']}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                      onTap: () => _selectSuggestion(s),
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.symmetric(vertical: 4.h),
+                      itemCount: source.length,
+                      itemBuilder: (_, i) {
+                        final s = source[i];
+                        final name = (s['stuname']?.toString() ?? '').toUpperCase();
+                        final admno = s['stuadmno']?.toString() ?? '';
+                        final cls = s['stuclass']?.toString() ?? '';
+                        final selected = i == 0;
+                        return InkWell(
+                          onTap: () => _selectSuggestion(s),
+                          hoverColor: AppColors.accent.withValues(alpha: 0.06),
+                          child: Container(
+                            color: selected ? AppColors.tableHeadBg : Colors.transparent,
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            child: Row(children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: _compactCtx ? 11 : 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              Text(
+                                admno,
+                                style: TextStyle(
+                                  fontSize: _compactCtx ? 10 : 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              if (cls.isNotEmpty) ...[
+                                SizedBox(width: 6.w),
+                                Text('•', style: TextStyle(fontSize: _compactCtx ? 10 : 12, color: AppColors.textLight)),
+                                SizedBox(width: 6.w),
+                                Text(
+                                  cls,
+                                  style: TextStyle(
+                                    fontSize: _compactCtx ? 10 : 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ]),
+                          ),
+                        );
+                      },
                     );
-                  },
+                  }),
                 ),
               ),
             ),
@@ -799,117 +845,115 @@ class _StudentFeeCollectionScreenState
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Single-line bar matching the Fee Collection reference: icon +
+          // title + subtitle on the left, then Standard/Class dropdowns +
+          // search + Clear button all inline on the right.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              AppIcon.linear('search-normal', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('Student Lookup',
-                  style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      )),
+              const CardTitleBlock(icon: 'receipt-2', title: 'Fee Collection', subtitle: 'collect fees for the selected student'),
               const Spacer(),
               SizedBox(
-                height: AppBtn.height(context),
-                child: ElevatedButton.icon(
-                  onPressed: _clear,
-                  icon: AppIcon('refresh', size: AppBtn.iconSize(context), color: Colors.white),
-                  label: const Text('Clear'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
+                width: _compactCtx ? 150.w : 180.w,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedCourse,
+                  isExpanded: true,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                  elevation: 6,
+                  icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                  decoration: _inputDec('Select Standard', filled: _selectedCourse != null),
+                  style: _ddTextStyle(),
+                  hint: Text('Select Standard',
+                      style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: _compactCtx ? 11 : 14)),
+                  items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: _ddItemStyle()))).toList(),
+                  selectedItemBuilder: (context) => _courseList.map((c) => Align(alignment: Alignment.centerLeft, child: Text(c, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: _compactCtx ? 11 : 14, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedCourse = val;
+                      _selectedClass = null;
+                      _classSuggestions = [];
+                      if (val != null && _courseClassMap.containsKey(val)) {
+                        _classList = List<String>.from(_courseClassMap[val]!);
+                      } else if (val != null) {
+                        _classList = List<String>.from(_allClasses);
+                      } else {
+                        _classList = List<String>.from(_allClasses);
+                      }
+                      _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
+                      if (val != null && val.startsWith('M') && _classList.length > 2) {
+                        _classList = _classList.sublist(0, 2);
+                      }
+                    });
+                  },
                 ),
               ),
-            ],
-          ),
-          SizedBox(height: 14.h),
-          // Single-line filter row: Course | Class | Search by Roll/Name.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 34,
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedCourse,
+              SizedBox(width: 10.w),
+              SizedBox(
+                width: _compactCtx ? 150.w : 180.w,
+                child: Builder(builder: (_) {
+                  final seen = <String>{};
+                  final items = <DropdownMenuItem<String>>[];
+                  for (final c in _classList) {
+                    if (c.isEmpty || !seen.add(c)) continue;
+                    items.add(DropdownMenuItem(value: c, child: Text(c, style: _ddItemStyle())));
+                  }
+                  final value = seen.contains(_selectedClass) ? _selectedClass : null;
+                  return DropdownButtonFormField<String>(
+                    key: ValueKey(_selectedCourse),
+                    value: value,
                     isExpanded: true,
                     dropdownColor: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                     elevation: 6,
-                    decoration: _inputDec('Course'),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    items: _courseList.map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600)))).toList(),
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                    decoration: _inputDec('Select Section', filled: value != null),
+                    style: _ddTextStyle(),
+                    hint: Text('Select Section',
+                        style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: _compactCtx ? 11 : 14)),
+                    items: items,
+                    selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text((m.child as Text).data ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: _compactCtx ? 11 : 14, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
                     onChanged: (val) {
                       setState(() {
-                        _selectedCourse = val;
-                        _selectedClass = null;
+                        _selectedClass = val;
+                        _classController.text = val ?? '';
                         _classSuggestions = [];
-                        if (val != null && _courseClassMap.containsKey(val)) {
-                          _classList = List<String>.from(_courseClassMap[val]!);
-                        } else if (val != null) {
-                          _classList = List<String>.from(_allClasses);
-                        } else {
-                          _classList = List<String>.from(_allClasses);
-                        }
-                        _classList.sort((a, b) => _classIndex(a).compareTo(_classIndex(b)));
-                        if (val != null && val.startsWith('M') && _classList.length > 2) {
-                          _classList = _classList.sublist(0, 2);
-                        }
                       });
+                      if (val != null) _searchByClass(val);
                     },
-                  ),
-                ),
+                  );
+                }),
               ),
               SizedBox(width: 10.w),
-              Expanded(
+              CompositedTransformTarget(
+                link: _admSearchLink,
                 child: SizedBox(
-                  height: 34,
-                  child: Builder(builder: (_) {
-                    final seen = <String>{};
-                    final items = <DropdownMenuItem<String>>[];
-                    for (final c in _classList) {
-                      if (c.isEmpty || !seen.add(c)) continue;
-                      items.add(DropdownMenuItem(value: c, child: Text(c, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600))));
-                    }
-                    final value = seen.contains(_selectedClass) ? _selectedClass : null;
-                    return DropdownButtonFormField<String>(
-                      key: ValueKey(_selectedCourse),
-                      value: value,
-                      isExpanded: true,
-                      dropdownColor: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      elevation: 6,
-                      decoration: _inputDec('Class'),
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                      items: items,
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedClass = val;
-                          _classController.text = val ?? '';
-                          _classSuggestions = [];
-                        });
-                        if (val != null) _searchByClass(val);
-                      },
-                    );
-                  }),
-                ),
-              ),
-              SizedBox(width: 10.w),
-              Expanded(
-                child: SizedBox(
-                  height: 34,
+                  width: _compactCtx ? 260.w : 340.w,
                   child: TextField(
                     controller: _admNoController,
                     onSubmitted: (_) => _search(),
-                    onChanged: _searchByAdmNoOrName,
-                    decoration: _inputDec('Search by Roll No or Name'),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                    expands: true,
-                    maxLines: null,
-                    textAlignVertical: TextAlignVertical.center,
+                    onChanged: (v) { setState(() {}); _searchByAdmNoOrName(v); },
+                    decoration: _inputDec('Admission No or Student Name', filled: _admNoController.text.trim().isNotEmpty).copyWith(
+                      prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textLight),
+                    ),
+                    style: _ddTextStyle().copyWith(color: _admNoController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              SizedBox(
+                height: _compactCtx ? 36.0 : 44.0,
+                child: ElevatedButton.icon(
+                  onPressed: _clear,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Clear'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(horizontal: _compactCtx ? 16.w : 22.w),
+                    textStyle: TextStyle(fontSize: _compactCtx ? 11.sp : 13.sp, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_compactCtx ? 6.r : 8.r)),
                   ),
                 ),
               ),
@@ -997,11 +1041,21 @@ class _StudentFeeCollectionScreenState
         SizedBox(width: 16.w),
         Expanded(child: _detailRow('teacher', 'Class', className)),
         SizedBox(width: 12.w),
-        OutlinedButton.icon(
-          onPressed: _openFeeDefinition,
-          icon: const Icon(Icons.fact_check_outlined, size: 16),
-          label: const Text('Fee Definition'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+        SizedBox(
+          height: _compactCtx ? 36.0 : 44.0,
+          child: ElevatedButton.icon(
+            onPressed: _openFeeDefinition,
+            icon: const Icon(Icons.fact_check_outlined, size: 16),
+            label: const Text('Fee Definition'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(horizontal: _compactCtx ? 16.w : 22.w),
+              textStyle: TextStyle(fontSize: _compactCtx ? 11.sp : 13.sp, fontWeight: FontWeight.w700),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_compactCtx ? 6.r : 8.r)),
+            ),
+          ),
         ),
       ],
     );
@@ -1050,14 +1104,20 @@ class _StudentFeeCollectionScreenState
             dropdownColor: Colors.white,
             borderRadius: BorderRadius.circular(12),
             elevation: 6,
+            icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
             decoration: InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _selectedTerm != null ? AppColors.accent : AppColors.border, width: 1.5)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _selectedTerm != null ? AppColors.accent : AppColors.border, width: 1.5)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
             ),
             items: [
               DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp))),
               ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp)))),
+            ],
+            selectedItemBuilder: (context) => [
+              Align(alignment: Alignment.centerLeft, child: Text('All', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+              ..._terms.map((t) => Align(alignment: Alignment.centerLeft, child: Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
             ],
             onChanged: (v) => setState(() => _selectedTerm = v),
           ),
@@ -1123,10 +1183,15 @@ class _StudentFeeCollectionScreenState
                       borderRadius: BorderRadius.circular(12),
                       elevation: 6,
                       style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                      decoration: _headerDropdownDec(),
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+                      decoration: _headerDropdownDec(filled: _selectedTerm != null),
                       items: [
                         DropdownMenuItem<String?>(value: null, child: Text('All', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700))),
                         ..._terms.map((t) => DropdownMenuItem<String?>(value: t, child: Text(t, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis))),
+                      ],
+                      selectedItemBuilder: (context) => [
+                        Align(alignment: Alignment.centerLeft, child: Text('All', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent))),
+                        ..._terms.map((t) => Align(alignment: Alignment.centerLeft, child: Text(t, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))),
                       ],
                       onChanged: (v) => setState(() => _selectedTerm = v),
                     ),
@@ -1250,7 +1315,7 @@ class _StudentFeeCollectionScreenState
             ],
           ),
         ),
-            builder: (context, controller) => ListView.separated(
+            builder: (context, controller) => FocusTraversalGroup(child: ListView.separated(
             controller: controller,
             itemCount: demands.length,
             separatorBuilder: (_, __) =>
@@ -1268,11 +1333,12 @@ class _StudentFeeCollectionScreenState
                   ? _formatDate(dueDate.substring(0, 10))
                   : dueDate;
 
-              return Container(
+              return FocusTraversalGroup(child: Container(
                 key: ValueKey('row-$key'),
-                color: isSelected
-                    ? AppColors.accent.withValues(alpha: 0.04)
-                    : null,
+                // Proper zebra: alternate white / warm stone by row parity,
+                // independent of selection (surface #F9F8F4 was too close to
+                // white to read).
+                color: i.isEven ? Colors.white : AppColors.accent.withValues(alpha: 0.05),
                 padding: EdgeInsets.symmetric(
                     horizontal: 12.w, vertical: 10.h),
                 child: Row(
@@ -1451,9 +1517,9 @@ class _StudentFeeCollectionScreenState
                     ),
                   ],
                 ),
-              );
+              ));
             },
-          ),
+          )),
             ),
         ),
 
@@ -1479,8 +1545,8 @@ class _StudentFeeCollectionScreenState
               const Spacer(),
               if (_selected.isNotEmpty) ...[
                 Container(
-                  height: 58,
-                  padding: EdgeInsets.symmetric(horizontal: 22.w),
+                  height: 44,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     // Stronger fill + border so the figure pops against the
@@ -1494,8 +1560,8 @@ class _StudentFeeCollectionScreenState
                     children: [
                       Text('NET AMOUNT: ',
                           style: TextStyle(
-                              fontSize: 19.sp,
-                              fontWeight: FontWeight.w800,
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                               letterSpacing: 0.3)),
                       // Live total — subscribes to every visible row's
@@ -1509,7 +1575,7 @@ class _StudentFeeCollectionScreenState
                         ]),
                         builder: (_, __) => Text(
                           '${formatIndianNumber(_totalNetSelected)}',
-                          style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.accent),
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.accent),
                         ),
                       ),
                     ],
@@ -1525,9 +1591,9 @@ class _StudentFeeCollectionScreenState
               // container shape as the NET AMOUNT pill so the two visually
               // match in height + corner radius.
               Container(
-                width: 200.w,
-                height: 58,
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                width: 160.w,
+                height: 44,
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   // Match the NET AMOUNT pill's accent-tinted fill so the
@@ -1542,11 +1608,12 @@ class _StudentFeeCollectionScreenState
                     value: _paymentMode,
                     isExpanded: true,
                     isDense: false,
-                    hint: Text('SELECT MODE', style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: 0.3)),
+                    hint: Text('SELECT MODE', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, letterSpacing: 0.3)),
+                    icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                     dropdownColor: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     elevation: 6,
-                    style: TextStyle(fontSize: 19.sp, fontWeight: FontWeight.w800, color: AppColors.accent, letterSpacing: 0.3),
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.accent, letterSpacing: 0.3),
                     items: const [
                       DropdownMenuItem(value: 'Cash', child: Text('CASH')),
                       DropdownMenuItem(value: 'QR/UPI', child: Text('QR/UPI')),
@@ -1562,12 +1629,12 @@ class _StudentFeeCollectionScreenState
               // accent-tinted fill, same border, same height, same corner
               // radius. Keeps the three footer elements as a unified triple.
               SizedBox(
-                height: 58,
+                height: 44,
                 child: ElevatedButton.icon(
                   onPressed: (_selected.isEmpty || _paymentMode == null)
                       ? null
                       : (_paymentMode == 'Cash' ? _saveCashPayment : _onCollectAndReceipt),
-                  icon: AppIcon(_paymentMode == 'Cash' ? 'save-2' : 'wallet-money', size: 20),
+                  icon: AppIcon(_paymentMode == 'Cash' ? 'save-2' : 'wallet-money', size: 16),
                   label: Text(_paymentMode == 'Cash' ? 'SAVE' : 'PROCEED TO PAY'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent.withValues(alpha: 0.18),
@@ -1579,9 +1646,9 @@ class _StudentFeeCollectionScreenState
                       borderRadius: BorderRadius.circular(10.r),
                       side: BorderSide(color: AppColors.accent.withValues(alpha: 0.45), width: 1.2),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 32.w),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w),
                     textStyle: TextStyle(
-                        fontSize: 19.sp, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                        fontSize: 14.sp, fontWeight: FontWeight.w600, letterSpacing: 0.3),
                   ),
                 ),
               ),
@@ -1647,9 +1714,11 @@ class _StudentFeeCollectionScreenState
                       hintText: 'Enter cash received',
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _tenderAmountController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: _tenderAmountController.text.trim().isNotEmpty ? AppColors.accent : AppColors.border, width: 1.5)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
                     ),
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: _tenderAmountController.text.trim().isNotEmpty ? AppColors.accent : null),
                   ),
                   if ((_cashTenderAmount ?? 0) < total && (_cashTenderAmount ?? 0) > 0) ...[
                     SizedBox(height: 6.h),
@@ -1838,13 +1907,13 @@ class _StudentFeeCollectionScreenState
                 ],
               ),
               child: SingleChildScrollView(
-                child: Column(
+                child: FocusTraversalGroup(child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Align(
                       alignment: Alignment.centerRight,
-                      child: GestureDetector(
+                      child: FocusableTap(
                         onTap: () => Navigator.of(context).pop(),
                         child: AppIcon.linear('close-circle', size: 18, color: AppColors.textSecondary),
                       ),
@@ -1907,10 +1976,10 @@ class _StudentFeeCollectionScreenState
                         child: TextField(
                           controller: _upiRefController,
                           onChanged: (_) {
-                            if (upiErr != null) setDialogState(() => upiErr = null);
+                            setDialogState(() { if (upiErr != null) upiErr = null; });
                           },
-                          decoration: _dialogInputDec(hint: 'e.g. 412345678901', prefix: AppIcon('receipt-2', size: 18, color: AppColors.accent)).copyWith(errorText: upiErr, errorMaxLines: 2),
-                          style: _dialogInputStyle(),
+                          decoration: _dialogInputDec(hint: 'e.g. 412345678901', prefix: AppIcon('receipt-2', size: 18, color: AppColors.accent), filled: _upiRefController.text.trim().isNotEmpty).copyWith(errorText: upiErr, errorMaxLines: 2),
+                          style: _dialogInputStyle().copyWith(color: _upiRefController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -1925,10 +1994,10 @@ class _StudentFeeCollectionScreenState
                               child: TextField(
                                 controller: _chequeNoController,
                                 onChanged: (_) {
-                                  if (chequeNoErr != null) setDialogState(() => chequeNoErr = null);
+                                  setDialogState(() { if (chequeNoErr != null) chequeNoErr = null; });
                                 },
-                                decoration: _dialogInputDec(hint: 'Enter cheque number').copyWith(errorText: chequeNoErr, errorMaxLines: 2),
-                                style: _dialogInputStyle(),
+                                decoration: _dialogInputDec(hint: 'Enter cheque number', filled: _chequeNoController.text.trim().isNotEmpty).copyWith(errorText: chequeNoErr, errorMaxLines: 2),
+                                style: _dialogInputStyle().copyWith(color: _chequeNoController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                               ),
                             ),
                           ),
@@ -1953,7 +2022,7 @@ class _StudentFeeCollectionScreenState
                                     setDialogState(() => chequeDateErr = null);
                                   }
                                 },
-                                decoration: _dialogInputDec(hint: 'DD/MM/YYYY').copyWith(
+                                decoration: _dialogInputDec(hint: 'DD/MM/YYYY', filled: _chequeDateController.text.trim().isNotEmpty).copyWith(
                                   suffixIcon: Padding(
                                     padding: EdgeInsets.only(right: 8.w),
                                     child: AppIcon.linear('calendar', size: 16, color: AppColors.accent),
@@ -1962,7 +2031,7 @@ class _StudentFeeCollectionScreenState
                                   errorText: chequeDateErr,
                                   errorMaxLines: 2,
                                 ),
-                                style: _dialogInputStyle(),
+                                style: _dialogInputStyle().copyWith(color: _chequeDateController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                               ),
                             ),
                           ),
@@ -1974,10 +2043,10 @@ class _StudentFeeCollectionScreenState
                         child: TextField(
                           controller: _bankNameController,
                           onChanged: (_) {
-                            if (bankNameErr != null) setDialogState(() => bankNameErr = null);
+                            setDialogState(() { if (bankNameErr != null) bankNameErr = null; });
                           },
-                          decoration: _dialogInputDec(hint: 'Enter bank name').copyWith(errorText: bankNameErr, errorMaxLines: 2),
-                          style: _dialogInputStyle(),
+                          decoration: _dialogInputDec(hint: 'Enter bank name', filled: _bankNameController.text.trim().isNotEmpty).copyWith(errorText: bankNameErr, errorMaxLines: 2),
+                          style: _dialogInputStyle().copyWith(color: _bankNameController.text.trim().isNotEmpty ? AppColors.accent : null, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -2066,7 +2135,7 @@ class _StudentFeeCollectionScreenState
                       ],
                     ),
                   ],
-                ),
+                )),
               ),
             ),
           ),
@@ -3232,24 +3301,30 @@ class _StudentFeeCollectionScreenState
 
   // Shared decoration for the Mode + Fee Type header dropdowns so they
   // render at the exact same height regardless of focus/value state.
-  InputDecoration _headerDropdownDec() {
+  InputDecoration _headerDropdownDec({bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10.r),
-      borderSide: const BorderSide(color: AppColors.border),
+      borderSide: BorderSide(color: idle, width: 1.5),
+    );
+    final focused = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10.r),
+      borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
     );
     return InputDecoration(
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: border,
       enabledBorder: border,
-      focusedBorder: border,
+      focusedBorder: focused,
       disabledBorder: border,
     );
   }
 
   // Shared styling for the Cheque / UPI / Online dialog input fields so
   // every input renders with the same bold-visible look.
-  InputDecoration _dialogInputDec({required String hint, Widget? prefix}) {
+  InputDecoration _dialogInputDec({required String hint, Widget? prefix, bool filled = false}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
@@ -3261,15 +3336,15 @@ class _StudentFeeCollectionScreenState
       contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.r),
-        borderSide: BorderSide(color: AppColors.border, width: 1.4),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.r),
-        borderSide: BorderSide(color: AppColors.border, width: 1.4),
+        borderSide: BorderSide(color: idle, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.r),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1.8),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
       ),
       filled: true,
       fillColor: Colors.white,
@@ -3284,24 +3359,30 @@ class _StudentFeeCollectionScreenState
         letterSpacing: 0.4,
       );
 
-  InputDecoration _inputDec(String hint) {
+  bool get _compactCtx => MediaQuery.of(context).size.width <= 1366;
+
+  TextStyle _ddTextStyle() =>
+      TextStyle(fontWeight: FontWeight.w600, fontSize: _compactCtx ? 11 : 14, color: const Color(0xFF333333));
+
+  TextStyle _ddItemStyle() =>
+      TextStyle(fontSize: _compactCtx ? 11 : 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary);
+
+  InputDecoration _inputDec(String hint, {bool filled = false}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final textSize = compact ? 11.0 : 14.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
     return InputDecoration(
       hintText: hint,
-      hintStyle:
-          TextStyle(fontSize: 13.sp, color: AppColors.textLight),
-      isDense: true,
-      contentPadding:
-          EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide: BorderSide(color: AppColors.border)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide: BorderSide(color: AppColors.border)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8.r),
-          borderSide:
-              const BorderSide(color: AppColors.accent, width: 1.5)),
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+      filled: true,
+      fillColor: Colors.white,
     );
   }
 
@@ -3350,6 +3431,8 @@ class _StudentFeeCollectionScreenState
 
   Widget _numField(TextEditingController? ctrl, VoidCallback onChange, {int? maxLength, String? fieldKey, FocusNode? focusNode, bool enabled = true}) {
     if (ctrl == null) return const SizedBox();
+    final filled = ctrl.text.trim().isNotEmpty;
+    final idle = filled ? AppColors.accent : AppColors.border;
     return SizedBox(
       height: 28.h,
       child: TextField(
@@ -3365,7 +3448,7 @@ class _StudentFeeCollectionScreenState
           if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
         ],
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13.sp),
+        style: TextStyle(fontSize: 13.sp, color: filled ? AppColors.accent : null),
         decoration: InputDecoration(
           hintText: '0',
           hintStyle: TextStyle(
@@ -3374,14 +3457,14 @@ class _StudentFeeCollectionScreenState
               EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
           border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6.r),
-              borderSide: BorderSide(color: AppColors.border)),
+              borderSide: BorderSide(color: idle, width: 1.5)),
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6.r),
-              borderSide: BorderSide(color: AppColors.border)),
+              borderSide: BorderSide(color: idle, width: 1.5)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6.r),
               borderSide: const BorderSide(
-                  color: AppColors.accent, width: 1.2)),
+                  color: AppColors.accent, width: 1.5)),
         ),
       ),
     );

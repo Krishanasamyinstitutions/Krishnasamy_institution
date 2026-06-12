@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 import '../../utils/auth_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/card_title_block.dart';
 import '../../widgets/classic_h_scrollbar.dart';
 import '../../widgets/app_vertical_scrollbar.dart';
 import '../../widgets/pill_tab.dart';
@@ -201,6 +202,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           }
 
           Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
+            // Filled = a date is chosen -> amber border + amber bold text.
+            final filled = value != null;
             return InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
@@ -214,16 +217,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: filled ? AppColors.accent : AppColors.border, width: 1.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    Icon(Icons.calendar_today, size: 14, color: filled ? AppColors.accent : AppColors.textSecondary),
                     const SizedBox(width: 8),
-                    Text(value != null ? _dailyFmt(value) : hint,
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    Text(filled ? _dailyFmt(value) : hint,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: filled ? FontWeight.w600 : FontWeight.w500, color: filled ? AppColors.accent : AppColors.textPrimary)),
                   ],
                 ),
               ),
@@ -376,6 +379,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           }
 
           Widget datePickerBox({required String hint, required DateTime? value, required ValueChanged<DateTime?> onChanged}) {
+            // Filled = a date is chosen -> amber border + amber bold text.
+            final filled = value != null;
             return InkWell(
               onTap: () async {
                 final picked = await showDatePicker(
@@ -389,16 +394,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: filled ? AppColors.accent : AppColors.border, width: 1.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+                    Icon(Icons.calendar_today, size: 14, color: filled ? AppColors.accent : AppColors.textSecondary),
                     const SizedBox(width: 8),
-                    Text(value != null ? _dailyFmt(value) : hint,
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    Text(filled ? _dailyFmt(value) : hint,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: filled ? FontWeight.w600 : FontWeight.w500, color: filled ? AppColors.accent : AppColors.textPrimary)),
                   ],
                 ),
               ),
@@ -938,39 +943,49 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   /// Empty selection = "All Fee Types".
   Widget _feeTypeMultiSelect({required double width}) {
     final compact = MediaQuery.of(context).size.width <= 1366;
-    final hPad = compact ? 10.0 : 14.0;
-    final radius = compact ? 6.0 : 10.0;
-    final textSize = compact ? 11.0 : 13.0;
+    // Render through the SAME InputDecorator frame + decoration that
+    // _filterDropdown uses, so the height/padding/border are identical to the
+    // other filter dropdowns (this is just a tappable multi-select).
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+    final textSize = compact ? 11.0 : 14.0;
     final selectedCount = _selectedFeeTypes.length;
+    final filled = selectedCount > 0;
     final label = selectedCount == 0
         ? 'All Fee Types'
         : selectedCount == 1
             ? _selectedFeeTypes.first
             : '$selectedCount fee types';
+    final idle = filled ? AppColors.accent : AppColors.border;
     return SizedBox(
       key: _feeTypeKey,
       width: width,
-      height: AppBtn.height(context),
       child: InkWell(
         borderRadius: BorderRadius.circular(radius),
         onTap: _openFeeTypePicker,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: hPad),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: AppColors.border),
+        child: InputDecorator(
+          isEmpty: false,
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  // Placeholder ("All Fee Types") = w500; selected value = w600 amber.
+                  style: TextStyle(fontSize: textSize, fontWeight: filled ? FontWeight.w600 : FontWeight.w500, color: filled ? AppColors.accent : AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
+              const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
             ],
           ),
         ),
@@ -1112,37 +1127,42 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     Key? key,
   }) {
     final compact = MediaQuery.of(context).size.width <= 1366;
-    final hPad = compact ? 10.0 : 14.0;
-    final radius = compact ? 6.0 : 10.0;
-    final textSize = compact ? 11.0 : 13.0;
+    final hPad = compact ? 8.0 : 14.0;
+    final vPad = compact ? 5.0 : 14.0;
+    final radius = compact ? 5.0 : 8.0;
+    final textSize = compact ? 11.0 : 14.0;
+    // Filled = a specific value is selected (not the "All"/null default).
+    final filled = value != null;
+    final idle = filled ? AppColors.accent : AppColors.border;
+    // Frame matches the Fee Master filter dropdowns (_filledFieldDec):
+    // DropdownButtonFormField + OutlineInputBorder, white fill, no label.
     return SizedBox(
       width: width,
-      height: AppBtn.height(context),
-      child: DropdownButtonHideUnderline(
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: hPad),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: DropdownButton<T>(
-            key: key,
-            value: value,
-            isExpanded: true,
-            hint: Text(hint, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-            icon: AppIcon.linear('Chevron Down', size: AppBtn.iconSize(context)),
-            isDense: true,
-            // Popup styling - rounded, white, soft elevation, no Material 3 tint.
-            dropdownColor: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            elevation: 6,
-            menuMaxHeight: 320,
-            items: items,
-            onChanged: onChanged,
-          ),
+      child: DropdownButtonFormField<T>(
+        key: key,
+        value: value,
+        isExpanded: true,
+        icon: Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+        dropdownColor: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        elevation: 6,
+        menuMaxHeight: 320,
+        style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: hint,
+          hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: textSize),
+          contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: BorderSide(color: idle, width: 1.5)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(radius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
         ),
+        items: items,
+        // Filled value reads bold + accent, distinct from the muted placeholder. Mirrors items 1:1.
+        selectedItemBuilder: (context) => items.map((m) => Align(alignment: Alignment.centerLeft, child: Text(m.child is Text ? ((m.child as Text).data ?? '') : '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600, color: filled ? AppColors.accent : AppColors.textPrimary)))).toList(),
+        onChanged: onChanged,
       ),
     );
   }
@@ -1296,9 +1316,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             Container(
               padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
               child: Row(children: [
-                AppIcon('chart-2', size: 18, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Consolidated Status', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const CardTitleBlock(icon: 'chart-2', title: 'Consolidated Status', subtitle: 'overall fee status across classes'),
                 SizedBox(width: 8.w),
                 Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                 const Spacer(),
@@ -1621,9 +1639,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             Container(
               padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
               child: Row(children: [
-                AppIcon('clock', size: 18, color: AppColors.accent),
-                SizedBox(width: 8.w),
-                Text('Pending Payment', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                const CardTitleBlock(icon: 'clock', title: 'Pending Payment', subtitle: 'students with outstanding balances'),
                 SizedBox(width: 8.w),
                 Text('— ${_formatDate(DateTime.now())}', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
                 const Spacer(),
@@ -1644,7 +1660,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ),
             Expanded(
               child: _stickyTable(
-                columnWidths: const [90, 90, 100, 140, 90, 170, 110, 100, 90, 110],
+                columnWidths: const [90, 90, 100, 140, 120, 140, 110, 100, 90, 110],
                 headers: const ['COURSE', 'CLASS', 'SEMESTER', 'ADMN TYPE', 'REG. NO', 'NAME', 'PENDING AMT', 'CON. AMT', 'QUOTA', 'MOBILE NO'],
                 rows: [
                   for (final r in rows)
@@ -1950,9 +1966,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
           child: Row(
             children: [
-              AppIcon('book-1', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('Student Ledger', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const CardTitleBlock(icon: 'book-1', title: 'Student Ledger', subtitle: 'per-student fee history and balance'),
               if (_ledgerLoading) ...[
                 SizedBox(width: 12.w),
                 SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
@@ -2437,28 +2451,30 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           padding: EdgeInsets.fromLTRB(0, 8.h, 0, 8.h),
           child: Row(
             children: [
-              AppIcon('calendar-1', size: 18, color: AppColors.accent),
-              SizedBox(width: 8.w),
-              Text('Daily Collection', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              const CardTitleBlock(icon: 'calendar-1', title: 'Daily Collection', subtitle: 'fee collection report by date range'),
               SizedBox(width: 8.w),
               if (_dailyLoading)
                 SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               const Spacer(),
-              SizedBox(
-                height: AppBtn.height(context),
-                child: OutlinedButton.icon(
-                  onPressed: _openDailyDateMethodDialog,
-                  icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                  label: Text(
-                    _dailyDateMethodLabel(),
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              Builder(builder: (_) {
+                // Filled = any date/mode/user filter is active -> amber.
+                final filled = _dailyFrom != null || _dailyTo != null || _selectedMode != null || _selectedUser != null;
+                return SizedBox(
+                  height: AppBtn.height(context),
+                  child: OutlinedButton.icon(
+                    onPressed: _openDailyDateMethodDialog,
+                    icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: filled ? AppColors.accent : AppColors.textPrimary),
+                    label: Text(
+                      _dailyDateMethodLabel(),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: filled ? AppColors.accent : AppColors.textPrimary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 14.w),
+                      side: BorderSide(color: filled ? AppColors.accent : AppColors.border, width: 1.5),
+                    ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    side: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-              ),
+                );
+              }),
               SizedBox(width: AppBtn.gap(context)),
               _miniExportBtn(
                 onPressed: _dailyRows.isEmpty ? () {} : () => _exportDailyCollectionExcel(),
@@ -3721,23 +3737,27 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               if (_pcLoading)
                 SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
               const Spacer(),
-              SizedBox(
-                height: AppBtn.height(context),
-                child: OutlinedButton.icon(
-                  onPressed: _openPcDateDialog,
-                  icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: AppColors.textPrimary),
-                  label: Text(
-                    _pcFrom != null && _pcTo != null
-                        ? '${_formatDate(_pcFrom!)} – ${_formatDate(_pcTo!)}'
-                        : 'Pick range',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              Builder(builder: (_) {
+                // Filled = a date range is picked -> amber.
+                final filled = _pcFrom != null && _pcTo != null;
+                return SizedBox(
+                  height: AppBtn.height(context),
+                  child: OutlinedButton.icon(
+                    onPressed: _openPcDateDialog,
+                    icon: Icon(Icons.calendar_today, size: AppBtn.iconSize(context), color: filled ? AppColors.accent : AppColors.textPrimary),
+                    label: Text(
+                      filled
+                          ? '${_formatDate(_pcFrom!)} – ${_formatDate(_pcTo!)}'
+                          : 'Pick range',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: filled ? AppColors.accent : AppColors.textPrimary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 14.w),
+                      side: BorderSide(color: filled ? AppColors.accent : AppColors.border, width: 1.5),
+                    ),
                   ),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    side: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-              ),
+                );
+              }),
               SizedBox(width: AppBtn.gap(context)),
               _miniExportBtn(
                 onPressed: (_pcRows.isEmpty || _pcExporting) ? () {} : _exportPowerCollege,

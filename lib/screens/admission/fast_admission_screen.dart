@@ -7,6 +7,7 @@ import '../../utils/friendly_error.dart';
 import '../../services/supabase_service.dart';
 import '../../services/admission_service.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/focusable_tap.dart';
 
 /// Fast Admission — spreadsheet-style bulk entry. Each row is a quick admission
 /// captured into public.admission (PENDING); allocate classes later in the
@@ -130,7 +131,7 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
   /// Fill Reg No for every non-blank row sequentially from the chosen sequence.
   void _autoNumber() {
     if (_selectedRegSeqId == null) {
-      _snack('Pick a Register Sequence first.', AppColors.warning);
+      _snack('Pick an Admission Sequence first.', AppColors.warning);
       return;
     }
     final seq = _regSeqs.firstWhere((s) => s['rns_id'].toString() == _selectedRegSeqId, orElse: () => const {});
@@ -273,77 +274,124 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
   static const _wReg = 130.0, _wName = 190.0, _wSex = 80.0, _wCourse = 150.0,
       _wClass = 120.0, _wType = 130.0, _wBatch = 80.0, _wDob = 115.0, _wAdm = 115.0, _wYear = 90.0, _wDel = 44.0;
 
+  // Page shell per admission-design.md § 1: outer white card with padding,
+  // inner bordered table card matches Section Allocation pattern.
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(16.w),
-      child: Container(
-        decoration: AppCard.decoration(),
-        child: Column(
-          children: [
-            _header(),
-            Divider(height: 1.h, color: AppColors.border),
-            _toolbar(),
-            Divider(height: 1.h, color: AppColors.border),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: _wReg + _wName + _wSex + _wCourse + _wClass + _wType + _wBatch + _wDob + _wAdm + _wYear + _wDel + 32,
-                        child: Column(
-                          children: [
-                            _tableHeader(),
-                            Expanded(
-                              child: ListView.builder(
-                                itemCount: _rows.length,
-                                itemBuilder: (_, i) => _rowWidget(i),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Container(
+            // Outer white card.
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
             ),
-            Divider(height: 1.h, color: AppColors.border),
-            _actionBar(),
-          ],
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 12.h),
+              child: Column(
+                children: [
+                  _topBar(),
+                  SizedBox(height: 8.h),
+                  // Inner bordered table card.
+                  Expanded(
+                    child: Container(
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator())
+                          : LayoutBuilder(builder: (ctx, constraints) {
+                              // Scale columns so they fill the inner card
+                              // when viewport is wider than the base width;
+                              // otherwise keep base sizes (allow H scroll).
+                              const baseSum = _wReg + _wName + _wSex + _wCourse + _wClass + _wType + _wBatch + _wDob + _wAdm + _wYear + _wDel + 32;
+                              final viewport = constraints.maxWidth;
+                              final scale = viewport > baseSum ? viewport / baseSum : 1.0;
+                              final tableW = scale > 1 ? viewport : baseSum;
+                              return SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: scale > 1 ? const NeverScrollableScrollPhysics() : null,
+                                child: SizedBox(
+                                  width: tableW,
+                                  child: Column(
+                                    children: [
+                                      _tableHeader(scale),
+                                      Expanded(
+                                        child: FocusTraversalGroup(
+                                          child: ListView.builder(
+                                            itemCount: _rows.length,
+                                            itemBuilder: (_, i) => _rowWidget(i, scale),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  _actionBar(),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _header() => Padding(
-        padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, 14.h),
-        child: Row(
-          children: [
-            const AppIcon('profile-add', size: 20, color: AppColors.primary),
-            SizedBox(width: 10.w),
-            Text('Fast Admission', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-            SizedBox(width: 10.w),
-            Text('bulk entry — allocate classes later', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-          ],
-        ),
-      );
-
-  Widget _toolbar() {
+  /// Single top bar: icon + "Fast Admission" + subtitle on the left,
+  /// pushed-right Sequence dropdown + Last-no chip + navy Fill button.
+  Widget _topBar() {
     return Padding(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.symmetric(vertical: 8.h),
       child: Row(
         children: [
-          Text('Register Sequence', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-          SizedBox(width: 8.w),
-          SizedBox(width: 180.w, child: _regSeqDropdown()),
+          const AppIcon('profile-add', size: 20, color: AppColors.primary),
+          SizedBox(width: 10.w),
+          Text('Fast Admission',
+              style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+          SizedBox(width: 10.w),
+          Text('bulk entry — allocate sections later',
+              style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+          const Spacer(),
+          SizedBox(width: 200.w, child: _regSeqDropdown()),
           SizedBox(width: 10.w),
           _lastRegNoChip(),
-          SizedBox(width: 8.w),
-          OutlinedButton.icon(
-            onPressed: _autoNumber,
-            icon: const Icon(Icons.format_list_numbered, size: 16),
-            label: const Text('Fill Reg Nos'),
-          ),
-          const Spacer(),
+          SizedBox(width: 10.w),
+          // Sized to match the Import CSV/Excel button used elsewhere in the
+          // project (compact / expanded responsive).
+          Builder(builder: (context) {
+            final compact = MediaQuery.of(context).size.width <= 1366;
+            final btnHeight = compact ? 30.0 : 40.0;
+            final iconSize = compact ? 12.0 : 16.0;
+            final hPad = compact ? 10.0 : 18.0;
+            final radius = compact ? 6.0 : 10.0;
+            final textSize = compact ? 11.0 : 13.0;
+            return SizedBox(
+              height: btnHeight,
+              child: ElevatedButton.icon(
+                onPressed: _autoNumber,
+                icon: Icon(Icons.format_list_numbered, size: iconSize, color: Colors.white),
+                label: const Text('Fill Admission Nos'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                  textStyle: TextStyle(fontSize: textSize, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -352,11 +400,46 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
   Widget _regSeqDropdown() => DropdownButtonFormField<String>(
         initialValue: _selectedRegSeqId,
         isExpanded: true,
-        decoration: _cellDec(),
-        hint: Text('Sequence', style: TextStyle(fontSize: 12.sp, color: AppColors.textLight)),
-        items: _regSeqs.map((s) => DropdownMenuItem(value: s['rns_id'].toString(), child: Text(s['rnsname']?.toString() ?? '', overflow: TextOverflow.ellipsis))).toList(),
+        dropdownColor: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        elevation: 6,
+        icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary),
+        decoration: _topBarDec(filled: _selectedRegSeqId != null),
+        hint: Text('Select Sequence', style: TextStyle(fontSize: 13.sp, color: AppColors.textLight)),
+        items: _regSeqs.map((s) => DropdownMenuItem(
+              value: s['rns_id'].toString(),
+              child: Text(s['rnsname']?.toString() ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+            )).toList(),
+        selectedItemBuilder: (context) => _regSeqs.map((s) => Align(alignment: Alignment.centerLeft, child: Text(s['rnsname']?.toString() ?? '', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
         onChanged: (v) => setState(() => _selectedRegSeqId = v),
       );
+
+  // Taller decoration for the top-bar Sequence dropdown so it lines up with
+  // the navy Fill button visually.
+  InputDecoration _topBarDec({bool filled = false, String? hint}) {
+    final compact = MediaQuery.of(context).size.width <= 1366;
+    final hPad = compact ? 10.0 : 14.0;
+    final vPad = compact ? 8.0 : 14.0;
+    final radius = compact ? 6.0 : 8.0;
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
+      contentPadding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      filled: true,
+      fillColor: Colors.white,
+      hintText: hint,
+      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 13.sp),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: idle, width: 1.5)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: idle, width: 1.5)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+    );
+  }
 
   /// Inline display of the last admission reg no, sitting next to the
   /// Register Sequence label. Tap to refresh.
@@ -375,7 +458,7 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
             children: [
               Icon(Icons.history, size: 14.sp, color: AppColors.primary),
               SizedBox(width: 6.w),
-              Text('Last Reg No: ', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+              Text('Last Admission No: ', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
               Text(_lastRegNo ?? '—',
                   style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
             ],
@@ -383,43 +466,49 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
         ),
       );
 
-  Widget _tableHeader() {
-    TextStyle s() => TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-    Widget c(String t, double w) => SizedBox(width: w, child: Padding(padding: EdgeInsets.symmetric(horizontal: 6.w), child: Text(t, style: s())));
+  Widget _tableHeader(double scale) {
+    TextStyle s() => TextStyle(
+        fontSize: 12.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.3);
+    Widget c(String t, double w) => SizedBox(width: w * scale, child: Padding(padding: EdgeInsets.symmetric(horizontal: 6.w), child: Text(t, style: s())));
     return Container(
       color: AppColors.tableHeadBg,
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
       child: Row(
         children: [
-          c('Reg. No', _wReg), c('Student Name', _wName), c('Sex', _wSex), c('Course', _wCourse),
-          c('Class', _wClass), c('Adm Type', _wType), c('Batch', _wBatch), c('Birth Date', _wDob),
-          c('Join Date', _wAdm), c('Adm Year', _wYear), c('', _wDel),
+          c('ADMISSION NO', _wReg), c('STUDENT NAME', _wName), c('SEX', _wSex), c('COURSE', _wCourse),
+          c('CLASS', _wClass), c('ADM TYPE', _wType), c('BATCH', _wBatch), c('BIRTH DATE', _wDob),
+          c('JOIN DATE', _wAdm), c('ADM YEAR', _wYear), c('', _wDel),
         ],
       ),
     );
   }
 
-  Widget _rowWidget(int i) {
+  Widget _rowWidget(int i, double scale) {
     final r = _rows[i];
-    return Container(
+    double w(double base) => base * scale;
+    return FocusTraversalGroup(
+      child: Container(
       decoration: BoxDecoration(
         color: i.isEven ? Colors.white : AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.4))),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
       child: Row(
         children: [
-          _cell(_wReg, _textCell(r.regNo)),
-          _cell(_wName, _textCell(r.name)),
-          _cell(_wSex, _dropCell(r.sex, _sexOptions.entries.map((e) => MapEntry(e.key, e.key)).toList(), (v) => setState(() => r.sex = v))),
-          _cell(_wCourse, _dropCell(r.course, _courses.map((e) => MapEntry(e, e)).toList(), (v) => setState(() => r.course = v))),
-          _cell(_wClass, _dropCell(r.cls, _classes.map((e) => MapEntry(e, e)).toList(), (v) => setState(() => r.cls = v))),
-          _cell(_wType, _dropCell(r.admType, _admTypes.map((e) => MapEntry(e['admname'].toString(), e['admname'].toString())).toList(), (v) => setState(() => r.admType = v))),
-          _cell(_wBatch, _textCell(r.batch)),
-          _cell(_wDob, _dateCell(r.dob, (d) => setState(() => r.dob = d))),
-          _cell(_wAdm, _dateCell(r.admDate, (d) => setState(() => r.admDate = d))),
-          _cell(_wYear, _textCell(r.admYear)),
-          _cell(_wDel, Center(
+          _cell(w(_wReg), _textCell(r.regNo)),
+          _cell(w(_wName), _textCell(r.name)),
+          _cell(w(_wSex), _dropCell(r.sex, _sexOptions.entries.map((e) => MapEntry(e.key, e.key)).toList(), (v) => setState(() => r.sex = v), hint: 'Select sex')),
+          _cell(w(_wCourse), _dropCell(r.course, _courses.map((e) => MapEntry(e, e)).toList(), (v) => setState(() => r.course = v), hint: 'Select course')),
+          _cell(w(_wClass), _dropCell(r.cls, _classes.map((e) => MapEntry(e, e)).toList(), (v) => setState(() => r.cls = v), hint: 'Select class')),
+          _cell(w(_wType), _dropCell(r.admType, _admTypes.map((e) => MapEntry(e['admname'].toString(), e['admname'].toString())).toList(), (v) => setState(() => r.admType = v), hint: 'Select type')),
+          _cell(w(_wBatch), _textCell(r.batch)),
+          _cell(w(_wDob), _dateCell(r.dob, (d) => setState(() => r.dob = d))),
+          _cell(w(_wAdm), _dateCell(r.admDate, (d) => setState(() => r.admDate = d))),
+          _cell(w(_wYear), _textCell(r.admYear)),
+          _cell(w(_wDel), Center(
             child: InkWell(
               onTap: () => _removeRow(i),
               borderRadius: BorderRadius.circular(6.r),
@@ -428,48 +517,68 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
           )),
         ],
       ),
+      ),
     );
   }
 
   Widget _cell(double w, Widget child) => SizedBox(width: w, child: Padding(padding: EdgeInsets.symmetric(horizontal: 3.w), child: child));
 
-  InputDecoration _cellDec() => InputDecoration(
+  InputDecoration _cellDec({bool filled = false, String? hint}) {
+    final idle = filled ? AppColors.accent : AppColors.border;
+    return InputDecoration(
         isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: const BorderSide(color: AppColors.border)),
+        hintText: hint,
+        hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 11.sp),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: idle, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: BorderSide(color: idle, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6.r), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
       );
+  }
 
-  Widget _textCell(TextEditingController c) => TextField(
+  Widget _textCell(TextEditingController c) {
+    final filled = c.text.trim().isNotEmpty;
+    return TextField(
         controller: c,
-        style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
-        decoration: _cellDec(),
+        style: TextStyle(fontSize: 11.sp, color: filled ? AppColors.accent : AppColors.textPrimary, fontWeight: filled ? FontWeight.w600 : null),
+        decoration: _cellDec(filled: filled),
+        onChanged: (_) => setState(() {}),
       );
+  }
 
-  Widget _dropCell(String? value, List<MapEntry<String, String>> items, ValueChanged<String?> onChanged) {
+  Widget _dropCell(String? value, List<MapEntry<String, String>> items, ValueChanged<String?> onChanged, {String? hint}) {
     final values = items.map((e) => e.key).toList();
     return DropdownButtonFormField<String>(
       initialValue: values.contains(value) ? value : null,
       isExpanded: true,
-      style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary),
-      decoration: _cellDec(),
-      items: items.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp)))).toList(),
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 6,
+      icon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+      style: TextStyle(fontSize: 11.sp, color: AppColors.textPrimary),
+      decoration: _cellDec(filled: values.contains(value), hint: hint),
+      items: items.map((e) => DropdownMenuItem(
+            value: e.key,
+            child: Text(e.value, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          )).toList(),
+      selectedItemBuilder: (context) => items.map((e) => Align(alignment: Alignment.centerLeft, child: Text(e.value, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.accent)))).toList(),
       onChanged: onChanged,
     );
   }
 
   Widget _dateCell(DateTime? value, ValueChanged<DateTime> onPick) {
-    return InkWell(
+    final filled = value != null;
+    return FocusableTap(
       onTap: () async {
         final now = DateTime.now();
         final picked = await showDatePicker(context: context, initialDate: value ?? DateTime(now.year - 17), firstDate: DateTime(1950), lastDate: DateTime(now.year + 5));
         if (picked != null) onPick(picked);
       },
       child: InputDecorator(
-        decoration: _cellDec(),
-        child: Text(value == null ? '—' : _fmt(value), style: TextStyle(fontSize: 12.sp, color: value == null ? AppColors.textLight : AppColors.textPrimary)),
+        decoration: _cellDec(filled: filled),
+        child: Text(value == null ? '—' : _fmt(value), style: TextStyle(fontSize: 11.sp, color: value == null ? AppColors.textLight : AppColors.accent, fontWeight: value == null ? null : FontWeight.w600)),
       ),
     );
   }
@@ -479,7 +588,7 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
   Widget _actionBar() {
     final count = _rows.where((r) => !r.isBlank).length;
     return Padding(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.symmetric(vertical: 6.h),
       child: Row(
         children: [
           OutlinedButton.icon(onPressed: _addRow, icon: const Icon(Icons.add, size: 16), label: const Text('Add Row')),
@@ -492,7 +601,7 @@ class _FastAdmissionScreenState extends State<FastAdmissionScreen> {
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.save, size: 16),
             label: Text(_saving ? 'Saving…' : 'Save All'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
           ),
         ],
       ),

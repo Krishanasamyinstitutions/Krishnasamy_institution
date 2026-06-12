@@ -50,6 +50,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _academicYear = '';
   List<Map<String, dynamic>> _availableYears = [];
 
+  // Sidebar nav scrolling — shows a bottom down-arrow cue when more menu
+  // items exist below the fold.
+  final ScrollController _navScrollCtrl = ScrollController();
+  bool _navMoreBelow = false;
+  bool _navMoreAbove = false;
+
   // Global search
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -71,11 +77,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _NavItem('people', 'Student', section: 'STUDENTS', adminOnly: true),
     _NavItem('book-1', 'Student Ledger', section: 'STUDENTS'),
     _NavItem('receipt-discount', 'Fee Master', section: 'FEES', accountantOnly: true),
+    _NavItem('indianrupeesign.circle.fill', 'Fee Collection', section: 'FEES', accountantOnly: true, unselectedIcon: 'indianrupeesign.circle'),
     _NavItem('discount-shape', 'Fee Concession', section: 'FEES', accountantOnly: true),
     _NavItem('receipt-edit', 'Fee Demand', section: 'FEES'),
     _NavItem('tick-square', 'Fee Demand Approval', section: 'FEES', adminOnly: true),
     _NavItem('bank', 'Bank Reconciliation', section: 'FEES', adminOnly: true),
-    _NavItem('indianrupeesign.circle.fill', 'Fee Collection', section: 'FEES', accountantOnly: true, unselectedIcon: 'indianrupeesign.circle'),
     _NavItem('receipt-2', 'Transactions', section: 'FEES'),
     _NavItem('notification', 'Notices', section: 'GENERAL'),
     _NavItem('notification-bing', 'Notifications', section: 'GENERAL'),
@@ -102,6 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _loadUnreadNotifCount();
     _loadAcademicYear();
+    _navScrollCtrl.addListener(_updateNavMoreBelow);
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus) {
         // Delay removal so overlay tap events can fire first
@@ -110,6 +117,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     });
+  }
+
+  // Toggles the sidebar up/down arrow cues based on scroll position.
+  void _updateNavMoreBelow() {
+    if (!_navScrollCtrl.hasClients) return;
+    final pos = _navScrollCtrl.position;
+    final below = pos.maxScrollExtent > 0 && pos.pixels < pos.maxScrollExtent - 4;
+    final above = pos.pixels > 4;
+    if ((below != _navMoreBelow || above != _navMoreAbove) && mounted) {
+      setState(() {
+        _navMoreBelow = below;
+        _navMoreAbove = above;
+      });
+    }
   }
 
   Future<void> _loadAcademicYear() async {
@@ -420,6 +441,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _navScrollCtrl.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _removeSearchOverlay();
@@ -441,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: AppColors.surface,
       drawer: (!isDesktop && !isTablet)
-          ? Drawer(child: _buildSidebar(context, false))
+          ? Drawer(child: ExcludeFocus(child: _buildSidebar(context, false)))
           : null,
       body: Row(
         children: [
@@ -450,28 +472,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
             AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               width: _sidebarCollapsed ? 78 : (isDesktop ? (size.width < 1100 ? 170 : size.width < 1400 ? 200 : 240) : 78),
-              child: _buildSidebar(
-                  context, _sidebarCollapsed || isTablet),
+              // Keep the sidebar out of keyboard Tab traversal so tabbing
+              // through a form's fields doesn't jump into the nav menu between
+              // rows. Items remain mouse-clickable.
+              child: ExcludeFocus(
+                child: _buildSidebar(
+                    context, _sidebarCollapsed || isTablet),
+              ),
             ),
 
           // Main content
           Expanded(
             child: Column(
               children: [
-                // Top bar
-                _buildTopBar(context, isDesktop),
+                // Top bar — kept out of Tab traversal (collapse/menu, bell,
+                // account are mouse-operated) so tabbing stays inside the form.
+                ExcludeFocus(child: _buildTopBar(context, isDesktop)),
 
-                // Content area
+                // Content area. Wrapped in a FocusTraversalGroup so a page's
+                // form fields tab as one contiguous unit (reading order),
+                // independent of any surrounding chrome (sidebar / top bar).
                 Expanded(
-                  child: _isFullHeightScreen()
-                      ? Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: _buildDashboardContent(context, isDesktop),
-                        )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: _buildDashboardContent(context, isDesktop),
-                        ),
+                  child: FocusTraversalGroup(
+                    child: _isFullHeightScreen()
+                        ? Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildDashboardContent(context, isDesktop),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildDashboardContent(context, isDesktop),
+                          ),
+                  ),
                 ),
               ],
             ),
@@ -482,6 +514,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSidebar(BuildContext context, bool collapsed) {
+    // After layout, refresh the "more below" cue (handles the initial render
+    // where the list is scrollable but hasn't been scrolled yet).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateNavMoreBelow());
     // Group visible nav items by section, preserving insertion order.
     final orderedSections = <String>[];
     final groupedIndices = <String, List<int>>{};
@@ -547,9 +582,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // suppressed so the sidebar reads as a flat menu — items still
           // scroll via mouse wheel / trackpad, just without a visible bar.
           Expanded(
-            child: ScrollConfiguration(
+            child: Stack(
+              children: [
+                ScrollConfiguration(
               behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
               child: ListView(
+                controller: _navScrollCtrl,
                 padding: EdgeInsets.symmetric(horizontal: hPad),
                 children: [
                   for (var s = 0; s < orderedSections.length; s++) ...[
@@ -578,6 +616,83 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SizedBox(height: 16.h),
                 ],
               ),
+            ),
+                // Full-width amber bar at the TOP when there are items above.
+                if (_navMoreAbove)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: GestureDetector(
+                      onTap: () {
+                        _navScrollCtrl.animateTo(
+                          (_navScrollCtrl.offset - 180).clamp(0.0, _navScrollCtrl.position.maxScrollExtent),
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                      child: Container(
+                        height: 26,
+                        margin: EdgeInsets.symmetric(horizontal: 20.w),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [AppColors.accent, AppColors.accentDark],
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accent.withValues(alpha: 0.40),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.keyboard_arrow_up, size: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                // Full-width amber bar at the BOTTOM when more items are below.
+                if (_navMoreBelow)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: GestureDetector(
+                      onTap: () {
+                        final pos = _navScrollCtrl.position;
+                        _navScrollCtrl.animateTo(
+                          (_navScrollCtrl.offset + 180).clamp(0.0, pos.maxScrollExtent),
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                      child: Container(
+                        height: 26,
+                        margin: EdgeInsets.symmetric(horizontal: 20.w),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [AppColors.accent, AppColors.accentDark],
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accent.withValues(alpha: 0.40),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -609,6 +724,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Material(
             color: Colors.transparent,
             child: InkWell(
+              // Mouse-only: never take keyboard focus, so Tab in a form never
+              // lands on a nav item.
+              canRequestFocus: false,
               onTap: () {
                 setState(() {
                   _selectedNavIndex = index;
@@ -758,6 +876,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
+                  canRequestFocus: false,
                   onTap: () {
                     setState(() {
                       _selectedNavIndex = parentIndex;
@@ -1058,6 +1177,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       borderRadius: BorderRadius.circular(radius),
       elevation: 0,
       child: InkWell(
+        // Top-bar buttons are mouse-only — keep them out of keyboard focus.
+        canRequestFocus: false,
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
         child: Container(
